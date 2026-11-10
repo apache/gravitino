@@ -45,6 +45,27 @@ public final class MetadataObjectSQL {
   }
 
   /**
+   * Excludes identities that currently belong to another metalake.
+   *
+   * @param tableName the entity table name
+   * @param idColumn the stable identity column
+   * @param alias the historical entity row alias
+   * @return a predicate bound to the metalakeId MyBatis parameter
+   */
+  public static String excludeOtherActiveMetalakes(
+      String tableName, String idColumn, String alias) {
+    return " AND NOT EXISTS (SELECT 1 FROM "
+        + tableName
+        + " live WHERE live."
+        + idColumn
+        + " = "
+        + alias
+        + "."
+        + idColumn
+        + " AND live.deleted_at = 0 AND live.metalake_id != #{metalakeId})";
+  }
+
+  /**
    * Excludes identities that currently belong to a schema outside the deletion scope.
    *
    * @param tableName the entity table name

@@ -133,7 +133,7 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE topic_id IN (SELECT topic_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at != 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }

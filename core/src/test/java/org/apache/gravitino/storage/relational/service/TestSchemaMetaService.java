@@ -47,6 +47,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -233,8 +234,11 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       Throwable firstFailure = firstResult.get(30, TimeUnit.SECONDS);
       Throwable secondFailure = secondResult.get(30, TimeUnit.SECONDS);
       assertTrue((firstFailure == null) != (secondFailure == null), "Exactly one revival must win");
+      Throwable losingFailure = firstFailure == null ? secondFailure : firstFailure;
       Assertions.assertInstanceOf(
-          EntityAlreadyExistsException.class, firstFailure == null ? secondFailure : firstFailure);
+          EntityAlreadyExistsException.class,
+          losingFailure,
+          () -> ExceptionUtils.getStackTrace(losingFailure));
       SchemaEntity winner = firstFailure == null ? first : second;
       SchemaEntity loser = firstFailure == null ? second : first;
       Assertions.assertEquals(

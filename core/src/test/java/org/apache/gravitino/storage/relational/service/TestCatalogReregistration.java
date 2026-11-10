@@ -33,6 +33,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.IntSupplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
@@ -56,8 +57,13 @@ import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.ViewPO;
@@ -131,6 +137,8 @@ public class TestCatalogReregistration extends TestJDBCBackend {
 
     backend.delete(original.catalog().nameIdentifier(), EntityType.CATALOG, true);
     assertGovernance(current.objects(), 1);
+    assertLiveTableData(current.table().id());
+    assertEquals(1, countLive("view_version_info", "view_id", current.view().id(), null, null));
     assertTrue(backend.exists(current.table().nameIdentifier(), EntityType.TABLE));
     backend.delete(current.catalog().nameIdentifier(), EntityType.CATALOG, true);
     assertGovernance(current.objects(), 0);
@@ -147,6 +155,8 @@ public class TestCatalogReregistration extends TestJDBCBackend {
 
     backend.delete(original.schema().nameIdentifier(), EntityType.SCHEMA, true);
     assertGovernance(current.objects(), 1);
+    assertLiveTableData(current.table().id());
+    assertEquals(1, countLive("view_version_info", "view_id", current.view().id(), null, null));
     backend.delete(current.schema().nameIdentifier(), EntityType.SCHEMA, true);
     Map<Long, String> children = new LinkedHashMap<>(current.objects());
     children.remove(current.catalog().id());
@@ -218,6 +228,113 @@ public class TestCatalogReregistration extends TestJDBCBackend {
                     }));
     assertGovernance(replacement.get().objects(), 1);
     assertTrue(backend.exists(replacement.get().schema().nameIdentifier(), EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  void testMetalakeDropKeepsVersionsOfIdsReusedInAnotherMetalake() throws Exception {
+    Registration original = createRegistration("original", null, true);
+    backend.delete(original.schema().nameIdentifier(), EntityType.SCHEMA, true);
+    String otherMetalake = "other_metalake";
+    createAndInsertMakeLake(otherMetalake);
+    createAndInsertCatalog(otherMetalake, "current");
+    SchemaEntity schema =
+        createSchemaEntity(
+            original.schema().id(), Namespace.of(otherMetalake, "current"), "schema", AUDIT_INFO);
+    backend.insert(schema, false);
+    TableEntity table =
+        TableEntity.builder()
+            .withId(original.table().id())
+            .withName("table")
+            .withNamespace(Namespace.of(otherMetalake, "current", schema.name()))
+            .withColumns(List.of(original.column()))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+    ViewEntity view = createViewEntity(original.view().id(), table.namespace(), "view");
+    backend.insert(view, false);
+
+    backend.delete(NameIdentifier.of(METALAKE), EntityType.METALAKE, true);
+    assertTrue(backend.exists(table.nameIdentifier(), EntityType.TABLE));
+    assertLiveTableData(table.id());
+    assertEquals(1, countLive("view_version_info", "view_id", view.id(), null, null));
+  }
+
+  @TestTemplate
+  void testLegacyGcPreservesActiveRegistrationsAndTheirChildren() throws Exception {
+    Registration current = createRegistration("source", null, true);
+    for (int generation = 0; generation < 2; generation++) {
+      backend.delete(current.catalog().nameIdentifier(), EntityType.CATALOG, true);
+      current = createRegistration("source", current, true);
+    }
+    seedGovernance(current.objects());
+    Map<String, Long> activeIds =
+        Map.of(
+            "schema",
+            current.schema().id(),
+            "table",
+            current.table().id(),
+            "topic",
+            current.topic().id(),
+            "view",
+            current.view().id());
+    Map<String, IntSupplier> rootGc =
+        Map.of(
+            "schema",
+                () ->
+                    SessionUtils.doWithCommitAndFetchResult(
+                        SchemaMetaMapper.class,
+                        mapper -> mapper.deleteSchemaMetasByLegacyTimeline(Long.MAX_VALUE, 1)),
+            "table",
+                () ->
+                    SessionUtils.doWithCommitAndFetchResult(
+                        TableMetaMapper.class,
+                        mapper -> mapper.deleteTableMetasByLegacyTimeline(Long.MAX_VALUE, 1)),
+            "topic",
+                () ->
+                    SessionUtils.doWithCommitAndFetchResult(
+                        TopicMetaMapper.class,
+                        mapper -> mapper.deleteTopicMetasByLegacyTimeline(Long.MAX_VALUE, 1)),
+            "view",
+                () ->
+                    SessionUtils.doWithCommitAndFetchResult(
+                        ViewMetaMapper.class,
+                        mapper -> mapper.deleteViewMetasByLegacyTimeline(Long.MAX_VALUE, 1)));
+    for (Map.Entry<String, IntSupplier> gc : rootGc.entrySet()) {
+      assertEquals(1, gc.getValue().getAsInt(), gc.getKey() + " first GC batch");
+      assertEquals(1, gc.getValue().getAsInt(), gc.getKey() + " second GC batch");
+      assertEquals(0, gc.getValue().getAsInt(), gc.getKey() + " exhausted history");
+      assertEquals(
+          1,
+          countLive(
+              gc.getKey() + "_meta", gc.getKey() + "_id", activeIds.get(gc.getKey()), null, null));
+    }
+    for (int generation = 0; generation < 2; generation++) {
+      assertEquals(
+          1,
+          SessionUtils.doWithCommitAndFetchResult(
+                  TableVersionMapper.class,
+                  mapper -> mapper.deleteTableVersionByLegacyTimeline(Long.MAX_VALUE, 1))
+              .intValue());
+      assertEquals(
+          1,
+          SessionUtils.doWithCommitAndFetchResult(
+                  TableColumnMapper.class,
+                  mapper -> mapper.deleteColumnPOsByLegacyTimeline(Long.MAX_VALUE, 1))
+              .intValue());
+      assertEquals(
+          1,
+          SessionUtils.doWithCommitAndFetchResult(
+                  ViewVersionInfoMapper.class,
+                  mapper -> mapper.deleteViewVersionsByLegacyTimeline(Long.MAX_VALUE, 1))
+              .intValue());
+    }
+    assertGovernance(current.objects(), 1);
+    assertLiveTableData(current.table().id());
+    assertTrue(backend.exists(current.schema().nameIdentifier(), EntityType.SCHEMA));
+    assertTrue(backend.exists(current.table().nameIdentifier(), EntityType.TABLE));
+    assertTrue(backend.exists(current.topic().nameIdentifier(), EntityType.TOPIC));
+    assertTrue(backend.exists(current.view().nameIdentifier(), EntityType.VIEW));
+    assertEquals(1, countLive("view_version_info", "view_id", current.view().id(), null, null));
   }
 
   private Registration createRegistration(
@@ -321,6 +438,17 @@ public class TestCatalogReregistration extends TestJDBCBackend {
                 nextId(), metalakeId, id, type));
       }
     }
+  }
+
+  private void assertLiveTableData(long tableId) throws SQLException {
+    assertEquals(
+        1,
+        countLive("table_version_info", "table_id", tableId, null, null),
+        "The active table version must survive cleanup of a previous registration");
+    assertEquals(
+        1,
+        countLive("table_column_version_info", "table_id", tableId, null, null),
+        "The active table columns must survive cleanup of a previous registration");
   }
 
   private void assertGovernance(Map<Long, String> objects, int expected) throws SQLException {

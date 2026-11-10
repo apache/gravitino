@@ -11,6 +11,25 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ## Upgrading from Gravitino 1.3 to 2.0
 
+### External catalog re-registration
+
+Apply the 1.3.0-to-2.0.0 database upgrade before starting the new server. The upgrade changes
+schema, table, topic, and view primary keys to `(entity_id, deleted_at)`, allowing deleted
+registrations and a new active registration to retain the same external identifier.
+Each external identifier can have only one active registration; importing it through another
+catalog or schema is rejected.
+
+Dropping a catalog clears owner, privilege, tag, and statistic associations for the catalog
+and its descendants. The upgrade also soft-deletes orphaned associations for retained schema,
+table, topic, and view IDs that have no active registration. Associations for IDs with an
+active registration are preserved. Metalake-level user, role, tag, and policy definitions
+are retained.
+
+After dropping and recreating an external catalog, its objects can be imported again without
+removing their external identifiers. Their deleted governance associations are not restored;
+explicitly reapply the associations needed by the new registration. Follow the database backup
+and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying the migration.
+
 ### Audit client address behind a reverse proxy
 
 - Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever

@@ -176,7 +176,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE schema_id IN (SELECT schema_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }
