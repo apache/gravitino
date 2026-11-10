@@ -79,6 +79,11 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+>>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -1612,6 +1617,53 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testRefusedDropKeepsDisabledCatalogNotInUse() throws Exception {
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+
+    NameIdentifier ident = NameIdentifier.of("metalake", "refused_drop");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3",
+            BaseCatalog.CATALOG_OPERATION_IMPL,
+            SingleSchemaCatalogOperations.class.getName());
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.put(
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(SingleSchemaCatalogOperations.SCHEMA_NAME)
+            .withNamespace(Namespace.of("metalake", "refused_drop"))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build());
+
+    manager.disableCatalog(ident);
+    Assertions.assertThrows(
+        NonEmptyCatalogException.class, () -> manager.dropCatalog(ident, false));
+
+    // The operations built while checking schemas for the refused drop must not be reused by
+    // later calls on the disabled catalog.
+    Namespace schemaNs = Namespace.of("metalake", "refused_drop");
+    Assertions.assertThrows(
+        CatalogNotInUseException.class,
+        () -> manager.loadCatalogAndWrap(ident).doWithSchemaOps(ops -> ops.listSchemas(schemaNs)));
+    manager.close();
+  }
+
+  @Test
   public void testForceDropCatalog() throws Exception {
     NameIdentifier ident = NameIdentifier.of("metalake", "test41");
     Map<String, String> props =
@@ -2126,4 +2178,53 @@ public class TestCatalogManager {
         PROPERTY_KEY5_PREFIX + "1",
         "value3");
   }
+<<<<<<< HEAD
+=======
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,reference");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "reference."
+            + SecretProviderRegistry.CLASS_NAME,
+        TestReferenceSecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
+  }
+
+  /** Catalog operations whose backend always holds one user-created schema. */
+  public static class SingleSchemaCatalogOperations extends TestCatalogOperations {
+    static final String SCHEMA_NAME = "existing_schema";
+
+    public SingleSchemaCatalogOperations() {
+      super(ImmutableMap.of());
+    }
+
+    @Override
+    public NameIdentifier[] listSchemas(Namespace namespace) {
+      return new NameIdentifier[] {NameIdentifier.of(namespace, SCHEMA_NAME)};
+    }
+
+    @Override
+    public Schema loadSchema(NameIdentifier ident) {
+      return Mockito.mock(Schema.class);
+    }
+  }
+>>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
 }

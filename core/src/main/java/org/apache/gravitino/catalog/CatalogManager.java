@@ -1358,15 +1358,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
               }
             }
-            catalogCache.invalidate(ident);
             return deleted;
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
+<<<<<<< HEAD
+=======
+          } catch (NoSuchEntityException ignored) {
+            // Another server deleted the catalog after it was loaded above, so a later store read
+            // such as listing its schemas no longer finds it. The drop stays idempotent.
+            // store.delete itself never reaches here: it maps a missing entity to false on its own.
+            return false;
+>>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
+          } finally {
+            // Discard the wrapper on every outcome. Operations initialized during the drop skip the
+            // catalog in-use check, so a refused or failed drop must not leave them cached for
+            // later calls on a disabled catalog.
+            catalogCache.invalidate(ident);
           }
         });
   }
