@@ -19,9 +19,11 @@
 package org.apache.gravitino.catalog.jdbc.converter;
 
 import java.sql.SQLException;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -55,5 +57,39 @@ public class TestJdbcExceptionConverter {
         NoSuchSchemaException.class,
         new JdbcExceptionConverter()
             .toGravitinoException(new SQLException("Unknown database 'x%'", "42000", 1049)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      ints = {
+        1059, 1060, 1061, 1062, 1063, 1067, 1068, 1072, 1074, 1075, 1091, 1101, 1113, 1117, 1118,
+        1138, 1166, 1170, 1171, 1264, 1265, 1280, 1366, 1406, 1425, 1426, 3730, 3780
+      })
+  void testRequestRefusedBySourceIsBadRequest(int errorCode) {
+    SQLException failure = new SQLException("refused at 100%", "42000", errorCode);
+    GravitinoRuntimeException error = new JdbcExceptionConverter().toGravitinoException(failure);
+    Assertions.assertInstanceOf(BadRequestException.class, error);
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertEquals(failure.getMessage(), error.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1205, 1213})
+  void testLockTimeoutAndDeadlockAreServiceUnavailable(int errorCode) {
+    Assertions.assertInstanceOf(
+        ServiceUnavailableException.class,
+        new JdbcExceptionConverter()
+            .toGravitinoException(
+                new SQLException("Lock wait timeout exceeded", "HY000", errorCode)));
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1054, 1064})
+  void testErrorsGeneratedStatementsCanRaiseStayServerErrors(int errorCode) {
+    Assertions.assertEquals(
+        GravitinoRuntimeException.class,
+        new JdbcExceptionConverter()
+            .toGravitinoException(new SQLException("Unknown column 'x'", "42S22", errorCode))
+            .getClass());
   }
 }
