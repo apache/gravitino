@@ -62,7 +62,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
         .withExecutable(resolveExecutable(IcebergRewriteDataFilesJob.class))
         .withClassName(IcebergRewriteDataFilesJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -365,15 +365,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
   }
 
   /**
-   * Build Spark configuration template.
-   *
-   * @return map of Spark configuration keys to template values
-   */
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
-  }
-
-  /**
    * Runs {@code rewrite_data_files} on an existing Spark session. Shared by CLI {@link #main} and
    * TMS {@link #executeAndCollectAfter}.
    *
@@ -487,8 +478,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
   }
 
-  @VisibleForTesting
-  static Map<String, Object> compactionMetrics(
+  private static Map<String, Object> compactionMetrics(
       double dataFileMse,
       long deleteFileNumber,
       double avgFileSize,

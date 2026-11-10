@@ -64,7 +64,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
         .withExecutable(resolveExecutable(IcebergExpireSnapshotsJob.class))
         .withClassName(IcebergExpireSnapshotsJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -217,7 +217,9 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
       SparkSession spark, String catalogName, String tableIdentifier) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
     preExpireData = collectTableData(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = expireBeforeMetrics(preExpireData.snapshotCount());
+    Map<String, Object> payload = new HashMap<>();
+    payload.put(
+        IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, preExpireData.snapshotCount());
     return TableSnapshotMetrics.of(snapshotId, payload);
   }
 
@@ -252,11 +254,15 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     PreExpireData after = collectTableData(spark, catalogName, tableIdentifier);
     PreExpireData beforeData = preExpireData == null ? after : preExpireData;
     preExpireData = null;
+    Map<String, Object> payload = new HashMap<>();
+    payload.put(
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC,
+        snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()));
+    payload.put(
+        IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC,
+        bytesReclaimed(beforeData.fileSizesByPath(), after.fileSizesByPath()));
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
-        expireAfterMetrics(
-            snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()),
-            bytesReclaimed(beforeData.fileSizesByPath(), after.fileSizesByPath())));
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), payload);
   }
 
   /**
@@ -398,15 +404,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
         "{{spark_conf:-}}");
   }
 
-  /**
-   * Build Spark configuration template.
-   *
-   * @return map of Spark configuration keys to template values
-   */
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
-  }
-
   // -------------------------------------------------------------------------
   // TMS metrics helpers (not used by CLI {@link #main})
   // -------------------------------------------------------------------------
@@ -438,22 +435,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenance
     long snapshotCount() {
       return snapshotIds.size();
     }
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> expireBeforeMetrics(long snapshotNumber) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, snapshotNumber);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> expireAfterMetrics(long expiredSnapshotNumber, long expiredFileSize) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(
-        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC, expiredSnapshotNumber);
-    metrics.put(IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC, expiredFileSize);
-    return metrics;
   }
 
   @VisibleForTesting

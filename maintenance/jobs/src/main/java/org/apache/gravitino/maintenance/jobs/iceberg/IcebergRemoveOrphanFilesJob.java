@@ -98,7 +98,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         .withExecutable(resolveExecutable(IcebergRemoveOrphanFilesJob.class))
         .withClassName(IcebergRemoveOrphanFilesJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -269,17 +269,11 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("location")),
             parseDryRun(IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("dry-run"))));
+    Map<String, Object> payload = new HashMap<>();
+    payload.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, orphan.filesRemoved());
+    payload.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, orphan.bytesReclaimed());
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
-        orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed()));
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> orphanAfterMetrics(long removedFileNumber, long removedFileSize) {
-    Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, removedFileNumber);
-    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, removedFileSize);
-    return metrics;
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), payload);
   }
 
   static String buildProcedureCall(
@@ -398,10 +392,6 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         "{{dry_run:-false}}",
         "--spark-conf",
         "{{spark_conf:-}}");
-  }
-
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 
   private static void printUsage() {
