@@ -17,7 +17,7 @@
 
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Optional
 
 from gravitino.api.audit import Audit
 from gravitino.api.authorization.supports_roles import SupportsRoles
@@ -43,6 +43,7 @@ from gravitino.client.metadata_object_secret_operations import (
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.utils.http_client import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericSchema(
@@ -112,11 +113,33 @@ class GenericSchema(
     def list_tags(self) -> list[str]:
         return self._metadata_object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._metadata_object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> list[Tag]:
         return self._metadata_object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._metadata_object_tag_operations.list_tags_info_with_visibility()
@@ -146,11 +169,33 @@ class GenericSchema(
     def list_policies(self) -> list[str]:
         return self._metadata_object_policy_operations.list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_policy_operations.list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policies_with_visibility(self) -> PolicyList[str]:
         return self._metadata_object_policy_operations.list_policies_with_visibility()
 
     def list_policy_infos(self) -> list[Policy]:
         return self._metadata_object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_policy_operations.list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         return (
@@ -165,6 +210,17 @@ class GenericSchema(
 
     def list_binding_role_names(self) -> list[str]:
         return self._metadata_object_role_operations.list_binding_role_names()
+
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_role_operations.list_binding_role_names_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def support_secrets(self) -> SupportsSecrets:
         return self

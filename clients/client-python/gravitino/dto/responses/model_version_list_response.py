@@ -21,12 +21,12 @@ from typing import List
 from dataclasses_json import config
 
 from gravitino.dto.model_version_dto import ModelVersionDTO
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
-class ModelVersionListResponse(BaseResponse):
+class ModelVersionListResponse(BaseListResponse):
     """Represents a response for a list of model versions."""
 
     _versions: List[int] = field(metadata=config(field_name="versions"))
@@ -47,7 +47,7 @@ class ModelVersionListResponse(BaseResponse):
 
 
 @dataclass
-class ModelVersionInfoListResponse(BaseResponse):
+class ModelVersionInfoListResponse(BaseListResponse):
     """Represents a response for a list of model versions with their information."""
 
     _versions: List[ModelVersionDTO] = field(metadata=config(field_name="infos"))

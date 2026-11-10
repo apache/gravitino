@@ -17,7 +17,11 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from abc import ABC, abstractmethod
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SupportsRoles(ABC):
@@ -37,3 +41,19 @@ class SupportsRoles(ABC):
             list[str]: The role name list associated with this metadata object.
         """
         raise NotImplementedError()
+
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_binding_role_names``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")

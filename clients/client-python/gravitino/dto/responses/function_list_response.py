@@ -21,12 +21,12 @@ from typing import List
 from dataclasses_json import config
 
 from gravitino.dto.function.function_dto import FunctionDTO
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
-class FunctionListResponse(BaseResponse):
+class FunctionListResponse(BaseListResponse):
     """Response wrapper for multiple functions."""
 
     _functions: List[FunctionDTO] = field(metadata=config(field_name="functions"))

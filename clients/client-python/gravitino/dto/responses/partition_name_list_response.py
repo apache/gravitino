@@ -19,12 +19,12 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
 @dataclass
-class PartitionNameListResponse(BaseResponse):
+class PartitionNameListResponse(BaseListResponse):
     """Represents a response containing a list of partition names."""
 
     _partition_names: list[str] = field(metadata=config(field_name="names"))

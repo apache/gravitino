@@ -38,6 +38,7 @@ from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOpe
 from gravitino.dto.rel.view_dto import ViewDTO
 from gravitino.namespace import Namespace
 from gravitino.utils.http_client import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericView(View, SupportsTags, SupportsSecrets):
@@ -106,11 +107,33 @@ class GenericView(View, SupportsTags, SupportsSecrets):
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._object_tag_operations.list_tags_info_with_visibility()

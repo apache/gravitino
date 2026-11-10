@@ -30,6 +30,7 @@ from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.function.function_dto import FunctionDTO
 from gravitino.namespace import Namespace
 from gravitino.utils.http_client import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericFunction(Function, SupportsTags):
@@ -91,6 +92,17 @@ class GenericFunction(Function, SupportsTags):
         """List the tag names associated with the function."""
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         """List visible tag names and authorization-filtering status."""
         return self._object_tag_operations.list_tags_with_visibility()
@@ -98,6 +110,17 @@ class GenericFunction(Function, SupportsTags):
     def list_tags_info(self) -> list[Tag]:
         """List the tags associated with the function."""
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         """List visible tag details and authorization-filtering status."""

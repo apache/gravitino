@@ -279,7 +279,9 @@ class TestRelationalCatalog(unittest.TestCase):
                 self.metalake_name, self.catalog_name, self.schema_name, name
             )
 
-        page1_body = EntityListResponse(0, [ident("t1"), ident("t2")], "token-1")
+        page1_body = EntityListResponse(
+            0, [ident("t1"), ident("t2")], _next_page_token="token-1"
+        )
         page2_body = EntityListResponse(0, [ident("t3")])
         self.assertIn('"nextPageToken": "token-1"', page1_body.to_json())
         self.assertNotIn("nextPageToken", page2_body.to_json())

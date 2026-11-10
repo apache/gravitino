@@ -16,7 +16,7 @@
 # under the License.
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.stats.statistic import Statistic
@@ -33,6 +33,7 @@ from gravitino.exceptions.handlers.statistics_error_handler import (
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from gravitino.utils.precondition import Precondition
+from gravitino.api.pagination import Page, page_params
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,27 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         statistic_resp.validate()
 
         return statistic_resp.statistics
+
+    def list_statistics_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Statistic]:
+        """Paged variant of ``list_statistics``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        resp = self._rest_client.get(
+            endpoint=self.request_path,
+            params=page_params(page_size, page_token),
+            error_handler=STATISTICS_ERROR_HANDLER,
+        )
+
+        statistic_resp = StatisticListResponse.from_json(resp.body, infer_missing=True)
+        statistic_resp.validate()
+
+        return Page(
+            items=list(statistic_resp.statistics),
+            next_page_token=statistic_resp.next_page_token(),
+        )
 
     def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
         Precondition.check_argument(

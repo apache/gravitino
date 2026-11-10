@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from abc import ABC, abstractmethod
 
 from gravitino.api.policy.policy import Policy
@@ -24,6 +26,7 @@ from gravitino.api.policy.policy_change import PolicyChange
 from gravitino.api.policy.policy_content import PolicyContent
 from gravitino.api.policy.policy_tag_association import PolicyTagAssociation
 from gravitino.exceptions.base import UnsupportedOperationException
+from gravitino.api.pagination import Page
 
 
 class PolicyOperations(ABC):
@@ -42,6 +45,22 @@ class PolicyOperations(ABC):
         """
         raise NotImplementedError()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_policies``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     @abstractmethod
     def list_policy_infos(self) -> list[Policy]:
         """Lists all policies in the metalake with their details.
@@ -53,6 +72,22 @@ class PolicyOperations(ABC):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         raise NotImplementedError()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """One page of ``list_policy_infos``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Policy]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def get_policy(self, policy_name: str) -> Policy:
@@ -172,3 +207,20 @@ class PolicyOperations(ABC):
         raise UnsupportedOperationException(
             "listTagAssociationsForPolicy is not supported"
         )
+
+    def list_tag_names_for_policy_page(
+        self, policy_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of the names of the tags associated with a policy, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            policy_name: The policy name.
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")

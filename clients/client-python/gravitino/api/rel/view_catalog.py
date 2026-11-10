@@ -25,6 +25,8 @@ from gravitino.api.rel.view_change import ViewChange
 from gravitino.exceptions.base import NoSuchViewException
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class ViewCatalog(ABC):
@@ -46,6 +48,22 @@ class ViewCatalog(ABC):
         Raises:
             NoSuchSchemaException: If the schema does not exist.
         """
+
+    def list_views_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """One page of ``list_views``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[NameIdentifier]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def load_view(self, identifier: NameIdentifier) -> View:

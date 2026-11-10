@@ -19,14 +19,14 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.semantic.json_serdes.semantic_json_mixin import SemanticJsonMixin
 from gravitino.dto.semantic.semantic_model_metric_dto import SemanticModelMetricDTO
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class MetricInfoListResponse(SemanticJsonMixin, BaseResponse):
+class MetricInfoListResponse(SemanticJsonMixin, BaseListResponse):
     """Response containing complete metrics discovered in a schema."""
 
     _metrics: list[SemanticModelMetricDTO] = field(

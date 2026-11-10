@@ -31,6 +31,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.http_client import Response
+from gravitino.api.pagination import Page, page_params
 
 
 class GenericTag(Tag, Tag.AssociatedObjects):
@@ -159,6 +160,38 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         objects_resp.validate()
 
         return objects_resp.metadata_objects()
+
+    def objects_page(
+        self,
+        value: Optional[str] = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[MetadataObject]:
+        """Paged variant of ``objects``: one page, ordered by object type and then full name.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_LIST_OBJECTS_ENDPOINT.format(
+            self._metalake,
+            encode_string(self.name()),
+        )
+        params = page_params(page_size, page_token)
+        if value is not None:
+            Precondition.check_argument(
+                value.strip() != "" and len(value) <= 256,
+                "value must not be empty or longer than 256 characters",
+            )
+            params["value"] = value
+        response = self.get_response(url, TAG_ERROR_HANDLER, params)
+        objects_resp = MetadataObjectListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        objects_resp.validate()
+        return Page(
+            items=objects_resp.metadata_objects(),
+            next_page_token=objects_resp.next_page_token(),
+        )
 
     def get_response(
         self,

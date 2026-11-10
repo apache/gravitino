@@ -27,6 +27,7 @@ from gravitino.dto.policy_dto import (
     PolicyForTagAssociationDTO,
     TagForPolicyAssociationDTO,
 )
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.exceptions.base import IllegalArgumentException
@@ -78,7 +79,7 @@ class PolicyResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class PolicyListResponse(BaseResponse):
+class PolicyListResponse(BaseListResponse):
     """Represents a response containing a list of policies."""
 
     _policies: list | None = field(
@@ -166,7 +167,7 @@ class PolicyTagAssociationResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class PolicyForTagAssociationListResponse(BaseResponse):
+class PolicyForTagAssociationListResponse(BaseListResponse):
     """Represents a response containing the policy associations of a tag."""
 
     _associations: list[PolicyForTagAssociationDTO] | None = field(
@@ -184,7 +185,7 @@ class PolicyForTagAssociationListResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class TagForPolicyAssociationListResponse(BaseResponse):
+class TagForPolicyAssociationListResponse(BaseListResponse):
     """Represents a response containing the tag associations of a policy."""
 
     _associations: list[TagForPolicyAssociationDTO] | None = field(

@@ -25,6 +25,8 @@ from gravitino.api.function.function_type import FunctionType
 from gravitino.exceptions.base import NoSuchFunctionException
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class FunctionCatalog(ABC):
@@ -45,6 +47,22 @@ class FunctionCatalog(ABC):
         """
         pass
 
+    def list_functions_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """One page of ``list_functions``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[NameIdentifier]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     @abstractmethod
     def list_function_infos(self, namespace: Namespace) -> List[Function]:
         """List the functions with details in a namespace from the catalog.
@@ -59,6 +77,22 @@ class FunctionCatalog(ABC):
             NoSuchSchemaException: If the schema does not exist.
         """
         pass
+
+    def list_function_infos_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Function]:
+        """One page of ``list_function_infos``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Function]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def get_function(self, ident: NameIdentifier) -> Function:

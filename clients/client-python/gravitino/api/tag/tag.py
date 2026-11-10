@@ -23,6 +23,7 @@ from typing import ClassVar, Optional
 from gravitino.api.auditable import Auditable
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.exceptions.base import UnsupportedOperationException
+from gravitino.api.pagination import Page
 
 
 class AssociatedObjects(ABC):
@@ -164,3 +165,25 @@ class Tag(Auditable):
                 list[MetadataObject]: The list of objects that are associated with this tag.
             """
             raise NotImplementedError()
+
+        def objects_page(
+            self,
+            value: Optional[str] = None,
+            *,
+            page_size: int,
+            page_token: Optional[str] = None,
+        ) -> Page[MetadataObject]:
+            """One page of ``objects``, ordered by object type and then full name.
+
+            The default implementation raises UnsupportedOperationException.
+
+            Args:
+                value: The optional exact assignment value filter.
+                page_size: The maximum number of entries in the page; must be at least 1.
+                page_token: The ``next_page_token`` of the previous page, or None for the first
+                    page.
+
+            Returns:
+                Page[MetadataObject]: The page.
+            """
+            raise UnsupportedOperationException("Paged listing is not supported")

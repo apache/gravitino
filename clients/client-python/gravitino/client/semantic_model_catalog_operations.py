@@ -54,6 +54,7 @@ from gravitino.exceptions.handlers.semantic_model_error_handler import (
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
+from gravitino.api.pagination import Page, page_params
 
 
 class SemanticModelCatalogOperations(SemanticModelCatalog):
@@ -88,6 +89,30 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             for ident in entity_list_resp.identifiers()
         ]
 
+    def list_semantic_models_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_semantic_models``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_semantic_model_namespace(namespace)
+        full_namespace = self._get_semantic_model_full_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_semantic_model_request_path(full_namespace),
+            params=page_params(page_size, page_token),
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+        return Page(
+            items=[
+                NameIdentifier.of(ident.namespace().level(2), ident.name())
+                for ident in entity_list_resp.identifiers()
+            ],
+            next_page_token=entity_list_resp.next_page_token(),
+        )
+
     def list_metrics(self, namespace: Namespace) -> list[NameIdentifier]:
         self._check_semantic_model_namespace(namespace)
         resp = self._rest_client.get(
@@ -106,6 +131,33 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             for ident in response.identifiers()
         ]
 
+    def list_metrics_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_metrics``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_semantic_model_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_metric_request_path(
+                self._get_semantic_model_full_namespace(namespace)
+            ),
+            params={**{"details": "false"}, **page_params(page_size, page_token)},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        response = EntityListResponse.from_json(resp.body, infer_missing=True)
+        response.validate()
+        return Page(
+            items=[
+                NameIdentifier.builder(
+                    self._relative_metric_namespace(ident.namespace()), ident.name()
+                )
+                for ident in response.identifiers()
+            ],
+            next_page_token=response.next_page_token(),
+        )
+
     def list_metric_infos(self, namespace: Namespace) -> list[SemanticModelMetric]:
         self._check_semantic_model_namespace(namespace)
         resp = self._rest_client.get(
@@ -123,6 +175,33 @@ class SemanticModelCatalogOperations(SemanticModelCatalog):
             )
             for info in response.metrics()
         ]
+
+    def list_metric_infos_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[SemanticModelMetric]:
+        """Paged variant of ``list_metric_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_semantic_model_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_metric_request_path(
+                self._get_semantic_model_full_namespace(namespace)
+            ),
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
+        )
+        response = MetricInfoListResponse.from_json(resp.body, infer_missing=True)
+        response.validate()
+        return Page(
+            items=[
+                SemanticModelMetric(
+                    self._relative_metric_namespace(info.namespace()), info.metric()
+                )
+                for info in response.metrics()
+            ],
+            next_page_token=response.next_page_token(),
+        )
 
     def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:
         self._check_semantic_model_name_identifier(identifier)

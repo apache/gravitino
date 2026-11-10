@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.dto.responses.name_list_response import NameListResponse
@@ -25,6 +27,7 @@ from gravitino.exceptions.handlers.role_error_handler import (
 )
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 
 class MetadataObjectRoleOperations(SupportsRoles):
@@ -60,3 +63,24 @@ class MetadataObjectRoleOperations(SupportsRoles):
         )
         role_names_list_resp.validate()
         return role_names_list_resp.names
+
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        response = self.rest_client.get(
+            self.role_request_path,
+            params={**{}, **page_params(page_size, page_token)},
+            error_handler=ROLE_ERROR_HANDLER,
+        )
+        role_names_list_resp = NameListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        role_names_list_resp.validate()
+        return Page(
+            items=list(role_names_list_resp.names),
+            next_page_token=role_names_list_resp.next_page_token(),
+        )

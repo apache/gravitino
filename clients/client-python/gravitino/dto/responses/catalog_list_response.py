@@ -20,12 +20,12 @@ from typing import List
 
 from dataclasses_json import config
 
-from .base_response import BaseResponse
+from .base_list_response import BaseListResponse
 from ..catalog_dto import CatalogDTO
 
 
 @dataclass
-class CatalogListResponse(BaseResponse):
+class CatalogListResponse(BaseListResponse):
     """Represents a response for a list of catalogs with their information."""
 
     _catalogs: List[CatalogDTO] = field(metadata=config(field_name="catalogs"))

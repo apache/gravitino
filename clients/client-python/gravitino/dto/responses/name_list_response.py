@@ -21,13 +21,13 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config, dataclass_json
 
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass_json
 @dataclass
-class NameListResponse(BaseResponse):
+class NameListResponse(BaseListResponse):
     """Represents a response for a list of entity names."""
 
     _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))

@@ -60,6 +60,7 @@ class TableCatalog(ABC):
     def list_tables_page(
         self,
         namespace: Namespace,
+        *,
         page_size: int,
         page_token: Optional[str] = None,
     ) -> Page[NameIdentifier]:

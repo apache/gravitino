@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
@@ -37,6 +39,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
+from gravitino.api.pagination import Page, page_params
 
 
 class MetadataObjectTagOperations(SupportsTags):
@@ -86,6 +89,28 @@ class MetadataObjectTagOperations(SupportsTags):
             list_tags_resp.tag_names(), list_tags_resp.has_inaccessible_tags()
         )
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        response = self.rest_client.get(
+            self.tag_request_path,
+            params={**{}, **page_params(page_size, page_token)},
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        list_tags_resp = TagNamesListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        list_tags_resp.validate()
+
+        return Page(
+            items=list(list_tags_resp.tag_names()),
+            next_page_token=list_tags_resp.next_page_token(),
+        )
+
     def list_tags_info(self) -> list[Tag]:
         return self.list_tags_info_with_visibility().tags()
 
@@ -109,6 +134,30 @@ class MetadataObjectTagOperations(SupportsTags):
                 for tag_dto in list_info_resp.tags()
             ],
             list_info_resp.has_inaccessible_tags(),
+        )
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        response = self.rest_client.get(
+            self.tag_request_path,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=TAG_ERROR_HANDLER,
+        )
+
+        list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
+        list_info_resp.validate()
+
+        return Page(
+            items=[
+                GenericTag(self.metalake_name, tag_dto, self.rest_client)
+                for tag_dto in list_info_resp.tags()
+            ],
+            next_page_token=list_info_resp.next_page_token(),
         )
 
     def get_tag(self, name: str) -> Tag:

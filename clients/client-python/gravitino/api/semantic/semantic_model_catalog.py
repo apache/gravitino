@@ -28,6 +28,7 @@ from gravitino.exceptions.base import (
 )
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
+from gravitino.api.pagination import Page
 
 
 class SemanticModelCatalog(ABC):
@@ -56,6 +57,22 @@ class SemanticModelCatalog(ABC):
             NoSuchSchemaException: If the schema does not exist.
         """
 
+    def list_semantic_models_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """One page of ``list_semantic_models``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[NameIdentifier]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     def list_metrics(self, namespace: Namespace) -> list[NameIdentifier]:
         """List visible metric identifiers across the Semantic Models in a schema.
 
@@ -76,6 +93,22 @@ class SemanticModelCatalog(ABC):
         """
         raise UnsupportedOperationException("Metric listing is not supported")
 
+    def list_metrics_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """One page of ``list_metrics``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[NameIdentifier]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     def list_metric_infos(self, namespace: Namespace) -> list[SemanticModelMetric]:
         """List complete visible metrics across the Semantic Models in a schema.
 
@@ -94,6 +127,22 @@ class SemanticModelCatalog(ABC):
             UnsupportedOperationException: If metric discovery is not supported.
         """
         raise UnsupportedOperationException("Metric info listing is not supported")
+
+    def list_metric_infos_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[SemanticModelMetric]:
+        """One page of ``list_metric_infos``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[SemanticModelMetric]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def load_semantic_model(self, identifier: NameIdentifier) -> SemanticModel:

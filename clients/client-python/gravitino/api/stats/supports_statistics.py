@@ -17,10 +17,12 @@
 
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SupportsStatistics(ABC):
@@ -36,6 +38,22 @@ class SupportsStatistics(ABC):
         Returns:
             A list of statistics
         """
+
+    def list_statistics_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Statistic]:
+        """One page of ``list_statistics``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Statistic]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:

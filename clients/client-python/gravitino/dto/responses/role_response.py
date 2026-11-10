@@ -23,6 +23,7 @@ from typing import Optional
 from dataclasses_json import config, dataclass_json
 
 from gravitino.dto.authorization.role_dto import RoleDTO
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.utils.precondition import Precondition
 
@@ -45,7 +46,7 @@ class RoleResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class RoleNamesListResponse(BaseResponse):
+class RoleNamesListResponse(BaseListResponse):
     """Represents a response for a list of role names."""
 
     _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))

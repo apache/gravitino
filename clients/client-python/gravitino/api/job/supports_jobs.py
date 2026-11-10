@@ -16,7 +16,10 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import List, Dict
+from typing import List, Dict, Optional
+
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 from .job_handle import JobHandle
 from .job_template import JobTemplate
 from .job_template_change import JobTemplateChange
@@ -37,6 +40,22 @@ class SupportsJobs(ABC):
             List of job templates.
         """
         pass
+
+    def list_job_templates_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[JobTemplate]:
+        """One page of ``list_job_templates``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[JobTemplate]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def register_job_template(self, job_template) -> None:
@@ -123,6 +142,26 @@ class SupportsJobs(ABC):
             List of JobHandle objects representing the jobs.
         """
         pass
+
+    def list_jobs_page(
+        self,
+        job_template_name: str = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None
+    ) -> Page[JobHandle]:
+        """One page of ``list_jobs``, newest queued first.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[JobHandle]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def run_job(self, job_template_name: str, job_conf: Dict[str, str]) -> JobHandle:
