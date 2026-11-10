@@ -262,7 +262,9 @@ public class TestGravitinoJdbcCatalog {
 
       JDBCOptions options =
           initialize(
-              catalog, option.isEmpty() ? Map.of() : Map.of("preferTimestampNTZ", option), Map.of());
+              catalog,
+              option.isEmpty() ? Map.of() : Map.of("preferTimestampNTZ", option),
+              Map.of());
       Assertions.assertEquals(expected, options.preferTimestampNTZ());
       Assertions.assertEquals(expected, catalog.useTimestampNtz());
       Assertions.assertEquals(
