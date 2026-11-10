@@ -55,6 +55,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -233,24 +234,10 @@ public class PolicyTagRelService {
       return;
     }
     PolicyAssociationSelector selector = PolicyAssociationSelectorSerde.deserialize(selectorJson);
-    if (!(selector instanceof TagValueSelector) || tagPO.getAllowedValues() == null) {
-      return;
+    if (selector instanceof TagValueSelector) {
+      TagMetaService.validateAllowedValue(
+          tagPO, TagValue.of(tagPO.getTagName(), ((TagValueSelector) selector).value()));
     }
-    String[] allowedValues =
-        JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class);
-    // A null stored constraint represents an unrestricted tag, just as in POConverters.
-    if (allowedValues == null) {
-      return;
-    }
-    String value = ((TagValueSelector) selector).value();
-    Preconditions.checkArgument(
-        allowedValues.length > 0, "Tag %s does not allow assignment values", tagPO.getTagName());
-    Preconditions.checkArgument(
-        Arrays.asList(allowedValues).contains(value),
-        "Tag %s value %s is not in allowed values %s",
-        tagPO.getTagName(),
-        value,
-        Arrays.toString(allowedValues));
   }
 
   private static List<RelationalEntity<?>> policyTargets(

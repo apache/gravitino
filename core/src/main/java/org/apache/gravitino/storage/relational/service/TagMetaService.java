@@ -790,14 +790,17 @@ public class TagMetaService {
         tagValue.value().orElse(null));
   }
 
-  private static void validateAllowedValue(TagPO tagPO, TagValue tagValue)
-      throws JsonProcessingException {
+  static void validateAllowedValue(TagPO tagPO, TagValue tagValue) throws JsonProcessingException {
     if (tagPO.getAllowedValues() == null) {
       return;
     }
 
     String[] allowedValues =
         JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class);
+    // Treat JSON null like SQL NULL, consistent with POConverters.
+    if (allowedValues == null) {
+      return;
+    }
     if (!tagValue.value().isPresent()) {
       Preconditions.checkArgument(
           allowedValues.length == 0,
