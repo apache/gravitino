@@ -214,6 +214,60 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testStringDefaultValueWithSpecialCharsRoundTrip() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_str_default";
+    String[] values = {"a'b", "a\\b", "a\\'b"};
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build());
+    for (int i = 0; i < values.length; i++) {
+      columns.add(
+          JdbcColumn.builder()
+              .withName("c" + i)
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .withDefaultValue(Literals.stringLiteral(values[i]))
+              .build());
+    }
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    for (int i = 0; i < values.length; i++) {
+      String columnName = "c" + i;
+      Column column =
+          Arrays.stream(load.columns())
+              .filter(c -> c.name().equals(columnName))
+              .findFirst()
+              .orElseThrow();
+      Assertions.assertEquals(Literals.stringLiteral(values[i]), column.defaultValue());
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME.toString(),
+                tableName,
+                TableChange.addColumn(
+                    new String[] {"c_invalid"},
+                    Types.ByteType.get(),
+                    Literals.of("128", Types.ByteType.get()))));
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";

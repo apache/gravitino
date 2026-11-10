@@ -94,6 +94,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTa
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.bean.JdbcIndexBean;
@@ -1646,7 +1647,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
       columnDefinition.append(
           "DEFAULT %s "
-              .formatted(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue())));
+              .formatted(defaultValueSql(addColumn.getDataType(), addColumn.getDefaultValue())));
     }
 
     // Append comment if available after default value
@@ -3492,6 +3493,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return value == '\'' || value == '"' || value == '`';
   }
 
+  private String defaultValueSql(Type columnType, Expression defaultValue) {
+    if (columnDefaultValueConverter instanceof ClickHouseColumnDefaultValueConverter converter) {
+      return converter.fromGravitino(columnType, defaultValue);
+    }
+    return columnDefaultValueConverter.fromGravitino(defaultValue);
+  }
+
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add Nullable data type
     String dataType = typeConverter.fromGravitino(column.dataType());
@@ -3504,8 +3512,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     // Add DEFAULT value if specified
     if (!DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
       sqlBuilder.append(
-          " DEFAULT %s "
-              .formatted(columnDefaultValueConverter.fromGravitino(column.defaultValue())));
+          " DEFAULT %s ".formatted(defaultValueSql(column.dataType(), column.defaultValue())));
     }
 
     // Add column comment if specified
