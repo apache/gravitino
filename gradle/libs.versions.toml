@@ -315,6 +315,7 @@ iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle"
 iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
 iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
+iceberg-common = { group = "org.apache.iceberg", name = "iceberg-common", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
 iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
