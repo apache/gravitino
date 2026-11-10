@@ -61,7 +61,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
@@ -394,7 +394,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson, "spark-conf");
+    return IcebergJobUtils.filterCustomSparkConfigs(parseJsonOptions(sparkConfJson, "spark-conf"));
   }
 
   /**

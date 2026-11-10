@@ -89,9 +89,12 @@ public final class SecretPropertyUtils {
    * <ul>
    *   <li>{@code metadata == null}: do <strong>not</strong> recover (URN-only). Used when the
    *       catalog does not expose properties metadata for the entity type.
-   *   <li>declared {@code hidden}: always recover, without the sensitive-keyword gate — so
-   *       shortening {@link Configs#SENSITIVE_KEY_KEYWORDS} cannot leave a masked property without
-   *       a recovery path.
+   *   <li>declared {@code hidden} and not {@code reserved}: always recover, without the
+   *       sensitive-keyword gate — so shortening {@link Configs#SENSITIVE_KEY_KEYWORDS} cannot
+   *       leave a masked property without a recovery path.
+   *   <li>declared {@code reserved} and {@code hidden} (for example {@code gravitino.identifier}):
+   *       never recover — these are internal system properties omitted from API responses, not user
+   *       secrets.
    *   <li>undeclared: recover only when the key name matches {@link #isSensitivePropertyKey}
    *       (historical fuzzy recovery).
    *   <li>declared non-hidden: never recover here (for example {@code credential-providers} stays
@@ -112,7 +115,9 @@ public final class SecretPropertyUtils {
       return false;
     }
     if (metadata.containsProperty(key)) {
-      return metadata.isHiddenProperty(key);
+      // Align with HiddenPropertyMaskUtils: reserved+hidden keys are internal (e.g.
+      // gravitino.identifier) and must not appear in getSecrets.
+      return metadata.isHiddenProperty(key) && !metadata.isReservedProperty(key);
     }
     return isSensitivePropertyKey(key);
   }
@@ -154,9 +159,10 @@ public final class SecretPropertyUtils {
    *   <li>Include every entry where {@link #isSecretProperty} is true, resolving the secret URN via
    *       {@link SecretManager#readSecret}.
    *   <li>Include every inline entry when {@link #shouldRecoverSensitiveNamedSecret} is true:
-   *       declared {@code hidden} (no keyword gate), or undeclared with a sensitive-looking name.
-   *       Declared non-hidden keys are excluded even when the name looks sensitive. When {@code
-   *       metadata} is {@code null}, inline plaintext is not recovered (URN-only).
+   *       declared {@code hidden} and not {@code reserved} (no keyword gate), or undeclared with a
+   *       sensitive-looking name. Reserved+hidden keys (for example {@code gravitino.identifier})
+   *       and declared non-hidden keys are excluded. When {@code metadata} is {@code null}, inline
+   *       plaintext is not recovered (URN-only).
    * </ol>
    *
    * <p>Normal non-sensitive, non-hidden properties are not included. Clients merge this map over

@@ -19,8 +19,8 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
+import com.fasterxml.jackson.databind.annotation.JsonTypeIdResolver;
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -28,9 +28,15 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.rest.RESTRequest;
 
-/** Represents a request to create a policy. */
+/**
+ * Represents a request to create a policy.
+ *
+ * <p>{@code policyType} accepts known type ids case-insensitively; storage and responses use the
+ * canonical lowercase value from {@link Policy.BuiltInType#policyType()}.
+ */
 @Getter
 @EqualsAndHashCode
 @ToString
@@ -54,18 +60,8 @@ public class PolicyCreateRequest implements RESTRequest {
       use = JsonTypeInfo.Id.NAME,
       include = JsonTypeInfo.As.EXTERNAL_PROPERTY,
       property = "policyType",
-      defaultImpl = PolicyContentDTO.CustomContentDTO.class)
-  @JsonSubTypes({
-    // add mappings for built-in types here
-    // For example: @JsonSubTypes.Type(value = DataCompactionContent.class, name =
-    // "system_data_compaction")
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergCompactionContentDTO.class,
-        name = "system_iceberg_compaction"),
-    @JsonSubTypes.Type(
-        value = PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.class,
-        name = "system_iceberg_orphan_file_removal")
-  })
+      defaultImpl = Void.class)
+  @JsonTypeIdResolver(PolicyContentTypeIdResolver.class)
   private final PolicyContentDTO policyContent;
 
   /**
@@ -102,6 +98,8 @@ public class PolicyCreateRequest implements RESTRequest {
         StringUtils.isNotBlank(name), "\"name\" is required and cannot be empty");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(policyType), "\"policyType\" is required and cannot be empty");
+    // An unknown policyType binds content as null, so resolve the type before the content checks.
+    Policy.BuiltInType.fromPolicyType(policyType);
     Preconditions.checkArgument(
         policyContent != null, "\"content\" is required and cannot be null");
     policyContent.validate();

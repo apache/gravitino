@@ -58,7 +58,9 @@ import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -241,8 +243,8 @@ public class PermissionOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("role") String role,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       PrivilegeGrantRequest privilegeGrantRequest) {
     if (privilegeGrantRequest == null) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -266,6 +268,8 @@ public class PermissionOperations {
             for (PrivilegeDTO privilegeDTO : privilegeGrantRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
+
+            TagOperations.checkVisibleTag(metalake, object);
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             return Utils.ok(
@@ -297,8 +301,8 @@ public class PermissionOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("role") String role,
-      @PathParam("type") String type,
-      @PathParam("fullName") String fullName,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
       PrivilegeRevokeRequest privilegeRevokeRequest) {
     if (privilegeRevokeRequest == null) {
       return ExceptionHandlers.handleRolePermissionOperationException(
@@ -322,6 +326,8 @@ public class PermissionOperations {
             for (PrivilegeDTO privilegeDTO : privilegeRevokeRequest.getPrivileges()) {
               AuthorizationUtils.checkPrivilege(privilegeDTO, object, metalake);
             }
+
+            TagOperations.checkVisibleTag(metalake, object);
 
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             return Utils.ok(
@@ -374,6 +380,8 @@ public class PermissionOperations {
               for (Privilege privilegeDTO : dto.privileges()) {
                 AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilegeDTO, dto, metalake);
               }
+
+              TagOperations.checkVisibleTag(metalake, dto);
 
               MetadataObjectUtil.checkMetadataObject(metalake, dto);
               AuthorizationUtils.checkDuplicatedNamePrivilege(dto.privileges());

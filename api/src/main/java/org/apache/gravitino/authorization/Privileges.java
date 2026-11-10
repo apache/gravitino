@@ -251,8 +251,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.allow();
-      case SELECT_SEMANTIC_MODEL:
-        return SelectSemanticModel.allow();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.allow();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.allow();
 
@@ -395,8 +395,8 @@ public class Privileges {
         // Semantic model
       case CREATE_SEMANTIC_MODEL:
         return CreateSemanticModel.deny();
-      case SELECT_SEMANTIC_MODEL:
-        return SelectSemanticModel.deny();
+      case USE_SEMANTIC_MODEL:
+        return UseSemanticModel.deny();
       case MODIFY_SEMANTIC_MODEL:
         return ModifySemanticModel.deny();
 
@@ -1445,10 +1445,11 @@ public class Privileges {
    * The privilege required to call {@code getSecrets}. Without {@link IncludeCredentialSecrets},
    * cloud access-key pairs are omitted from the result.
    *
-   * <p>Intended for connectors that recover JDBC and similar secrets via {@code getSecrets}, and
-   * recover cloud access keys via {@code getCredentials} (which requires no privilege). Callers
-   * that are not the metalake owner and lack this privilege receive an empty {@code getSecrets}
-   * result rather than a forbidden error, once they can already access the metadata object.
+   * <p>Catalog {@code getCredentials} requires both this privilege and {@link
+   * IncludeCredentialSecrets}, or metalake ownership, in addition to metadata access. Fileset
+   * credential authorization is path-based. Callers that are not the metalake owner and lack this
+   * privilege receive an empty {@code getSecrets} result rather than a forbidden error, once they
+   * can already access the metadata object.
    */
   public static final class UseSecrets extends GenericPrivilege<UseSecrets> {
 
@@ -1483,7 +1484,8 @@ public class Privileges {
 
   /**
    * When held together with {@link UseSecrets}, includes cloud access-key pairs and other
-   * credential secrets in the {@code getSecrets} result.
+   * credential secrets in the {@code getSecrets} result. Both privileges are also required for
+   * catalog {@code getCredentials}, unless the caller is the metalake owner.
    *
    * <p>Does not authorize {@code getSecrets} or {@code getCredentials} by itself. Metalake owners
    * and holders of both privileges receive the full secrets map; holders of only {@link UseSecrets}
@@ -1770,27 +1772,27 @@ public class Privileges {
   }
 
   /** The privilege to discover a semantic model and load its definition. */
-  public static class SelectSemanticModel extends GenericPrivilege<SelectSemanticModel> {
-    private static final SelectSemanticModel ALLOW_INSTANCE =
-        new SelectSemanticModel(Condition.ALLOW, Name.SELECT_SEMANTIC_MODEL);
-    private static final SelectSemanticModel DENY_INSTANCE =
-        new SelectSemanticModel(Condition.DENY, Name.SELECT_SEMANTIC_MODEL);
+  public static class UseSemanticModel extends GenericPrivilege<UseSemanticModel> {
+    private static final UseSemanticModel ALLOW_INSTANCE =
+        new UseSemanticModel(Condition.ALLOW, Name.USE_SEMANTIC_MODEL);
+    private static final UseSemanticModel DENY_INSTANCE =
+        new UseSemanticModel(Condition.DENY, Name.USE_SEMANTIC_MODEL);
 
-    private SelectSemanticModel(Condition condition, Name name) {
+    private UseSemanticModel(Condition condition, Name name) {
       super(condition, name);
     }
 
     /**
      * @return The instance with allow condition of the privilege.
      */
-    public static SelectSemanticModel allow() {
+    public static UseSemanticModel allow() {
       return ALLOW_INSTANCE;
     }
 
     /**
      * @return The instance with deny condition of the privilege.
      */
-    public static SelectSemanticModel deny() {
+    public static UseSemanticModel deny() {
       return DENY_INSTANCE;
     }
 

@@ -212,6 +212,20 @@ gravitino.iceberg.rest-catalog.oauth2.scope=email
 This is a completely separate credential from the one the connector uses against the main Gravitino
 server; it is not reused automatically.
 
+:::note
+With `iceberg.rest-catalog.session=USER`, the IRC is reached with the end user's token only. The
+metadata fallback described above does not apply to the IRC: a session without a forwarded token
+fails to read or write tables in that catalog instead of using the service credential, even though
+the catalog is still listed and its schemas can still be browsed. On open-source Trino this is the
+case for every user who signs in through OAuth2, because the coordinator does not forward the token
+(see step 1 of the example below).
+
+The IRC always reads the token from the extra-credential key `token`;
+`gravitino.client.session.userTokenCredentialKey` does not apply to it. Unless the forwarded user
+owns the metalake or the catalog, it needs `USE_CATALOG` and `USE_SCHEMA` in addition to
+`SELECT_TABLE` or `MODIFY_TABLE`; granting `SELECT_TABLE` at the metalake level alone is not enough.
+:::
+
 For an Iceberg catalog with `catalog-backend=rest` (pointing at an Iceberg REST Catalog of its own,
 which the connector does not re-route), the connector does not set `iceberg.rest-catalog.security`/`iceberg.rest-catalog.session` on its own — that catalog's own `gravitino.client.*` config is unrelated to how its underlying Iceberg REST catalog authenticates. To also forward the end user's token to the REST catalog itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and `trino.bypass.iceberg.rest-catalog.session=USER` explicitly on that catalog's properties, alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.*` credentials; see the worked example below.
 
@@ -247,7 +261,8 @@ populate the session's extra-credentials with the caller's access token under th
   [trinodb/trino discussion #24403](https://github.com/trinodb/trino/discussions/24403) and
   [issue #27917](https://github.com/trinodb/trino/issues/27917) for this feature request. Until
   it lands upstream, forwarding OAuth2 user tokens requires a Trino distribution that
-  provides this extra-credential itself. Sessions without it use the shared service metadata.
+  provides this extra-credential itself. Sessions without it use the shared service metadata,
+  but cannot access tables through an IRC that uses `session=USER`.
 
 **2. Gravitino server: enable OAuth2** (in `conf/gravitino.conf`):
 

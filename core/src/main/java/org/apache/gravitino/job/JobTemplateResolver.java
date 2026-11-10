@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.job;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.io.File;
-import java.net.URI;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -31,15 +28,16 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.gravitino.connector.job.JobResourceUtils;
 import org.apache.gravitino.meta.JobTemplateEntity;
-import org.apache.gravitino.utils.FileFetcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Resolves a job template into the runtime job template of a job run: the template with its
- * placeholders replaced with the job configuration, and its executable, scripts, jars, files and
- * archives fetched into the job's staging directory.
+ * placeholders replaced with the job configuration. The resources of the runtime job template, that
+ * is its executable, scripts, jars, files and archives, are kept as URIs; fetch them with {@link
+ * JobResourceUtils} where needed.
  *
  * <p>Creating a resolver parses and validates the template's placeholders, so a resolver always
  * holds a valid template, and the placeholders are parsed only once per job run. To only validate a
@@ -48,8 +46,6 @@ import org.slf4j.LoggerFactory;
 public final class JobTemplateResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(JobTemplateResolver.class);
-
-  private static final int FETCH_TIMEOUT_IN_MS = 30 * 1000; // 30 seconds
 
   private final JobTemplateEntity jobTemplateEntity;
 
@@ -114,94 +110,59 @@ public final class JobTemplateResolver {
   }
 
   /**
-   * Resolves the template into the runtime job template of a job run.
+   * Resolves the template into the runtime job template of a job run. It fetches nothing, the
+   * resources of the runtime job template are the resolved URIs.
    *
    * @param jobConf the job configuration, may be null
-   * @param stagingDir the staging directory of the job, where the files are fetched to
    * @return the runtime job template
    * @throws IllegalArgumentException if a required parameter has no value, or the resolved
    *     environments, custom fields or configs contain duplicate keys
-   * @throws RuntimeException if a file cannot be fetched
    */
-  public JobTemplate resolve(@Nullable Map<String, String> jobConf, File stagingDir) {
+  public JobTemplate resolve(@Nullable Map<String, String> jobConf) {
     String name = jobTemplateEntity.name();
     String comment = jobTemplateEntity.comment();
 
     JobTemplateEntity.TemplateContent content = jobTemplateEntity.templateContent();
     Map<String, String> conf = jobConf == null ? Collections.emptyMap() : jobConf;
-    // Check every parameter before fetching any file, so a missing value fails without downloading
-    // anything and reports all the missing parameters at once.
+    // Check every parameter first, so all the missing parameters are reported at once.
     checkRequiredParameters(conf);
     Function<String, String> resolver =
         value -> JobTemplatePlaceholderUtils.replacePlaceholders(value, conf, parameters);
 
-    // Resolve everything before fetching anything, so a template that resolves to duplicate keys
-    // is rejected without downloading a file first.
-    String executableUri = resolver.apply(content.executable());
+    String executable = resolver.apply(content.executable());
     List<String> args = resolveList(content.arguments(), resolver);
     Map<String, String> environments = resolveMap(content.environments(), resolver, "environments");
     Map<String, String> customFields = resolveMap(content.customFields(), resolver, "customFields");
 
     if (content.jobType() == JobTemplate.JobType.SHELL) {
-      List<String> scriptUris = resolveList(content.scripts(), resolver);
-
       return ShellJobTemplate.builder()
           .withName(name)
           .withComment(comment)
-          .withExecutable(fetchFileFromUri(executableUri, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withExecutable(executable)
           .withArguments(args)
           .withEnvironments(environments)
           .withCustomFields(customFields)
-          .withScripts(fetchFilesFromUri(scriptUris, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withScripts(resolveList(content.scripts(), resolver))
           .build();
     }
 
     if (content.jobType() == JobTemplate.JobType.SPARK) {
-      String className = resolver.apply(content.className());
-      List<String> jarUris = resolveList(content.jars(), resolver);
-      List<String> fileUris = resolveList(content.files(), resolver);
-      List<String> archiveUris = resolveList(content.archives(), resolver);
-      Map<String, String> configs = resolveMap(content.configs(), resolver, "configs");
-
       return SparkJobTemplate.builder()
           .withName(name)
           .withComment(comment)
-          .withExecutable(fetchFileFromUri(executableUri, stagingDir, FETCH_TIMEOUT_IN_MS))
+          .withExecutable(executable)
           .withArguments(args)
           .withEnvironments(environments)
           .withCustomFields(customFields)
-          .withClassName(className)
-          .withJars(fetchFilesFromUri(jarUris, stagingDir, FETCH_TIMEOUT_IN_MS))
-          .withFiles(fetchFilesFromUri(fileUris, stagingDir, FETCH_TIMEOUT_IN_MS))
-          .withArchives(fetchFilesFromUri(archiveUris, stagingDir, FETCH_TIMEOUT_IN_MS))
-          .withConfigs(configs)
+          .withClassName(resolver.apply(content.className()))
+          .withJars(resolveList(content.jars(), resolver))
+          .withFiles(resolveList(content.files(), resolver))
+          .withArchives(resolveList(content.archives(), resolver))
+          .withConfigs(resolveMap(content.configs(), resolver, "configs"))
           .build();
     }
 
     throw new IllegalArgumentException("Unsupported job type: " + content.jobType());
-  }
-
-  @VisibleForTesting
-  static List<String> fetchFilesFromUri(List<String> uris, File stagingDir, int timeoutInMs) {
-    return uris.stream()
-        .map(uri -> fetchFileFromUri(uri, stagingDir, timeoutInMs))
-        .collect(Collectors.toList());
-  }
-
-  @VisibleForTesting
-  static String fetchFileFromUri(String uri, File stagingDir, int timeoutInMs) {
-    try {
-      URI fileUri = new URI(uri);
-      File destFile = new File(stagingDir, new File(fileUri.getPath()).getName());
-      return FileFetcher.get()
-          .fetchFileFromUri(
-              uri,
-              destFile,
-              timeoutInMs,
-              null /* hadoopConf: job file URIs never use the hdfs scheme */);
-    } catch (Exception e) {
-      throw new RuntimeException(String.format("Failed to fetch file from URI %s", uri), e);
-    }
   }
 
   private void checkRequiredParameters(Map<String, String> jobConf) {

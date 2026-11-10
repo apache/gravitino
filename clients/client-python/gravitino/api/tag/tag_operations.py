@@ -18,9 +18,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Optional
 
+from gravitino.api.policy.policy_association_selector import PolicyAssociationSelector
+from gravitino.api.policy.policy_tag_association import PolicyTagAssociation
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_change import TagChange
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class TagOperations(ABC):
@@ -137,3 +141,62 @@ class TagOperations(ABC):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         pass
+
+    def list_policy_associations_for_tag(
+        self, tag_name: str
+    ) -> list[PolicyTagAssociation]:
+        """
+        List the policy associations of a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            list[PolicyTagAssociation]: The policy associations of the tag.
+
+        Raises:
+            UnsupportedOperationException: If the implementation does not
+                support policy associations for tags.
+        """
+        raise UnsupportedOperationException(
+            "listPolicyAssociationsForTag is not supported"
+        )
+
+    def add_policy_for_tag(
+        self,
+        tag_name: str,
+        policy_name: str,
+        selector: Optional[PolicyAssociationSelector] = None,
+    ) -> PolicyTagAssociation:
+        """
+        Associate a policy with a tag under a metalake. When no selector is
+        given, the association applies to all values of the tag.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+            selector (PolicyAssociationSelector): The selector scoping the
+                association, or None for all tag values.
+
+        Returns:
+            PolicyTagAssociation: The created policy association.
+
+        Raises:
+            UnsupportedOperationException: If the implementation does not
+                support policy associations for tags.
+        """
+        raise UnsupportedOperationException("addPolicyForTag is not supported")
+
+    def remove_policy_from_tag(self, tag_name: str, policy_name: str) -> None:
+        """
+        Remove the association between a policy and a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+
+        Raises:
+            UnsupportedOperationException: If the implementation does not
+                support policy associations for tags.
+        """
+        raise UnsupportedOperationException("removePolicyFromTag is not supported")

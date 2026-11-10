@@ -79,6 +79,25 @@ public class TestFileFetcher {
   }
 
   @Test
+  public void testFetchLocalFileOntoItselfKeepsFile() throws Exception {
+    File file = new File(tempDir, "run.sh");
+    Files.writeString(file.toPath(), "echo hi");
+
+    // Fetching a file into the place where it already is must not replace it with a symlink.
+    FileFetcher.get().fetchFileFromUri(file.toURI().toString(), file, 10, null);
+    Assertions.assertFalse(Files.isSymbolicLink(file.toPath()));
+    Assertions.assertEquals("echo hi", Files.readString(file.toPath()));
+
+    // Nor fetching a symlink created by an earlier fetch onto itself.
+    File srcFile = new File(tempDir, "source");
+    Files.writeString(srcFile.toPath(), "source content");
+    File destFile = new File(tempDir, "dest");
+    FileFetcher.get().fetchFileFromUri(srcFile.toURI().toString(), destFile, 10, null);
+    FileFetcher.get().fetchFileFromUri(destFile.toURI().toString(), destFile, 10, null);
+    Assertions.assertEquals("source content", Files.readString(destFile.toPath()));
+  }
+
+  @Test
   public void testOpaqueFileUriWithNullPathShouldFail() {
     // An opaque file URI (no authority/path) must fail with a clear IOException, not a raw NPE.
     File destFile = new File(tempDir, "dest_opaque");

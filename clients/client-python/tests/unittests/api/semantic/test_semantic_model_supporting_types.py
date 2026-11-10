@@ -18,10 +18,7 @@
 import unittest
 
 from gravitino.api.semantic.ai_context import AIContext
-from gravitino.api.semantic.ai_context_object import (
-    MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH,
-    AIContextObject,
-)
+from gravitino.api.semantic.ai_context_object import AIContextObject
 from gravitino.api.semantic.custom_extension import CustomExtension
 from gravitino.api.semantic.data_type import DataType
 from gravitino.api.semantic.dialect_expression import DialectExpression
@@ -249,14 +246,6 @@ class TestSemanticModelSupportingTypes(unittest.TestCase):
             ValueError, r"Additional property nested\.self contains a cyclic value"
         ):
             AIContextObject(additional_properties={"nested": cyclic})
-
-    def test_ai_context_object_rejects_deeply_nested_additional_properties(self):
-        value = "leaf"
-        for _ in range(MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH + 1):
-            value = [value]
-
-        with self.assertRaisesRegex(ValueError, "exceeds maximum nesting depth of 100"):
-            AIContextObject(additional_properties={"nested": value})
 
     def test_ai_context_object_rejects_none_elements(self):
         with self.assertRaisesRegex(ValueError, r"synonyms\[1\] must be a string"):

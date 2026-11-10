@@ -18,7 +18,12 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
+import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
+import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
+
 import com.google.common.base.Preconditions;
+import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
@@ -30,14 +35,23 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.semantic.OssieDocument;
+import org.apache.gravitino.semantic.OssieDocumentConverter;
+import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 
 /** Dispatches always-managed Semantic Model operations to Gravitino's EntityStore. */
 public class SemanticModelOperationDispatcher extends OperationDispatcher
     implements SemanticModelDispatcher {
+
+  private static final SemanticModelPropertiesMetadata PROPERTIES_METADATA =
+      new SemanticModelPropertiesMetadata();
 
   private final CatalogManager catalogManager;
   private final SchemaDispatcher schemaDispatcher;
@@ -77,6 +91,20 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetrics(namespace);
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    checkRelationalCatalog(namespace);
+    schemaDispatcher.loadSchema(NameIdentifier.of(namespace.levels()));
+    return managedOperations.listMetricInfos(namespace);
+  }
+
+  @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
     checkRelationalCatalog(ident.namespace());
     if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
@@ -90,29 +118,55 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(properties != null, "Properties must not be null");
+    validatePropertyForCreate(PROPERTIES_METADATA, properties);
+    Map<String, String> effectiveProperties = new HashMap<>(properties);
+    effectiveProperties.putIfAbsent(
+        PROPERTY_OSSIE_VERSION,
+        (String) PROPERTIES_METADATA.getDefaultValue(PROPERTY_OSSIE_VERSION));
+
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     schemaDispatcher.loadSchema(schemaIdent);
-    return managedOperations.createSemanticModel(ident, comment, definition, properties);
+    return managedOperations.createSemanticModel(
+        ident, comment, definition, effectiveProperties, sourceUpdate);
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel importSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
+    return createSemanticModel(ident, comment, definition, properties, sourceUpdate);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
+    return OssieDocumentConverter.exportDocument(loadSemanticModel(ident), format);
+  }
+
+  @Override
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     if (changes == null || changes.length == 0) {
       throw new IllegalSemanticModelException("At least one Semantic Model change is required");
     }
+    validatePropertyChanges(changes);
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-    return managedOperations.alterSemanticModel(ident, changes);
+    return managedOperations.alterSemanticModel(ident, sourceUpdate, changes);
   }
 
   @Override
@@ -137,5 +191,21 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
 
   private static NameIdentifier schemaIdentifier(NameIdentifier ident) {
     return NameIdentifier.of(ident.namespace().levels());
+  }
+
+  private static void validatePropertyChanges(SemanticModelChange[] changes) {
+    Map<String, String> upserts = new HashMap<>();
+    Map<String, String> deletes = new HashMap<>();
+    for (SemanticModelChange change : changes) {
+      if (change instanceof SemanticModelChange.SetProperty) {
+        SemanticModelChange.SetProperty setProperty = (SemanticModelChange.SetProperty) change;
+        upserts.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (change instanceof SemanticModelChange.RemoveProperty) {
+        SemanticModelChange.RemoveProperty removeProperty =
+            (SemanticModelChange.RemoveProperty) change;
+        deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
+      }
+    }
+    validatePropertyForAlter(PROPERTIES_METADATA, upserts, deletes);
   }
 }

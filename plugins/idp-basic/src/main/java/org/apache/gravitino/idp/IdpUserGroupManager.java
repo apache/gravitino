@@ -29,6 +29,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
@@ -45,12 +46,16 @@ import org.apache.gravitino.idp.storage.service.IdpGroupMetaService;
 import org.apache.gravitino.idp.storage.service.IdpUserMetaService;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manager for built-in IdP users and groups. It mirrors {@link
  * org.apache.gravitino.authorization.UserGroupManager} but operates on global IdP metadata.
  */
 public class IdpUserGroupManager implements Closeable {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IdpUserGroupManager.class);
 
   private static final IdpUserMetaService USER_SERVICE = IdpUserMetaService.getInstance();
   private static final IdpGroupMetaService GROUP_SERVICE = IdpGroupMetaService.getInstance();
@@ -116,7 +121,15 @@ public class IdpUserGroupManager implements Closeable {
     IdpCredentialValidator.validatePassword(initialAdminPassword);
     String passwordHash = passwordHasher.hash(initialAdminPassword);
     for (String serviceAdmin : missingServiceAdmins) {
-      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash, true));
+      try {
+        USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash, true));
+      } catch (AlreadyExistsException e) {
+        // Another node may have created the same service admin between the existence check and
+        // insert. Treat the unique-constraint conflict as success so bootstrap stays idempotent.
+        LOG.info(
+            "Configured service admin {} already exists; skipping create during bootstrap",
+            serviceAdmin);
+      }
     }
   }
 
@@ -197,17 +210,35 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   /**
+   * Changes the password for a built-in IdP user after verifying the old password.
+   *
+   * @param username The username.
+   * @param newPassword The new plaintext password.
+   * @param oldPassword The caller's current plaintext password.
+   * @return {@code true} if the password was updated
+   * @throws NotFoundException if the user does not exist
+   * @throws IllegalArgumentException if {@code oldPassword} does not match the stored hash
+   */
+  public boolean changePassword(String username, String newPassword, String oldPassword) {
+    IdpUser user = USER_SERVICE.getIdpUser(username);
+    if (user.passwordHash() == null || !passwordHasher.verify(oldPassword, user.passwordHash())) {
+      throw new IllegalArgumentException("\"oldPassword\" does not match the stored password");
+    }
+    return changePassword(username, newPassword);
+  }
+
+  /**
    * Enables or disables a built-in IdP user.
    *
    * @param username The username.
    * @param enabled Whether the user should be enabled.
    * @return {@code true} if the enabled flag was updated
    * @throws NotFoundException if the user does not exist
-   * @throws IllegalArgumentException if {@code enabled} is {@code false} and the username is a
-   *     configured service admin
+   * @throws IllegalArgumentException if the username is a configured service admin
    */
   public boolean updateEnabled(String username, boolean enabled) {
-    checkCanDisableUser(username, enabled);
+    Preconditions.checkArgument(
+        !isServiceAdmin(username), "Cannot update the enabled flag of service admin %s", username);
     return USER_SERVICE.updateIdpUserEnabled(username, enabled);
   }
 

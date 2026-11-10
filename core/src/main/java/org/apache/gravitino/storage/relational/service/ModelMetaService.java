@@ -29,6 +29,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
@@ -38,9 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.EntityChangeLogDiagnostics;
-import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -132,9 +131,8 @@ public class ModelMetaService {
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
-    String modelFullName =
-        EntityChangeLogNameIdentifierCodec.encode(
-            NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()));
+    NameIdentifier modelIdent =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name());
 
     // Delete the model row first, and only when its concurrency version still matches the value
     // read above. If another writer changed the model, stop before removing any related data.
@@ -142,18 +140,8 @@ public class ModelMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> deleteModelWithVersion(ident, modelPO),
           () -> deleteModelDependents(modelPO),
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.MODEL.name(),
-                        modelFullName,
-                        OperateType.DROP));
-            EntityChangeLogDiagnostics.logAppended(
-                metalakeName, Entity.EntityType.MODEL.name(), OperateType.DROP, modelFullName);
-          });
+          () ->
+              EntityChangeLogWriter.append(modelIdent, Entity.EntityType.MODEL, OperateType.DROP));
     } catch (NoSuchEntityException e) {
       // Another writer dropped the model between the read above and this transaction. A drop that
       // finds nothing to drop is reported the same way as the read above reports it, so that a
@@ -338,10 +326,8 @@ public class ModelMetaService {
     String metalakeName = identifier.namespace().level(0);
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
-    String oldFullName =
-        EntityChangeLogNameIdentifierCodec.encode(
-            NameIdentifierUtil.ofModel(
-                metalakeName, catalogName, schemaName, oldModelEntity.name()));
+    NameIdentifier oldModelIdent =
+        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name());
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     try {
@@ -352,6 +338,9 @@ public class ModelMetaService {
               oldModelPO.getCatalogId(),
               oldModelPO.getMetalakeId(),
               () -> {
+                if (isRenamed) {
+                  failIfModelNameTaken(oldModelPO, newEntity);
+                }
                 // The model CAS is the first child write. It succeeds only if the concurrency
                 // version
                 // still matches, so an older request cannot overwrite a newer model or add an
@@ -368,16 +357,8 @@ public class ModelMetaService {
               },
               () -> {
                 if (isRenamed) {
-                  SessionUtils.doWithoutCommit(
-                      EntityChangeLogMapper.class,
-                      mapper ->
-                          mapper.insertEntityChange(
-                              metalakeName,
-                              Entity.EntityType.MODEL.name(),
-                              oldFullName,
-                              OperateType.ALTER));
-                  EntityChangeLogDiagnostics.logAppended(
-                      metalakeName, Entity.EntityType.MODEL.name(), OperateType.ALTER, oldFullName);
+                  EntityChangeLogWriter.append(
+                      oldModelIdent, Entity.EntityType.MODEL, OperateType.ALTER);
                 }
               });
     } catch (RuntimeException re) {
@@ -387,6 +368,26 @@ public class ModelMetaService {
     }
 
     return newEntity;
+  }
+
+  /**
+   * Fails a rename whose new name is already taken, before the UPDATE runs. On PostgreSQL the
+   * UPDATE waits on the unique index entry of the row that holds the name, so two renames that swap
+   * names would wait for each other and deadlock.
+   */
+  private void failIfModelNameTaken(ModelPO oldModelPO, ModelEntity newEntity) {
+    Long existingId =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.selectModelIdBySchemaIdAndModelName(
+                    oldModelPO.getSchemaId(), newEntity.name()));
+    // The model's own row matches when the rename only changes case on a case-insensitive store.
+    if (existingId != null && !Objects.equals(existingId, oldModelPO.getModelId())) {
+      throw new EntityAlreadyExistsException(
+          "The %s entity: %s already exists.",
+          Entity.EntityType.MODEL.name(), newEntity.nameIdentifier());
+    }
   }
 
   @Monitored(

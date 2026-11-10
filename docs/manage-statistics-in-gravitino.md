@@ -14,7 +14,7 @@ This page covers the Gravitino API for statistics. For what a statistic is, the 
 reserved and custom, and how partition statistics relate to partitions, see
 [Statistics](./statistics.md).
 
-Statistics attach to tables. Custom names must begin with `custom.` to stay clear of names Gravitino
+Statistics attach to tables. Custom names must begin with `custom-` to stay clear of names Gravitino
 may reserve later.
 
 ## Table Statistics
@@ -24,6 +24,19 @@ may reserve later.
 Updating creates a statistic that does not exist and overwrites one that does. Reserved statistics
 maintained by the system are not modifiable and the request is rejected.
 
+Concurrent creation, modification or deletion of the same statistic can return HTTP 409, as can a
+write that times out waiting for a concurrent writer. The entire update batch is rolled back on a
+conflict. If the client chooses to retry, it should retry against the current state. If the target
+table was deleted or replaced while the operation was in progress, the request fails with HTTP 404.
+On a MySQL backend, whose collation ignores trailing spaces, a name that differs only in trailing
+spaces from an existing statistic, or from another name in the same request, is rejected with
+HTTP 400.
+
+OCC conflicts are an expected result of concurrent writes. Clients decide whether to abort or
+retry according to their application semantics. Gravitino does not automatically retry a
+conflicting write. The built-in statistics updater propagates the exception to its caller; a
+maintenance job can therefore fail on a conflict under its existing failure handling.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
@@ -31,8 +44,8 @@ maintained by the system are not modifiable and the request is rejected.
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
   "updates": {
-    "custom.last_reviewed": "2026-08-02",
-    "custom.owner_team": "risk"
+    "custom-last_reviewed": "2026-08-02",
+    "custom-owner_team": "risk"
   }
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
@@ -43,8 +56,8 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 ```java
 Table orders = ...
 Map<String, StatisticValue<?>> updates = Maps.newHashMap();
-updates.put("custom.last_reviewed", StatisticValues.stringValue("2026-08-02"));
-updates.put("custom.owner_team", StatisticValues.stringValue("risk"));
+updates.put("custom-last_reviewed", StatisticValues.stringValue("2026-08-02"));
+updates.put("custom-owner_team", StatisticValues.stringValue("risk"));
 
 orders.supportsStatistics().updateStatistics(updates);
 ```
@@ -74,13 +87,18 @@ List<Statistic> statistics = orders.supportsStatistics().listStatistics();
 
 ### Drop Statistics
 
+Dropping a statistic that another request has already removed is not a conflict. If a statistic
+was updated or deleted and recreated after the drop read it, the request can return HTTP 409 and
+the entire drop batch is rolled back. Retry against the current state. If the target table was
+deleted or replaced while dropping existing statistics, the request fails with HTTP 404.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   -H "Content-Type: application/json" -d '{
-  "names": ["custom.owner_team"]
+  "names": ["custom-owner_team"]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
@@ -88,7 +106,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 <TabItem value="java" label="Java">
 
 ```java
-orders.supportsStatistics().dropStatistics(ImmutableList.of("custom.owner_team"));
+orders.supportsStatistics().dropStatistics(ImmutableList.of("custom-owner_team"));
 ```
 
 </TabItem>
@@ -111,7 +129,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
   "updates": [
     {
       "partitionName": "dt=2026-08-02",
-      "statistics": {"custom.row_estimate": "18000"}
+      "statistics": {"custom-row_estimate": "18000"}
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -122,7 +140,7 @@ curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-stats.put("custom.row_estimate", StatisticValues.longValue(18000L));
+stats.put("custom-row_estimate", StatisticValues.longValue(18000L));
 
 orders.supportsPartitionStatistics().updatePartitionStatistics(
     ImmutableList.of(PartitionStatisticsModification.update("dt=2026-08-02", stats)));
@@ -167,7 +185,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "drops": [
     {
       "partitionName": "dt=2026-08-02",
-      "statisticNames": ["custom.row_estimate"]
+      "statisticNames": ["custom-row_estimate"]
     }
   ]
 }' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
@@ -180,7 +198,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 orders.supportsPartitionStatistics().dropPartitionStatistics(
     ImmutableList.of(
         PartitionStatisticsModification.drop(
-            "dt=2026-08-02", ImmutableList.of("custom.row_estimate"))));
+            "dt=2026-08-02", ImmutableList.of("custom-row_estimate"))));
 ```
 
 </TabItem>

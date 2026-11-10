@@ -49,8 +49,10 @@ dependencies {
   testImplementation(project(":server-common"))
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.commons.dbcp2)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)

@@ -56,7 +56,16 @@ class TestGravitinoLanceModeParsing {
   void testNormalizeTokenPreservesSpecialCharacters() {
     Assertions.assertEquals("CREATE", CommonUtil.normalizeToken(" create "));
     Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("exist_ok"));
+    Assertions.assertEquals("OVERWRITE", CommonUtil.normalizeToken(" OverWrite "));
     Assertions.assertEquals("#CREATE$", CommonUtil.normalizeToken("#create$"));
+  }
+
+  @Test
+  void testNormalizeTokenMapsPascalCaseExistOk() {
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("ExistOk"));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken(" ExistOk "));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("existOk"));
+    Assertions.assertEquals("EXIST_OK", CommonUtil.normalizeToken("EXISTOK"));
   }
 
   @Test
@@ -64,6 +73,9 @@ class TestGravitinoLanceModeParsing {
     Assertions.assertEquals(
         TestMode.EXIST_OK,
         CommonUtil.parseEnumToken(TestMode.class, "exist_ok", "Unknown mode: ", "table"));
+    Assertions.assertEquals(
+        TestMode.EXIST_OK,
+        CommonUtil.parseEnumToken(TestMode.class, "ExistOk", "Unknown mode: ", "table"));
 
     InvalidInputException exception =
         Assertions.assertThrows(
@@ -111,12 +123,16 @@ class TestGravitinoLanceModeParsing {
     GravitinoLanceTableOperations operations = newTableOperations(tableCatalog);
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
+    operations.createTable("catalog.schema.table", "ExistOk", ".", null, Map.of(), null);
 
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog)
+    Mockito.verify(tableCatalog, Mockito.times(2))
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
-    Assertions.assertEquals("EXIST_OK", propertiesCaptor.getValue().get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(0).get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "EXIST_OK", propertiesCaptor.getAllValues().get(1).get(LANCE_CREATION_MODE));
   }
 
   @Test

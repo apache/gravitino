@@ -35,7 +35,11 @@ paths:
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
@@ -51,9 +55,17 @@ paths:
             examples:
               FilesetCreateRequest:
                 $ref: "#/components/examples/FilesetCreateRequest"
+              MultipleLocationsFilesetCreateRequest:
+                $ref: "#/components/examples/MultipleLocationsFilesetCreateRequest"
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
+        "400":
+          $ref: "#/components/responses/FilesetCreateBadRequestResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target fileset already exists
           content:
@@ -63,7 +75,7 @@ paths:
               examples:
                 FilesetAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/FilesetAlreadyExistsException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
@@ -83,10 +95,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target fileset does not exist
+          description: >-
+            Not Found - The fileset or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -98,7 +114,9 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
-        "5xx":
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     put:
@@ -117,10 +135,14 @@ paths:
           $ref: "#/components/responses/FilesetResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target fileset does not exist
+          description: >-
+            Not Found - The fileset or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -132,6 +154,8 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target fileset already exists
           content:
@@ -141,7 +165,7 @@ paths:
               examples:
                 FilesetAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/FilesetAlreadyExistsException"
-        "5xx":
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
@@ -154,7 +178,11 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/location:
@@ -169,28 +197,44 @@ paths:
         - location
       summary: Get file location
       operationId: getFileLocation
-      description: Returns the specified file location object
+      description: >-
+        Returns the specified file location object by resolving the storage location and
+        sub path. This operation remains available when the catalog property
+        disable-filesystem-ops is true because it does not access the filesystem.
       parameters:
         - name: sub_path
           in: query
           required: true
           schema:
             type: string
-          description: The sub path to the file or directory
+          description: >-
+            The sub path to the file or directory within the selected storage location.
+            Leading and trailing whitespace is trimmed. An empty path or `/` refers to
+            that location, and a leading slash is relative to it. Complete `..` path
+            segments and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
         - name: location_name
           in: query
           required: false
           schema:
             type: string
-            default: "default"
-          description: The location name in the fileset
+          description: >-
+            The location name in the fileset. When omitted, the server uses the only storage
+            location, or properties.default-location-name if there are multiple locations.
+            An unknown name returns HTTP 404 with NoSuchLocationNameException.
       responses:
         "200":
           $ref: "#/components/responses/FileLocationResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The target fileset does not exist
+          description: >-
+            Not Found - The fileset, its parent resource, or the specified location name
+            does not exist. When authorization is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -202,7 +246,11 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
-        "5xx":
+                NoSuchLocationNameException:
+                  $ref: "#/components/examples/NoSuchLocationNameException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/files:
@@ -217,7 +265,10 @@ paths:
         - fileset
       summary: List files
       operationId: listFilesetFiles
-      description: List metadata of files and directories in a fileset
+      description: >-
+        Lists metadata of files and directories in a fileset. Returns HTTP 501 when the
+        catalog property disable-filesystem-ops is true. The getFileLocation operation
+        remains available in that configuration.
       parameters:
         - name: sub_path
           in: query
@@ -225,20 +276,35 @@ paths:
           schema:
             type: string
             default: "/"
-          description: The sub path within the fileset to list files and directories from
+          description: >-
+            The sub path within the selected storage location to list files and directories
+            from. Leading and trailing whitespace is trimmed. An empty path or `/` refers
+            to that location, and a leading slash is relative to it. Complete `..` path
+            segments and NUL characters (U+0000) are not allowed.
+            The normalized path must remain within the selected storage location.
+            The path must exist; otherwise, this operation returns HTTP 400.
         - name: location_name
           in: query
           required: false
           schema:
             type: string
-          description: The name of the storage location
+          description: >-
+            The location name in the fileset. When omitted, the server uses the only storage
+            location, or properties.default-location-name if there are multiple locations.
+            An unknown name returns HTTP 404 with NoSuchLocationNameException.
       responses:
         "200":
           $ref: "#/components/responses/FileInfoListResponse"
+        "400":
+          $ref: "#/components/responses/InvalidSubPathErrorResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found – the target fileset or subPath or locationName does not exist
+          description: >-
+            Not Found - The fileset, its parent resource, or the specified location name
+            does not exist. When authorization is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -250,7 +316,13 @@ paths:
                   $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
                 NoSuchFilesetException:
                   $ref: "#/components/examples/NoSuchFilesetException"
-        "5xx":
+                NoSuchLocationNameException:
+                  $ref: "#/components/examples/NoSuchLocationNameException"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/FilesystemOperationsDisabledErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
@@ -328,22 +400,41 @@ components:
           nullable: true
         storageLocation:
           type: string
-          description: The location of the fileset. If the storage location of managed fileset is empty, it will \
-            use the location of namespace. The storage location of external fileset must be set.
+          description: >-
+            The location of the fileset. When omitted for a managed fileset, the location is
+            derived from its schema, which may inherit locations from the catalog. External
+            filesets must specify a storage location.
           nullable: true
         storageLocations:
           type: object
-          description: The storage locations of the fileset. If the storage location of managed fileset is empty, \
-            it will use the location of namespace. The storage locations of external fileset must be set.
+          description: >-
+            The named storage locations of the fileset. Locations are resolved by name:
+            request locations override schema locations, which override catalog locations
+            with the same name. Other inherited location names are retained. Managed filesets
+            may omit storageLocations and use locations derived from their schema and catalog.
+            External filesets must specify storage locations. When the resulting fileset has
+            more than one location, including inherited locations, properties must include
+            default-location-name with a value matching one of the resolved location keys.
           nullable: true
           default: { }
           additionalProperties:
             type: string
         properties:
           type: object
-          description: The properties of the fileset. Can be empty.
+          description: >-
+            The properties of the fileset. When the resulting fileset has multiple storage locations,
+            default-location-name is required and must match one of the resolved location keys;
+            otherwise creation returns HTTP 400. Managed filesets may inherit locations from the
+            schema or catalog even when storageLocations is omitted.
           nullable: true
           default: {}
+          properties:
+            default-location-name:
+              type: string
+              description: >-
+                The default storage location key. Required when there is more than one resolved
+                storage location. For a single location, the server fills in that location's key when
+                this property is omitted; an explicit value must match that key.
           additionalProperties:
               type: string
         secretBindings:
@@ -378,6 +469,8 @@ components:
         - $ref: "#/components/schemas/RenameFilesetRequest"
         - $ref: "#/components/schemas/SetFilesetPropertyRequest"
         - $ref: "#/components/schemas/UpdateFilesetCommentRequest"
+        - $ref: "#/components/schemas/RemoveFilesetCommentRequest"
+        - $ref: "#/components/schemas/UpdateFilesetTypeRequest"
         - $ref: "#/components/schemas/RemoveFilesetPropertyRequest"
         - $ref: "#/components/schemas/SetFilesetSecretBindingRequest"
         - $ref: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -387,6 +480,8 @@ components:
           rename: "#/components/schemas/RenameFilesetRequest"
           setProperty: "#/components/schemas/SetFilesetPropertyRequest"
           updateComment: "#/components/schemas/UpdateFilesetCommentRequest"
+          removeComment: "#/components/schemas/RemoveFilesetCommentRequest"
+          updateType: "#/components/schemas/UpdateFilesetTypeRequest"
           removeProperty: "#/components/schemas/RemoveFilesetPropertyRequest"
           setSecretBinding: "#/components/schemas/SetFilesetSecretBindingRequest"
           setSecretReference: "#/components/schemas/SetFilesetSecretReferenceRequest"
@@ -451,6 +546,32 @@ components:
       example: {
         "@type": "updateComment",
         "newComment": "new comment"
+      }
+
+    UpdateFilesetTypeRequest:
+      type: object
+      description: >-
+        Changes the fileset type without changing its identity, storage locations, or files.
+        Changing to external retains data on drop. Changing to managed accepts management
+        of the data, including deleting it on drop. Setting the current type is allowed.
+      required:
+        - "@type"
+        - newType
+      properties:
+        "@type":
+          type: string
+          description: The type of the update
+          enum:
+            - updateType
+        newType:
+          type: string
+          description: The new type of the fileset
+          enum:
+            - managed
+            - external
+      example: {
+        "@type": "updateType",
+        "newType": "external"
       }
 
     RemoveFilesetPropertyRequest:
@@ -550,6 +671,44 @@ components:
       }
 
   responses:
+    FilesetCreateBadRequestResponse:
+      description: >-
+        Bad Request - The fileset creation request is invalid. For multiple storage
+        locations, properties.default-location-name must name one of the location keys.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1001
+            type: IllegalArgumentException
+            message: >-
+              The fileset property default-location-name must be set and must be one of
+              the fileset locations, location names: [primary, secondary], default location name: null
+
+    FilesystemOperationsDisabledErrorResponse:
+      description: Not Implemented - Filesystem operations are disabled by the catalog property disable-filesystem-ops
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1006
+            type: UnsupportedOperationException
+            message: Filesystem operations are disabled on this server
+
+    InvalidSubPathErrorResponse:
+      description: >-
+        The sub path does not satisfy the fileset path requirements.
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1001
+            type: IllegalArgumentException
+            message: subPath must not contain parent directory segments
+
     FilesetResponse:
       description: The response of fileset object
       content:
@@ -622,6 +781,17 @@ components:
         }
       }
 
+    MultipleLocationsFilesetCreateRequest:
+      value:
+        name: fileset1
+        type: EXTERNAL
+        comment: A fileset with two storage locations
+        storageLocations:
+          primary: s3://bucket/path
+          secondary: s3://other-bucket/path
+        properties:
+          default-location-name: primary
+
     FilesetResponse:
       value: {
         "code": 0,
@@ -683,3 +853,9 @@ components:
             "java.lang.NoSuchFilesetException: Fileset does not exist"
         ]
       }
+
+    NoSuchLocationNameException:
+      value:
+        code: 1003
+        type: NoSuchLocationNameException
+        message: Location name missing does not exist in fileset fileset1

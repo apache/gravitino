@@ -30,6 +30,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
+import org.apache.gravitino.iceberg.common.rest.auth.UserPrincipalForwardingAuthManager;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
@@ -41,6 +42,7 @@ import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.jdbc.UncheckedSQLException;
+import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -515,5 +517,89 @@ public class TestIcebergCatalogUtil {
         IcebergCatalogUtil.loadCatalogBackend(
             IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
     Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog2);
+  }
+
+  @Test
+  void testRestBackendForwardsUserTokenByDefault() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.REST_BACKEND_TOKEN, "ignored");
+
+    IcebergCatalogUtil.applyRestBackendAuthProperties(
+        new IcebergConfig(new HashMap<>()), properties);
+
+    Assertions.assertEquals(
+        UserPrincipalForwardingAuthManager.class.getName(),
+        properties.get(AuthProperties.AUTH_TYPE));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.REST_BACKEND_TOKEN));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_REST_TOKEN));
+  }
+
+  @Test
+  void testRestBackendServiceAccountWithToken() {
+    Map<String, String> config = serviceAccountConfig();
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.REST_BACKEND_TOKEN, "cf-token");
+    properties.put(IcebergConstants.REST_BACKEND_AUTH_TYPE, "service-account");
+
+    IcebergCatalogUtil.applyRestBackendAuthProperties(new IcebergConfig(config), properties);
+
+    Assertions.assertEquals(
+        AuthProperties.AUTH_TYPE_OAUTH2, properties.get(AuthProperties.AUTH_TYPE));
+    Assertions.assertEquals("cf-token", properties.get(IcebergConstants.ICEBERG_REST_TOKEN));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_REST_CREDENTIAL));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.REST_BACKEND_TOKEN));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.REST_BACKEND_AUTH_TYPE));
+  }
+
+  @Test
+  void testRestBackendServiceAccountWithClientCredential() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.REST_BACKEND_CREDENTIAL, "client:secret");
+    properties.put(IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI, "https://idp/token");
+    properties.put(IcebergConstants.REST_BACKEND_SCOPE, "catalog");
+
+    IcebergCatalogUtil.applyRestBackendAuthProperties(
+        new IcebergConfig(serviceAccountConfig()), properties);
+
+    Assertions.assertEquals(
+        AuthProperties.AUTH_TYPE_OAUTH2, properties.get(AuthProperties.AUTH_TYPE));
+    Assertions.assertEquals(
+        "client:secret", properties.get(IcebergConstants.ICEBERG_REST_CREDENTIAL));
+    Assertions.assertEquals(
+        "https://idp/token", properties.get(IcebergConstants.ICEBERG_REST_OAUTH2_SERVER_URI));
+    Assertions.assertEquals("catalog", properties.get(IcebergConstants.ICEBERG_REST_SCOPE));
+    Assertions.assertFalse(properties.containsKey(IcebergConstants.ICEBERG_REST_TOKEN));
+  }
+
+  @Test
+  void testRestBackendServiceAccountRequiresExactlyOneCredential() {
+    IcebergConfig config = new IcebergConfig(serviceAccountConfig());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergCatalogUtil.applyRestBackendAuthProperties(config, new HashMap<>()));
+
+    Map<String, String> both = new HashMap<>();
+    both.put(IcebergConstants.REST_BACKEND_TOKEN, "t");
+    both.put(IcebergConstants.REST_BACKEND_CREDENTIAL, "c:s");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> IcebergCatalogUtil.applyRestBackendAuthProperties(config, both));
+  }
+
+  @Test
+  void testRestBackendAuthTypeRejectsUnknownValue() {
+    Map<String, String> config = new HashMap<>();
+    config.put(IcebergConstants.REST_BACKEND_AUTH_TYPE, "basic");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new IcebergConfig(config).isRestBackendServiceAccount());
+  }
+
+  private static Map<String, String> serviceAccountConfig() {
+    Map<String, String> config = new HashMap<>();
+    config.put(
+        IcebergConstants.REST_BACKEND_AUTH_TYPE,
+        IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT);
+    return config;
   }
 }

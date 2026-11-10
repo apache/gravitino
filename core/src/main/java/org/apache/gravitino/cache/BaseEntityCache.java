@@ -107,10 +107,10 @@ public abstract class BaseEntityCache implements EntityCache {
   public final <E extends Entity & HasIdentifier> void put(E entity) {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
 
-    // Called before the cacheability check and before any subclass takes this entity's lock: it
-    // may take another key's lock (e.g. the model key when inserting a model version), and nesting
-    // two entity locks could deadlock. A non-cacheable entity can still invalidate a cacheable one,
-    // so this runs for every entity.
+    // Called before the cacheability check: a non-cacheable entity can still invalidate a cacheable
+    // one, so this runs for every entity. The caller may already hold this entity's lock, so the
+    // hook must not take another entity's lock (see
+    // SupportsEntityStoreCache#invalidateOnKeyChange).
     invalidateOnKeyChange(entity);
 
     if (!isCacheable(entity.type())) {
@@ -182,9 +182,28 @@ public abstract class BaseEntityCache implements EntityCache {
   }
 
   /**
-   * Removes an expired entity from the data cache.
+   * Removes a key from the implementation's bookkeeping only if it is absent from the underlying
+   * cache. This includes eviction, expiration, and explicit invalidation. This may be called while
+   * the underlying cache holds an internal lock. Implementations must not acquire locks held across
+   * underlying cache operations, and must tolerate the key having been added back before the call.
    *
-   * @param key The expired entity key to remove.
+   * <p>The default implementation delegates to the legacy hook so existing subclass overrides
+   * remain effective.
+   *
+   * @param key The cache key to remove from bookkeeping if absent.
    */
+  protected void removeIndexEntryIfAbsent(EntityCacheKey key) {
+    invalidateExpiredItem(key);
+  }
+
+  /**
+   * Legacy hook for removing an absent key from the implementation's bookkeeping.
+   *
+   * @param key The evicted, expired, or explicitly invalidated entity key.
+   * @deprecated Use {@link #removeIndexEntryIfAbsent(EntityCacheKey)}. Existing overrides continue
+   *     to receive calls through its default implementation and must obey its locking and
+   *     reinsertion contract.
+   */
+  @Deprecated
   protected abstract void invalidateExpiredItem(EntityCacheKey key);
 }

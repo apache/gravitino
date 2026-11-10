@@ -20,6 +20,7 @@
 package org.apache.gravitino.policy;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.tag.TagManager.SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
@@ -27,25 +28,32 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.sql.RestrictedSqlExpressionParserFacade;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.RenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +78,55 @@ public class PolicyManager implements PolicyDispatcher {
     this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
+  /**
+   * Applies a policy to an object through its hidden tag using the entity store.
+   *
+   * <p>The hidden tag is created with the policy. This method loads that tag and submits an
+   * idempotent object assignment. The relation operation validates the object endpoint and owns the
+   * transaction.
+   *
+   * <p>This internal method is not exposed through the policy dispatcher or client APIs.
+   *
+   * @param metalake The policy and object's metalake.
+   * @param policyName The policy name.
+   * @param object The metadata object to associate.
+   * @param auditInfo The audit information to preserve on newly created relations.
+   * @return The policy's hidden tag ID.
+   * @throws IOException If an entity or relation cannot be persisted.
+   * @throws NoSuchEntityException If the policy, hidden tag or target object does not exist.
+   * @throws IllegalArgumentException If auditInfo is null or the object type does not support tag
+   *     assignments.
+   */
+  public long addPolicyToObject(
+      String metalake, String policyName, MetadataObject object, Audit auditInfo)
+      throws IOException {
+    Preconditions.checkArgument(auditInfo != null, "Policy binding audit information is required");
+    Preconditions.checkArgument(
+        SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(object.type()),
+        "Unsupported policy binding object type: %s",
+        object.type());
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+
+    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    PolicyEntity policy =
+        entityStore.get(policyIdent, Entity.EntityType.POLICY, PolicyEntity.class);
+    NameIdentifier tagIdent = NameIdentifierUtil.ofTag(metalake, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = entityStore.get(tagIdent, Entity.EntityType.TAG, TagEntity.class);
+    entityStore
+        .relationOperations()
+        .updateEntityRelations(
+            RelationUpdate.of(
+                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                    MetadataObjectUtil.toEntityIdent(metalake, object),
+                    MetadataObjectUtil.toEntityType(object),
+                    new RelationEdgeTarget[] {
+                      RelationEdgeTarget.of(tagIdent, Entity.EntityType.TAG, null)
+                    },
+                    null)
+                .withAuditInfo(auditInfo));
+    return tag.id();
+  }
+
   @Override
   public String[] listPolicies(String metalake) {
     return Arrays.stream(listPolicyInfos(metalake)).map(PolicyEntity::name).toArray(String[]::new);
@@ -79,42 +136,31 @@ public class PolicyManager implements PolicyDispatcher {
   public PolicyEntity[] listPolicyInfos(String metalake) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(NamespaceUtil.ofPolicy(metalake).levels()),
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore
-                .list(
-                    NamespaceUtil.ofPolicy(metalake), PolicyEntity.class, Entity.EntityType.POLICY)
-                .toArray(new PolicyEntity[0]);
-          } catch (IOException ioe) {
-            LOG.error("Failed to list policies under metalake {}", metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      return entityStore
+          .list(NamespaceUtil.ofPolicy(metalake), PolicyEntity.class, Entity.EntityType.POLICY)
+          .toArray(new PolicyEntity[0]);
+    } catch (IOException ioe) {
+      LOG.error("Failed to list policies under metalake {}", metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
   public PolicyEntity getPolicy(String metalake, String policyName) throws NoSuchPolicyException {
     checkMetalake(NameIdentifier.of(metalake), entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofPolicy(metalake, policyName),
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore.get(
-                NameIdentifierUtil.ofPolicy(metalake, policyName),
-                Entity.EntityType.POLICY,
-                PolicyEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchPolicyException(
-                "Policy with name %s under metalake %s does not exist", policyName, metalake);
-          } catch (IOException ioe) {
-            LOG.error("Failed to get policy {} under metalake {}", policyName, metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      return entityStore.get(
+          NameIdentifierUtil.ofPolicy(metalake, policyName),
+          Entity.EntityType.POLICY,
+          PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchPolicyException(
+          "Policy with name %s under metalake %s does not exist", policyName, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Failed to get policy {} under metalake {}", policyName, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
@@ -128,66 +174,64 @@ public class PolicyManager implements PolicyDispatcher {
       throws PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofPolicy(metalake, policyName),
-        LockType.WRITE,
-        () -> {
-          PolicyEntity policyEntity =
-              PolicyEntity.builder()
-                  .withId(idGenerator.nextId())
-                  .withName(policyName)
-                  .withNamespace(NamespaceUtil.ofPolicy(metalake))
-                  .withComment(comment)
-                  .withPolicyType(type)
-                  .withEnabled(enabled)
-                  .withContent(content)
-                  .withAuditInfo(
-                      AuditInfo.builder()
-                          .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-                          .withCreateTime(Instant.now())
-                          .build())
-                  .build();
+    content.validate();
+    validateReadRestrictionContent(type, content);
 
-          try {
-            entityStore.put(policyEntity, false /* overwritten */);
-            return policyEntity;
-          } catch (EntityAlreadyExistsException e) {
-            throw new PolicyAlreadyExistsException(
-                "Policy with name %s under metalake %s already exists", policyName, metalake);
-          } catch (IOException ioe) {
-            LOG.error("Failed to create policy {} under metalake {}", policyName, metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    PolicyEntity policyEntity =
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(policyName)
+            .withNamespace(NamespaceUtil.ofPolicy(metalake))
+            .withComment(comment)
+            .withPolicyType(type)
+            .withEnabled(enabled)
+            .withContent(content)
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build();
+
+    try {
+      entityStore.put(policyEntity, false /* overwritten */);
+      return policyEntity;
+    } catch (EntityAlreadyExistsException e) {
+      throw new PolicyAlreadyExistsException(
+          "Policy with name %s under metalake %s already exists", policyName, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Failed to create policy {} under metalake {}", policyName, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
-  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes) {
+  public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes)
+      throws NoSuchPolicyException, PolicyAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofPolicy(metalake, policyName),
-        LockType.WRITE,
-        () -> {
-          try {
-            return entityStore.update(
-                NameIdentifierUtil.ofPolicy(metalake, policyName),
-                PolicyEntity.class,
-                Entity.EntityType.POLICY,
-                policyEntity -> updatePolicyEntity(policyEntity, changes));
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchPolicyException(
-                "Policy with name %s under metalake %s does not exist", policyName, metalake);
-          } catch (EntityAlreadyExistsException e) {
-            throw new RuntimeException(
-                String.format(
-                    "Trying to alter policy %s under metalake %s, but the new name already exists",
-                    policyName, metalake));
-          } catch (IOException ioe) {
-            LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      return entityStore.update(
+          NameIdentifierUtil.ofPolicy(metalake, policyName),
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          policyEntity -> updatePolicyEntity(policyEntity, changes));
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchPolicyException(
+          "Policy with name %s under metalake %s does not exist", policyName, metalake);
+    } catch (EntityAlreadyExistsException e) {
+      String newName =
+          RenameUtils.getLastRenameName(
+              policyName,
+              changes,
+              PolicyChange.RenamePolicy.class,
+              PolicyChange.RenamePolicy::getNewName);
+      throw new PolicyAlreadyExistsException(
+          e, "Policy with name %s under metalake %s already exists", newName, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Failed to alter policy {} under metalake {}", policyName, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
@@ -204,46 +248,37 @@ public class PolicyManager implements PolicyDispatcher {
   public boolean deletePolicy(String metalake, String policyName) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofPolicy(metalake, policyName),
-        LockType.WRITE,
-        () -> {
-          try {
-            return entityStore.delete(
-                NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
-          } catch (IOException ioe) {
-            LOG.error("Failed to delete policy {} under metalake {}", policyName, metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      return entityStore.delete(
+          NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
+    } catch (IOException ioe) {
+      LOG.error("Failed to delete policy {} under metalake {}", policyName, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   @Override
   public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
     NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
-    return TreeLockUtils.doWithTreeLock(
-        policyIdentifier,
-        LockType.READ,
-        () -> {
-          getPolicyWithoutLock(metalake, policyName);
-          try {
-            return entityStore
-                .relationOperations()
-                .batchListEntitiesByRelation(
-                    SupportsRelationOperations.Type.POLICY_TAG_REL,
-                    Collections.singletonList(policyIdentifier),
-                    Entity.EntityType.POLICY)
-                .toArray(new RelationalEntity<?>[0]);
-          } catch (IOException e) {
-            LOG.error(
-                "Failed to list tag associations for policy {} under metalake {}",
-                policyName,
-                metalake,
-                e);
-            throw new RuntimeException(e);
-          }
-        });
+    loadPolicyEntity(metalake, policyName);
+    try {
+      return entityStore
+          .relationOperations()
+          .batchListEntitiesByRelation(
+              SupportsRelationOperations.Type.POLICY_TAG_REL,
+              Collections.singletonList(policyIdentifier),
+              Entity.EntityType.POLICY)
+          .stream()
+          .toArray(RelationalEntity<?>[]::new);
+    } catch (IOException e) {
+      LOG.error(
+          "Failed to list tag associations for policy {} under metalake {}",
+          policyName,
+          metalake,
+          e);
+      throw new RuntimeException(e);
+    }
   }
 
   @Override
@@ -256,7 +291,17 @@ public class PolicyManager implements PolicyDispatcher {
     return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
-  private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    if (metadataObjects.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return objectPolicyResolver.resolve(metalake, metadataObjects);
+  }
+
+  private PolicyEntity loadPolicyEntity(String metalake, String policyName) {
     try {
       return entityStore.get(
           NameIdentifierUtil.ofPolicy(metalake, policyName),
@@ -274,34 +319,30 @@ public class PolicyManager implements PolicyDispatcher {
       String metalake, String policyName, boolean expectedEnabledState) {
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
-    TreeLockUtils.doWithTreeLock(
-        NameIdentifierUtil.ofPolicy(metalake, policyName),
-        LockType.WRITE,
-        () -> {
-          if (policyEnabled(metalake, policyName) == expectedEnabledState) {
-            return null;
-          }
+    if (policyEnabled(metalake, policyName) == expectedEnabledState) {
+      return;
+    }
 
-          try {
-            entityStore.update(
-                NameIdentifierUtil.ofPolicy(metalake, policyName),
-                PolicyEntity.class,
-                Entity.EntityType.POLICY,
-                policyEntity -> {
-                  PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
-                  builder.withEnabled(expectedEnabledState);
-                  return builder.build();
-                });
-            return null;
-          } catch (IOException ioe) {
-            LOG.error(
-                "Failed to change policy {} enabled state under metalake {}",
-                policyName,
-                metalake,
-                ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+    try {
+      entityStore.update(
+          NameIdentifierUtil.ofPolicy(metalake, policyName),
+          PolicyEntity.class,
+          Entity.EntityType.POLICY,
+          policyEntity -> {
+            PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
+            builder.withEnabled(expectedEnabledState);
+            // Enable/disable must not re-validate legacy stored content.
+            return builder.buildSkippingContentValidation();
+          });
+    } catch (NoSuchEntityException e) {
+      // The policy was dropped between the state check above and this update.
+      throw new NoSuchPolicyException(
+          e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
+    } catch (IOException ioe) {
+      LOG.error(
+          "Failed to change policy {} enabled state under metalake {}", policyName, metalake, ioe);
+      throw new RuntimeException(ioe);
+    }
   }
 
   private PolicyEntity.Builder newPolicyBuilder(PolicyEntity policyEntity) {
@@ -342,6 +383,7 @@ public class PolicyManager implements PolicyDispatcher {
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
     PolicyContent newContent = policyEntity.content();
+    boolean contentUpdated = false;
 
     for (PolicyChange change : changes) {
       if (change instanceof PolicyChange.RenamePolicy) {
@@ -371,9 +413,16 @@ public class PolicyManager implements PolicyDispatcher {
         }
 
         newContent = updateContent.getContent();
+        contentUpdated = true;
+        validateReadRestrictionContent(policyType, newContent);
       } else {
         throw new IllegalArgumentException("Unsupported policy change: " + change);
       }
+    }
+
+    // Rename/comment must not re-validate legacy stored content that would fail new checks.
+    if (contentUpdated) {
+      newContent.validate();
     }
 
     PolicyEntity.Builder builder = newPolicyBuilder(policyEntity);
@@ -381,6 +430,18 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withComment(newComment);
     builder.withContent(newContent);
 
-    return builder.build();
+    return contentUpdated ? builder.build() : builder.buildSkippingContentValidation();
+  }
+
+  private static void validateReadRestrictionContent(
+      Policy.BuiltInType policyType, PolicyContent content) {
+    if (policyType == Policy.BuiltInType.ROW_FILTER && content instanceof RowFilterContent) {
+      RestrictedSqlExpressionParserFacade.validateRowFilter(
+          ((RowFilterContent) content).expression());
+    } else if (policyType == Policy.BuiltInType.COLUMN_MASK
+        && content instanceof ColumnMaskContent) {
+      RestrictedSqlExpressionParserFacade.validateColumnMask(
+          ((ColumnMaskContent) content).expression());
+    }
   }
 }
