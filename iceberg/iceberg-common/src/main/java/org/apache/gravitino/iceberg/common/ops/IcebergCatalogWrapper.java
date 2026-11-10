@@ -757,9 +757,12 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   /**
    * Same gate as Iceberg {@code TableMetadataParser.read} → {@code Codec.fromFileName}: reject
-   * directory / non-metadata paths before reading. Do not catch {@link IllegalArgumentException}
-   * around {@code read()} — corrupt content / {@code fromJson} validation must not be mislabeled as
-   * a bad metadata-location.
+   * directory / non-metadata paths before reading. Iceberg itself requires the path to contain
+   * {@code .metadata.json} (including {@code .metadata.json.gz}); any metadata file Iceberg can
+   * load already passes this check, so this is not stricter than Iceberg and does not break
+   * existing registered tables. Do not catch {@link IllegalArgumentException} around {@code read()}
+   * — corrupt content / {@code fromJson} validation must not be mislabeled as a bad
+   * metadata-location.
    */
   private static void requireMetadataFileName(String metadataLocation) {
     if (metadataLocation == null) {

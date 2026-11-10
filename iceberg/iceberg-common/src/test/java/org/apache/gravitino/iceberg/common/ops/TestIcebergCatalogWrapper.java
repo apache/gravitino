@@ -403,6 +403,9 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Request-supplied metadata-location miss on registerTable → BadRequest, not Iceberg NotFound.
+   */
   @Test
   public void testRegisterTableWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -422,6 +425,7 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /** Request-supplied metadata-location miss on registerView → BadRequest, not Iceberg NotFound. */
   @Test
   public void testRegisterViewWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -442,6 +446,10 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Request-supplied metadata-location miss on loadTableMetadataFromLocation → BadRequest (used by
+   * register-table authz / executor before register).
+   */
   @Test
   public void testLoadTableMetadataFromMissingLocationIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {

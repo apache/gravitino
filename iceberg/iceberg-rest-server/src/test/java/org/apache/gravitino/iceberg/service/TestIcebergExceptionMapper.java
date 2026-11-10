@@ -80,6 +80,29 @@ public class TestIcebergExceptionMapper {
     // Iceberg NotFoundException stays unmapped → 500. Client-supplied metadata-location misses are
     // converted to BadRequestException at the call site, not here.
     checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 500);
+    checkExceptionStatus(new BadRequestException(""), 400);
+  }
+
+  @Test
+  public void testRequestSuppliedMetadataLocationMissesAreBadRequestNotMapperNotFound() {
+    // Unconverted Iceberg NotFoundException would be 500 (mapper intentionally omits it).
+    checkExceptionStatus(
+        new org.apache.iceberg.exceptions.NotFoundException("Failed to open input stream"), 500);
+    // registerTable / registerView / loadTableMetadataFromLocation convert first; those messages
+    // must map to 400. Call-site conversion is covered in TestIcebergCatalogWrapper.
+    checkExceptionStatus(
+        new BadRequestException(
+            "Cannot register table ghost: metadata location file:/missing/v1.metadata.json does not"
+                + " exist"),
+        400);
+    checkExceptionStatus(
+        new BadRequestException(
+            "Cannot register view ghost: metadata location file:/missing/v1.metadata.json does not"
+                + " exist"),
+        400);
+    checkExceptionStatus(
+        new BadRequestException("Metadata location file:/missing/v1.metadata.json does not exist"),
+        400);
   }
 
   @Test
