@@ -3624,6 +3624,56 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testCreateFilesetRejectsInheritedTooLongLocationName() throws IOException {
+    String tooLongLocationName =
+        StringUtils.repeat("l", EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH + 1);
+    String locationPath = TEST_ROOT_PATH + "/inherited_long_location";
+    Map<String, String> catalogPaths =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + tooLongLocationName, locationPath + "_catalog");
+    Map<String, String> schemaPaths =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + tooLongLocationName, locationPath + "_schema");
+
+    // The location name is inherited from the catalog location.
+    createMultiLocationSchema("s_inherit_catalog", "comment", ImmutableMap.of(), ImmutableMap.of());
+    assertInheritedLocationRejected(
+        "s_inherit_catalog",
+        catalogPaths,
+        locationPath + "_catalog/s_inherit_catalog/fileset_inherit");
+
+    // The location name is inherited from the schema location.
+    createMultiLocationSchema("s_inherit_schema", "comment", ImmutableMap.of(), schemaPaths);
+    assertInheritedLocationRejected(
+        "s_inherit_schema", ImmutableMap.of(), locationPath + "_schema/fileset_inherit");
+  }
+
+  private void assertInheritedLocationRejected(
+      String schemaName, Map<String, String> catalogPaths, String filesetPath) throws IOException {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createMultiLocationFileset(
+                    "fileset_inherit",
+                    schemaName,
+                    null,
+                    Fileset.Type.MANAGED,
+                    catalogPaths,
+                    ImmutableMap.of(),
+                    null));
+    Assertions.assertEquals(
+        "The storage location name of the fileset must not exceed 256 characters",
+        exception.getMessage());
+
+    // No directory is left behind for the rejected fileset.
+    Path path = new Path(filesetPath);
+    try (FileSystem fs = path.getFileSystem(new Configuration())) {
+      Assertions.assertFalse(fs.exists(path));
+    }
+  }
+
+  @Test
   public void testCreateMultipleLocationsWithExceptions() throws IOException {
     // empty location name in catalog location
     Map<String, String> illegalLocations =
@@ -3717,6 +3767,25 @@ public class TestFilesetCatalogOperations {
                       ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // too long location name in storage location
+      String tooLongLocationName =
+          StringUtils.repeat("l", EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH + 1);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of(tooLongLocationName, TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals(
+          "The storage location name of the fileset must not exceed 256 characters",
+          exception.getMessage());
 
       // empty fileset storage location
       exception =

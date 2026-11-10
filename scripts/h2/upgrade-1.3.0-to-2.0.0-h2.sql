@@ -246,3 +246,7 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
 CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);
+
+-- Align the location and uri name widths with the MySQL and PostgreSQL schemas.
+ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default';
+ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL;
