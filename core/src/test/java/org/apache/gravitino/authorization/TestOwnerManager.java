@@ -56,10 +56,12 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.lock.LockManager;
@@ -289,5 +291,52 @@ public class TestOwnerManager {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "gravitinoAuthorizer", originalAuthorizer, true);
     }
+  }
+
+  @Test
+  @Order(5)
+  public void testSetOwnerReportsObjectDroppedDuringAssignment() throws IOException {
+    EntityStore store = storeFailingOwnerInsert();
+    Mockito.when(store.exists(AuthorizationUtils.ofUser(METALAKE, USER), Entity.EntityType.USER))
+        .thenReturn(true);
+    MetadataObject table = MetadataObjects.parse("c.s.t", MetadataObject.Type.TABLE);
+
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> new OwnerManager(store).setOwner(METALAKE, table, USER, Owner.Type.USER));
+  }
+
+  @Test
+  @Order(6)
+  public void testSetOwnerKeepsGenericNotFoundForMissingOwner() throws IOException {
+    EntityStore store = storeFailingOwnerInsert();
+    Mockito.when(store.exists(AuthorizationUtils.ofUser(METALAKE, USER), Entity.EntityType.USER))
+        .thenReturn(false);
+    MetadataObject table = MetadataObjects.parse("c.s.t", MetadataObject.Type.TABLE);
+
+    NotFoundException thrown =
+        Assertions.assertThrows(
+            NotFoundException.class,
+            () -> new OwnerManager(store).setOwner(METALAKE, table, USER, Owner.Type.USER));
+    Assertions.assertFalse(thrown instanceof NoSuchMetadataObjectException);
+  }
+
+  private static EntityStore storeFailingOwnerInsert() throws IOException {
+    EntityStore store =
+        Mockito.mock(
+            EntityStore.class,
+            Mockito.withSettings().extraInterfaces(SupportsRelationOperations.class));
+    SupportsRelationOperations relations = (SupportsRelationOperations) store;
+    Mockito.when(store.relationOperations()).thenReturn(relations);
+    Mockito.doThrow(new NoSuchEntityException("The entity is gone"))
+        .when(relations)
+        .insertRelation(
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.any(),
+            Mockito.anyBoolean());
+    return store;
   }
 }
