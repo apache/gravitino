@@ -81,12 +81,11 @@ public final class JobRuntimeTemplateMaskUtils {
    * callers must pass the original map to job execution.
    *
    * @param jobConf runtime configuration from the runJob caller; may be null
-   * @return a masked copy, or null when {@code jobConf} is null
+   * @return a masked copy, or an empty map when {@code jobConf} is null
    */
-  @Nullable
   public static Map<String, String> maskSensitiveJobConf(@Nullable Map<String, String> jobConf) {
     if (jobConf == null) {
-      return null;
+      return new LinkedHashMap<>();
     }
     Map<String, String> masked = new LinkedHashMap<>();
     for (Map.Entry<String, String> entry : jobConf.entrySet()) {
