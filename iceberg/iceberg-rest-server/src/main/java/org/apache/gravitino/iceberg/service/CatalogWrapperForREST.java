@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.net.URI;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -615,9 +616,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
       return response;
 
-    } catch (IllegalArgumentException | ValidationException e) {
-      // A filter is bound to the schema only while files are planned, so an unknown column or a
-      // value of the wrong type surfaces here as a ValidationException.
+    } catch (IllegalArgumentException | ValidationException | DateTimeParseException e) {
+      // A filter is bound to the schema only while files are planned. Unknown columns and wrong
+      // literal types usually surface as ValidationException; a timestamp without a zone compared
+      // to timestamptz surfaces as DateTimeParseException. Broader DateTimeException is not
+      // caught so unrelated server-side date/time bugs stay 5xx.
       LOG.info("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
       throw new IllegalArgumentException(
           "Invalid scan parameters: " + withoutSchemaStruct(e.getMessage()), e);
