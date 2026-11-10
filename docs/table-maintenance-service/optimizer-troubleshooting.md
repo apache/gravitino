@@ -76,12 +76,11 @@ spark.hadoop.fs.defaultFS=file:///
 default provides the Iceberg runtime, list it in `spark_conf` as well.
 
 **`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino
-endpoint needs CLI `gravitino.optimizer.auth.*` (for `submit-strategy-jobs`) and/or
-`auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options`
-for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in
+endpoint needs the optimizer Gravitino client auth (`none` / `simple` / `basic` / `oauth`) in CLI
+conf and/or short names in `updater_options`. A secured Iceberg REST catalog needs `rest.auth.*` in
 `spark-conf` for any built-in job that reads the table. Object-store writes also need
 `spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials`. See
-[Configuration](./optimizer-configuration.md) and
+[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats) and
 [Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
 
 **`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)

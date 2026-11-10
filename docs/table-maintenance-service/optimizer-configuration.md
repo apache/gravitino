@@ -212,19 +212,35 @@ gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 ```
 
-When the Gravitino server enables authentication, add CLI client credentials (used by
-`submit-strategy-jobs` and related providers). Short names in `updater_options` (`auth_type`,
-`username`, `password`, …) are equivalent for update-stats jobs:
+### Gravitino client auth (CLI and update-stats)
 
-```properties
-gravitino.optimizer.auth.type = basic
-gravitino.optimizer.auth.username = admin
-gravitino.optimizer.auth.password = YourSecureGravitinoPassword
-```
+One auth model backs both the CLI Gravitino client (`submit-strategy-jobs` and related providers)
+and `builtin-iceberg-update-stats` / `submit-update-stats-job`. Supported types are **`none`**,
+**`simple`**, **`basic`**, and **`oauth`** (client-credentials only). Put the same fields in either
+place:
 
-For Iceberg REST on object storage, set `warehouse_location` to the catalog name and put
-vended credentials (plus IRC `rest.auth.*` when required) in `spark_conf`. See
+| Type               | CLI conf (`gravitino-optimizer.conf`)                                                                                                                                 | Short name in `updater_options` / `--updater-options`                                      |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `none` (default)   | omit keys, or `gravitino.optimizer.auth.type = none`                                                                                                                  | omit keys, or `auth_type=none`                                                             |
+| `simple`           | `gravitino.optimizer.auth.type`, optional `gravitino.optimizer.auth.username`                                                                                         | `auth_type`, optional `username`                                                           |
+| `basic`            | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.username`, `gravitino.optimizer.auth.password`                                                              | `auth_type`, `username`, `password`                                                        |
+| `oauth`            | `gravitino.optimizer.auth.type`, `gravitino.optimizer.auth.oauth.serverUri`, `gravitino.optimizer.auth.oauth.path`, `gravitino.optimizer.auth.oauth.credential`, `gravitino.optimizer.auth.oauth.scope` | `auth_type`, `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
+
+Short names are promoted onto the `gravitino.optimizer.auth.*` keys before the client is built.
+Use CLI conf when the optimizer process talks to a secured server; use short names in
+`updater_options` when the update-stats Spark job (or `submit-update-stats-job` `runJob`) must
+authenticate. They are two surfaces for the same fields, not two auth systems.
+
+Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
+job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files
+do not read these Gravitino client auth fields. For Iceberg REST on object storage, set
+`warehouse_location` to the catalog name and put vended credentials (plus IRC `rest.auth.*` when
+required) in `spark_conf`. See
 [Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
+
+Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
+the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
+redacts them in DRY-RUN / SUBMIT output).
 
 For manifest rewrite policies, the mapping
 `gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className` is optional. When
@@ -232,25 +248,6 @@ omitted or blank, the recommender uses the built-in
 `org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler`.
 An explicit class name overrides that default. An omitted policy `spec_id` uses Iceberg's
 current default spec from table metadata; see [Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md).
-
-When the Gravitino server has authentication enabled, `builtin-iceberg-update-stats` needs
-credentials in `--updater-options` / `updater_options` for the Gravitino client (statistics
-updater and `submit-update-stats-job` `runJob` calls):
-
-| `auth_type`      | Fields                                                                                       |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| `none` (default) | (none)                                                                                       |
-| `simple`         | `username` (optional)                                                                        |
-| `basic`          | `username`, `password`                                                                       |
-| `oauth`          | client-credentials only: `oauth_server_uri`, `oauth_path`, `oauth_credential`, `oauth_scope` |
-
-Iceberg REST catalog authentication is separate: set `rest.auth.*` in `spark-conf` for any built-in
-job that talks to a secured IRC (including update-stats). Expire-snapshots and rewrite-data-files
-do not read `updater_options` auth fields.
-
-Passwords and OAuth credentials in `updater_options` (and secrets in `spark_conf`) travel with
-the job command line and `jobConf`; avoid logging raw `jobConf` (the submit-update-stats CLI
-redacts them in DRY-RUN / SUBMIT output).
 
 Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
 

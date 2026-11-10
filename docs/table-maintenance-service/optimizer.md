@@ -90,21 +90,19 @@ If your Iceberg REST backend runs in memory, do not restart it partway through. 
 
 #### Secured Gravitino and Iceberg REST (object storage)
 
-The local `file:///` samples below omit authentication. Against a secured evaluation cluster (basic auth + Iceberg REST on S3 or similar), also set:
+The local `file:///` samples below omit authentication. Against a secured cluster (Gravitino auth
+plus Iceberg REST on object storage), also set:
 
-1. **CLI → Gravitino auth** — when the server enables basic auth, add credentials to the optimizer conf (or the equivalent short names in `updater_options`):
-
-```properties
-gravitino.optimizer.auth.type = basic
-gravitino.optimizer.auth.username = admin
-gravitino.optimizer.auth.password = YourSecureGravitinoPassword
-```
-
-Without them, `submit-strategy-jobs` and update-stats callbacks fail with unauthorized / “credentials did not support”. See [CLI Configuration](./optimizer-configuration.md#cli-configuration).
+1. **Gravitino client auth** — configure `none` / `simple` / `basic` / `oauth` for the optimizer
+   client in `gravitino-optimizer.conf`, or the matching short names in `updater_options`. See
+   [Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats).
+   Without credentials that match the server, `submit-strategy-jobs` and update-stats callbacks
+   fail with unauthorized / “credentials did not support”.
 
 2. **REST `warehouse_location`** — for Iceberg REST catalogs this must be the **Gravitino catalog name** (for example `catalog_iceberg_s3`), not an `s3://...` URI. An object-store URI yields `NoSuchWarehouse`. Leave it empty only for local filesystem demos.
 
-3. **Object-store data plane** — Spark needs Iceberg vended credentials (and IRC `rest.auth.*` when the REST catalog is secured), for example inside `spark_conf`:
+3. **Object-store data plane** — Spark needs Iceberg vended credentials (and IRC `rest.auth.*`
+   matching your REST catalog auth mode) inside `spark_conf`, for example:
 
 ```json
 {
@@ -115,7 +113,9 @@ Without them, `submit-strategy-jobs` and update-stats callbacks fail with unauth
 }
 ```
 
-Without vended credentials, inserts and rewrites fail on the cloud credential chain. See [Configuration](./optimizer-configuration.md) and [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+Without vended credentials, inserts and rewrites fail on the cloud credential chain. See
+[Configuration](./optimizer-configuration.md) and
+[Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 
 ### Compaction
 
@@ -259,7 +259,10 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
 echo "update-stats job id: ${update_stats_job_id}"
 ```
 
-For a secured server, put `auth_type` / `username` / `password` (or OAuth fields) inside `updater_options`. For REST on object storage, set `warehouse_location` to the catalog name and add vended-credentials to `spark_conf` as in the shared prerequisites.
+For a secured server, put the matching short-name auth fields inside `updater_options` (see
+[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats)).
+For REST on object storage, set `warehouse_location` to the catalog name and add
+vended-credentials to `spark_conf` as in the shared prerequisites.
 
 Wait for it to finish, then confirm the statistics landed:
 
@@ -297,7 +300,8 @@ gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS"
 EOF_CONF
 ```
 
-On a secured cluster, add `gravitino.optimizer.auth.*` and the object-store `spark_conf` keys from [Secured Gravitino and Iceberg REST](#secured-gravitino-and-iceberg-rest-object-storage).
+On a secured cluster, add Gravitino client auth and the object-store `spark_conf` keys from
+[Secured Gravitino and Iceberg REST](#secured-gravitino-and-iceberg-rest-object-storage).
 
 Preview first. A dry run evaluates the policy and prints what it would do without submitting anything.
 
