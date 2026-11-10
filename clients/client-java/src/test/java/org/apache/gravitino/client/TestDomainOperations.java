@@ -108,7 +108,18 @@ public class TestDomainOperations extends TestBase {
         200);
     assertSnapshot(metalake.listDomainsInfo()[0], dto);
     buildMockResource(Method.GET, PATH, null, new DomainResponse(dto), 200);
-    assertSnapshot(metalake.getDomain(NAME), dto);
+    Domain loaded = metalake.getDomain(NAME);
+    assertSnapshot(loaded, dto);
+    Assertions.assertEquals(created, loaded);
+    Assertions.assertEquals(created.hashCode(), loaded.hashCode());
+    Assertions.assertNotEquals(
+        loaded, new GenericDomain(dto, client.restClient(), "another-metalake"));
+    Assertions.assertNotEquals(
+        loaded,
+        new GenericDomain(
+            dto(NAME, Domain.Status.PUBLISHED, null, TagValue.of("dept", "finance")),
+            client.restClient(),
+            "metalake"));
     DomainUpdatesRequest request =
         new DomainUpdatesRequest(
             Arrays.asList(
@@ -281,6 +292,10 @@ public class TestDomainOperations extends TestBase {
                 .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
                 .withNameContains("a/b +&.")
                 .build());
+    buildMockResource(Method.GET, PATH + "/objects", null, response, 200);
+    DomainMember reloaded = domain.listMembers(DomainMemberFilter.builder().build())[0];
+    Assertions.assertEquals(members[0], reloaded);
+    Assertions.assertEquals(members[0].hashCode(), reloaded.hashCode());
     Assertions.assertEquals(object, members[0].object());
     Assertions.assertTrue(Collections.singleton(object).contains(members[0].object()));
     Assertions.assertArrayEquals(relations, members[0].relations());
@@ -320,7 +335,7 @@ public class TestDomainOperations extends TestBase {
         Method.DELETE,
         PATH,
         null,
-        ErrorResponse.unsupportedOperation("children", new NonEmptyDomainException("children")),
+        ErrorResponse.nonEmpty(NonEmptyDomainException.class.getSimpleName(), "children"),
         409);
     Assertions.assertThrows(NonEmptyDomainException.class, () -> metalake.deleteDomain(NAME));
     Class<?>[] conflicts = {

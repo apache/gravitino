@@ -24,9 +24,11 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import lombok.EqualsAndHashCode;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
@@ -37,6 +39,7 @@ import org.apache.gravitino.domain.DomainMemberFilter;
 import org.apache.gravitino.domain.DomainRelation;
 import org.apache.gravitino.dto.domain.DomainBackingTagDTO;
 import org.apache.gravitino.dto.domain.DomainDTO;
+import org.apache.gravitino.dto.domain.DomainMemberDTO;
 import org.apache.gravitino.dto.domain.DomainRelationDTO;
 import org.apache.gravitino.dto.requests.DomainBackingTagSetRequest;
 import org.apache.gravitino.dto.requests.DomainCreateRequest;
@@ -248,25 +251,44 @@ class GenericDomain implements Domain {
             ErrorHandlers.domainErrorHandler());
     response.validate();
     return Arrays.stream(response.getMembers())
-        .map(
-            dto ->
-                new DomainMember() {
-                  private final MetadataObject object =
-                      MetadataObjects.parse(dto.getObject().fullName(), dto.getObject().type());
-
-                  /** {@inheritDoc} */
-                  @Override
-                  public MetadataObject object() {
-                    return object;
-                  }
-
-                  /** {@inheritDoc} */
-                  @Override
-                  public DomainRelation[] relations() {
-                    return GenericDomain.relations(dto.getRelations());
-                  }
-                })
+        .map(dto -> new GenericDomainMember(metalake, dto))
         .toArray(DomainMember[]::new);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean equals(@Nullable Object other) {
+    if (this == other) {
+      return true;
+    }
+    if (!(other instanceof GenericDomain)) {
+      return false;
+    }
+    GenericDomain that = (GenericDomain) other;
+    return metalake.equals(that.metalake)
+        && name().equals(that.name())
+        && Objects.equals(comment(), that.comment())
+        && properties().equals(that.properties())
+        && status() == that.status()
+        && parent().equals(that.parent())
+        && backingTag().equals(that.backingTag())
+        && Objects.equals(auditInfo(), that.auditInfo())
+        && Arrays.equals(relations(), that.relations());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        metalake,
+        name(),
+        comment(),
+        properties(),
+        status(),
+        parent(),
+        backingTag(),
+        auditInfo(),
+        Arrays.hashCode(relations()));
   }
 
   static String domainPath(String metalake, String name) {
@@ -312,5 +334,31 @@ class GenericDomain implements Domain {
   private Domain snapshot(DomainResponse response) {
     response.validate();
     return new GenericDomain(response.getDomain(), restClient, metalake);
+  }
+
+  /** A member and its relations in the queried metalake. */
+  @EqualsAndHashCode
+  private static final class GenericDomainMember implements DomainMember {
+    private final String metalake;
+    private final MetadataObject object;
+    private final DomainRelation[] relations;
+
+    private GenericDomainMember(String metalake, DomainMemberDTO dto) {
+      this.metalake = metalake;
+      this.object = MetadataObjects.parse(dto.getObject().fullName(), dto.getObject().type());
+      this.relations = GenericDomain.relations(dto.getRelations());
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public MetadataObject object() {
+      return object;
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public DomainRelation[] relations() {
+      return relations.clone();
+    }
   }
 }
