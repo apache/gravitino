@@ -52,6 +52,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -400,6 +401,9 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Request-supplied metadata-location miss on registerTable → BadRequest, not Iceberg NotFound.
+   */
   @Test
   public void testRegisterTableWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -419,7 +423,35 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /** Request-supplied metadata-location miss on registerView → BadRequest, not Iceberg NotFound. */
   @Test
+<<<<<<< HEAD
+=======
+  public void testRegisterViewWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(
+            new IcebergConfig(Map.of(IcebergConstants.CATALOG_BACKEND, "memory")))) {
+      Namespace namespace = Namespace.of("db");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      RegisterViewRequest request =
+          ImmutableRegisterViewRequest.builder()
+              .name("ghost")
+              .metadataLocation(warehouseDir.resolve("missing/v1.metadata.json").toUri().toString())
+              .build();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.registerView(namespace, request));
+      Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  /**
+   * Request-supplied metadata-location miss on loadTableMetadataFromLocation → BadRequest (used by
+   * register-table authz / executor before register).
+   */
+  @Test
+>>>>>>> 23042f85a ([#14302,#14417,#14744,#14421] fix(iceberg-rest): Map remaining IRC client errors to 4xx (#14751))
   public void testLoadTableMetadataFromMissingLocationIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
     try (IcebergCatalogWrapper wrapper =
@@ -429,6 +461,51 @@ public class TestIcebergCatalogWrapper {
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
       Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromDirectoryIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path directory = Files.createDirectories(warehouseDir.resolve("not-a-metadata-file"));
+      String location = directory.toUri().toString();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("is not a valid metadata file"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromCorruptContentIsNotBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path metadataFile = warehouseDir.resolve("v1.metadata.json");
+      Files.writeString(metadataFile, "{not-valid-table-metadata", StandardCharsets.UTF_8);
+      String location = metadataFile.toUri().toString();
+      // Codec.fromFileName accepts *.metadata.json; corrupt JSON must not become BadRequest.
+      Assertions.assertThrows(
+          RuntimeIOException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromUnreadableSchemeIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      // Local JDBC catalogs have no S3 FileIO; the client-supplied scheme is unreadable.
+      String location = "s3://bucket/path/v1.metadata.json";
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("unsupported or unreadable scheme"), e.getMessage());
+      Assertions.assertFalse(e.getMessage().contains("No FileSystem"), e.getMessage());
     }
   }
 

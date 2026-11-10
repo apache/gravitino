@@ -213,6 +213,48 @@ public class TestIcebergNamespaceOperationExecutor {
     verifyNoInteractions(mockCatalogWrapper);
   }
 
+  @Test
+  public void testRegisterTablePropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/missing/v1.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation))
+        .thenThrow(
+            new BadRequestException("Metadata location %s does not exist", metadataLocation));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(any(), any(), any(Boolean.class));
+  }
+
+  @Test
+  public void testRegisterViewPropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    RegisterViewRequest request = mock(RegisterViewRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn("file:/tmp/missing/v1.metadata.json");
+    when(mockCatalogWrapper.registerView(namespace, request))
+        .thenThrow(
+            new BadRequestException(
+                "Cannot register view ghost: metadata location file:/tmp/missing/v1.metadata.json"
+                    + " does not exist"));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerView(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).registerView(namespace, request);
+  }
+
   @ParameterizedTest
   @ValueSource(
       ints = {EntityFieldLimits.MAX_NAME_LENGTH + 1, EntityFieldLimits.MAX_COLUMN_NAME_LENGTH})
