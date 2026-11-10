@@ -33,6 +33,7 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainMember;
@@ -40,6 +41,9 @@ import org.apache.gravitino.domain.DomainMemberFilter;
 import org.apache.gravitino.dto.domain.DomainMemberDTO;
 import org.apache.gravitino.dto.responses.DomainMemberListResponse;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.DomainAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -76,8 +80,10 @@ public class DomainMembershipOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-domain-members." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-domain-members", absolute = true)
+  @AuthorizationExpression(expression = "")
   public Response listMembers(
-      @PathParam("metalake") String metalake,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
       @PathParam("domain") String domain,
       @QueryParam("types") @Nullable String types,
       @QueryParam("nameContains") @Nullable String nameContains,
@@ -98,9 +104,10 @@ public class DomainMembershipOperations {
             if (domains != null) {
               filter.withDomains(domains.toArray(new String[0]));
             }
-            // Domain visibility and member authorization will be added with domain access control.
             DomainMemberDTO[] members =
-                Arrays.stream(domainDispatcher.listMembers(metalake, domain, filter.build()))
+                Arrays.stream(
+                        DomainAuthzHelper.listMembers(
+                            domainDispatcher, metalake, domain, filter.build()))
                     .map(DomainMemberDTO::from)
                     .toArray(DomainMemberDTO[]::new);
             return Utils.ok(new DomainMemberListResponse(members));

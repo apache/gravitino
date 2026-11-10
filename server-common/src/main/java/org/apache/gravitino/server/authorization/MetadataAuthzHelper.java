@@ -247,11 +247,32 @@ public class MetadataAuthzHelper {
    */
   public static MetadataObject[] filterMetadataObject(
       String metalake, MetadataObject[] metadataObjects) {
+    return filterMetadataObject(
+        metalake,
+        metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
+  }
+
+  /**
+   * Filters metadata objects using an explicitly supplied caller and authorizer.
+   *
+   * @param metalake The metalake name.
+   * @param metadataObjects The objects to filter.
+   * @param principal The caller.
+   * @param authorizer The authorizer evaluating the ordinary metadata access expression.
+   * @return The objects accessible to the caller.
+   */
+  public static MetadataObject[] filterMetadataObject(
+      String metalake,
+      MetadataObject[] metadataObjects,
+      Principal principal,
+      GravitinoAuthorizer authorizer) {
     return doFilter(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         metadataObjects,
-        PrincipalUtils.getCurrentPrincipal(),
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        principal,
+        authorizer,
         new AuthorizationRequestContext(),
         metadataObject ->
             NameIdentifierUtil.splitNameIdentifier(

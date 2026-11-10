@@ -486,6 +486,18 @@ public class RelationalEntityStore
   }
 
   @Override
+  public boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check)
+      throws IOException {
+    try {
+      return backend.deleteDomain(ident, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    } finally {
+      invalidateCache(ident, Entity.EntityType.DOMAIN);
+    }
+  }
+
+  @Override
   public DomainEntity updateDomainBackingTagAndGet(
       NameIdentifier ident,
       @Nullable TagValue backingTag,
