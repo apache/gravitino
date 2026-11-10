@@ -400,6 +400,11 @@ components:
                 description: A list of NameIdentifier objects
                 items:
                   $ref: "#/components/schemas/NameIdentifier"
+              nextPageToken:
+                type: string
+                description: >-
+                  Token for the next page. Present only on a paged response when more visible
+                  entries remain.
           examples:
             CatalogListResponse:
               $ref: "./catalogs.yaml#/components/examples/CatalogListResponse"
@@ -723,6 +728,30 @@ components:
       schema:
         type: boolean
         default: false
+
+    pageSize:
+      name: pageSize
+      in: query
+      description: >-
+        Maximum number of entries in the page. Must be at least 1. A value above the server's
+        `gravitino.server.list.maxPageSize` returns a page of that size. Without `pageSize` and
+        `pageToken`, the full list is returned.
+      required: false
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+
+    pageToken:
+      name: pageToken
+      in: query
+      description: >-
+        Opaque token from the `nextPageToken` of a previous response, requesting the page that
+        follows it. A malformed token, or a token issued for a different list, is rejected with a
+        400.
+      required: false
+      schema:
+        type: string
 
   securitySchemes:
 
