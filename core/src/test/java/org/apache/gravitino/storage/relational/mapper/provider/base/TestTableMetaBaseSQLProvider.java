@@ -50,7 +50,7 @@ class TestTableMetaBaseSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = PROVIDER.softDeleteTableMetasByTableId(null, null);
+    String sql = PROVIDER.softDeleteTableMetasByTableId(null, null, null);
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

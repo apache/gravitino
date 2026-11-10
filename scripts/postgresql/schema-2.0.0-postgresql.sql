@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (schema_id),
+    PRIMARY KEY (schema_id, deleted_at),
     UNIQUE (catalog_id, schema_name, deleted_at)
 );
 
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS table_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (table_id),
+    PRIMARY KEY (table_id, deleted_at),
     UNIQUE (schema_id, table_name, deleted_at)
 );
 
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS topic_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (topic_id),
+    PRIMARY KEY (topic_id, deleted_at),
     UNIQUE (schema_id, topic_name, deleted_at)
 );
 
@@ -944,7 +944,7 @@ CREATE TABLE IF NOT EXISTS view_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (view_id),
+    PRIMARY KEY (view_id, deleted_at),
     UNIQUE (schema_id, view_name, deleted_at)
 );
 

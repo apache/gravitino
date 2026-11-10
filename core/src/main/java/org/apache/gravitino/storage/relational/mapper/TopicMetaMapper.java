@@ -37,15 +37,6 @@ public interface TopicMetaMapper {
       method = "insertTopicMetaOnDuplicateKeyUpdate")
   void insertTopicMetaOnDuplicateKeyUpdate(@Param("topicMeta") TopicPO topicPO);
 
-  /**
-   * Restores topic metadata only while the retained row is soft-deleted.
-   *
-   * @param topicPO the replacement topic metadata
-   * @return the number of restored rows
-   */
-  @UpdateProvider(type = TopicMetaSQLProviderFactory.class, method = "restoreSoftDeletedTopicMeta")
-  Integer restoreSoftDeletedTopicMeta(@Param("topicMeta") TopicPO topicPO);
-
   @SelectProvider(type = TopicMetaSQLProviderFactory.class, method = "listTopicPOsBySchemaId")
   List<TopicPO> listTopicPOsBySchemaId(@Param("schemaId") Long schemaId);
 
@@ -98,17 +89,20 @@ public interface TopicMetaMapper {
       @Param("schemaId") Long schemaId, @Param("topicName") String name);
 
   /**
-   * Soft-deletes a topic only if its version has not changed since the caller read it.
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
    *
-   * @param topicId the topic ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the topic changed or disappeared
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the number of affected rows
    */
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByTopicId")
   Integer softDeleteTopicMetasByTopicId(
-      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion);
+      @Param("topicId") Long topicId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,

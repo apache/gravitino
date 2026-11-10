@@ -193,16 +193,6 @@ public class SchemaMetaBaseSQLProvider {
     return SELECT_SCHEMA_BY_ID + " AND deleted_at = 0";
   }
 
-  /**
-   * Returns SQL that locks a schema identity, including a retired row that can be revived.
-   *
-   * @param schemaId the schema ID bound by MyBatis
-   * @return a select-for-update statement without a deleted-at filter
-   */
-  public String selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId) {
-    return SELECT_SCHEMA_BY_ID + " FOR UPDATE";
-  }
-
   /** Returns SQL that checks whether an active child exists in the schema. */
   public String selectActiveChildBySchemaId(@Param("schemaId") Long schemaId) {
     // Each branch returns only the same literal, so UNION ALL avoids unnecessary duplicate
@@ -360,6 +350,7 @@ public class SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
+        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
         + " AND deleted_at = 0";
   }

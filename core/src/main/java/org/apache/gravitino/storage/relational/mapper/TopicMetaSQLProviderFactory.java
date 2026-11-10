@@ -70,10 +70,6 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().insertTopicMetaOnDuplicateKeyUpdate(topicPO);
   }
 
-  public static String restoreSoftDeletedTopicMeta(@Param("topicMeta") TopicPO topicPO) {
-    return getProvider().restoreSoftDeletedTopicMeta(topicPO);
-  }
-
   public static String listTopicPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listTopicPOsBySchemaId(schemaId);
   }
@@ -128,15 +124,18 @@ public class TopicMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that soft-deletes a topic by ID and expected version.
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
    *
-   * @param topicId the topic ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
    */
   public static String softDeleteTopicMetasByTopicId(
-      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion);
+      @Param("topicId") Long topicId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion, catalogId);
   }
 
   public static String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

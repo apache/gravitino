@@ -52,7 +52,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -84,7 +83,6 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
-import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -92,7 +90,6 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
-import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -207,7 +204,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testConcurrentRevivalOfRetiredSchemaIdKeepsOneOwner() throws Exception {
+  void testConcurrentImportsOfRetiredSchemaIdKeepOneOwner() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertCatalog(metalakeName, "first_revival_catalog");
@@ -231,23 +228,8 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     try {
       Future<Throwable> firstResult;
       Future<Throwable> secondResult;
-      try (SqlSession session =
-          SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false)) {
-        SchemaPO locked =
-            session
-                .getMapper(SchemaMetaMapper.class)
-                .selectSchemaMetaByIdIncludingDeletedForUpdate(retired.id());
-        Assertions.assertNotNull(locked);
-        assertTrue(locked.getDeletedAt() > 0);
-        firstResult =
-            executor.submit(() -> reviveSchemaAfterIdentityCheck(first, lockingReadsStarted));
-        secondResult =
-            executor.submit(() -> reviveSchemaAfterIdentityCheck(second, lockingReadsStarted));
-        // Both non-locking checks have observed no active owner. Hold the retired row until both
-        // writers reach the locking read, forcing the loser to revalidate the winner's active ID.
-        assertTrue(lockingReadsStarted.await(30, TimeUnit.SECONDS));
-        session.commit();
-      }
+      firstResult = executor.submit(() -> importSchemaAfterBarrier(first, lockingReadsStarted));
+      secondResult = executor.submit(() -> importSchemaAfterBarrier(second, lockingReadsStarted));
       Throwable firstFailure = firstResult.get(30, TimeUnit.SECONDS);
       Throwable secondFailure = secondResult.get(30, TimeUnit.SECONDS);
       assertTrue((firstFailure == null) != (secondFailure == null), "Exactly one revival must win");
@@ -547,42 +529,42 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testCatalogReregistrationRejectsSoftDeletedIdentifiers() throws IOException {
+  void testCatalogReregistrationReimportsExternalIdentifiers() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
     SchemaEntity schema = createAndInsertSchema(metalakeName, catalogName, "schema_reregister");
-    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schema.name());
-    TableEntity table = createAndInsertTableEntity(tableNamespace, "table_reregister");
+    Namespace namespace = NamespaceUtil.ofTable(metalakeName, catalogName, schema.name());
+    TableEntity table = createAndInsertTableEntity(namespace, "table_reregister");
     ViewEntity view =
-        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "view_reregister");
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "view_reregister");
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, "topic_reregister", AUDIT_INFO);
     backend.insert(view, false);
-    backend.delete(
-        NameIdentifier.of(metalakeName, catalogName),
-        Entity.EntityType.CATALOG,
-        true /* cascade */);
-    createAndInsertCatalog(metalakeName, catalogName);
-
-    SoftDeletedEntityIdentifierException schemaException =
-        assertThrows(
-            SoftDeletedEntityIdentifierException.class, () -> backend.insert(schema, false));
-    Assertions.assertTrue(schemaException.getMessage().contains(String.valueOf(schema.id())));
-
-    SchemaEntity replacementSchema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            NamespaceUtil.ofSchema(metalakeName, catalogName),
-            schema.name(),
-            AUDIT_INFO);
-    backend.insert(replacementSchema, false);
-
-    SoftDeletedEntityIdentifierException tableException =
-        assertThrows(
-            SoftDeletedEntityIdentifierException.class, () -> backend.insert(table, false));
-    Assertions.assertTrue(tableException.getMessage().contains(String.valueOf(table.id())));
-
-    SoftDeletedEntityIdentifierException viewException =
-        assertThrows(SoftDeletedEntityIdentifierException.class, () -> backend.insert(view, false));
-    Assertions.assertTrue(viewException.getMessage().contains(String.valueOf(view.id())));
+    backend.insert(topic, false);
+    for (int attempt = 0; attempt < 3; attempt++) {
+      backend.delete(NameIdentifier.of(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
+      createAndInsertCatalog(metalakeName, catalogName);
+      backend.insert(schema, false);
+      backend.insert(table, false);
+      backend.insert(view, false);
+      backend.insert(topic, false);
+      Assertions.assertEquals(
+          schema.id(),
+          backend.<SchemaEntity>get(schema.nameIdentifier(), Entity.EntityType.SCHEMA).id());
+      Assertions.assertEquals(
+          table.id(),
+          backend.<TableEntity>get(table.nameIdentifier(), Entity.EntityType.TABLE).id());
+      Assertions.assertEquals(
+          view.id(), backend.<ViewEntity>get(view.nameIdentifier(), Entity.EntityType.VIEW).id());
+      Assertions.assertEquals(
+          topic.id(),
+          backend.<TopicEntity>get(topic.nameIdentifier(), Entity.EntityType.TOPIC).id());
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schema, false));
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(table, false));
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(view, false));
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topic, false));
+    }
   }
 
   @TestTemplate
@@ -2719,32 +2701,11 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @Nullable
-  private Throwable reviveSchemaAfterIdentityCheck(
-      SchemaEntity schema, CountDownLatch lockingReadsStarted) {
-    // Static mocks are thread-local: install this observer in each database writer, and delegate
-    // every mapper call to the real session so the row locks and transaction remain real.
-    try (MockedStatic<SqlSessions> sessions =
-        Mockito.mockStatic(
-            SqlSessions.class,
-            invocation -> {
-              Object result = invocation.callRealMethod();
-              if (!"getMapper".equals(invocation.getMethod().getName())
-                  || invocation.getArgument(0) != SchemaMetaMapper.class) {
-                return result;
-              }
-              SchemaMetaMapper actual = (SchemaMetaMapper) result;
-              SchemaMetaMapper observed =
-                  Mockito.mock(SchemaMetaMapper.class, AdditionalAnswers.delegatesTo(actual));
-              Mockito.doAnswer(
-                      call -> {
-                        lockingReadsStarted.countDown();
-                        return actual.selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
-                      })
-                  .when(observed)
-                  .selectSchemaMetaByIdIncludingDeletedForUpdate(schema.id());
-              return observed;
-            })) {
-      backend.insert(schema, true);
+  private Throwable importSchemaAfterBarrier(SchemaEntity schema, CountDownLatch writersStarted) {
+    try {
+      writersStarted.countDown();
+      assertTrue(writersStarted.await(30, TimeUnit.SECONDS));
+      backend.insert(schema, false);
       return null;
     } catch (Throwable failure) {
       return failure;

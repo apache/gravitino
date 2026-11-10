@@ -64,14 +64,25 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Soft-deletes an observed view registration in the same catalog lifetime.
+   *
+   * @param viewId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
+   */
   @Override
   public String softDeleteViewMetasByViewId(
-      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
+      @Param("viewId") Long viewId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE view_id = #{viewId}"
+        + " AND catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

@@ -55,7 +55,6 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -429,7 +428,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testImportViewWithSoftDeletedIdentifierRequiresManualCleanup() throws IOException {
+  void testImportViewAfterRegistrationDeletionReusesIdentifier() throws IOException {
     Namespace viewNs = Namespace.of(metalake, catalog, "schema_soft_deleted_view_identifier");
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
@@ -439,16 +438,10 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     entityStore.delete(viewIdent, VIEW);
 
     reset(entityStore);
-    doThrow(new SoftDeletedEntityIdentifierException(VIEW, viewEntity.id()))
-        .when(entityStore)
-        .put(any(ViewEntity.class), eq(false));
-
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
-    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
-    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
-    Assertions.assertTrue(exception.getMessage().contains("external view"));
+    Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(
+        viewEntity.id(), entityStore.get(viewIdent, VIEW, ViewEntity.class).id());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
   }
 
   @Test

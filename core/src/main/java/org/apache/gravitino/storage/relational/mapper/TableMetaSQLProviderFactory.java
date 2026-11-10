@@ -115,15 +115,18 @@ public class TableMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that soft-deletes a table with a version check.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
    */
   public static String softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion);
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion, catalogId);
   }
 
   public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

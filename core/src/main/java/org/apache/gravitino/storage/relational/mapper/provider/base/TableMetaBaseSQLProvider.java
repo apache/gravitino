@@ -287,21 +287,23 @@ public class TableMetaBaseSQLProvider {
   }
 
   /**
-   * Returns SQL that deletes only the table version observed by the caller.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * <p>For example, a drop that read version 3 must not delete version 4 after a concurrent alter.
-   *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
    */
   public String softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId}"
+        + " AND catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

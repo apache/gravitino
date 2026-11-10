@@ -94,11 +94,12 @@ catalog-wide recovery procedure:
 1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
    This deletes every Gravitino registration and its privileges, tags, and other relationships in
    the catalog. It does not drop the Paimon databases, tables, views, or physical data.
-2. Remove `gravitino.identifier` from all affected external objects.
-3. Recreate the Gravitino catalog and load the objects again.
-4. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
 
-Coordinate with other Gravitino catalogs that share the external source before clearing identifiers.
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
 :::
 
 #### Hadoop S3A (optional)

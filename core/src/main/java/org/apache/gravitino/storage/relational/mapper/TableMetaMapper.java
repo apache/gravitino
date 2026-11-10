@@ -29,7 +29,6 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -146,10 +145,6 @@ public interface TableMetaMapper {
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "selectTableMetaByIdForUpdate")
   TablePO selectTableMetaByIdForUpdate(@Param("tableId") Long tableId);
 
-  /** Checks whether a soft-deleted table still owns the requested primary key. */
-  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE table_id = #{tableId} AND deleted_at > 0")
-  int countDeletedTableMetasById(@Param("tableId") Long tableId);
-
   @InsertProvider(type = TableMetaSQLProviderFactory.class, method = "insertTableMeta")
   void insertTableMeta(@Param("tableMeta") TablePO tablePO);
 
@@ -165,17 +160,20 @@ public interface TableMetaMapper {
       @Param("newSchemaId") Long newSchemaId);
 
   /**
-   * Soft-deletes a table only if its version has not changed since the caller read it.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the table changed or disappeared
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the number of affected rows
    */
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
   Integer softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion);
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

@@ -1601,8 +1601,7 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   @Test
-  public void testCatalogReregistrationRequiresExternalIdentifierCleanup()
-      throws InterruptedException {
+  void testCatalogReregistrationKeepsExternalIdentifiers() throws InterruptedException {
     String reregisteredCatalogName = GravitinoITUtils.genRandomName("hive_reregistered_catalog");
     String externalSchemaName = GravitinoITUtils.genRandomName("hive_reregistered_schema");
     String externalTableName = GravitinoITUtils.genRandomName("hive_reregistered_table");
@@ -1637,68 +1636,28 @@ public class CatalogHive2IT extends BaseIT {
             "comment",
             catalogProperties);
 
-    UnsupportedOperationException exception =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () -> reregisteredCatalog.asSchemas().loadSchema(externalSchemaName));
-    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
-    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
-
-    HiveSchema externalSchema = loadHiveSchema(externalSchemaName);
-    Map<String, String> cleanedProperties = new HashMap<>(externalSchema.properties());
-    cleanedProperties.remove(StringIdentifier.ID_KEY);
-    HiveSchema cleanedSchema =
-        HiveSchema.builder()
-            .withName(externalSchema.name())
-            .withComment(externalSchema.comment())
-            .withProperties(cleanedProperties)
-            .withAuditInfo(externalSchema.auditInfo())
-            .withCatalogName(externalSchema.catalogName())
-            .build();
-    hiveClientPool.run(
-        client -> {
-          client.alterDatabase(hmsCatalog, externalSchemaName, cleanedSchema);
-          return null;
-        });
-
+    String originalSchemaId =
+        loadHiveSchema(externalSchemaName).properties().get(StringIdentifier.ID_KEY);
+    String originalTableId =
+        loadHiveTable(externalSchemaName, externalTableName)
+            .properties()
+            .get(StringIdentifier.ID_KEY);
+    Assertions.assertNotNull(originalSchemaId);
+    Assertions.assertNotNull(originalTableId);
     Assertions.assertEquals(
         externalSchemaName.toLowerCase(Locale.ROOT),
         reregisteredCatalog.asSchemas().loadSchema(externalSchemaName).name());
-
-    exception =
-        assertThrows(
-            UnsupportedOperationException.class,
-            () -> reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier));
-    Assertions.assertTrue(exception.getMessage().contains("soft-deleted Gravitino registration"));
-    Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
-
-    HiveTable externalTable = loadHiveTable(externalSchemaName, externalTableName);
-    Map<String, String> cleanedTableProperties = new HashMap<>(externalTable.properties());
-    cleanedTableProperties.remove(StringIdentifier.ID_KEY);
-    HiveTable.Builder cleanedTable =
-        HiveTable.builder()
-            .withName(externalTable.name())
-            .withColumns(externalTable.columns())
-            .withProperties(cleanedTableProperties)
-            .withAuditInfo(externalTable.auditInfo())
-            .withDistribution(externalTable.distribution())
-            .withSortOrders(externalTable.sortOrder())
-            .withPartitioning(externalTable.partitioning())
-            .withCatalogName(externalTable.catalogName())
-            .withDatabaseName(externalTable.databaseName());
-    if (externalTable.comment() != null) {
-      cleanedTable.withComment(externalTable.comment());
-    }
-    hiveClientPool.run(
-        client -> {
-          client.alterTable(
-              hmsCatalog, externalSchemaName, externalTableName, cleanedTable.build());
-          return null;
-        });
-
     Assertions.assertEquals(
         externalTableName.toLowerCase(Locale.ROOT),
         reregisteredCatalog.asTableCatalog().loadTable(externalTableIdentifier).name());
+    Assertions.assertEquals(
+        originalSchemaId,
+        loadHiveSchema(externalSchemaName).properties().get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(
+        originalTableId,
+        loadHiveTable(externalSchemaName, externalTableName)
+            .properties()
+            .get(StringIdentifier.ID_KEY));
     Assertions.assertTrue(reregisteredCatalog.asSchemas().dropSchema(externalSchemaName, true));
     Assertions.assertTrue(metalake.dropCatalog(reregisteredCatalogName, true));
   }

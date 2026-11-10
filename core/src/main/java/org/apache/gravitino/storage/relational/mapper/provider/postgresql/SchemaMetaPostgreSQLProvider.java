@@ -51,7 +51,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{schemaMeta.lastVersion},"
         + " #{schemaMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " ON CONFLICT(schema_id, deleted_at) DO UPDATE SET"
         + " schema_name = #{schemaMeta.schemaName},"
         + " metalake_id = #{schemaMeta.metalakeId},"
         + " catalog_id = #{schemaMeta.catalogId},"
@@ -85,7 +85,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
         + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
         + "</foreach>"
-        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " ON CONFLICT(schema_id, deleted_at) DO UPDATE SET"
         + " schema_name = EXCLUDED.schema_name,"
         + " metalake_id = EXCLUDED.metalake_id,"
         + " catalog_id = EXCLUDED.catalog_id,"
@@ -122,6 +122,7 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
+        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
         + " AND deleted_at = 0";
   }

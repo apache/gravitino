@@ -154,15 +154,18 @@ public interface ViewMetaMapper {
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO);
 
   /**
-   * Soft-deletes a view only if its version has not changed since the caller read it.
+   * Soft-deletes an observed view registration in the same catalog lifetime.
    *
-   * @param viewId the view ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the view changed or disappeared
+   * @param viewId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the number of affected rows
    */
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasByViewId")
   Integer softDeleteViewMetasByViewId(
-      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion);
+      @Param("viewId") Long viewId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId);
 
   @UpdateProvider(
       type = ViewMetaSQLProviderFactory.class,

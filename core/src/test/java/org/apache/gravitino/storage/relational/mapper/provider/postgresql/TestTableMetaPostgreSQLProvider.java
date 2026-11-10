@@ -48,7 +48,7 @@ class TestTableMetaPostgreSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = new TableMetaPostgreSQLProvider().softDeleteTableMetasByTableId(null, null);
+    String sql = new TableMetaPostgreSQLProvider().softDeleteTableMetasByTableId(null, null, null);
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

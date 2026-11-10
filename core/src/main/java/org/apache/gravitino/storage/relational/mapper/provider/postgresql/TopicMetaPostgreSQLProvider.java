@@ -27,13 +27,22 @@ import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
+  /**
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
+   *
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
+   */
   @Override
-  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion) {
+  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion, Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE topic_id = #{topicId}"
+        + " AND catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

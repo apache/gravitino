@@ -52,17 +52,8 @@ class TestTopicMetaBaseSQLProvider {
   }
 
   @Test
-  void testRestoreOnlyUpdatesSoftDeletedStableId() {
-    String sql = PROVIDER.restoreSoftDeletedTopicMeta(null);
-
-    Assertions.assertTrue(sql.endsWith("WHERE topic_id = #{topicMeta.topicId} AND deleted_at > 0"));
-    Assertions.assertTrue(sql.contains("last_version = current_version + 1"));
-    Assertions.assertTrue(sql.contains("current_version = current_version + 1"));
-  }
-
-  @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = PROVIDER.softDeleteTopicMetasByTopicId(null, null);
+    String sql = PROVIDER.softDeleteTopicMetasByTopicId(null, null, null);
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

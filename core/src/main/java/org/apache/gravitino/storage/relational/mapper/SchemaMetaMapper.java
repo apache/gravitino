@@ -20,13 +20,11 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -88,11 +86,6 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
-  /** Checks whether a soft-deleted schema still owns the requested primary key. */
-  @Select(
-      "SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE schema_id = #{schemaId} AND deleted_at > 0")
-  int countDeletedSchemaMetasById(@Param("schemaId") Long schemaId);
-
   /**
    * Returns one when an active table, view, fileset, function, model, or topic exists in the
    * schema, and {@code null} otherwise.
@@ -102,18 +95,6 @@ public interface SchemaMetaMapper {
    */
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
   Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
-
-  /**
-   * Locks a schema identity, whether active or retired, for an overwrite transaction.
-   *
-   * @param schemaId the schema identity to lock
-   * @return the locked row, or null if that identity has never been registered or was collected
-   */
-  @Nullable
-  @SelectProvider(
-      type = SchemaMetaSQLProviderFactory.class,
-      method = "selectSchemaMetaByIdIncludingDeletedForUpdate")
-  SchemaPO selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId);
 
   /** Selects and locks an active schema by ID for the current transaction. */
   @SelectProvider(

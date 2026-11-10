@@ -91,26 +91,20 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testRestoreSoftDeletedTopicOnly() throws IOException {
-    TopicEntity topic = createTopic("topic_restore_soft_deleted", "original");
+  void testReregisteredCatalogImportsTopicWithoutOverwritingHistory() throws IOException {
+    TopicEntity topic = createTopic("topic_reregistered", "original");
     backend.insert(topic, false);
-
-    Assertions.assertFalse(
-        backend.restoreSoftDeletedEntity(copyTopic(topic, topic.name(), "active")));
-    Assertions.assertEquals(
-        "original",
-        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topic, false));
 
     backend.delete(NameIdentifier.of(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
-
-    TopicEntity replacement = copyTopic(topic, topic.name(), "restored");
-    Assertions.assertTrue(backend.restoreSoftDeletedEntity(replacement));
+    TopicEntity replacement = copyTopic(topic, topic.name(), "new registration");
+    backend.insert(replacement, false);
     Assertions.assertEquals(
-        "restored",
+        "new registration",
         TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
-    Assertions.assertFalse(backend.restoreSoftDeletedEntity(replacement));
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(replacement, false));
   }
 
   @TestTemplate

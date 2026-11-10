@@ -139,7 +139,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   + ident
                   + " cannot be imported because its immutable Kafka topic UUID is already "
                   + "managed under another active Gravitino path. Use the existing path or "
-                  + "remove its active Gravitino registration before retrying.");
+                  + "drop its containing Gravitino catalog registration before retrying.");
         }
       }
     }
@@ -340,19 +340,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     try {
       store.put(topicEntity, false);
     } catch (EntityAlreadyExistsException e) {
-      try {
-        // Kafka does not persist a removable Gravitino identifier. Restore the retained row only
-        // while it remains soft-deleted, which supports catalog re-registration without allowing
-        // an active registration for the same Kafka UUID to be rebound from another path.
-        if (!store.restoreSoftDeletedEntity(topicEntity)) {
-          throw e;
-        }
-      } catch (EntityAlreadyExistsException | OptimisticLockException restoreConflict) {
-        throw restoreConflict;
-      } catch (Exception restoreFailure) {
-        LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "restore", identifier, restoreFailure);
-        throw new RuntimeException("Failed to restore soft-deleted topic entity", restoreFailure);
-      }
+      throw e;
     } catch (OptimisticLockException e) {
       // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
       throw e;

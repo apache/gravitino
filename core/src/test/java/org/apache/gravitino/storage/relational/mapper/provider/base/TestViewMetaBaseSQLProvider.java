@@ -41,7 +41,7 @@ class TestViewMetaBaseSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = PROVIDER.softDeleteViewMetasByViewId(null, null);
+    String sql = PROVIDER.softDeleteViewMetasByViewId(null, null, null);
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

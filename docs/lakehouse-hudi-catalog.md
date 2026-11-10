@@ -68,13 +68,12 @@ catalog-wide recovery procedure:
 1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
    This deletes every Gravitino registration and its privileges, tags, and other relationships in
    the catalog. It does not drop the Hudi schemas, tables, or physical data in the Hive Metastore.
-2. If an affected Hive Metastore schema or table carries `gravitino.identifier`, remove the property
-   with an external Hive Metastore administration tool. Gravitino Hudi catalog operations cannot
-   modify it. Skip this step for objects that do not carry the property.
-3. Recreate the Gravitino catalog and load the objects again.
-4. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
 
-Coordinate with other Gravitino catalogs that share the Hive Metastore before clearing identifiers.
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
 :::
 
 ### Catalog Operations

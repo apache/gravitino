@@ -45,7 +45,7 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
         + " #{tableMeta.lastVersion},"
         + " #{tableMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT (table_id) DO UPDATE SET"
+        + " ON CONFLICT (table_id, deleted_at) DO UPDATE SET"
         + " table_name = #{tableMeta.tableName},"
         + " metalake_id = #{tableMeta.metalakeId},"
         + " catalog_id = #{tableMeta.catalogId},"
@@ -62,13 +62,22 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
+  /**
+   * Soft-deletes an observed table registration in the same catalog lifetime.
+   *
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
+   */
   @Override
-  public String softDeleteTableMetasByTableId(Long tableId, Long currentVersion) {
+  public String softDeleteTableMetasByTableId(Long tableId, Long currentVersion, Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE table_id = #{tableId}"
+        + " AND catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

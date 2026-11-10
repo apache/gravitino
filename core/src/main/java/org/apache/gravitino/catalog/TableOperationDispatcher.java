@@ -51,7 +51,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SoftDeletedEntityIdentifierException;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.MaskAndOmitKeys;
@@ -662,8 +661,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       // silently change schema or catalog ownership and make existing privileges refer to the
       // wrong path.
       store.put(tableEntity, false);
-    } catch (SoftDeletedEntityIdentifierException e) {
-      throw softDeletedExternalIdentifierException(identifier, uid, TABLE);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {

@@ -176,7 +176,6 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
             () -> topicOperationDispatcher.loadTopic(topicIdent1));
     Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
     verify(entityStore).put(any(TopicEntity.class), eq(false));
-    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
     reset(entityStore);
     TopicEntity topicEntity =
         entityStore.get(topicIdent1, Entity.EntityType.TOPIC, TopicEntity.class);
@@ -206,29 +205,24 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     Topic loadedTopic =
         Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
     Assertions.assertEquals(topicIdent.name(), loadedTopic.name());
-    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
   }
 
   @Test
-  public void testImportTopicRestoresSoftDeletedEntity() throws IOException {
-    Namespace topicNs = Namespace.of(metalake, catalog, "schema_soft_deleted_topic_identifier");
+  void testImportTopicAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_reimport_topic_identifier");
     NameIdentifier schemaIdent = NameIdentifier.of(topicNs.levels());
     schemaOperationDispatcher.createSchema(
         schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
-    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_soft_deleted_identifier");
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_reimport_identifier");
     createTopicForLockTest(topicIdent);
+    TopicEntity topicEntity = entityStore.get(topicIdent, TOPIC, TopicEntity.class);
+    entityStore.delete(topicIdent, TOPIC);
 
     reset(entityStore);
-    doThrow(new NoSuchEntityException("mock error")).when(entityStore).get(any(), eq(TOPIC), any());
-    doThrow(new EntityAlreadyExistsException("mock retained identifier"))
-        .when(entityStore)
-        .put(any(TopicEntity.class), eq(false));
-    doReturn(true).when(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
-
-    Topic loadedTopic =
-        Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
-    Assertions.assertEquals(topicIdent.name(), loadedTopic.name());
-    verify(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
+    Assertions.assertDoesNotThrow(() -> topicOperationDispatcher.loadTopic(topicIdent));
+    Assertions.assertEquals(
+        topicEntity.id(), entityStore.get(topicIdent, TOPIC, TopicEntity.class).id());
+    verify(entityStore).put(any(TopicEntity.class), eq(false));
   }
 
   @Test
@@ -334,33 +328,6 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     try {
       Assertions.assertThrows(
           OptimisticLockException.class, () -> topicOperationDispatcher.loadTopic(topicIdent));
-    } finally {
-      reset(entityStore);
-    }
-  }
-
-  @Test
-  void testRestoreTopicPropagatesOptimisticLockConflict() throws IOException {
-    Namespace topicNs = Namespace.of(metalake, catalog, "schema_restore_topic_occ");
-    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
-    schemaOperationDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
-    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_restore_occ");
-    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
-    entityStore.delete(topicIdent, Entity.EntityType.TOPIC);
-
-    doThrow(new NoSuchEntityException(""))
-        .when(entityStore)
-        .get(any(), eq(Entity.EntityType.TOPIC), any());
-    doThrow(new EntityAlreadyExistsException("retained topic"))
-        .when(entityStore)
-        .put(any(TopicEntity.class), eq(false));
-    OptimisticLockException conflict = new OptimisticLockException("mock restore conflict");
-    doThrow(conflict).when(entityStore).restoreSoftDeletedEntity(any(TopicEntity.class));
-    try {
-      Assertions.assertSame(
-          conflict,
-          Assertions.assertThrows(
-              OptimisticLockException.class, () -> topicOperationDispatcher.loadTopic(topicIdent)));
     } finally {
       reset(entityStore);
     }

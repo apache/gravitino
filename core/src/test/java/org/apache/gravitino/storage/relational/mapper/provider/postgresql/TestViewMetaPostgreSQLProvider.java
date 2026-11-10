@@ -25,7 +25,7 @@ class TestViewMetaPostgreSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = new ViewMetaPostgreSQLProvider().softDeleteViewMetasByViewId(null, null);
+    String sql = new ViewMetaPostgreSQLProvider().softDeleteViewMetasByViewId(null, null, null);
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

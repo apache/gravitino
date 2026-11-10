@@ -111,15 +111,18 @@ public class ViewMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that soft-deletes a view with a version check.
+   * Soft-deletes an observed view registration in the same catalog lifetime.
    *
-   * @param viewId the view ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param viewId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @return the guarded soft-delete SQL
    */
   public static String softDeleteViewMetasByViewId(
-      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteViewMetasByViewId(viewId, currentVersion);
+      @Param("viewId") Long viewId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteViewMetasByViewId(viewId, currentVersion, catalogId);
   }
 
   public static String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
