@@ -449,16 +449,11 @@ public class TestIcebergRewriteManifestsJob {
 
   @Test
   public void testManifestMetricsSchemaForTms() {
-    Map<String, Object> before = IcebergRewriteManifestsJob.manifestBeforeMetrics(120L, 8388608D);
-    assertEquals(2, before.size());
+    assertEquals("custom-manifest-number", IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC);
     assertEquals(
-        120L,
-        ((Number) before.get(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC)).longValue());
-    Map<String, Object> after = IcebergRewriteManifestsJob.manifestAfterMetrics(18750L);
-    assertEquals(1, after.size());
+        "custom-avg-manifest-size", IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC);
     assertEquals(
-        18750L,
-        ((Number) after.get(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC))
-            .longValue());
+        "custom-rewritten-manifest-number",
+        IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC);
   }
 }

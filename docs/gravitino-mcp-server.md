@@ -141,6 +141,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
 | `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
 | `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
+| `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
@@ -148,7 +149,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 ### Semantic Models
 
-Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
+Semantic Model tools manage semantic metadata and discover source associations through the Gravitino REST API.
 For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
 and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
 Use the `semantic_model` tag with `--include-tool-tags` to expose these tools.
@@ -174,6 +175,32 @@ datatype, AI context, and custom extensions. JSON number precision is preserved.
 Both modes follow containing-model visibility and sort by model identifier, then
 case-sensitive metric name. An empty result is `[]`; failures propagate as tool
 errors. These tools discover definitions and do not execute metric queries.
+
+`list_semantic_model_datasets` discovers datasets directly associated with a
+table or view using one REST request. Pass `source_type` (`table` or `view`),
+the source's `catalog_name`, `schema_name`, and `source_name`, and optionally `metalake`:
+
+```json
+{"metalake": "prod", "source_type": "table", "catalog_name": "sales", "schema_name": "raw", "source_name": "orders"}
+```
+
+Source `catalog_name`, `schema_name`, and `source_name` must not contain literal
+dots: the REST source lookup route uses `catalog.schema.name` without component
+escaping. The tool rejects these inputs before sending a request.
+
+The result is a JSON array of identifiers with `namespace`
+`[metalake, catalog, schema, semanticModel]` and the exact dataset `name`. Results
+may span catalogs and schemas in the selected metalake. Keep each component
+separate: a dataset name such as `orders.raw` contains a literal dot. The namespace
+components identify the containing Semantic Model. Server ordering is preserved:
+namespace components first, then dataset name, using case-sensitive UTF-16 ordering.
+
+The caller must be able to access the source metadata; Gravitino returns datasets
+only from models the caller can load. No visible matches returns `[]`; missing or
+inaccessible sources and other failures raise tool errors. Associations reflect the
+latest model definition write, including explicit replacement, and do not describe
+transitive dependencies or guarantee that a model can execute. An empty result is
+not evidence that a source can be safely changed or deleted.
 
 For example, call `create_semantic_model` with the following arguments after the
 `sales.mart.orders` source table exists in the selected metalake:

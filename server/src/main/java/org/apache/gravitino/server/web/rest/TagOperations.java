@@ -66,6 +66,7 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -427,13 +428,11 @@ public class TagOperations {
             PolicyTagAddRequest effectiveRequest =
                 request == null ? new PolicyTagAddRequest() : request;
             effectiveRequest.validate();
-            tagDispatcher.addPolicyForTag(
-                metalake, tagName, policyName, effectiveRequest.selector());
+            PolicyAssociationSelector selector = effectiveRequest.selector();
+            tagDispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
             return Utils.ok(
                 new PolicyTagAssociationResponse(
-                    policyName,
-                    tagName,
-                    PolicyAssociationSelectorDTO.fromSelector(effectiveRequest.selector())));
+                    policyName, tagName, PolicyAssociationSelectorDTO.fromSelector(selector)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, tagName, metalake, e);

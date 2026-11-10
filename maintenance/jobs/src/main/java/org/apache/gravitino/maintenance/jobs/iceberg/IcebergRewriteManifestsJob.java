@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -62,7 +63,7 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
         .withExecutable(resolveExecutable(IcebergRewriteManifestsJob.class))
         .withClassName(IcebergRewriteManifestsJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -263,8 +264,8 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
   public TableSnapshotMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
-    return TableSnapshotMetrics.of(snapshotId, payload);
+    Map<String, Object> metrics = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+    return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
   @Override
@@ -295,16 +296,24 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
           rewritten,
           ((Number) result.get(1)).longValue());
     }
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewritten);
     return TableSnapshotMetrics.of(
-        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier),
-        manifestAfterMetrics(rewritten));
+        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier), metrics);
   }
 
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergRewriteManifestsJob --catalog <catalog_name> --table <table_identifier>"
-            + " [--use-caching <true|false>] [--spec-id <non-negative integer>]"
-            + " [--spark-conf <json>]");
+    IcebergJobUtils.printCliUsage(
+        IcebergRewriteManifestsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --use-caching <bool>      Whether to use caching during rewrite",
+            "  --spec-id <int>           Non-negative partition spec id to rewrite"),
+        ImmutableList.of(
+            "  --catalog iceberg_prod --table db.sample",
+            "  --catalog iceberg_prod --table db.sample --use-caching false --spec-id 0"));
   }
 
   /**
@@ -324,15 +333,6 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
         "{{spec_id:-}}",
         "--spark-conf",
         "{{spark_conf:-}}");
-  }
-
-  /**
-   * Build Spark configuration template.
-   *
-   * @return map of Spark configuration keys to template values
-   */
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
   }
 
   // -------------------------------------------------------------------------
@@ -356,22 +356,11 @@ public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanc
         totalSize += manifest.length();
       }
     }
-    return manifestBeforeMetrics(count, count == 0L ? 0D : (double) totalSize / count);
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, manifestNumber);
-    metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
-    return metrics;
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> manifestAfterMetrics(long rewrittenManifestNumber) {
-    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, count);
     metrics.put(
-        IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewrittenManifestNumber);
+        IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC,
+        count == 0L ? 0D : (double) totalSize / count);
     return metrics;
   }
 }

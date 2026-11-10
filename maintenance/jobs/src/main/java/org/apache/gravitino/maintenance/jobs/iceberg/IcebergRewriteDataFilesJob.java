@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -61,7 +62,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
         .withExecutable(resolveExecutable(IcebergRewriteDataFilesJob.class))
         .withClassName(IcebergRewriteDataFilesJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -295,41 +296,35 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
 
   /** Print usage information. */
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergRewriteDataFilesJob [OPTIONS]\n"
-            + "\n"
-            + "Required Options:\n"
-            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
-            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
-            + "\n"
-            + "Optional Options:\n"
-            + "  --strategy <name>         Rewrite strategy: binpack (default) or sort\n"
-            + "  --sort-order <spec>       Sort order specification:\n"
-            + "                              For columns: 'id DESC NULLS LAST, name ASC'\n"
-            + "                              For Z-Order: 'zorder(c1,c2,c3)'\n"
-            + "  --where <predicate>       Filter predicate to select files\n"
-            + "                              Example: 'year = 2024 and status = ''active'''\n"
-            + "  --options <json>          JSON map of Iceberg rewrite options\n"
-            + "                              Example: '{\"min-input-files\":\"2\"}'\n"
-            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
-            + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
-            + "                              Note: Cannot override catalog, extensions, or app name configs\n"
-            + "\n"
-            + "Examples:\n"
-            + "  # Basic binpack\n"
-            + "  --catalog iceberg_prod --table db.sample\n"
-            + "\n"
-            + "  # Sort by columns\n"
-            + "  --catalog iceberg_prod --table db.sample --strategy sort \\\n"
-            + "    --sort-order 'id DESC NULLS LAST'\n"
-            + "\n"
-            + "  # With filter and options\n"
-            + "  --catalog iceberg_prod --table db.sample --where 'year = 2024 and status = ''active''' \\\n"
-            + "    --options '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'\n"
-            + "\n"
-            + "  # With custom Spark configurations\n"
-            + "  --catalog iceberg_prod --table db.sample --strategy binpack \\\n"
-            + "    --spark-conf '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'");
+    IcebergJobUtils.printCliUsage(
+        IcebergRewriteDataFilesJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --strategy <name>         Rewrite strategy: binpack (default) or sort",
+            "  --sort-order <spec>       Sort order specification:",
+            "                              For columns: 'id DESC NULLS LAST, name ASC'",
+            "                              For Z-Order: 'zorder(c1,c2,c3)'",
+            "  --where <predicate>       Filter predicate to select files",
+            "                              Example: 'year = 2024 and status = ''active'''",
+            "  --options <json>          JSON map of Iceberg rewrite options",
+            "                              Example: '{\"min-input-files\":\"2\"}'"),
+        ImmutableList.of(
+            "  # Basic binpack",
+            "  --catalog iceberg_prod --table db.sample",
+            "",
+            "  # Sort by columns",
+            "  --catalog iceberg_prod --table db.sample --strategy sort \\",
+            "    --sort-order 'id DESC NULLS LAST'",
+            "",
+            "  # With filter and options",
+            "  --catalog iceberg_prod --table db.sample --where 'year = 2024 and status = ''active''' \\",
+            "    --options '{\"min-input-files\":\"2\",\"remove-dangling-deletes\":\"true\"}'",
+            "",
+            "  # With custom Spark configurations",
+            "  --catalog iceberg_prod --table db.sample --strategy binpack \\",
+            "    --spark-conf '{\"spark.sql.shuffle.partitions\":\"200\",\"spark.executor.memory\":\"4g\"}'"));
   }
 
   /**
@@ -370,15 +365,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
   }
 
   /**
-   * Build Spark configuration template.
-   *
-   * @return map of Spark configuration keys to template values
-   */
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
-  }
-
-  /**
    * Runs {@code rewrite_data_files} on an existing Spark session. Shared by CLI {@link #main} and
    * TMS {@link #executeAndCollectAfter}.
    *
@@ -409,8 +395,8 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
   public TableSnapshotMetrics collectBeforeMetrics(
       SparkSession spark, String catalogName, String tableIdentifier) {
     long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
-    Map<String, Object> payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
-    return TableSnapshotMetrics.of(snapshotId, payload);
+    Map<String, Object> metrics = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    return TableSnapshotMetrics.of(snapshotId, metrics);
   }
 
   @Override
@@ -492,8 +478,7 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
   }
 
-  @VisibleForTesting
-  static Map<String, Object> compactionMetrics(
+  private static Map<String, Object> compactionMetrics(
       double dataFileMse,
       long deleteFileNumber,
       double avgFileSize,

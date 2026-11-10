@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -1324,6 +1325,53 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals(2, tagEntities7.size());
     Assertions.assertTrue(containsValuelessTagAssignment(tagEntities7, tagEntity2));
     Assertions.assertTrue(containsValuelessTagAssignment(tagEntities7, tagEntity3));
+  }
+
+  /** Verifies a stored JSON null constraint permits valued and valueless tag assignments. */
+  @TestTemplate
+  public void testAssociateTagValuesWithNullJsonConstraint() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_null_constraint");
+    TagMetaService service = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("stage")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    service.insertTag(tag, false);
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false);
+        PreparedStatement statement =
+            session
+                .getConnection()
+                .prepareStatement("UPDATE tag_meta SET allowed_values = ? WHERE tag_id = ?")) {
+      statement.setString(1, "null");
+      statement.setLong(2, tag.id());
+      Assertions.assertEquals(1, statement.executeUpdate());
+      session.commit(true);
+    } catch (SQLException e) {
+      throw new IOException(e);
+    }
+
+    List<TagEntity> valued =
+        service.associateTagValuesWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new TagValue[] {TagValue.of(tag.name(), "dev")},
+            new TagValue[0]);
+    Assertions.assertEquals(1, valued.size());
+    assertAssignmentValues(valued.get(0), "dev");
+
+    List<TagEntity> valueless =
+        service.associateTagValuesWithMetadataObject(
+            catalog.nameIdentifier(),
+            catalog.type(),
+            new TagValue[] {TagValue.noValue(tag.name())},
+            new TagValue[] {TagValue.of(tag.name(), "dev")});
+    Assertions.assertEquals(1, valueless.size());
+    Assertions.assertTrue(containsValuelessTagAssignment(valueless, tag));
   }
 
   @TestTemplate
