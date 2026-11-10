@@ -23,9 +23,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
@@ -39,8 +41,18 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
-/** Dispatches schema-scoped Semantic Model operations through the server pipeline. */
+/** Dispatches Semantic Model operations through the server pipeline. */
 public interface SemanticModelDispatcher {
+
+  /**
+   * Lists datasets directly associated with a table or View.
+   *
+   * @param source The fully qualified source identifier.
+   * @param sourceType TABLE or VIEW.
+   * @return Fully qualified dataset identifiers sorted by their components.
+   * @throws NoSuchMetadataObjectException If the source does not exist.
+   */
+  NameIdentifier[] listSemanticModelDatasets(NameIdentifier source, Entity.EntityType sourceType);
 
   /**
    * Lists the Semantic Models in a schema namespace.

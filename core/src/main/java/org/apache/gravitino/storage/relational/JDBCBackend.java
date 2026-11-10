@@ -92,6 +92,7 @@ import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetricService;
+import org.apache.gravitino.storage.relational.service.SemanticModelSourceService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -721,6 +722,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      case SEMANTIC_MODEL_SOURCE_REL:
+        return (List<E>)
+            SemanticModelSourceService.getInstance().listForSource(nameIdentifier, identType);
       case POLICY_TAG_REL:
         return (List<E>)
             PolicyTagRelService.getInstance()

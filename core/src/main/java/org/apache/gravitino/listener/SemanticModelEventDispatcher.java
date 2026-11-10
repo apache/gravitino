@@ -22,6 +22,8 @@ package org.apache.gravitino.listener;
 import java.util.Map;
 import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -45,6 +47,9 @@ import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelPreEv
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourcePreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
@@ -86,6 +91,24 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   public SemanticModelEventDispatcher(EventBus eventBus, SemanticModelDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
+  }
+
+  @Override
+  public NameIdentifier[] listSemanticModelDatasets(
+      NameIdentifier source, Entity.EntityType sourceType) {
+    String user = PrincipalUtils.getCurrentUserName();
+    MetadataObject.Type type = MetadataObject.Type.valueOf(sourceType.name());
+    eventBus.dispatchEvent(new ListSemanticModelDatasetsBySourcePreEvent(user, source, type));
+    try {
+      NameIdentifier[] datasets = dispatcher.listSemanticModelDatasets(source, sourceType);
+      eventBus.dispatchEvent(
+          new ListSemanticModelDatasetsBySourceEvent(user, source, type, datasets.length));
+      return datasets;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListSemanticModelDatasetsBySourceFailureEvent(user, source, type, e));
+      throw e;
+    }
   }
 
   @Override

@@ -33,12 +33,16 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import java.util.Locale;
 import java.util.Map;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.semantic.Dataset;
@@ -75,6 +79,50 @@ public class TestSemanticModelNormalizeDispatcher {
     when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     dispatcher = new SemanticModelNormalizeDispatcher(delegate, catalogManager);
+  }
+
+  @Test
+  public void testSourceLookupUsesTableAndViewNamingRules() {
+    NameIdentifier source = NameIdentifier.of(INPUT_NAMESPACE, "Orders");
+    NameIdentifier[] datasets = {NameIdentifier.of("metalake", "other", "schema", "Model", "a")};
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TABLE, Entity.EntityType.VIEW}) {
+      NameIdentifier normalized =
+          NameIdentifier.of(
+              NORMALIZED_NAMESPACE, type == Entity.EntityType.TABLE ? "orders" : "ORDERS");
+      when(delegate.listSemanticModelDatasets(normalized, type)).thenReturn(datasets);
+      assertSame(datasets, dispatcher.listSemanticModelDatasets(source, type));
+      verify(delegate).listSemanticModelDatasets(normalized, type);
+    }
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.listSemanticModelDatasets(source, Entity.EntityType.SCHEMA));
+    verifyNoMoreInteractions(delegate);
+  }
+
+  @Test
+  public void testSourceLookupResolvesPhysicalTableName() throws Exception {
+    CatalogManager manager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    CatalogOperations operations =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(catalog.ops()).thenReturn(operations);
+    when(catalog.capability()).thenReturn(new ParentNormalizingCapability());
+    CatalogTestUtils.mockDoWithCatalog(manager, catalog);
+    SemanticModelNormalizeDispatcher normalizer =
+        new SemanticModelNormalizeDispatcher(delegate, manager);
+    NameIdentifier source = NameIdentifier.of(INPUT_NAMESPACE, "orders");
+    NameIdentifier normalized = NameIdentifier.of(NORMALIZED_NAMESPACE, "orders");
+    NameIdentifier physical = NameIdentifier.of(NORMALIZED_NAMESPACE, "ORDERS");
+    when(((SupportsTableNameResolution) operations).resolveTableName(normalized))
+        .thenReturn(physical);
+    NameIdentifier[] datasets = new NameIdentifier[0];
+    when(delegate.listSemanticModelDatasets(physical, Entity.EntityType.TABLE))
+        .thenReturn(datasets);
+    assertSame(datasets, normalizer.listSemanticModelDatasets(source, Entity.EntityType.TABLE));
+    verify(delegate).listSemanticModelDatasets(physical, Entity.EntityType.TABLE);
   }
 
   @Test
@@ -239,6 +287,12 @@ public class TestSemanticModelNormalizeDispatcher {
       }
       if (scope == Scope.SEMANTIC_MODEL) {
         return name.toLowerCase(Locale.ROOT);
+      }
+      if (scope == Scope.TABLE) {
+        return name.toLowerCase(Locale.ROOT);
+      }
+      if (scope == Scope.VIEW) {
+        return name.toUpperCase(Locale.ROOT);
       }
       return name;
     }

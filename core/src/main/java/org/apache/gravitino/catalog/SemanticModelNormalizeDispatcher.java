@@ -22,11 +22,13 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilitiesOnName;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -58,6 +60,22 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
       SemanticModelDispatcher dispatcher, CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
     this.catalogManager = catalogManager;
+  }
+
+  @Override
+  public NameIdentifier[] listSemanticModelDatasets(
+      NameIdentifier source, Entity.EntityType sourceType) {
+    Preconditions.checkArgument(
+        sourceType == Entity.EntityType.TABLE || sourceType == Entity.EntityType.VIEW,
+        "Source must be a table or View");
+    Capability capability = getCapability(source, catalogManager);
+    Capability.Scope scope =
+        sourceType == Entity.EntityType.TABLE ? Capability.Scope.TABLE : Capability.Scope.VIEW;
+    NameIdentifier normalized = applyCaseSensitive(source, scope, capability);
+    if (sourceType == Entity.EntityType.TABLE) {
+      normalized = resolvePhysicalTableName(normalized, catalogManager);
+    }
+    return dispatcher.listSemanticModelDatasets(normalized, sourceType);
   }
 
   @Override
