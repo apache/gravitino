@@ -21,12 +21,15 @@ The CLI binary, its configuration file, and its configuration keys carry the old
 
 Confirm your environment matches this list before starting an evaluation against the built-ins. Anything outside it needs a custom extension, which is covered in the [Extension Guide](./optimizer-extension-guide.md).
 
-- Compaction and orphan file cleanup have built-in strategies. Snapshot expiration is available as a directly submitted built-in job. Scheduling and minimum run intervals remain separate from strategy evaluation. Sort and cluster maintenance also require custom strategies.
-- Compaction applies to Iceberg tables. Prefer identity partitions for the **policy/strategy**
-  path (time/bucket partition filters can fail Spark translation). Direct
-  `builtin-iceberg-rewrite-data-files` with an empty `where_clause` works on broader layouts such
-  as `PARTITIONED BY (p, days(ts))`; see
-  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+- Four built-in Iceberg jobs ship with policy/strategy handlers and direct `runJob` templates:
+  rewrite data files (compaction), rewrite manifests, expire snapshots, and remove orphan files.
+  Scheduling and `minIntervalMs` stay outside strategy evaluation. Sort and cluster maintenance
+  still need custom strategies.
+- Compaction's **policy/strategy** path prefers identity partitions (time/bucket filters can fail
+  Spark translation). Direct `builtin-iceberg-rewrite-data-files` with an empty `where_clause`
+  covers broader layouts such as `PARTITIONED BY (p, days(ts))`; see
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures). The other three jobs
+  are not limited by that partition caveat.
 - The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
 ## How It Works
