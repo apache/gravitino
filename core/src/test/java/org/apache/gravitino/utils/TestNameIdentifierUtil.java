@@ -206,7 +206,10 @@ public class TestNameIdentifierUtil {
           type == Entity.EntityType.TAG
               ? NameIdentifierUtil.ofTag("metalake1", "legacy.with.dot")
               : NameIdentifierUtil.ofPolicy("metalake1", "legacy.with.dot");
-      MetadataObject object = NameIdentifierUtil.toMetadataObject(ident, type);
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.toMetadataObject(ident, type));
+      MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
       assertEquals("legacy.with.dot", object.name());
       assertEquals("legacy.with.dot", object.fullName());
       assertEquals(MetadataObject.Type.valueOf(type.name()), object.type());
@@ -216,6 +219,31 @@ public class TestNameIdentifierUtil {
           IllegalNameIdentifierException.class,
           () -> NameIdentifierUtil.checkMetadataObjectName(ident, type));
     }
+  }
+
+  /** The read conversion retains namespace and external-object name validation. */
+  @Test
+  public void testReadConversionRetainsStrictValidation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(null, Entity.EntityType.TAG));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("tag"), null));
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      assertThrows(
+          IllegalNamespaceException.class,
+          () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("legacy.tag"), type));
+    }
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    assertThrows(
+        IllegalNameIdentifierException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(table, Entity.EntityType.TABLE));
+    NameIdentifier valid = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales");
+    assertEquals(
+        NameIdentifierUtil.toMetadataObject(valid, Entity.EntityType.TABLE),
+        NameIdentifierUtil.toMetadataObjectForRead(valid, Entity.EntityType.TABLE));
   }
 
   @Test

@@ -127,7 +127,7 @@ public class RoleMetaService {
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
+        NameIdentifierUtil.toMetadataObjectForRead(metadataObjectIdent, metadataObjectType);
     long metadataObjectId = EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
         allFields
