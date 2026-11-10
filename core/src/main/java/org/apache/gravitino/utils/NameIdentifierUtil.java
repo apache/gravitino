@@ -641,6 +641,10 @@ public class NameIdentifierUtil {
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
+   * <p>Existing single-level tag and policy names can contain dots so they remain addressable
+   * through normal authorization. This conversion is not write validation: create and rename
+   * callers must use {@link #checkMetadataObjectName} before persisting a new name.
+   *
    * @param ident The identifier
    * @param entityType The entity type
    * @return The converted {@link MetadataObject}

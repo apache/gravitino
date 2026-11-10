@@ -20,6 +20,8 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -50,8 +52,11 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.session.LocalCacheScope;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
@@ -166,11 +171,36 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
   /** Peer renames must be visible to repeated role reads in a READ_COMMITTED session. */
   @TestTemplate
   public void testPeerParentRenamesRefreshFunctionSecurableNames() throws Exception {
+    checkPeerParentRenames(false);
+  }
+
+  /** Listing full roles also refreshes parent names without a preceding get-role call. */
+  @TestTemplate
+  public void testPeerParentRenamesRefreshListedFunctionSecurableNames() throws Exception {
+    checkPeerParentRenames(true);
+  }
+
+  /** Queries outside full-role authorization reads still reuse the MyBatis session cache. */
+  @TestTemplate
+  public void testUnrelatedQueriesRetainSessionCaching() {
+    try (SqlSession session =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
+      assertEquals(LocalCacheScope.SESSION, session.getConfiguration().getLocalCacheScope());
+      CatalogMetaMapper mapper = session.getMapper(CatalogMetaMapper.class);
+      CatalogPO first = mapper.selectCatalogMetaById(catalog.id());
+      assertEquals(CATALOG, first.getCatalogName());
+      assertSame(first, mapper.selectCatalogMetaById(catalog.id()));
+      session.clearCache();
+      assertNotSame(first, mapper.selectCatalogMetaById(catalog.id()));
+    }
+  }
+
+  private void checkPeerParentRenames(boolean listRoles) throws Exception {
     withReaderCache(
         () -> {
           SessionUtils.beginTransaction();
           try {
-            assertFunctionGrantName(CATALOG + "." + SCHEMA + ".function");
+            assertFunctionGrantName(CATALOG + "." + SCHEMA + ".function", listRoles);
             onPeer(
                 () ->
                     backend.update(
@@ -187,7 +217,7 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
                                 .withProperties(catalog.getProperties())
                                 .withAuditInfo(AUDIT_INFO)
                                 .build()));
-            assertFunctionGrantName("renamed_catalog." + SCHEMA + ".function");
+            assertFunctionGrantName("renamed_catalog." + SCHEMA + ".function", listRoles);
             onPeer(
                 () ->
                     backend.update(
@@ -202,7 +232,7 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
                                 .withComment(schema.comment())
                                 .withAuditInfo(AUDIT_INFO)
                                 .build()));
-            assertFunctionGrantName("renamed_catalog.renamed_schema.function");
+            assertFunctionGrantName("renamed_catalog.renamed_schema.function", listRoles);
             FunctionEntity loaded =
                 FunctionMetaService.getInstance()
                     .getFunctionByIdentifier(
@@ -220,8 +250,20 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
         });
   }
 
-  private void assertFunctionGrantName(String expected) throws Exception {
-    RoleEntity loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+  private void assertFunctionGrantName(String expected, boolean listRoles) throws Exception {
+    RoleEntity loaded;
+    if (listRoles) {
+      List<RoleEntity> roles =
+          RoleMetaService.getInstance()
+              .listRolesByMetadataObject(
+                  NameIdentifier.parse(METALAKE + "." + expected),
+                  Entity.EntityType.FUNCTION,
+                  true);
+      assertEquals(1, roles.size());
+      loaded = roles.get(0);
+    } else {
+      loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
+    }
     assertEquals(1, loaded.securableObjects().size());
     assertEquals(expected, loaded.securableObjects().get(0).fullName());
     assertEquals(

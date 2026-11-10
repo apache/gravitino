@@ -26,10 +26,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import com.google.common.hash.Hashing;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.Arrays;
+import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -42,6 +43,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.token.Token;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -112,16 +114,7 @@ public class IcebergHiveCachedClientPool
 
   @VisibleForTesting
   HiveClientPool clientPool() {
-    // A pooled Thrift connection retains the identity that opened it. A username alone cannot
-    // distinguish a proxy subject (or its delegation tokens) from a Kerberos login subject.
-    String cacheKeys = properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS);
-    if (cacheKeys == null || cacheKeys.isEmpty()) {
-      cacheKeys = "UGI";
-    } else if (Arrays.stream(cacheKeys.split(","))
-        .noneMatch(element -> "UGI".equalsIgnoreCase(element.trim()))) {
-      cacheKeys += ",UGI";
-    }
-    Key key = extractKey(cacheKeys, conf);
+    Key key = extractKey(properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS), conf);
     return clientPoolCache.get(
         key,
         k -> {
@@ -185,6 +178,13 @@ public class IcebergHiveCachedClientPool
     elements.add(conf.getBoolean(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL.varname, false));
     elements.add(conf.get(HiveConf.ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname, ""));
     elements.add(conf.get(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE.varname, ""));
+    try {
+      // Proxy UGIs are recreated for each request. Share pools by authentication identity, not
+      // Subject identity, while keeping different real users, auth methods and tokens isolated.
+      elements.add(authenticationIdentity(UserGroupInformation.getCurrentUser()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
     if (cacheKeys == null || cacheKeys.isEmpty()) {
       return Key.of(elements);
     }
@@ -233,6 +233,23 @@ public class IcebergHiveCachedClientPool
       }
     }
     return Key.of(elements);
+  }
+
+  private static List<Object> authenticationIdentity(UserGroupInformation user) throws IOException {
+    List<String> tokens = Lists.newArrayList();
+    for (Token<?> token : user.getTokens()) {
+      // Include token credentials without retaining their plaintext in cache keys or diagnostics.
+      tokens.add(
+          Hashing.sha256()
+              .hashString(token.encodeToUrlString(), StandardCharsets.UTF_8)
+              .toString());
+    }
+    tokens.sort(String::compareTo);
+    return List.of(
+        user.getUserName(),
+        user.getAuthenticationMethod(),
+        tokens,
+        user.getRealUser() == null ? List.of() : authenticationIdentity(user.getRealUser()));
   }
 
   static class Key {

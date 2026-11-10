@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.ibatis.session.SqlSession;
 
 /**
  * This class provides utility methods to perform database operations with MyBatis mappers in the
@@ -72,6 +73,29 @@ public class SessionUtils {
       return func.apply(mapper);
     } finally {
       // This will decrement the counter, the session is closed only when the counter is 0.
+      SqlSessions.closeSqlSession();
+    }
+  }
+
+  /**
+   * Performs a read after clearing the current session's local query cache.
+   *
+   * <p>Use at full-role authorization read boundaries so subsequent ID-to-name queries observe peer
+   * commits at READ_COMMITTED. This does not change JDBC isolation, session ownership, or the cache
+   * policy of other reads.
+   *
+   * @param mapperClazz the mapper class
+   * @param func the read operation
+   * @param <T> the mapper type
+   * @param <R> the result type
+   * @return the read result
+   */
+  public static <T, R> R getWithoutCommitFresh(Class<T> mapperClazz, Function<T, R> func) {
+    try {
+      SqlSession session = SqlSessions.getSqlSession();
+      session.clearCache();
+      return func.apply(session.getMapper(mapperClazz));
+    } finally {
       SqlSessions.closeSqlSession();
     }
   }

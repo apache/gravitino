@@ -37,7 +37,6 @@ import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.apache.ibatis.mapping.Environment;
 import org.apache.ibatis.session.Configuration;
-import org.apache.ibatis.session.LocalCacheScope;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.apache.ibatis.session.SqlSessionFactoryBuilder;
 import org.apache.ibatis.transaction.TransactionFactory;
@@ -120,9 +119,6 @@ public class SqlSessionFactoryHelper {
 
       // Initialize the configuration
       Configuration configuration = new Configuration(environment);
-      // Sessions can span several authorization and role reads. At READ_COMMITTED each statement
-      // must see peer commits instead of reusing a result from earlier in the same session.
-      configuration.setLocalCacheScope(LocalCacheScope.STATEMENT);
       configuration.setDatabaseId(jdbcType.name().toLowerCase());
       configuration.getTypeHandlerRegistry().register(OperateType.class, new OperateTypeHandler());
       ServiceLoader<MapperPackageProvider> loader = ServiceLoader.load(MapperPackageProvider.class);

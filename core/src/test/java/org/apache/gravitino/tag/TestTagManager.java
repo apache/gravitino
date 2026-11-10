@@ -110,7 +110,10 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -863,16 +866,23 @@ public class TestTagManager {
   /** Invalid create/rename requests must never leave a persisted dotted name. */
   @Test
   public void testRejectDottedNameBeforeWrite() throws IOException {
+    TagDispatcher dispatcher =
+        new TagEventDispatcher(new EventBus(List.of()), new TagHookDispatcher(tagManager));
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> tagManager.createTag(METALAKE, "invalid.tag", null, Map.of()));
+        () -> dispatcher.createTag(METALAKE, "invalid.tag", null, Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTag(
+                METALAKE, "invalid.tag", null, Map.of(), TagValueConstraint.anyValue()));
     Assertions.assertFalse(
         entityStore.exists(
             NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));
     Tag original = tagManager.createTag(METALAKE, "valid_tag", null, Map.of());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> tagManager.alterTag(METALAKE, original.name(), TagChange.rename("invalid.tag")));
+        () -> dispatcher.alterTag(METALAKE, original.name(), TagChange.rename("invalid.tag")));
     Assertions.assertEquals(original, tagManager.getTag(METALAKE, original.name()));
     Assertions.assertFalse(
         entityStore.exists(

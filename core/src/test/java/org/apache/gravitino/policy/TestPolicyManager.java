@@ -93,6 +93,9 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.PolicyHookDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -478,10 +481,14 @@ public class TestPolicyManager {
   /** Invalid create/rename requests must never persist an unaddressable policy. */
   @Test
   public void testRejectDottedNameBeforeWrite() throws IOException {
+    PolicyDispatcher dispatcher =
+        new PolicyEventDispatcher(new EventBus(List.of()), new PolicyHookDispatcher(policyManager));
     PolicyContent content = PolicyContents.custom(Map.of("rule", 1), SUPPORTS_OBJECT_TYPES, null);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> createCustomPolicy(METALAKE, "invalid.policy", content));
+        () ->
+            dispatcher.createPolicy(
+                METALAKE, "invalid.policy", Policy.BuiltInType.CUSTOM, null, true, content));
     Assertions.assertFalse(
         entityStore.exists(
             NameIdentifierUtil.ofPolicy(METALAKE, "invalid.policy"), Entity.EntityType.POLICY));
@@ -489,7 +496,7 @@ public class TestPolicyManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            policyManager.alterPolicy(
+            dispatcher.alterPolicy(
                 METALAKE, original.name(), PolicyChange.rename("invalid.policy")));
     Assertions.assertEquals(original, policyManager.getPolicy(METALAKE, original.name()));
     Assertions.assertFalse(
