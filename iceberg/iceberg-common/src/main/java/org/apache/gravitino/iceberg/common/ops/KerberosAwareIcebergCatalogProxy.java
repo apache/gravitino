@@ -58,9 +58,10 @@ public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
 
   /**
    * Create a proxy instance that delegates every call to the wrapped target. The proxy instance is
-   * allocated without running any constructor of the wrapper class, so no second catalog or
-   * Kerberos client (and its ticket refresh thread) is created. Closing the proxy closes the target
-   * exactly once.
+   * allocated without running any constructor of the wrapper class, so it does not own a duplicate
+   * set of wrapper resources (for example a second credential manager, scan plan cache or, on
+   * versions that load the catalog eagerly in the constructor, a second catalog and Kerberos
+   * client). Closing the proxy closes the target exactly once.
    *
    * @return The proxy instance.
    */

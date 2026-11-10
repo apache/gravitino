@@ -57,7 +57,7 @@ public class TestKerberosAwareIcebergCatalogProxy {
 
   /** A wrapper that creates one {@link CountingKerberosCatalog} per constructed instance. */
   public static class CountingWrapper extends IcebergCatalogWrapper {
-    private final Catalog countingCatalog = new CountingKerberosCatalog();
+    private Catalog countingCatalog;
 
     public CountingWrapper(IcebergConfig config) {
       super(config);
@@ -65,13 +65,17 @@ public class TestKerberosAwareIcebergCatalogProxy {
     }
 
     @Override
-    public Catalog getCatalog() {
+    public synchronized Catalog getCatalog() {
+      // Load lazily like the real wrapper, so the catalog is only created on first access.
+      if (countingCatalog == null) {
+        countingCatalog = new CountingKerberosCatalog();
+      }
       return countingCatalog;
     }
 
     @Override
     public void close() throws Exception {
-      ((AutoCloseable) countingCatalog).close();
+      ((AutoCloseable) getCatalog()).close();
     }
   }
 
@@ -93,7 +97,7 @@ public class TestKerberosAwareIcebergCatalogProxy {
   public void testProxyDoesNotRunWrapperConstructor() {
     CountingWrapper target = new CountingWrapper(memoryConfig());
     Assertions.assertEquals(1, WRAPPER_CONSTRUCTIONS.get());
-    Assertions.assertEquals(1, CATALOG_CONSTRUCTIONS.get());
+    Assertions.assertEquals(0, CATALOG_CONSTRUCTIONS.get());
 
     IcebergCatalogWrapper proxy = new KerberosAwareIcebergCatalogProxy(target).getProxy();
 
