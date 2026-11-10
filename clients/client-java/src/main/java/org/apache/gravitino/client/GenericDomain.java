@@ -27,8 +27,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainMember;
 import org.apache.gravitino.domain.DomainMemberFilter;
@@ -52,17 +54,11 @@ class GenericDomain implements Domain {
   private final DomainDTO domain;
   private final RESTClient restClient;
   private final String metalake;
-  private final String path;
 
   GenericDomain(DomainDTO domain, RESTClient restClient, String metalake) {
     this.domain = domain;
     this.restClient = restClient;
     this.metalake = metalake;
-    this.path =
-        "api/metalakes/"
-            + RESTUtils.encodeString(metalake)
-            + "/domains/"
-            + RESTUtils.encodeString(domain.getName());
   }
 
   /** {@inheritDoc} */
@@ -133,7 +129,7 @@ class GenericDomain implements Domain {
     request.validate();
     return snapshot(
         restClient.put(
-            path + "/parent",
+            domainPath(metalake, name()) + "/parent",
             request,
             DomainResponse.class,
             Collections.emptyMap(),
@@ -145,7 +141,7 @@ class GenericDomain implements Domain {
   public Domain detachFromParent() {
     return snapshot(
         restClient.delete(
-            path + "/parent",
+            domainPath(metalake, name()) + "/parent",
             DomainResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.domainErrorHandler()));
@@ -162,7 +158,7 @@ class GenericDomain implements Domain {
     request.validate();
     return snapshot(
         restClient.put(
-            path + "/backingTag",
+            domainPath(metalake, name()) + "/backingTag",
             request,
             DomainResponse.class,
             Collections.emptyMap(),
@@ -203,7 +199,7 @@ class GenericDomain implements Domain {
   public String[] listSubdomains() {
     NameListResponse response =
         restClient.get(
-            path + "/subdomains",
+            domainPath(metalake, name()) + "/subdomains",
             NameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.domainErrorHandler());
@@ -216,7 +212,7 @@ class GenericDomain implements Domain {
   public Domain[] listSubdomainsInfo() {
     DomainListResponse response =
         restClient.get(
-            path + "/subdomains",
+            domainPath(metalake, name()) + "/subdomains",
             ImmutableMap.of("details", "true"),
             DomainListResponse.class,
             Collections.emptyMap(),
@@ -241,7 +237,8 @@ class GenericDomain implements Domain {
         filter.domains().stream()
             .map(value -> "domains=" + RESTUtils.encodeString(value))
             .collect(Collectors.joining("&"));
-    String requestPath = path + "/objects" + (scopes.isEmpty() ? "" : "?" + scopes);
+    String requestPath =
+        domainPath(metalake, name()) + "/objects" + (scopes.isEmpty() ? "" : "?" + scopes);
     DomainMemberListResponse response =
         restClient.get(
             requestPath,
@@ -254,10 +251,13 @@ class GenericDomain implements Domain {
         .map(
             dto ->
                 new DomainMember() {
+                  private final MetadataObject object =
+                      MetadataObjects.parse(dto.getObject().fullName(), dto.getObject().type());
+
                   /** {@inheritDoc} */
                   @Override
                   public MetadataObject object() {
-                    return dto.getObject();
+                    return object;
                   }
 
                   /** {@inheritDoc} */
@@ -267,6 +267,17 @@ class GenericDomain implements Domain {
                   }
                 })
         .toArray(DomainMember[]::new);
+  }
+
+  static String domainPath(String metalake, String name) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(name), "domain name must not be blank");
+    // A proxy can normalize a dot segment and route the request to a different resource.
+    Preconditions.checkArgument(
+        !".".equals(name) && !"..".equals(name), "Unsafe domain path segment: %s", name);
+    return "api/metalakes/"
+        + RESTUtils.encodeString(metalake)
+        + "/domains/"
+        + RESTUtils.encodeString(name);
   }
 
   private static DomainRelation[] relations(DomainRelationDTO[] relations) {
@@ -291,7 +302,7 @@ class GenericDomain implements Domain {
   private Domain setStatus(Status status) {
     return snapshot(
         restClient.patch(
-            path,
+            domainPath(metalake, name()),
             new DomainSetRequest(status),
             DomainResponse.class,
             Collections.emptyMap(),

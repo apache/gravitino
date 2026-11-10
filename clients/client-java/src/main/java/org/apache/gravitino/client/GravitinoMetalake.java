@@ -1054,12 +1054,9 @@ public class GravitinoMetalake extends MetalakeDTO
   /** {@inheritDoc} */
   @Override
   public Domain getDomain(String name) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "domain name must not be blank");
     DomainResponse response =
         restClient.get(
-            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name()))
-                + "/"
-                + RESTUtils.encodeString(name),
+            GenericDomain.domainPath(name(), name),
             DomainResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.domainErrorHandler());
@@ -1099,7 +1096,7 @@ public class GravitinoMetalake extends MetalakeDTO
   /** {@inheritDoc} */
   @Override
   public Domain alterDomain(String name, DomainChange... changes) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "domain name must not be blank");
+    Preconditions.checkArgument(changes != null, "domain changes must not be null");
     DomainUpdatesRequest request =
         new DomainUpdatesRequest(
             Arrays.stream(changes)
@@ -1108,9 +1105,7 @@ public class GravitinoMetalake extends MetalakeDTO
     request.validate();
     DomainResponse response =
         restClient.put(
-            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name()))
-                + "/"
-                + RESTUtils.encodeString(name),
+            GenericDomain.domainPath(name(), name),
             request,
             DomainResponse.class,
             Collections.emptyMap(),
@@ -1122,12 +1117,9 @@ public class GravitinoMetalake extends MetalakeDTO
   /** {@inheritDoc} */
   @Override
   public boolean deleteDomain(String name) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "domain name must not be blank");
     DropResponse response =
         restClient.delete(
-            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name()))
-                + "/"
-                + RESTUtils.encodeString(name),
+            GenericDomain.domainPath(name(), name),
             DropResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.domainErrorHandler());

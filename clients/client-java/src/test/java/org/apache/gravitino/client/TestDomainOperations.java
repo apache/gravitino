@@ -281,7 +281,8 @@ public class TestDomainOperations extends TestBase {
                 .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
                 .withNameContains("a/b +&.")
                 .build());
-    Assertions.assertEquals(object.fullName(), members[0].object().fullName());
+    Assertions.assertEquals(object, members[0].object());
+    Assertions.assertTrue(Collections.singleton(object).contains(members[0].object()));
     Assertions.assertArrayEquals(relations, members[0].relations());
     members[0].relations()[0] = null;
     Assertions.assertArrayEquals(relations, members[0].relations());
@@ -356,6 +357,18 @@ public class TestDomainOperations extends TestBase {
   @Test
   public void testInvalidRequests() {
     GravitinoMetalake metalake = metalake();
+    for (String segment : new String[] {".", ".."}) {
+      Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(segment));
+      Domain snapshot =
+          new GenericDomain(
+              dto(segment, Domain.Status.DRAFT, null, null), client.restClient(), "metalake");
+      Assertions.assertEquals(segment, snapshot.name());
+      Assertions.assertThrows(IllegalArgumentException.class, snapshot::publish);
+    }
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> metalake.alterDomain(NAME, (DomainChange[]) null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> metalake.alterDomain(NAME, (DomainChange) null));
     Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.getDomain(" "));
     Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(null));
     Assertions.assertThrows(

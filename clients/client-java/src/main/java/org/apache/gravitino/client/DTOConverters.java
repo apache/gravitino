@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -436,6 +437,7 @@ class DTOConverters {
   }
 
   static DomainUpdateRequest toDomainUpdateRequest(DomainChange change) {
+    Preconditions.checkArgument(change != null, "domain change must not be null");
     if (change instanceof DomainChange.RenameDomain) {
       return new DomainUpdateRequest.RenameDomainRequest(
           ((DomainChange.RenameDomain) change).getNewName());
