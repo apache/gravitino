@@ -407,7 +407,11 @@ Automatic manifest policy triggering is separate follow-up work.
 
 `builtin-iceberg-rewrite-data-files` performs the compaction itself, merging small data files into larger ones. It is what a compaction policy submits when its thresholds are crossed.
 
-In alpha this works only on Iceberg tables where every partition uses an identity transform. Tables combining identity with a time or bucket transform fail during the rewrite, which is covered in [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+In alpha the **built-in compaction strategy** targets Iceberg tables where every partition uses an
+identity transform. A direct `builtin-iceberg-rewrite-data-files` submit with an empty
+`where_clause` can rewrite broader partition layouts on `1.3.x`; the older `1.2.0` hard failure for
+identity-plus-time/bucket layouts is covered in
+[Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 
 For the policy that drives it, including threshold tuning, see [Iceberg Compaction Policy](../iceberg-compaction-policy.md).
 
