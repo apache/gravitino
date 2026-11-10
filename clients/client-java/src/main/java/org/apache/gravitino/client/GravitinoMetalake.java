@@ -1252,6 +1252,13 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getUsers();
   }
 
+  /**
+   * Lists one page of the users in the metalake, with their details, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of users and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
   public Page<User> listUsers(PageRequest pageRequest) throws NoSuchMetalakeException {
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
@@ -1288,6 +1295,13 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getNames();
   }
 
+  /**
+   * Lists one page of the user names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of user names and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
   public Page<String> listUserNames(PageRequest pageRequest) throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
@@ -1398,6 +1412,13 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getGroups();
   }
 
+  /**
+   * Lists one page of the groups in the metalake, with their details, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of groups and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
   public Page<Group> listGroups(PageRequest pageRequest) throws NoSuchMetalakeException {
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
@@ -1432,6 +1453,13 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getNames();
   }
 
+  /**
+   * Lists one page of the group names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of group names and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
   public Page<String> listGroupNames(PageRequest pageRequest) throws NoSuchMetalakeException {
     NameListResponse resp =
         restClient.get(
@@ -1549,6 +1577,12 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getNames();
   }
 
+  /**
+   * Lists one page of the role names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of role names and the token for the next page, if any.
+   */
   public Page<String> listRoleNames(PageRequest pageRequest) {
     NameListResponse resp =
         restClient.get(
