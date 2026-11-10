@@ -21,7 +21,7 @@ from gravitino.name_identifier import NameIdentifier
 
 
 class SupportsSemanticModels(ABC):
-    """Source-scoped discovery of datasets directly associated with tables or Views."""
+    """Source-scoped discovery of datasets directly associated with tables or views."""
 
     @abstractmethod
     def list_semantic_model_datasets(self) -> list[NameIdentifier]:

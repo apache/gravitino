@@ -27,7 +27,7 @@ from gravitino.utils.http_client import HTTPClient
 
 
 class MetadataObjectSemanticModelOperations(SupportsSemanticModels):
-    """Shared relationship request handling for tables and Views."""
+    """Shared relationship request handling for tables and views."""
 
     def __init__(self, metalake: str, source: MetadataObject, rest_client: HTTPClient):
         self._rest_client = rest_client
@@ -39,8 +39,7 @@ class MetadataObjectSemanticModelOperations(SupportsSemanticModels):
 
     def list_semantic_model_datasets(self) -> list[NameIdentifier]:
         response = self._rest_client.get(
-            self._request_path,
-            params={},
+            endpoint=self._request_path,
             error_handler=SEMANTIC_MODEL_ERROR_HANDLER,
         )
         result = EntityListResponse.from_json(response.body, infer_missing=True)
