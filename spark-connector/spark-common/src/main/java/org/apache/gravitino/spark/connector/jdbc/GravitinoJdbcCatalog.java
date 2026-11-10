@@ -54,14 +54,13 @@ import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCTableCatalog;
 import org.apache.spark.sql.jdbc.JdbcDialect;
 import org.apache.spark.sql.jdbc.JdbcDialects;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-<<<<<<< HEAD
-=======
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Tuple2;
->>>>>>> 5d8d16651 ([#14842] fix(spark-connector): Report the JDBC source error when a table cannot be read (#14843))
 
 public class GravitinoJdbcCatalog extends BaseCatalog {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoJdbcCatalog.class);
 
   private static final String PREFER_TIMESTAMP_NTZ = "preferTimestampNTZ";
 
@@ -164,22 +163,6 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       LOG.debug("Failed to read the schema of {} again", table, e);
       return null;
     }
-  }
-
-  // The cast is redundant on Scala 2.12 and required on Scala 2.13.
-  @SuppressWarnings({"unchecked", "cast"})
-  private static scala.collection.immutable.Map<String, String> toScalaMap(
-      Map<String, String> map) {
-    // Built entry by entry because the Java-to-Scala map converters differ between Scala 2.12
-    // and 2.13.
-    scala.collection.immutable.Map<String, String> result =
-        scala.collection.immutable.Map$.MODULE$.empty();
-    for (Map.Entry<String, String> entry : map.entrySet()) {
-      result =
-          (scala.collection.immutable.Map<String, String>)
-              result.$plus(new Tuple2<>(entry.getKey(), entry.getValue()));
-    }
-    return result;
   }
 
   /**
@@ -289,6 +272,22 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   static void setPreferTimestampNtz(Map<String, String> properties, boolean value) {
     properties.keySet().removeIf(PREFER_TIMESTAMP_NTZ::equalsIgnoreCase);
     properties.put(PREFER_TIMESTAMP_NTZ, String.valueOf(value));
+  }
+
+  // The cast is redundant on Scala 2.12 and required on Scala 2.13.
+  @SuppressWarnings({"unchecked", "cast"})
+  private static scala.collection.immutable.Map<String, String> toScalaMap(
+      Map<String, String> map) {
+    // Built entry by entry because the Java-to-Scala map converters differ between Scala 2.12
+    // and 2.13.
+    scala.collection.immutable.Map<String, String> result =
+        scala.collection.immutable.Map$.MODULE$.empty();
+    for (Map.Entry<String, String> entry : map.entrySet()) {
+      result =
+          (scala.collection.immutable.Map<String, String>)
+              result.$plus(new Tuple2<>(entry.getKey(), entry.getValue()));
+    }
+    return result;
   }
 
   /**
