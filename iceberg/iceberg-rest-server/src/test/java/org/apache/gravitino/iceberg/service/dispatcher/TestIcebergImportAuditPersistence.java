@@ -50,6 +50,7 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.EntityCombinedSchema;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
@@ -316,6 +317,59 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
       Assertions.assertNull(stored.auditInfo().createTime());
       Assertions.assertNull(stored.columns().get(0).auditInfo().creator());
       Assertions.assertNull(f.tables.loadTable(table).auditInfo().creator());
+    }
+  }
+
+  @TestTemplate
+  void testSchemaAuditRecoveryToleratesConcurrentRenameAndDrop() throws Exception {
+    try (Fixture f = new Fixture()) {
+      for (boolean rename : new boolean[] {false, true}) {
+        String name = rename ? "renamed_during_audit" : "dropped_during_audit";
+        NameIdentifier original = f.ident(name);
+        NameIdentifier renamed = f.ident(name + "_new");
+        f.createSourceSchema(name, AuditInfo.EMPTY);
+        f.schemas.loadSchema(original);
+        SchemaEntity observed = f.store.get(original, Entity.EntityType.SCHEMA, SchemaEntity.class);
+        doAnswer(
+                call -> {
+                  // Another node changes the source and registration after this load's snapshot,
+                  // without participating in its tree lock, before audit recovery reads the row.
+                  f.source.dropSchema(original, false);
+                  if (rename) {
+                    f.createSourceSchema(renamed.name(), AuditInfo.EMPTY);
+                    backend.update(
+                        original,
+                        Entity.EntityType.SCHEMA,
+                        (SchemaEntity current) ->
+                            SchemaEntity.builder()
+                                .withId(current.id())
+                                .withName(renamed.name())
+                                .withNamespace(current.namespace())
+                                .withComment(current.comment())
+                                .withProperties(current.properties())
+                                .withAuditInfo(current.auditInfo())
+                                .build());
+                  } else {
+                    f.store.delete(original, Entity.EntityType.SCHEMA);
+                  }
+                  return call.callRealMethod();
+                })
+            .when(f.store)
+            .update(eq(original), eq(SchemaEntity.class), eq(Entity.EntityType.SCHEMA), any());
+
+        EntityCombinedSchema loaded =
+            (EntityCombinedSchema) f.schemas.importSchema(original, ALICE);
+        Assertions.assertEquals(original.name(), loaded.name());
+        Assertions.assertFalse(loaded.imported());
+        Assertions.assertNull(loaded.schemaEntity());
+        Assertions.assertNull(loaded.auditInfo().creator());
+        Assertions.assertFalse(f.store.exists(original, Entity.EntityType.SCHEMA));
+        if (rename) {
+          SchemaEntity moved = f.store.get(renamed, Entity.EntityType.SCHEMA, SchemaEntity.class);
+          Assertions.assertEquals(observed.id(), moved.id());
+          Assertions.assertEquals(AuditInfo.EMPTY, moved.auditInfo());
+        }
+      }
     }
   }
 

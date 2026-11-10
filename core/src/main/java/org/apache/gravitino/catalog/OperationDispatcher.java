@@ -103,7 +103,7 @@ public abstract class OperationDispatcher {
    * @param withAudit copies the current entity with the new audit
    * @param <E> the auditable entity type
    * @return the current registration, with missing creation fields filled if it still matches, or
-   *     null if the registration disappeared after a conflict; callers then return the source
+   *     null if the registration disappeared during recovery; callers then return the source
    *     snapshot as not imported
    */
   @Nullable
@@ -146,6 +146,10 @@ public abstract class OperationDispatcher {
                     .build();
             return withAudit.apply(current, filled);
           });
+    } catch (NoSuchEntityException e) {
+      // A rename or drop can remove the observed registration before the store read or CAS.
+      // Return the source snapshot without a registration; never resurrect it with the old audit.
+      return null;
     } catch (OptimisticLockException e) {
       // Audit recovery must not fail a read or attribute a replacement to the old create request.
       // Do not retry with the requested audit: it belongs to the entity originally observed.

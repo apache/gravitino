@@ -172,9 +172,9 @@ public class SchemaMetaService {
         String[] parts = schemaName.split(Pattern.quote(logicalSep), -1);
         for (int nSeg = 1; nSeg < parts.length; nSeg++) {
           String ancestorLogical = String.join(logicalSep, Arrays.copyOf(parts, nSeg));
-          // Creating a registration does not imply that this request created the external
-          // ancestor. Keep its audit unknown rather than attributing the leaf's audit to it;
-          // callers that know the ancestor's audit import that namespace explicitly.
+          // For every catalog, creating a registration does not imply that this request created
+          // the external ancestor. Keep its audit unknown rather than attributing the leaf's
+          // audit to it; callers that know the ancestor's audit import that namespace explicitly.
           SchemaEntity ancestor =
               SchemaEntity.builder()
                   .withId(nextIdForNestedAncestor())

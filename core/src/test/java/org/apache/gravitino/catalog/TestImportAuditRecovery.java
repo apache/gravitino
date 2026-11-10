@@ -21,7 +21,9 @@ package org.apache.gravitino.catalog;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -31,6 +33,7 @@ import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
@@ -89,6 +92,25 @@ public class TestImportAuditRecovery {
     when(store.get(observed.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class))
         .thenReturn(current);
     Assertions.assertSame(current, fill(observed, ALICE));
+  }
+
+  @Test
+  void testDisappearedRegistrationIsNotRecoveredFromObservedSnapshot() throws Exception {
+    SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
+    when(store.update(
+            eq(observed.nameIdentifier()),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA),
+            any()))
+        .thenThrow(new NoSuchEntityException("Registration was renamed or dropped"));
+    Assertions.assertNull(fill(observed, ALICE));
+    verify(store)
+        .update(
+            eq(observed.nameIdentifier()),
+            eq(SchemaEntity.class),
+            eq(Entity.EntityType.SCHEMA),
+            any());
+    verifyNoMoreInteractions(store);
   }
 
   @Test
