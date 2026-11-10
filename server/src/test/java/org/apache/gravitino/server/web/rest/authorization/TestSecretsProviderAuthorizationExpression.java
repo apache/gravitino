@@ -33,7 +33,9 @@ public class TestSecretsProviderAuthorizationExpression {
   @Test
   public void testListSecretProvidersRequiresOwnerOrViewPrivilege()
       throws NoSuchMethodException, OgnlException {
-    Method method = SecretsProviderOperations.class.getMethod("listSecretProviders", String.class);
+    Method method =
+        SecretsProviderOperations.class.getMethod(
+            "listSecretProviders", String.class, Integer.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     MockAuthorizationExpressionEvaluator mockEvaluator =

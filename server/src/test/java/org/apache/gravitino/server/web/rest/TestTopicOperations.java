@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -32,6 +33,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -90,6 +93,7 @@ public class TestTopicOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
@@ -439,5 +443,22 @@ public class TestTopicOperations extends BaseOperationsTest {
 
   private String topicPath(String metalake, String catalog, String schema) {
     return "/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/" + schema + "/topics";
+  }
+
+  @Test
+  public void testListTopicsPaged() {
+    NameIdentifier a = NameIdentifier.of(metalake, catalog, schema, "a");
+    NameIdentifier b = NameIdentifier.of(metalake, catalog, schema, "b");
+    NameIdentifier c = NameIdentifier.of(metalake, catalog, schema, "c");
+    when(dispatcher.listTopics(any())).thenReturn(new NameIdentifier[] {c, a, b});
+
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target(topicPath(metalake, catalog, schema)),
+            2,
+            EntityListResponse.class,
+            EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(a, b, c), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(topicPath(metalake, catalog, schema)));
   }
 }

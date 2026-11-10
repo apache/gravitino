@@ -40,6 +40,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
@@ -272,7 +273,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                       EntityType.SEMANTIC_MODEL,
                       listed))
           .thenReturn(filtered);
-      Response response = operations.listSemanticModels(metalake, catalog, schema);
+      Response response = operations.listSemanticModels(metalake, catalog, schema, null, null);
       Assertions.assertEquals(200, response.getStatus());
       Assertions.assertArrayEquals(
           filtered, ((EntityListResponse) response.getEntity()).identifiers());
@@ -1709,5 +1710,21 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     when(entity.id()).thenReturn(sourceId);
     when(table.tableFromGravitino()).thenReturn(entity);
     return table;
+  }
+
+  @Test
+  void testListSemanticModelsPaged() {
+    NameIdentifier a = semanticModelIdentifier("a");
+    NameIdentifier b = semanticModelIdentifier("b");
+    NameIdentifier c = semanticModelIdentifier("c");
+    when(dispatcher.listSemanticModels(namespace)).thenReturn(new NameIdentifier[] {c, a, b});
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target(semanticModelPath()),
+            2,
+            EntityListResponse.class,
+            EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(a, b, c), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(semanticModelPath()));
   }
 }

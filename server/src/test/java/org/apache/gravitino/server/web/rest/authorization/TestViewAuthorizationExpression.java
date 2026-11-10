@@ -44,13 +44,19 @@ public class TestViewAuthorizationExpression {
   @Test
   public void testListViewAuthorization() throws NoSuchMethodException, OgnlException {
     Method method =
-        ViewOperations.class.getMethod("listViews", String.class, String.class, String.class);
+        ViewOperations.class.getMethod(
+            "listViews", String.class, String.class, String.class, Integer.class, String.class);
     assertAuthorizationAnnotation(
         method,
         AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
         MetadataObject.Type.SCHEMA);
     assertMetadataTypes(
-        method, Entity.EntityType.METALAKE, Entity.EntityType.CATALOG, Entity.EntityType.SCHEMA);
+        method,
+        Entity.EntityType.METALAKE,
+        Entity.EntityType.CATALOG,
+        Entity.EntityType.SCHEMA,
+        null,
+        null);
 
     MockAuthorizationExpressionEvaluator gateway = evaluator(method);
     assertFalse(gateway.getResult(ImmutableSet.of()));

@@ -59,6 +59,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,20 +85,32 @@ public class MetalakeOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-metalake." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-metalake", absolute = true)
-  public Response listMetalakes() {
+  public Response listMetalakes(
+      @QueryParam("pageSize") Integer pageSize, @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list metalakes request.");
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Metalake[] metalakes = metalakeDispatcher.listMetalakes();
-            metalakes =
-                MetadataAuthzHelper.filterMetalakes(
-                    metalakes,
-                    AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
+            ListPager.ArrayPage<Metalake> page =
+                ListPager.pageArray(
+                    metalakeDispatcher.listMetalakes(),
+                    Metalake::name,
+                    all ->
+                        MetadataAuthzHelper.filterMetalakes(
+                            all,
+                            AuthorizationExpressionConstants
+                                .LOAD_METALAKE_AUTHORIZATION_EXPRESSION),
+                    Metalake[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listMetalakes"));
+            Metalake[] metalakes = page.items();
             MetalakeDTO[] metalakeDTOs =
                 Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
-            Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
+            Response response =
+                Utils.ok(
+                    new MetalakeListResponse(metalakeDTOs).withNextPageToken(page.nextPageToken()));
             LOG.info("List {} metalakes in Gravitino", metalakeDTOs.length);
             return response;
           });

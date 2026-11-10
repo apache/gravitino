@@ -25,7 +25,7 @@ import lombok.ToString;
 /** Represents a response containing a list of partition names. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class PartitionNameListResponse extends BaseResponse {
+public class PartitionNameListResponse extends BaseListResponse {
 
   @JsonProperty("names")
   private final String[] partitionNames;

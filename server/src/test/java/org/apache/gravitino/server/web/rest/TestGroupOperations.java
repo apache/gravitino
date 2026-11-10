@@ -22,14 +22,18 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -403,7 +407,7 @@ public class TestGroupOperations extends BaseOperationsTest {
       HttpServletRequest request = mock(HttpServletRequest.class);
       FieldUtils.writeField(groupOperations, "httpRequest", request, true);
 
-      Response resp = groupOperations.listGroups("metalake1", false);
+      Response resp = groupOperations.listGroups("metalake1", false, null, null);
 
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
       NameListResponse listResponse = (NameListResponse) resp.getEntity();
@@ -507,7 +511,7 @@ public class TestGroupOperations extends BaseOperationsTest {
       HttpServletRequest request = mock(HttpServletRequest.class);
       FieldUtils.writeField(groupOperations, "httpRequest", request, true);
 
-      Response resp = groupOperations.listGroups("metalake1", true);
+      Response resp = groupOperations.listGroups("metalake1", true, null, null);
 
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
       GroupListResponse listResponse = (GroupListResponse) resp.getEntity();
@@ -592,5 +596,47 @@ public class TestGroupOperations extends BaseOperationsTest {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  @Test
+  public void testListGroupNamesPaged() throws IOException {
+    doReturn(new String[] {"c", "a", "b"}).when(manager).listGroupNames(any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+            target("/metalakes/metalake1/groups"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target("/metalakes/metalake1/groups"));
+  }
+
+  @Test
+  public void testListGroupsPaged() throws IOException {
+    doReturn(new Group[] {buildGroup("c"), buildGroup("a"), buildGroup("b")})
+        .when(manager)
+        .listGroups(any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+                target("/metalakes/metalake1/groups").queryParam("details", "true"),
+                2,
+                GroupListResponse.class,
+                GroupListResponse::getGroups)
+            .stream()
+            .map(GroupDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

@@ -27,6 +27,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -1367,5 +1368,31 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
   private String basePath(String metalake) {
     return "/metalakes/" + metalake + "/objects";
+  }
+
+  @Test
+  public void testListTagsForMetadataObjectPaged() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    Tag[] tags =
+        Arrays.stream(new String[] {"c", "a", "b"})
+            .map(
+                name ->
+                    TagEntity.builder()
+                        .withName(name)
+                        .withId(1L)
+                        .withAuditInfo(testAuditInfo1)
+                        .build())
+            .toArray(Tag[]::new);
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog)).thenReturn(tags);
+    List<String> walked =
+        PagedListWalker.walk(
+            target(basePath(metalake))
+                .path(catalog.type().toString())
+                .path(catalog.fullName())
+                .path("/tags"),
+            2,
+            TagNameListResponse.class,
+            TagNameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

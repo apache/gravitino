@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.model.ModelVersionDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class ModelVersionInfoListResponse extends BaseResponse {
+public class ModelVersionInfoListResponse extends BaseListResponse {
 
   @JsonProperty("infos")
   private ModelVersionDTO[] versions;

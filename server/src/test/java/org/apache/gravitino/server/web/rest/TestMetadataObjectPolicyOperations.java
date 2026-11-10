@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -28,6 +29,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
@@ -95,6 +97,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
@@ -434,7 +437,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
       Response detailsResponse =
           operations.listPoliciesForMetadataObject(
-              metalake, table.type().toString(), table.fullName(), true);
+              metalake, table.type().toString(), table.fullName(), true, null, null);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
       MetadataObjectPolicyListResponse details =
           (MetadataObjectPolicyListResponse) detailsResponse.getEntity();
@@ -443,7 +446,7 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
 
       Response namesResponse =
           operations.listPoliciesForMetadataObject(
-              metalake, table.type().toString(), table.fullName(), false);
+              metalake, table.type().toString(), table.fullName(), false, null, null);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), namesResponse.getStatus());
       PolicyNameListResponse names = (PolicyNameListResponse) namesResponse.getEntity();
       Assertions.assertEquals(0, names.getNames().length);
@@ -482,5 +485,22 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
         .withContent(policyContent)
         .withAuditInfo(testAuditInfo1)
         .build();
+  }
+
+  @Test
+  public void testListPoliciesForMetadataObjectPaged() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, catalog))
+        .thenReturn(new PolicyEntity[] {createPolicy("c"), createPolicy("a"), createPolicy("b")});
+    List<String> walked =
+        PagedListWalker.walk(
+            target(basePath(metalake))
+                .path(catalog.type().toString())
+                .path(catalog.fullName())
+                .path("/policies"),
+            2,
+            PolicyNameListResponse.class,
+            PolicyNameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.stats.StatisticDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class StatisticListResponse extends BaseResponse {
+public class StatisticListResponse extends BaseListResponse {
 
   @JsonProperty("statistics")
   private StatisticDTO[] statistics;

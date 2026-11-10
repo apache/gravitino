@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -33,7 +34,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -109,6 +112,7 @@ public class TestPolicyOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
@@ -1049,5 +1053,41 @@ public class TestPolicyOperations extends BaseOperationsTest {
 
   private String policyPath(String metalake) {
     return "/metalakes/" + metalake + "/policies";
+  }
+
+  @Test
+  public void testListPolicyNamesPaged() {
+    when(policyManager.listPolicies(metalake)).thenReturn(new String[] {"c", "a", "b"});
+    List<String> walked =
+        PagedListWalker.walk(
+            target(policyPath(metalake)), 2, NameListResponse.class, NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(policyPath(metalake)));
+  }
+
+  @Test
+  public void testListTagsForPolicyPaged() {
+    String policyName = "policy1";
+    RelationalEntity<?>[] associations =
+        Arrays.stream(new String[] {"c", "gravitino_hidden_1", "a", "b"})
+            .map(
+                name -> {
+                  TagEntity tag = mock(TagEntity.class);
+                  when(tag.name()).thenReturn(name);
+                  return new RelationalEntity<>(
+                      SupportsRelationOperations.Type.POLICY_TAG_REL,
+                      NameIdentifier.of(metalake, policyName),
+                      org.apache.gravitino.Entity.EntityType.POLICY,
+                      tag);
+                })
+            .toArray(RelationalEntity<?>[]::new);
+    when(policyManager.listTagAssociationsForPolicy(metalake, policyName)).thenReturn(associations);
+    List<String> walked =
+        PagedListWalker.walk(
+            target(policyPath(metalake) + "/" + policyName + "/tags"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

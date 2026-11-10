@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.function.FunctionDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class FunctionListResponse extends BaseResponse {
+public class FunctionListResponse extends BaseListResponse {
 
   @JsonProperty("functions")
   private FunctionDTO[] functions;

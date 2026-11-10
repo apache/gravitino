@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -114,6 +116,7 @@ public class TestModelOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
@@ -584,13 +587,14 @@ public class TestModelOperations extends BaseOperationsTest {
                 return kept;
               });
 
-      Response resp = modelOperations.listModelVersions(metalake, catalog, schema, "model1", false);
+      Response resp =
+          modelOperations.listModelVersions(metalake, catalog, schema, "model1", false, null, null);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
       Assertions.assertArrayEquals(
           new int[] {0, 2}, ((ModelVersionListResponse) resp.getEntity()).getVersions());
 
       Response verboseResp =
-          modelOperations.listModelVersions(metalake, catalog, schema, "model1", true);
+          modelOperations.listModelVersions(metalake, catalog, schema, "model1", true, null, null);
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), verboseResp.getStatus());
       ModelVersionDTO[] kept =
           ((ModelVersionInfoListResponse) verboseResp.getEntity()).getVersions();
@@ -1778,5 +1782,19 @@ public class TestModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(left.auditInfo().lastModifier(), right.auditInfo().lastModifier());
     Assertions.assertEquals(
         left.auditInfo().lastModifiedTime(), right.auditInfo().lastModifiedTime());
+  }
+
+  @Test
+  public void testListModelsPaged() {
+    NameIdentifier a = NameIdentifier.of(metalake, catalog, schema, "a");
+    NameIdentifier b = NameIdentifier.of(metalake, catalog, schema, "b");
+    NameIdentifier c = NameIdentifier.of(metalake, catalog, schema, "c");
+    when(modelDispatcher.listModels(modelNs)).thenReturn(new NameIdentifier[] {c, a, b});
+
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target(modelPath()), 2, EntityListResponse.class, EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(a, b, c), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(modelPath()));
   }
 }

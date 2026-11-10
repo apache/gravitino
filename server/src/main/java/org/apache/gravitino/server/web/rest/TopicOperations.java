@@ -29,6 +29,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -51,6 +52,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -80,7 +83,9 @@ public class TopicOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     try {
       LOG.info("Received list topics request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
@@ -88,15 +93,23 @@ public class TopicOperations {
           () -> {
             LOG.info("Listing topics under schema: {}.{}.{}", metalake, catalog, schema);
             Namespace topicNS = NamespaceUtil.ofTopic(metalake, catalog, schema);
-            NameIdentifier[] topics = dispatcher.listTopics(topicNS);
-            topics = topics == null ? new NameIdentifier[0] : topics;
-            topics =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.TOPIC,
-                    topics);
-            Response response = Utils.ok(new EntityListResponse(topics));
+            ListPager.ArrayPage<NameIdentifier> page =
+                ListPager.pageArray(
+                    dispatcher.listTopics(topicNS),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.FILTER_TOPICS_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.TOPIC,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listTopics", metalake, catalog, schema));
+            NameIdentifier[] topics = page.items();
+            Response response =
+                Utils.ok(new EntityListResponse(topics).withNextPageToken(page.nextPageToken()));
             LOG.info(
                 "List {} topics under schema: {}.{}.{}", topics.length, metalake, catalog, schema);
             return response;

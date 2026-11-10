@@ -53,6 +53,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,33 +113,55 @@ public class UserOperations {
   public Response listUsers(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
-              User[] users = accessControlManager.listUsers(metalake);
-              users =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_USER_PRIVILEGE,
-                      Entity.EntityType.USER,
-                      users,
-                      (userEntity) -> NameIdentifierUtil.ofUser(metalake, userEntity.name()));
+              ListPager.ArrayPage<User> usersPage =
+                  ListPager.pageArray(
+                      accessControlManager.listUsers(metalake),
+                      User::name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_USER_PRIVILEGE,
+                              Entity.EntityType.USER,
+                              all,
+                              (userEntity) ->
+                                  NameIdentifierUtil.ofUser(metalake, userEntity.name())),
+                      User[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listUsers", metalake, "details"));
+              User[] users = usersPage.items();
 
-              return Utils.ok(new UserListResponse(DTOConverters.toDTOs(users)));
+              return Utils.ok(
+                  new UserListResponse(DTOConverters.toDTOs(users))
+                      .withNextPageToken(usersPage.nextPageToken()));
             } else {
-              String[] users = accessControlManager.listUserNames(metalake);
-              users =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_USER_PRIVILEGE,
-                      Entity.EntityType.USER,
-                      users,
-                      (username) -> NameIdentifierUtil.ofUser(metalake, username));
-              return Utils.ok(new NameListResponse(users));
+              ListPager.ArrayPage<String> usersPage =
+                  ListPager.pageArray(
+                      accessControlManager.listUserNames(metalake),
+                      name -> name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_USER_PRIVILEGE,
+                              Entity.EntityType.USER,
+                              all,
+                              (username) -> NameIdentifierUtil.ofUser(metalake, username)),
+                      String[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listUsers", metalake, "names"));
+              String[] users = usersPage.items();
+              return Utils.ok(
+                  new NameListResponse(users).withNextPageToken(usersPage.nextPageToken()));
             }
           });
     } catch (Exception e) {

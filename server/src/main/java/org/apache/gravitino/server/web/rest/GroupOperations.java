@@ -54,6 +54,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -184,7 +186,9 @@ public class GroupOperations {
   public Response listGroups(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list groups request.");
     try {
       return Utils.doAs(
@@ -192,26 +196,46 @@ public class GroupOperations {
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
-              Group[] groups = accessControlManager.listGroups(metalake);
-              groups =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_GROUP_PRIVILEGE,
-                      Entity.EntityType.GROUP,
-                      groups,
-                      groupEntity -> NameIdentifierUtil.ofGroup(metalake, groupEntity.name()));
+              ListPager.ArrayPage<Group> groupsPage =
+                  ListPager.pageArray(
+                      accessControlManager.listGroups(metalake),
+                      Group::name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_GROUP_PRIVILEGE,
+                              Entity.EntityType.GROUP,
+                              all,
+                              groupEntity ->
+                                  NameIdentifierUtil.ofGroup(metalake, groupEntity.name())),
+                      Group[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listGroups", metalake, "details"));
+              Group[] groups = groupsPage.items();
 
-              return Utils.ok(new GroupListResponse(DTOConverters.toDTOs(groups)));
+              return Utils.ok(
+                  new GroupListResponse(DTOConverters.toDTOs(groups))
+                      .withNextPageToken(groupsPage.nextPageToken()));
             } else {
-              String[] groups = accessControlManager.listGroupNames(metalake);
-              groups =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_GROUP_PRIVILEGE,
-                      Entity.EntityType.GROUP,
-                      groups,
-                      groupName -> NameIdentifierUtil.ofGroup(metalake, groupName));
-              return Utils.ok(new NameListResponse(groups));
+              ListPager.ArrayPage<String> groupsPage =
+                  ListPager.pageArray(
+                      accessControlManager.listGroupNames(metalake),
+                      name -> name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_GROUP_PRIVILEGE,
+                              Entity.EntityType.GROUP,
+                              all,
+                              groupName -> NameIdentifierUtil.ofGroup(metalake, groupName)),
+                      String[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listGroups", metalake, "names"));
+              String[] groups = groupsPage.items();
+              return Utils.ok(
+                  new NameListResponse(groups).withNextPageToken(groupsPage.nextPageToken()));
             }
           });
 

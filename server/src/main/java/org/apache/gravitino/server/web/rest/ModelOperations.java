@@ -68,6 +68,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -98,7 +100,9 @@ public class ModelOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list models request for schema: {}.{}.{}", metalake, catalog, schema);
     Namespace modelNs = NamespaceUtil.ofModel(metalake, catalog, schema);
 
@@ -106,16 +110,24 @@ public class ModelOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            NameIdentifier[] modelIds = modelDispatcher.listModels(modelNs);
-            modelIds = modelIds == null ? new NameIdentifier[0] : modelIds;
-            modelIds =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.MODEL,
-                    modelIds);
+            ListPager.ArrayPage<NameIdentifier> modelIdsPage =
+                ListPager.pageArray(
+                    modelDispatcher.listModels(modelNs),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.FILTER_MODEL_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.MODEL,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listModels", metalake, catalog, schema));
+            NameIdentifier[] modelIds = modelIdsPage.items();
             LOG.info("List {} models under schema {}", modelIds.length, modelNs);
-            return Utils.ok(new EntityListResponse(modelIds));
+            return Utils.ok(
+                new EntityListResponse(modelIds).withNextPageToken(modelIdsPage.nextPageToken()));
           });
 
     } catch (Exception e) {
@@ -258,7 +270,9 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list model versions request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
 
@@ -269,38 +283,56 @@ public class ModelOperations {
             // All versions are filtered in one call so the authorization state loaded for the
             // request (user, roles, model id, owner) is resolved once instead of once per version.
             if (verbose) {
-              ModelVersion[] modelVersions = modelDispatcher.listModelVersionInfos(modelId);
-              modelVersions = modelVersions == null ? new ModelVersion[0] : modelVersions;
-              modelVersions =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.MODEL_VERSION,
-                      modelVersions,
-                      modelVersion ->
-                          NameIdentifierUtil.ofModelVersion(
-                              metalake, catalog, schema, model, modelVersion.version()));
-              LOG.info("List {} versions of model {}", modelVersions.length, modelId);
-              return Utils.ok(
-                  new ModelVersionInfoListResponse(DTOConverters.toDTOs(modelVersions)));
-            } else {
-              int[] versions = modelDispatcher.listModelVersions(modelId);
-              versions = versions == null ? new int[0] : versions;
-              Integer[] boxedVersions = Arrays.stream(versions).boxed().toArray(Integer[]::new);
-              versions =
-                  Arrays.stream(
+              ListPager.ArrayPage<ModelVersion> modelVersionsPage =
+                  ListPager.pageArray(
+                      modelDispatcher.listModelVersionInfos(modelId),
+                      v -> ListPager.numericKey(v.version()),
+                      all ->
                           MetadataAuthzHelper.filterByExpression(
                               metalake,
                               AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
                               Entity.EntityType.MODEL_VERSION,
-                              boxedVersions,
+                              all,
+                              modelVersion ->
+                                  NameIdentifierUtil.ofModelVersion(
+                                      metalake, catalog, schema, model, modelVersion.version())),
+                      ModelVersion[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf(
+                          "listModelVersions", metalake, catalog, schema, model, "details"));
+              ModelVersion[] modelVersions = modelVersionsPage.items();
+              LOG.info("List {} versions of model {}", modelVersions.length, modelId);
+              return Utils.ok(
+                  new ModelVersionInfoListResponse(DTOConverters.toDTOs(modelVersions))
+                      .withNextPageToken(modelVersionsPage.nextPageToken()));
+            } else {
+              int[] versions = modelDispatcher.listModelVersions(modelId);
+              versions = versions == null ? new int[0] : versions;
+              Integer[] boxedVersions = Arrays.stream(versions).boxed().toArray(Integer[]::new);
+              ListPager.ArrayPage<Integer> versionsPage =
+                  ListPager.pageArray(
+                      boxedVersions,
+                      version -> ListPager.numericKey(version),
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_MODEL_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.MODEL_VERSION,
+                              all,
                               version ->
                                   NameIdentifierUtil.ofModelVersion(
-                                      metalake, catalog, schema, model, version)))
-                      .mapToInt(Integer::intValue)
-                      .toArray();
+                                      metalake, catalog, schema, model, version)),
+                      Integer[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf(
+                          "listModelVersions", metalake, catalog, schema, model, "names"));
+              versions = Arrays.stream(versionsPage.items()).mapToInt(Integer::intValue).toArray();
               LOG.info("List {} versions of model {}", versions.length, modelId);
-              return Utils.ok(new ModelVersionListResponse(versions));
+              return Utils.ok(
+                  new ModelVersionListResponse(versions)
+                      .withNextPageToken(versionsPage.nextPageToken()));
             }
           });
 

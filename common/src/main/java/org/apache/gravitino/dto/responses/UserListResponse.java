@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.authorization.UserDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class UserListResponse extends BaseResponse {
+public class UserListResponse extends BaseListResponse {
 
   @JsonProperty("users")
   private final UserDTO[] users;

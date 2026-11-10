@@ -22,6 +22,7 @@ import static javax.ws.rs.core.Response.Status.INTERNAL_SERVER_ERROR;
 import static org.apache.gravitino.Catalog.PROPERTY_IN_USE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -38,8 +39,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -102,6 +106,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
@@ -882,5 +887,44 @@ public class TestCatalogOperations extends BaseOperationsTest {
             .build();
 
     return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
+  }
+
+  @Test
+  public void testListCatalogsPaged() {
+    NameIdentifier a = NameIdentifier.of("metalake1", "a");
+    NameIdentifier b = NameIdentifier.of("metalake1", "b");
+    NameIdentifier c = NameIdentifier.of("metalake1", "c");
+    when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[] {c, a, b});
+
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target("/metalakes/metalake1/catalogs"),
+            2,
+            EntityListResponse.class,
+            EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(a, b, c), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target("/metalakes/metalake1/catalogs"));
+  }
+
+  @Test
+  public void testListCatalogsInfoPaged() {
+    when(manager.listCatalogsInfo(any()))
+        .thenReturn(
+            new Catalog[] {
+              buildCatalog("metalake1", "c"),
+              buildCatalog("metalake1", "a"),
+              buildCatalog("metalake1", "b")
+            });
+
+    List<String> walked =
+        PagedListWalker.walk(
+                target("/metalakes/metalake1/catalogs").queryParam("details", "true"),
+                2,
+                CatalogListResponse.class,
+                CatalogListResponse::getCatalogs)
+            .stream()
+            .map(CatalogDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

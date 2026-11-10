@@ -27,7 +27,7 @@ import org.apache.gravitino.dto.semantic.SemanticModelMetricDTO;
 /** Response containing complete metrics discovered in a schema. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class MetricInfoListResponse extends BaseResponse {
+public class MetricInfoListResponse extends BaseListResponse {
 
   @JsonProperty("metrics")
   private SemanticModelMetricDTO[] metrics;

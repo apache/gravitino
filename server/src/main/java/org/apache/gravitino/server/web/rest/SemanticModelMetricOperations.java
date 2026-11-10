@@ -48,6 +48,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -91,7 +93,9 @@ public class SemanticModelMetricOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @QueryParam("details") @DefaultValue("false") boolean details) {
+      @QueryParam("details") @DefaultValue("false") boolean details,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list Semantic Model metrics request for {}.{}.{}, details: {}",
         metalake,
@@ -104,39 +108,60 @@ public class SemanticModelMetricOperations {
           () -> {
             Namespace namespace = NamespaceUtil.ofSemanticModel(metalake, catalog, schema);
             if (!details) {
-              NameIdentifier[] identifiers = dispatcher.listMetrics(namespace);
-              identifiers = identifiers == null ? new NameIdentifier[0] : identifiers;
-              Set<NameIdentifier> visibleModels =
-                  visibleModels(
-                      metalake,
-                      Arrays.stream(identifiers)
-                          .map(ident -> NameIdentifier.of(ident.namespace().levels()))
-                          .toArray(NameIdentifier[]::new));
-              NameIdentifier[] visible =
-                  Arrays.stream(identifiers)
-                      .filter(
-                          ident ->
-                              visibleModels.contains(NameIdentifier.of(ident.namespace().levels())))
-                      .toArray(NameIdentifier[]::new);
-              return Utils.ok(new EntityListResponse(visible));
+              ListPager.ArrayPage<NameIdentifier> page =
+                  ListPager.pageArray(
+                      dispatcher.listMetrics(namespace),
+                      NameIdentifier::toString,
+                      all -> {
+                        Set<NameIdentifier> visibleModels =
+                            visibleModels(
+                                metalake,
+                                Arrays.stream(all)
+                                    .map(ident -> NameIdentifier.of(ident.namespace().levels()))
+                                    .toArray(NameIdentifier[]::new));
+                        return Arrays.stream(all)
+                            .filter(
+                                ident ->
+                                    visibleModels.contains(
+                                        NameIdentifier.of(ident.namespace().levels())))
+                            .toArray(NameIdentifier[]::new);
+                      },
+                      NameIdentifier[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listMetrics", metalake, catalog, schema, "names"));
+              return Utils.ok(
+                  new EntityListResponse(page.items()).withNextPageToken(page.nextPageToken()));
             }
 
-            SemanticModelMetric[] metrics = dispatcher.listMetricInfos(namespace);
-            metrics = metrics == null ? new SemanticModelMetric[0] : metrics;
-            Set<NameIdentifier> visibleModels =
-                visibleModels(
-                    metalake,
-                    Arrays.stream(metrics)
-                        .map(info -> NameIdentifier.of(info.namespace().levels()))
-                        .toArray(NameIdentifier[]::new));
+            ListPager.ArrayPage<SemanticModelMetric> page =
+                ListPager.pageArray(
+                    dispatcher.listMetricInfos(namespace),
+                    info -> NameIdentifier.of(info.namespace(), info.metric().name()).toString(),
+                    all -> {
+                      Set<NameIdentifier> visibleModels =
+                          visibleModels(
+                              metalake,
+                              Arrays.stream(all)
+                                  .map(info -> NameIdentifier.of(info.namespace().levels()))
+                                  .toArray(NameIdentifier[]::new));
+                      return Arrays.stream(all)
+                          .filter(
+                              info ->
+                                  visibleModels.contains(
+                                      NameIdentifier.of(info.namespace().levels())))
+                          .toArray(SemanticModelMetric[]::new);
+                    },
+                    SemanticModelMetric[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listMetrics", metalake, catalog, schema, "details"));
             SemanticModelMetricDTO[] visible =
-                Arrays.stream(metrics)
-                    .filter(
-                        info ->
-                            visibleModels.contains(NameIdentifier.of(info.namespace().levels())))
+                Arrays.stream(page.items())
                     .map(SemanticModelMetricDTO::fromSemanticModelMetric)
                     .toArray(SemanticModelMetricDTO[]::new);
-            return Utils.ok(new MetricInfoListResponse(visible));
+            return Utils.ok(
+                new MetricInfoListResponse(visible).withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSemanticModelException(

@@ -67,6 +67,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationFullNa
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsModification;
@@ -104,7 +106,9 @@ public class StatisticOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
-      @PathParam("fullName") @AuthorizationFullName String fullName) {
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list statistics request for object full name: {} type: {} in the metalake {}",
         fullName,
@@ -126,9 +130,18 @@ public class StatisticOperations {
             MetadataObjectUtil.checkMetadataObject(metalake, object);
 
             List<Statistic> statistics = statisticDispatcher.listStatistics(metalake, object);
+            ListPager.ArrayPage<Statistic> page =
+                ListPager.pageArray(
+                    statistics.toArray(new Statistic[0]),
+                    Statistic::name,
+                    all -> all,
+                    Statistic[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listStatistics", metalake, type, fullName));
             return Utils.ok(
-                new StatisticListResponse(
-                    DTOConverters.toDTOs(statistics.toArray(new Statistic[0]))));
+                new StatisticListResponse(DTOConverters.toDTOs(page.items()))
+                    .withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(OperationType.LIST, fullName, metalake, e);
@@ -263,7 +276,9 @@ public class StatisticOperations {
       @QueryParam("from") String fromPartitionName,
       @QueryParam("to") String toPartitionName,
       @QueryParam("fromInclusive") @DefaultValue("true") boolean fromInclusive,
-      @QueryParam("toInclusive") @DefaultValue("false") boolean toInclusive) {
+      @QueryParam("toInclusive") @DefaultValue("false") boolean toInclusive,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
 
     String formattedFromPartitionName =
         getFormattedFromPartitionName(fromPartitionName, fromInclusive);
@@ -316,7 +331,26 @@ public class StatisticOperations {
                                 DTOConverters.toDTOs(partitionStatistic.statistics())))
                     .toArray(PartitionStatisticsDTO[]::new);
 
-            return Utils.ok(new PartitionStatisticsListResponse(partitionStatistics));
+            ListPager.ArrayPage<PartitionStatisticsDTO> page =
+                ListPager.pageArray(
+                    partitionStatistics,
+                    PartitionStatisticsDTO::partitionName,
+                    all -> all,
+                    PartitionStatisticsDTO[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listPartitionStatistics",
+                        metalake,
+                        type,
+                        fullName,
+                        fromPartitionName,
+                        toPartitionName,
+                        String.valueOf(fromInclusive),
+                        String.valueOf(toInclusive)));
+            return Utils.ok(
+                new PartitionStatisticsListResponse(page.items())
+                    .withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       LOG.error(

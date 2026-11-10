@@ -293,7 +293,12 @@ public class TestGravitinoInterceptionService {
               "loadSemanticModel", String.class, String.class, String.class, String.class);
       Method list =
           SemanticModelOperations.class.getMethod(
-              "listSemanticModels", String.class, String.class, String.class);
+              "listSemanticModels",
+              String.class,
+              String.class,
+              String.class,
+              Integer.class,
+              String.class);
       Method alter =
           SemanticModelOperations.class.getMethod(
               "alterSemanticModel",
@@ -323,7 +328,13 @@ public class TestGravitinoInterceptionService {
               String.class);
       Method metrics =
           SemanticModelMetricOperations.class.getMethod(
-              "listMetrics", String.class, String.class, String.class, boolean.class);
+              "listMetrics",
+              String.class,
+              String.class,
+              String.class,
+              boolean.class,
+              Integer.class,
+              String.class);
       int metricMode = 0;
       for (Method method :
           List.of(create, load, list, alter, drop, importOssie, exportOssie, metrics, metrics)) {
@@ -419,13 +430,16 @@ public class TestGravitinoInterceptionService {
       ViewOperations operations = new ViewOperations(dispatcher);
       FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
       Method method =
-          ViewOperations.class.getMethod("listViews", String.class, String.class, String.class);
+          ViewOperations.class.getMethod(
+              "listViews", String.class, String.class, String.class, Integer.class, String.class);
       MethodInvocation invocation = mock(MethodInvocation.class);
       when(invocation.getMethod()).thenReturn(method);
       when(invocation.getArguments())
           .thenReturn(new Object[] {"testMetalake", "testCatalog", "testSchema"});
       when(invocation.proceed())
-          .thenAnswer(ignored -> operations.listViews("testMetalake", "testCatalog", "testSchema"));
+          .thenAnswer(
+              ignored ->
+                  operations.listViews("testMetalake", "testCatalog", "testSchema", null, null));
 
       MethodInterceptor interceptor =
           new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
@@ -1059,7 +1073,9 @@ public class TestGravitinoInterceptionService {
             String.class,
             String.class,
             String.class,
-            boolean.class);
+            boolean.class,
+            Integer.class,
+            String.class);
     for (Method method : new Method[] {tags, policies}) {
       for (String fullName : new String[] {"catalog", "catalog.schema.extra", "catalog.*", " "}) {
         MethodInvocation invocation = mock(MethodInvocation.class);

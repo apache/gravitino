@@ -27,7 +27,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -42,6 +44,7 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SecretProviderListResponse;
+import org.apache.gravitino.dto.secret.SecretProviderDTO;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
@@ -198,5 +201,26 @@ public class TestSecretsProviderOperations extends BaseOperationsTest {
     when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
     when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
     when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+  }
+
+  @Test
+  public void testListSecretProvidersPaged() throws IOException {
+    when(secretProviderRegistry.listProviders())
+        .thenReturn(
+            List.of(
+                new SecretProviderInfo("c", "vault", "https://c"),
+                new SecretProviderInfo("a", "vault", "https://a"),
+                new SecretProviderInfo("b", "vault", "https://b")));
+    stubMetalakeInUse();
+    List<String> walked =
+        PagedListWalker.walk(
+                target("/metalakes").path(METALAKE).path("secrets/providers"),
+                2,
+                SecretProviderListResponse.class,
+                SecretProviderListResponse::getProviders)
+            .stream()
+            .map(SecretProviderDTO::getName)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

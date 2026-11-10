@@ -67,6 +67,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -220,7 +221,8 @@ public class TestSemanticModelMetricOperations extends BaseOperationsTest {
                   MetadataAuthzHelper.filterByExpression(
                       "lake", FILTER, Entity.EntityType.SEMANTIC_MODEL, models))
           .thenReturn(new NameIdentifier[] {models[0]});
-      try (Response response = operations().listMetrics("lake", "catalog", "schema", details)) {
+      try (Response response =
+          operations().listMetrics("lake", "catalog", "schema", details, null, null)) {
         assertEquals(200, response.getStatus());
         if (details) {
           assertEquals(2, ((MetricInfoListResponse) response.getEntity()).getMetrics().length);
@@ -283,7 +285,8 @@ public class TestSemanticModelMetricOperations extends BaseOperationsTest {
                       value -> value,
                       new UserPrincipal("tester"),
                       authorizer));
-      try (Response response = operations().listMetrics("lake", "catalog", "schema", details)) {
+      try (Response response =
+          operations().listMetrics("lake", "catalog", "schema", details, null, null)) {
         assertEquals(200, response.getStatus());
         if (details) {
           assertEquals(1, ((MetricInfoListResponse) response.getEntity()).getMetrics().length);
@@ -306,7 +309,8 @@ public class TestSemanticModelMetricOperations extends BaseOperationsTest {
         .when(dispatcher)
         .listMetricInfos(SCHEMA);
     try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class);
-        Response response = operations().listMetrics("lake", "catalog", "schema", true)) {
+        Response response =
+            operations().listMetrics("lake", "catalog", "schema", true, null, null)) {
       assertEquals(500, response.getStatus());
       helper.verifyNoInteractions();
     }
@@ -343,5 +347,19 @@ public class TestSemanticModelMetricOperations extends BaseOperationsTest {
                     .build())
             .build();
     return new ImmutableSemanticModelMetric(identifier(model, name).namespace(), metric);
+  }
+
+  @Test
+  void testListMetricsPagedAcrossModels() {
+    // Metric names repeat across semantic models, so pages are ordered by the full identifier.
+    NameIdentifier aRevenue = identifier("a", "revenue");
+    NameIdentifier bCost = identifier("b", "cost");
+    NameIdentifier bRevenue = identifier("b", "revenue");
+    when(dispatcher.listMetrics(SCHEMA))
+        .thenReturn(new NameIdentifier[] {bRevenue, aRevenue, bCost});
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target(PATH), 2, EntityListResponse.class, EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(aRevenue, bCost, bRevenue), walked);
   }
 }

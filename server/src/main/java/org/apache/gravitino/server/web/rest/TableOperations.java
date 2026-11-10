@@ -102,28 +102,18 @@ public class TableOperations {
           httpRequest,
           () -> {
             Namespace tableNS = NamespaceUtil.ofTable(metalake, catalog, schema);
-            NameIdentifier[] idents = dispatcher.listTables(tableNS);
-            if (ListPager.isPaged(pageSize, pageToken)) {
-              ListPager.Result<NameIdentifier> page =
-                  ListPager.page(
-                      Arrays.asList(idents),
-                      NameIdentifier::name,
-                      chunk -> Arrays.asList(filterTables(metalake, chunk)),
-                      pageSize,
-                      pageToken,
-                      PageToken.scopeOf("listTables", metalake, catalog, schema),
-                      ListPager.maxPageSize());
-              NameIdentifier[] pageIdents = page.items().toArray(new NameIdentifier[0]);
-              LOG.info(
-                  "List page of {} tables under schema: {}.{}.{}",
-                  pageIdents.length,
-                  metalake,
-                  catalog,
-                  schema);
-              return Utils.ok(new EntityListResponse(pageIdents, page.nextPageToken()));
-            }
-            idents = filterTables(metalake, Arrays.asList(idents));
-            Response response = Utils.ok(new EntityListResponse(idents));
+            ListPager.ArrayPage<NameIdentifier> page =
+                ListPager.pageArray(
+                    dispatcher.listTables(tableNS),
+                    NameIdentifier::name,
+                    all -> filterTables(metalake, Arrays.asList(all)),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listTables", metalake, catalog, schema));
+            NameIdentifier[] idents = page.items();
+            Response response =
+                Utils.ok(new EntityListResponse(idents).withNextPageToken(page.nextPageToken()));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
             return response;

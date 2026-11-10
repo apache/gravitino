@@ -32,7 +32,7 @@ import org.apache.gravitino.dto.policy.PolicyDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class PolicyListResponse extends BaseResponse {
+public class PolicyListResponse extends BaseListResponse {
 
   @JsonProperty("policies")
   private final PolicyDTO[] policies;

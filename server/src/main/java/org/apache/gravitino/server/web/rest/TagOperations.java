@@ -75,6 +75,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -106,7 +108,9 @@ public class TagOperations {
   public Response listTags(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list tag {} request for metalake: {}", verbose ? "infos" : "names", metalake);
 
@@ -126,15 +130,24 @@ public class TagOperations {
                         .map(t -> DTOConverters.toDTO(t, Optional.empty()))
                         .toArray(TagDTO[]::new);
               }
-              tagDTOs =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.TAG,
+              ListPager.ArrayPage<TagDTO> page =
+                  ListPager.pageArray(
                       tagDTOs,
-                      tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
+                      TagDTO::name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.TAG,
+                              all,
+                              tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name())),
+                      TagDTO[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listTags", metalake, "details"));
+              tagDTOs = page.items();
               LOG.info("List {} tags info under metalake: {}", tagDTOs.length, metalake);
-              return Utils.ok(new TagListResponse(tagDTOs));
+              return Utils.ok(new TagListResponse(tagDTOs).withNextPageToken(page.nextPageToken()));
 
             } else {
               String[] tagNames = tagDispatcher.listTags(metalake);
@@ -143,15 +156,25 @@ public class TagOperations {
                   Arrays.stream(tagNames)
                       .filter(name -> !HiddenPolicyTag.isReservedName(name))
                       .toArray(String[]::new);
-              tagNames =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.TAG,
+              ListPager.ArrayPage<String> page =
+                  ListPager.pageArray(
                       tagNames,
-                      tagName -> NameIdentifierUtil.ofTag(metalake, tagName));
+                      name -> name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.TAG,
+                              all,
+                              tagName -> NameIdentifierUtil.ofTag(metalake, tagName)),
+                      String[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listTags", metalake, "names"));
+              tagNames = page.items();
               LOG.info("List {} tags under metalake: {}", tagNames.length, metalake);
-              return Utils.ok(new NameListResponse(tagNames));
+              return Utils.ok(
+                  new NameListResponse(tagNames).withNextPageToken(page.nextPageToken()));
             }
           });
     } catch (Exception e) {
@@ -317,7 +340,9 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
-      @QueryParam("value") String value) {
+      @QueryParam("value") String value,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list objects for tag: {} and value: {} under metalake: {}",
         tagName,
@@ -342,8 +367,18 @@ public class TagOperations {
 
             MetadataObjectDTO[] objectDTOs =
                 Arrays.stream(objects).map(DTOConverters::toDTO).toArray(MetadataObjectDTO[]::new);
-            objectDTOs = MetadataAuthzHelper.filterMetadataObject(metalake, objectDTOs);
-            return Utils.ok(new MetadataObjectListResponse(objectDTOs));
+            ListPager.ArrayPage<MetadataObjectDTO> page =
+                ListPager.pageArray(
+                    objectDTOs,
+                    object -> object.type() + ":" + object.fullName(),
+                    all -> MetadataAuthzHelper.filterMetadataObject(metalake, all),
+                    MetadataObjectDTO[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listMetadataObjectsForTag", metalake, tagName, value));
+            return Utils.ok(
+                new MetadataObjectListResponse(page.items())
+                    .withNextPageToken(page.nextPageToken()));
           });
 
     } catch (Exception e) {
@@ -362,29 +397,40 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list policy associations for tag: {} under metalake: {}", tagName, metalake);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             checkVisibleTag(metalake, tagName);
-            RelationalEntity<?>[] associations =
-                tagDispatcher.listPolicyAssociationsForTag(metalake, tagName);
-            associations =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.POLICY,
-                    associations,
-                    association ->
-                        NameIdentifierUtil.ofPolicy(metalake, association.targetEntity().name()));
+            ListPager.ArrayPage<RelationalEntity<?>> page =
+                ListPager.pageArray(
+                    tagDispatcher.listPolicyAssociationsForTag(metalake, tagName),
+                    association -> association.targetEntity().name(),
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.POLICY,
+                            all,
+                            association ->
+                                NameIdentifierUtil.ofPolicy(
+                                    metalake, association.targetEntity().name())),
+                    RelationalEntity<?>[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listPoliciesForTag", metalake, tagName, verbose ? "details" : "names"));
+            RelationalEntity<?>[] associations = page.items();
             if (!verbose) {
               String[] names =
                   Arrays.stream(associations)
                       .map(association -> association.targetEntity().name())
                       .toArray(String[]::new);
-              return Utils.ok(new NameListResponse(names));
+              return Utils.ok(new NameListResponse(names).withNextPageToken(page.nextPageToken()));
             }
 
             PolicyForTagAssociationDTO[] associationDTOs =
@@ -396,7 +442,9 @@ public class TagOperations {
                                     (PolicyEntity) association.targetEntity(), Optional.empty()),
                                 PolicyOperations.toSelectorDTO(association)))
                     .toArray(PolicyForTagAssociationDTO[]::new);
-            return Utils.ok(new PolicyForTagAssociationListResponse(associationDTOs));
+            return Utils.ok(
+                new PolicyForTagAssociationListResponse(associationDTOs)
+                    .withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.LIST, tagName, metalake, e);
@@ -502,11 +550,14 @@ public class TagOperations {
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     MetadataObjectTagOperations metadataObjectTagOperations =
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
-    return metadataObjectTagOperations.listTagsForMetadataObject(metalake, type, fullName, verbose);
+    return metadataObjectTagOperations.listTagsForMetadataObject(
+        metalake, type, fullName, verbose, pageSize, pageToken);
   }
 
   /**

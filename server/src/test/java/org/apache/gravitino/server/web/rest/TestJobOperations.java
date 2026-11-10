@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import static javax.ws.rs.core.MediaType.APPLICATION_JSON_TYPE;
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
@@ -39,6 +40,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -151,6 +153,7 @@ public class TestJobOperations extends JerseyTest {
     Config config = mock(Config.class);
     doReturn(false).when(config).get(CACHE_ENABLED);
     doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     IdGenerator idGenerator = new RandomIdGenerator();
@@ -1755,5 +1758,66 @@ public class TestJobOperations extends JerseyTest {
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();
+  }
+
+  @Test
+  public void testListJobTemplatesPaged() {
+    when(jobOperationDispatcher.listJobTemplates(metalake))
+        .thenReturn(
+            Lists.newArrayList(
+                newShellJobTemplateEntity("c", "c"),
+                newShellJobTemplateEntity("a", "a"),
+                newShellJobTemplateEntity("b", "b")));
+    List<String> walked =
+        PagedListWalker.walk(
+            target(jobTemplatePath()), 2, NameListResponse.class, NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(jobTemplatePath()));
+  }
+
+  @Test
+  public void testListJobsPagedKeepsRequestedSortAndFullStatusCounts() {
+    JobEntity job1 = newJobEntityWithQueuedAt("t", JobHandle.Status.QUEUED, 1000L, 0L, 0L);
+    JobEntity job2 = newJobEntityWithQueuedAt("t", JobHandle.Status.STARTED, 2000L, 2500L, 0L);
+    JobEntity job3 = newJobEntityWithQueuedAt("t", JobHandle.Status.SUCCEEDED, 3000L, 3100L, 3500L);
+    when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
+        .thenReturn(Lists.newArrayList(job1, job3, job2));
+
+    // Default order is queuedAt descending.
+    List<JobDTO> walked =
+        PagedListWalker.walk(
+            target(jobRunPath()),
+            2,
+            JobListResponse.class,
+            response -> response.getJobs().toArray(new JobDTO[0]));
+    Assertions.assertEquals(
+        Arrays.asList(
+            JobOperations.toDTO(job3), JobOperations.toDTO(job2), JobOperations.toDTO(job1)),
+        walked);
+
+    // Ascending by startedAt puts the job that never started last.
+    List<JobDTO> byStart =
+        PagedListWalker.walk(
+            target(jobRunPath()).queryParam("sortBy", "startedAt").queryParam("sortOrder", "asc"),
+            1,
+            JobListResponse.class,
+            response -> response.getJobs().toArray(new JobDTO[0]));
+    Assertions.assertEquals(
+        Arrays.asList(
+            JobOperations.toDTO(job2), JobOperations.toDTO(job3), JobOperations.toDTO(job1)),
+        byStart);
+
+    // Every page carries the status counts of the whole filtered list.
+    Response firstPage =
+        target(jobRunPath())
+            .queryParam("pageSize", 1)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    JobListResponse page = firstPage.readEntity(JobListResponse.class);
+    Assertions.assertEquals(1, page.getJobs().size());
+    Assertions.assertEquals(1L, page.getStatusCounts().get("queued"));
+    Assertions.assertEquals(1L, page.getStatusCounts().get("started"));
+    Assertions.assertEquals(1L, page.getStatusCounts().get("succeeded"));
   }
 }

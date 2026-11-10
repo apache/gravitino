@@ -31,7 +31,7 @@ import org.apache.gravitino.dto.MetalakeDTO;
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class MetalakeListResponse extends BaseResponse {
+public class MetalakeListResponse extends BaseListResponse {
 
   @JsonProperty("metalakes")
   private final MetalakeDTO[] metalakes;

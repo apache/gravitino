@@ -58,6 +58,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -90,7 +92,9 @@ public class FunctionOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @QueryParam("details") @DefaultValue("false") boolean details) {
+      @QueryParam("details") @DefaultValue("false") boolean details,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     try {
       LOG.info("Received list functions request for schema: {}.{}.{}", metalake, catalog, schema);
       return Utils.doAs(
@@ -98,32 +102,49 @@ public class FunctionOperations {
           () -> {
             Namespace namespace = NamespaceUtil.ofFunction(metalake, catalog, schema);
             if (!details) {
-              NameIdentifier[] identifiers = dispatcher.listFunctions(namespace);
-              identifiers = identifiers == null ? new NameIdentifier[0] : identifiers;
-              identifiers =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.FUNCTION,
-                      identifiers);
+              ListPager.ArrayPage<NameIdentifier> page =
+                  ListPager.pageArray(
+                      dispatcher.listFunctions(namespace),
+                      NameIdentifier::name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants
+                                  .FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.FUNCTION,
+                              all),
+                      NameIdentifier[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listFunctions", metalake, catalog, schema, "names"));
+              NameIdentifier[] identifiers = page.items();
               LOG.info(
                   "List {} function names under schema: {}.{}.{}",
                   identifiers.length,
                   metalake,
                   catalog,
                   schema);
-              return Utils.ok(new EntityListResponse(identifiers));
+              return Utils.ok(
+                  new EntityListResponse(identifiers).withNextPageToken(page.nextPageToken()));
             }
 
-            Function[] functions = dispatcher.listFunctionInfos(namespace);
-            functions = functions == null ? new Function[0] : functions;
-            functions =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.FUNCTION,
-                    functions,
-                    f -> NameIdentifier.of(namespace, f.name()));
+            ListPager.ArrayPage<Function> page =
+                ListPager.pageArray(
+                    dispatcher.listFunctionInfos(namespace),
+                    Function::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants
+                                .FILTER_FUNCTION_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.FUNCTION,
+                            all,
+                            f -> NameIdentifier.of(namespace, f.name())),
+                    Function[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listFunctions", metalake, catalog, schema, "details"));
+            Function[] functions = page.items();
             FunctionDTO[] functionDTOs =
                 Arrays.stream(functions)
                     .map(DTOConverters::toDTO)
@@ -135,7 +156,8 @@ public class FunctionOperations {
                 metalake,
                 catalog,
                 schema);
-            return Utils.ok(new FunctionListResponse(functionDTOs));
+            return Utils.ok(
+                new FunctionListResponse(functionDTOs).withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFunctionException(OperationType.LIST, "", schema, e);

@@ -31,7 +31,7 @@ import org.apache.gravitino.dto.secret.SecretProviderDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class SecretProviderListResponse extends BaseResponse {
+public class SecretProviderListResponse extends BaseListResponse {
 
   @JsonProperty("providers")
   private final SecretProviderDTO[] providers;

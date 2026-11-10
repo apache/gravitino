@@ -28,7 +28,10 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -37,6 +40,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.dto.function.FunctionDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.function.FunctionImplDTO;
 import org.apache.gravitino.dto.function.FunctionParamDTO;
@@ -912,5 +916,38 @@ public class TestFunctionOperations extends BaseOperationsTest {
     Assertions.assertNotNull(right.auditInfo());
     Assertions.assertEquals(left.auditInfo().creator(), right.auditInfo().creator());
     Assertions.assertEquals(left.auditInfo().createTime(), right.auditInfo().createTime());
+  }
+
+  @Test
+  public void testListFunctionNamesPaged() {
+    NameIdentifier a = NameIdentifier.of(metalake, catalog, schema, "a");
+    NameIdentifier b = NameIdentifier.of(metalake, catalog, schema, "b");
+    NameIdentifier c = NameIdentifier.of(metalake, catalog, schema, "c");
+    when(functionDispatcher.listFunctions(functionNs)).thenReturn(new NameIdentifier[] {c, a, b});
+
+    List<NameIdentifier> walked =
+        PagedListWalker.walk(
+            target(functionPath()), 2, EntityListResponse.class, EntityListResponse::identifiers);
+    Assertions.assertEquals(Arrays.asList(a, b, c), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(functionPath()));
+  }
+
+  @Test
+  public void testListFunctionInfosPaged() {
+    Function f1 = mockFunction("func1", "c1", FunctionType.SCALAR);
+    Function f2 = mockFunction("func2", "c2", FunctionType.SCALAR);
+    Function f3 = mockFunction("func3", "c3", FunctionType.SCALAR);
+    when(functionDispatcher.listFunctionInfos(functionNs)).thenReturn(new Function[] {f3, f1, f2});
+
+    List<String> walked =
+        PagedListWalker.walk(
+                target(functionPath()).queryParam("details", "true"),
+                2,
+                FunctionListResponse.class,
+                FunctionListResponse::getFunctions)
+            .stream()
+            .map(FunctionDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("func1", "func2", "func3"), walked);
   }
 }

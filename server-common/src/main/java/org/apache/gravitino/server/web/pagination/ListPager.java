@@ -18,10 +18,13 @@ package org.apache.gravitino.server.web.pagination;
 
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.function.Function;
+import java.util.function.IntFunction;
+import java.util.function.UnaryOperator;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
@@ -65,6 +68,37 @@ public final class ListPager {
 
     /**
      * @return The token for the next page, or null when no visible entry remains.
+     */
+    public String nextPageToken() {
+      return nextPageToken;
+    }
+  }
+
+  /**
+   * One page of an array-valued list.
+   *
+   * @param <T> The entry type.
+   */
+  public static final class ArrayPage<T> {
+    private final T[] items;
+    private final String nextPageToken;
+
+    ArrayPage(T[] items, String nextPageToken) {
+      this.items = items;
+      this.nextPageToken = nextPageToken;
+    }
+
+    /**
+     * @return The entries in the page. For an unpaged request, the full visible list in its
+     *     original order.
+     */
+    public T[] items() {
+      return items;
+    }
+
+    /**
+     * @return The token for the next page, or null when no visible entry remains or the request was
+     *     not paged.
      */
     public String nextPageToken() {
       return nextPageToken;
@@ -146,6 +180,59 @@ public final class ListPager {
     List<T> page = new ArrayList<>(found.subList(0, size));
     String next = PageToken.encode(sortKey.apply(page.get(size - 1)), scope);
     return new Result<>(page, next);
+  }
+
+  /**
+   * Returns one page of an array-valued list, or the full visible list when the request is not
+   * paged. For an unpaged request, {@code visible} is applied once to the whole array, exactly as
+   * the list endpoints did before paging existed.
+   *
+   * @param entries The full list, in any order; null is treated as empty. Sort keys must be unique.
+   * @param sortKey Returns the sort key of an entry.
+   * @param visible Returns the entries of an array the caller may see, in the order given.
+   * @param newArray Creates an array of the entry type.
+   * @param pageSize The {@code pageSize} query parameter, or null.
+   * @param pageToken The {@code pageToken} query parameter, or null.
+   * @param scope The scope of the list, from {@link PageToken#scopeOf(String...)}.
+   * @param <T> The entry type.
+   * @return The page.
+   * @throws IllegalArgumentException If {@code pageSize} is below 1 or {@code pageToken} is
+   *     invalid. The message names the parameter.
+   */
+  public static <T> ArrayPage<T> pageArray(
+      T[] entries,
+      Function<T, String> sortKey,
+      UnaryOperator<T[]> visible,
+      IntFunction<T[]> newArray,
+      Integer pageSize,
+      String pageToken,
+      String scope) {
+    T[] all = entries == null ? newArray.apply(0) : entries;
+    if (!isPaged(pageSize, pageToken)) {
+      return new ArrayPage<>(visible.apply(all), null);
+    }
+    Result<T> result =
+        page(
+            Arrays.asList(all),
+            sortKey,
+            chunk -> Arrays.asList(visible.apply(chunk.toArray(newArray.apply(0)))),
+            pageSize,
+            pageToken,
+            scope,
+            maxPageSize());
+    return new ArrayPage<>(result.items().toArray(newArray.apply(0)), result.nextPageToken());
+  }
+
+  /**
+   * Returns the sort key of a non-negative integer, zero-padded so that string order is numeric
+   * order.
+   *
+   * @param value A non-negative integer, such as a model version number.
+   * @return The sort key.
+   */
+  public static String numericKey(long value) {
+    Preconditions.checkArgument(value >= 0, "value must be non-negative: %s", value);
+    return String.format("%019d", value);
   }
 
   /** Returns the index of the first entry whose key sorts strictly after {@code afterKey}. */

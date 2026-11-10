@@ -29,6 +29,7 @@ import javax.ws.rs.PUT;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -52,6 +53,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -82,21 +85,32 @@ public class ViewOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list views request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             Namespace viewNS = NamespaceUtil.ofView(metalake, catalog, schema);
-            NameIdentifier[] idents = dispatcher.listViews(viewNS);
-            idents =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.VIEW,
-                    idents);
-            Response response = Utils.ok(new EntityListResponse(idents));
+            ListPager.ArrayPage<NameIdentifier> page =
+                ListPager.pageArray(
+                    dispatcher.listViews(viewNS),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.VIEW,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listViews", metalake, catalog, schema));
+            NameIdentifier[] idents = page.items();
+            Response response =
+                Utils.ok(new EntityListResponse(idents).withNextPageToken(page.nextPageToken()));
             LOG.info(
                 "List {} views under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
             return response;

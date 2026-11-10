@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.tag.TagForPolicyAssociationDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class TagForPolicyAssociationListResponse extends BaseResponse {
+public class TagForPolicyAssociationListResponse extends BaseListResponse {
 
   @JsonProperty("associations")
   private final TagForPolicyAssociationDTO[] associations;
