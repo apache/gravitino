@@ -52,9 +52,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.AuditDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -1168,9 +1172,24 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     for (SchemaEntity schema : schemas) {
       boolean leaf = schema.name().equals(logicalLeaf);
-      Assertions.assertEquals(leaf ? AUDIT_INFO.creator() : null, schema.auditInfo().creator());
+      AuditInfo expectedAudit = leaf ? AUDIT_INFO : AuditInfo.EMPTY;
+      Assertions.assertEquals(expectedAudit, schema.auditInfo());
+
+      SchemaPO stored =
+          SessionUtils.getWithoutCommit(
+              SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+      Assertions.assertNotNull(stored.getAuditInfo());
       Assertions.assertEquals(
-          leaf ? AUDIT_INFO.createTime() : null, schema.auditInfo().createTime());
+          expectedAudit,
+          JsonUtils.anyFieldMapper().readValue(stored.getAuditInfo(), AuditInfo.class));
+
+      SchemaEntity reloaded = schemaMetaService.getSchemaByIdentifier(schema.nameIdentifier());
+      Assertions.assertEquals(expectedAudit, reloaded.auditInfo());
+      AuditDTO dto = DTOConverters.toDTO(reloaded.auditInfo());
+      Assertions.assertEquals(expectedAudit.creator(), dto.creator());
+      Assertions.assertEquals(expectedAudit.createTime(), dto.createTime());
+      Assertions.assertEquals(expectedAudit.lastModifier(), dto.lastModifier());
+      Assertions.assertEquals(expectedAudit.lastModifiedTime(), dto.lastModifiedTime());
     }
 
     SchemaEntity loaded =
