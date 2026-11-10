@@ -288,6 +288,36 @@ Two constraints follow from `ServiceLoader` discovery:
   class that cannot be loaded at all is not survivable in the same way: it fails the scan before any
   candidate is reached.
 
+##### Schema locations (optional)
+
+Services that allocate storage usually do it hierarchically: a schema is registered first, with the
+owner and the storage domain it belongs to, and the paths of its tables are derived from it. A
+provider that needs a say in schemas implements
+`org.apache.gravitino.catalog.lakehouse.generic.SupportsSchemaLocations` in addition to
+`TableLocationProvider`. A provider that does not implement it is never consulted for schemas, and
+the catalog does no extra work on its behalf.
+
+- **Create.** `provisionSchemaLocation` is called before the schema is stored, with the properties of
+  the creation request, including a caller-supplied `location` if there is one. It returns the
+  schema location, or `null` to keep the request unchanged; a non-null value is stored verbatim as
+  the schema's `location` property and must not be blank. If it throws, the schema is not created. A
+  schema that already exists is rejected before the provider is consulted.
+- **Drop.** `unprovisionSchemaLocation` is called only after the schema has been removed. With
+  cascade, the tables are dropped first through the usual path, so their table callbacks have
+  already run. The `SchemaLocationContext` carries the stored schema properties, whether the drop
+  cascaded, and `tablesWithRetainedData()`: the external tables the cascade dropped rather than
+  purged, whose data is still under the schema location. The catalog reports this and the provider
+  decides whether to release the schema location anyway, keep it, or keep it and report it; there is
+  no force option on the drop. A failure is logged at WARN and the drop still reports success.
+
+Both callbacks are called concurrently and must be thread-safe, and the catalog applies no timeout
+to them. The same limitations apply as for tables: a creation that fails after the provider was
+consulted (a concurrent creation of the same name, or a store failure) leaves the schema location
+provisioned, and is deliberately not compensated, because a provider answering idempotently may have
+returned the allocation of the schema that won the race; altering the schema's `location` property
+does not tell the provider; and a crash between the removal and the callback skips it. A provider
+reclaiming real storage needs its own reconciliation.
+
 #### Key Property: `location`
 
 The `location` property specifies the root directory for the lakehouse table. All schemas and tables are stored under this location unless explicitly overridden at the schema or table level.

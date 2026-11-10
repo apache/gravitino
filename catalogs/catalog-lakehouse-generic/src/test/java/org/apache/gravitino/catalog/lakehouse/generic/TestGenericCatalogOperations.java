@@ -114,6 +114,7 @@ public class TestGenericCatalogOperations {
   private static GenericCatalogOperations ops;
   private static GenericCatalogOperations opsWithFakeProvider;
   private static GenericCatalogOperations opsWithDefaultProvider;
+  private static GenericCatalogOperations opsWithSchemaProvider;
 
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
@@ -199,6 +200,16 @@ public class TestGenericCatalogOperations {
     opsWithDefaultProvider = new GenericCatalogOperations(store, idGenerator);
     opsWithDefaultProvider.initialize(
         ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
+
+    // A fourth instance whose provider also implements SupportsSchemaLocations, to exercise the
+    // schema callbacks.
+    opsWithSchemaProvider = new GenericCatalogOperations(store, idGenerator);
+    opsWithSchemaProvider.initialize(
+        ImmutableMap.of(
+            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
+            FakeSchemaLocationProvider.NAME),
+        null /* CatalogInfo, unused */,
+        new GenericCatalog());
   }
 
   @TempDir private Path lanceDataDir;
@@ -344,6 +355,7 @@ public class TestGenericCatalogOperations {
   @BeforeEach
   public void resetProvider() {
     FakeTableLocationProvider.reset();
+    FakeSchemaLocationProvider.reset();
     FakeTableDelegator.reset();
   }
 
@@ -352,6 +364,7 @@ public class TestGenericCatalogOperations {
     ops.close();
     opsWithFakeProvider.close();
     opsWithDefaultProvider.close();
+    opsWithSchemaProvider.close();
     store.close();
     FileUtils.deleteDirectory(new File(STORE_PATH));
   }
@@ -923,6 +936,176 @@ public class TestGenericCatalogOperations {
     // The format cache is populated after a successful creation, so a refused one must leave no
     // entry behind for a later table of the same name to read.
     Assertions.assertNull(opsWithFakeProvider.tableFormatCache().getIfPresent(tableIdent));
+  }
+
+  @Test
+  public void testASchemaProviderAllocatesTheSchemaLocation() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+
+    List<SchemaLocationContext> provisioned = FakeSchemaLocationProvider.provisioned();
+    Assertions.assertEquals(1, provisioned.size());
+    Assertions.assertEquals(schemaIdent, provisioned.get(0).schemaIdentifier());
+    Assertions.assertFalse(provisioned.get(0).cascade());
+    Assertions.assertTrue(provisioned.get(0).tablesWithRetainedData().isEmpty());
+
+    Schema schema = opsWithSchemaProvider.loadSchema(schemaIdent);
+    String schemaLocation = FakeSchemaLocationProvider.LOCATION_PREFIX + schemaIdent.name() + "/";
+    Assertions.assertEquals(schemaLocation, schema.properties().get(Schema.PROPERTY_LOCATION));
+    Assertions.assertNotNull(StringIdentifier.fromProperties(schema.properties()));
+
+    // A table placed by the same provider is derived from the location stored on its schema.
+    Table table =
+        createTableThroughCatalog(opsWithSchemaProvider, schemaIdent, "t1", ImmutableMap.of());
+    Assertions.assertEquals(
+        schemaLocation + "t1/", table.properties().get(Table.PROPERTY_LOCATION));
+  }
+
+  @Test
+  public void testASchemaProviderReturningNullKeepsTheSuppliedLocation() {
+    FakeSchemaLocationProvider.provisionLocation(null);
+    String supplied = "s3://caller-owned-bucket/db/";
+
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(supplied);
+
+    Assertions.assertEquals(
+        supplied,
+        FakeSchemaLocationProvider.provisioned()
+            .get(0)
+            .schemaProperties()
+            .get(Schema.PROPERTY_LOCATION));
+    Assertions.assertEquals(
+        supplied,
+        opsWithSchemaProvider.loadSchema(schemaIdent).properties().get(Schema.PROPERTY_LOCATION));
+  }
+
+  @Test
+  public void testABlankSchemaLocationFailsTheCreation() {
+    FakeSchemaLocationProvider.provisionLocation("   ");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
+
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createSchemaWithSchemaProvider(schemaIdent, null));
+    Assertions.assertTrue(e.getMessage().contains(FakeSchemaLocationProvider.NAME), e.getMessage());
+    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testASchemaProviderRefusingTheCreationLeavesNoSchema() {
+    FakeSchemaLocationProvider.failOnProvision(true);
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
+
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> createSchemaWithSchemaProvider(schemaIdent, null));
+    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testAnExistingSchemaIsRejectedBeforeTheProviderIsConsulted() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    FakeSchemaLocationProvider.reset();
+
+    Assertions.assertThrows(
+        SchemaAlreadyExistsException.class,
+        () -> createSchemaWithSchemaProvider(schemaIdent, null));
+    // Asking a provider to allocate for a taken name could hand back the allocation of the schema
+    // that exists, which nothing could then safely release.
+    Assertions.assertTrue(FakeSchemaLocationProvider.provisioned().isEmpty());
+  }
+
+  @Test
+  public void testDroppingASchemaUnprovisionsItsLocation() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+
+    Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, false));
+
+    List<SchemaLocationContext> unprovisioned = FakeSchemaLocationProvider.unprovisioned();
+    Assertions.assertEquals(1, unprovisioned.size());
+    SchemaLocationContext context = unprovisioned.get(0);
+    Assertions.assertEquals(schemaIdent, context.schemaIdentifier());
+    Assertions.assertFalse(context.cascade());
+    Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
+    // The stored properties are read before the schema is removed.
+    Assertions.assertEquals(
+        FakeSchemaLocationProvider.LOCATION_PREFIX + schemaIdent.name() + "/",
+        context.schemaProperties().get(Schema.PROPERTY_LOCATION));
+  }
+
+  @Test
+  public void testDroppingANonExistentSchemaDoesNotUnprovision() {
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
+
+    Assertions.assertFalse(opsWithSchemaProvider.dropSchema(schemaIdent, true));
+    Assertions.assertTrue(FakeSchemaLocationProvider.unprovisioned().isEmpty());
+  }
+
+  @Test
+  public void testACascadeReportsTheTablesThatKeptTheirData() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    createTableThroughCatalog(
+        opsWithSchemaProvider,
+        schemaIdent,
+        "external_table",
+        ImmutableMap.of(
+            Table.PROPERTY_EXTERNAL,
+            "true",
+            Table.PROPERTY_LOCATION,
+            "s3://caller-owned-bucket/existing/data/"));
+    createTableThroughCatalog(
+        opsWithSchemaProvider, schemaIdent, "managed_table", ImmutableMap.of());
+
+    Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, true /* cascade */));
+
+    // The external table was dropped rather than purged, so its data is still under the schema
+    // location. The catalog reports it; whether to release the schema location is the provider's
+    // decision.
+    List<SchemaLocationContext> unprovisioned = FakeSchemaLocationProvider.unprovisioned();
+    Assertions.assertEquals(1, unprovisioned.size());
+    Assertions.assertTrue(unprovisioned.get(0).cascade());
+    Assertions.assertEquals(
+        List.of(
+            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "external_table")),
+        unprovisioned.get(0).tablesWithRetainedData());
+  }
+
+  @Test
+  public void testAFailedSchemaUnprovisionStillReportsTheDropAsSuccessful() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    FakeSchemaLocationProvider.failOnUnprovision(true);
+
+    Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, false));
+    Assertions.assertEquals(1, FakeSchemaLocationProvider.unprovisioned().size());
+    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testAProviderWithoutSchemaSupportIsNotConsultedForSchemas() {
+    NameIdentifier schemaIdent = createSchema();
+    Assertions.assertNull(
+        opsWithFakeProvider.loadSchema(schemaIdent).properties().get(Schema.PROPERTY_LOCATION));
+
+    Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, false));
+    Assertions.assertTrue(FakeSchemaLocationProvider.provisioned().isEmpty());
+    Assertions.assertTrue(FakeSchemaLocationProvider.unprovisioned().isEmpty());
+  }
+
+  private NameIdentifier createSchemaWithSchemaProvider(@Nullable String location) {
+    return createSchemaWithSchemaProvider(
+        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName()), location);
+  }
+
+  private NameIdentifier createSchemaWithSchemaProvider(
+      NameIdentifier schemaIdent, @Nullable String location) {
+    StringIdentifier stringId = StringIdentifier.fromId(idGenerator.nextId());
+    Map<String, String> properties =
+        location == null ? null : ImmutableMap.of(Schema.PROPERTY_LOCATION, location);
+    opsWithSchemaProvider.createSchema(
+        schemaIdent, "schema comment", StringIdentifier.newPropertiesWithId(stringId, properties));
+    return schemaIdent;
   }
 
   private NameIdentifier createSchema() {
