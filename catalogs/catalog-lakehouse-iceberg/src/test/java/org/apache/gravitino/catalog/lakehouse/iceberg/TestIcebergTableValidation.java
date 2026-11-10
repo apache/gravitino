@@ -54,6 +54,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestIcebergTableValidation {
 
@@ -168,6 +169,42 @@ class TestIcebergTableValidation {
         Arrays.stream(operations.loadTable(table("valid")).columns())
             .map(Column::name)
             .toArray(String[]::new));
+  }
+
+  @Test
+  void testMultipleSingleFieldBucketTransformsArePreserved() {
+    create(
+        "multiple_buckets",
+        new Column[] {
+          Column.of("a", Types.IntegerType.get()), Column.of("b", Types.StringType.get())
+        },
+        Transforms.bucket(16, new String[] {"a"}),
+        Transforms.bucket(8, new String[] {"b"}));
+    Transform[] partitioning = operations.loadTable(table("multiple_buckets")).partitioning();
+    assertEquals(2, partitioning.length);
+    assertEquals(Transforms.bucket(16, new String[] {"a"}), partitioning[0]);
+    assertEquals(Transforms.bucket(8, new String[] {"b"}), partitioning[1]);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"0", "999", "not-a-version"})
+  void testInvalidFormatVersionIsBadRequest(String version) {
+    Exception failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                operations.createTable(
+                    table("invalid_version"),
+                    new Column[] {Column.of("value", Types.IntegerType.get())},
+                    "",
+                    Map.of("format-version", version),
+                    new Transform[0],
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    new Index[0]));
+    assertTrue(failure.getMessage().contains("format-version"));
+    assertEquals(400, tableError(OperationType.CREATE, failure));
+    assertFalse(operations.tableExists(table("invalid_version")));
   }
 
   private static Stream<Arguments> incompatiblePartitionTransforms() {

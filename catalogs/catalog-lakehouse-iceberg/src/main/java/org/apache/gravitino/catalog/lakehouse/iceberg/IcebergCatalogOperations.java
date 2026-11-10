@@ -80,6 +80,7 @@ import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -625,7 +626,7 @@ public class IcebergCatalogOperations
       return createdTable;
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
-    } catch (ValidationException e) {
+    } catch (ValidationException | BadRequestException e) {
       throw new IllegalArgumentException(e.getMessage(), e);
     }
   }

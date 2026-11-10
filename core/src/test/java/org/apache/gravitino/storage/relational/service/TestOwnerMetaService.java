@@ -26,6 +26,7 @@ import java.sql.Statement;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -52,6 +53,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 
 class TestOwnerMetaService extends TestJDBCBackend {
@@ -1006,6 +1008,73 @@ class TestOwnerMetaService extends TestJDBCBackend {
 
     Assertions.assertNotNull(relations);
     Assertions.assertTrue(relations.isEmpty());
+  }
+
+  @TestTemplate
+  void testRetiredOwnerRowsAlwaysGetANewerDeletedAt() throws Exception {
+    // PostgreSQL's transaction-start clock is what lets retired rows repeat a deleted_at.
+    Assumptions.assumeTrue("postgresql".equalsIgnoreCase(backendType));
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    UserEntity first = insertUser("first");
+    UserEntity second = insertUser("second");
+    setCatalogOwner(catalog, first);
+    setCatalogOwner(catalog, second);
+    long future = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement()) {
+      statement.executeUpdate(
+          "UPDATE owner_meta SET deleted_at = "
+              + future
+              + " WHERE metadata_object_id = "
+              + catalog.id()
+              + " AND deleted_at > 0");
+    }
+
+    setCatalogOwner(catalog, first);
+    Assertions.assertEquals(future + 1, latestRetiredAt(catalog));
+
+    OwnerMetaService.getInstance()
+        .batchSetOwners(
+            List.of(catalog.nameIdentifier()),
+            Entity.EntityType.CATALOG,
+            second.nameIdentifier(),
+            second.type());
+    Assertions.assertEquals(future + 2, latestRetiredAt(catalog));
+  }
+
+  private UserEntity insertUser(String name) throws IOException {
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            name,
+            AUDIT_INFO);
+    backend.insert(user, false);
+    return user;
+  }
+
+  private void setCatalogOwner(CatalogEntity catalog, UserEntity owner) {
+    OwnerMetaService.getInstance()
+        .setOwner(
+            catalog.nameIdentifier(),
+            Entity.EntityType.CATALOG,
+            owner.nameIdentifier(),
+            owner.type());
+  }
+
+  private long latestRetiredAt(CatalogEntity catalog) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                "SELECT MAX(deleted_at) FROM owner_meta WHERE metadata_object_id = "
+                    + catalog.id())) {
+      Assertions.assertTrue(rs.next());
+      return rs.getLong(1);
+    }
   }
 
   private Integer countAllOwnerRel(Long ownerId) {
