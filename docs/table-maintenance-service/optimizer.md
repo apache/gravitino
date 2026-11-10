@@ -296,9 +296,9 @@ policy thresholds. Drop `--dry-run` to submit.
 
 **Notes**
 
-- Direct `runJob` must include `strategy`, `sort_order`, and `where_clause` in `jobConf` even when
-  empty (`""` is fine); omitting them returns HTTP 400. Policy-driven submits fill these through
-  the adapter.
+- Direct `runJob` requires `where_clause` in `jobConf` (pass `""` for the whole table). `strategy`
+  defaults to `binpack`; `sort_order` / `options` default to empty when omitted. Policy-driven
+  submits fill these through the adapter.
 - A successful job with `Rewritten data files: 0` usually means fewer than `min-input-files`
   (default 5) eligible files per rewrite group.
 
@@ -316,8 +316,8 @@ partition spec. It leaves data files and other specs' manifests unchanged.
 
 - Direct path: `POST .../jobs/runs` with `jobTemplateName` `builtin-iceberg-rewrite-manifests`,
   plus `catalog_name`, `table_identifier`, and the shared Spark/catalog `jobConf` keys.
-- Policy path through Policy → Strategy → Adapter is a follow-up; `submit-strategy-jobs` does not
-  select this job automatically yet.
+- Policy path: `system_iceberg_rewrite_manifests` (strategy type `iceberg-rewrite-manifests`).
+  Collect manifest statistics first, then `submit-strategy-jobs` with the policy name.
 
 **Notes**
 

@@ -251,8 +251,8 @@ The following Iceberg job templates ship with the service. A full maintenance pa
 | `builtin-iceberg-rewrite-manifests`     | Consolidates small manifest files        |
 | `builtin-iceberg-update-manifest-stats` | Collects complete per-spec manifest maps |
 
-Each can be submitted directly over REST. Compaction, snapshot expiry, and orphan cleanup also
-have policy-driven paths; manifest rewrite policy integration is a follow-up. See
+Each can be submitted directly over REST. Compaction, manifest rewrite, snapshot expiry, and
+orphan cleanup also have policy-driven paths through `submit-strategy-jobs`. See
 [Walkthrough](./optimizer.md#walkthrough).
 
 These templates set Iceberg Spark session and catalog classes, but they do not list an Iceberg Spark
@@ -403,7 +403,8 @@ locks. If the previous PUT outcome cannot be established, leave the marker intac
 Consumers must read both objects from one table-statistics response and use the same chosen
 spec key in each. A missing object or key means collection is required, not zero manifests.
 `IcebergManifestStatistics.fromStatistics` returns an empty result for an incomplete pair.
-Automatic manifest policy triggering is separate follow-up work.
+After collection, evaluate and submit with a `system_iceberg_rewrite_manifests` policy through
+`submit-strategy-jobs` (see [Rewrite Manifests](#rewrite-manifests)).
 
 ## Rewrite Data Files
 
@@ -420,10 +421,10 @@ directly with `POST .../jobs/runs`.
 
 ### Parameters
 
-`catalog_name`, `table_identifier`, and `where_clause` are required in `jobConf` for direct
-`runJob` (pass `""` for `where_clause` to rewrite the whole table). Omitting `strategy`,
-`sort_order`, or `where_clause` returns HTTP 400; empty string is accepted. Policy-driven
-`submit-strategy-jobs` fills these through the compaction adapter.
+Besides the shared catalog keys, only `where_clause` is required with no template default (pass
+`""` to rewrite the whole table). `strategy` defaults to `binpack` and `sort_order` / `options`
+default to empty when omitted. An empty string is a value, not an omission: it overrides the
+default. Policy-driven `submit-strategy-jobs` fills these through the compaction adapter.
 
 | Key                | Description                                                         | Default   |
 | ------------------ | ------------------------------------------------------------------- | --------- |
@@ -529,8 +530,9 @@ FROM rest_catalog.db.t1.manifests;
 ```
 
 `spec_id` selects the existing spec whose manifests are eligible; it is not a partition-evolution
-operation. Policy -> Strategy -> Adapter automatic triggering is a follow-up;
-`submit-strategy-jobs` does not select this job automatically yet. See
+operation. Policy-driven submission uses `system_iceberg_rewrite_manifests` with strategy type
+`iceberg-rewrite-manifests` (handler and job adapter are built in). Collect manifest statistics
+first, then run `submit-strategy-jobs` with the policy name. See
 [Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md) and
 [Configuration](./optimizer-configuration.md#rewrite-manifests).
 

@@ -86,9 +86,10 @@ conf and/or short names in `updater_options`. A secured Iceberg REST catalog nee
 **`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)
 URI. For REST catalogs use the Gravitino **catalog name** instead.
 
-**Direct rewrite `runJob` returns HTTP 400 listing missing keys** — include `strategy`,
-`sort_order`, and `where_clause` in `jobConf` even when empty. Empty string rewrites the whole
-table for `where_clause`.
+**Direct rewrite `runJob` returns HTTP 400 listing missing keys** — `where_clause` has no template
+default; pass `""` to rewrite the whole table. Shared catalog keys
+(`catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location`) are also
+required. `strategy` / `sort_order` / `options` have defaults when omitted.
 
 **Rewrite succeeds with `Rewritten data files: 0`** — Iceberg's default `min-input-files` is 5.
 One small file per partition is not enough for a non-empty rewrite. Add more small files or pass

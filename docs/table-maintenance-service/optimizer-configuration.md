@@ -301,9 +301,10 @@ that expect a storage root, use the warehouse URI those backends document.
 ## Compaction (rewrite data files)
 
 Submit `builtin-iceberg-rewrite-data-files` through `POST /api/metalakes/{metalake}/jobs/runs` or
-through `submit-strategy-jobs`. Direct `runJob` must include `strategy`, `sort_order`, and
-`where_clause` in `jobConf` even when empty (`""` is accepted). Omitting them returns HTTP 400.
-Policy-driven submits fill these through the compaction adapter.
+through `submit-strategy-jobs`. Besides the shared catalog keys, only `where_clause` is required
+with no template default (pass `""` to rewrite the whole table). `strategy` defaults to `binpack`;
+`sort_order` and `options` default to empty when omitted. Policy-driven submits fill these through
+the compaction adapter.
 
 | Key                | Meaning                                           | Default   |
 | ------------------ | ------------------------------------------------- | --------- |
@@ -361,11 +362,22 @@ Register the handler (optional; the Recommender defaults this class when unset):
 gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteStrategyHandler
 ```
 
-Policy content and per-spec thresholds are documented in
-[Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md). Policy -> Strategy ->
-Adapter automatic selection is a follow-up; `submit-strategy-jobs` does not select this job
-automatically yet. Direct submission and verification examples are under
-[Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests).
+Create a policy through `POST /api/metalakes/{metalake}/policies`:
+
+```json
+{
+  "name": "rewrite_manifests",
+  "policyType": "system_iceberg_rewrite_manifests",
+  "enabled": true,
+  "content": {}
+}
+```
+
+Associate the policy with a tag and attach that tag to the target table, schema, or catalog.
+Collect with `builtin-iceberg-update-manifest-stats`, then run
+`submit-strategy-jobs --strategy-name rewrite_manifests`. Content fields and thresholds are in
+[Iceberg manifest rewrite policy](../iceberg-rewrite-manifests-policy.md). Direct submission and
+verification examples are under [Rewrite Manifests](./optimizer-cli-reference.md#rewrite-manifests).
 
 ## Snapshot Expiration
 
