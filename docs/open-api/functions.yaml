@@ -32,6 +32,8 @@ paths:
       operationId: listFunctions
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of function objects if {details} is true, otherwise returns the list of function identifiers
@@ -696,6 +698,8 @@ components:
     FunctionListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

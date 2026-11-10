@@ -29,6 +29,8 @@ paths:
       operationId: listTags
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of tag objects if {details} is true, otherwise returns the list of tag name
@@ -190,6 +192,8 @@ paths:
       operationId: listObjectTags
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of tag objects associated with specified metadata object if {details} is true, otherwise returns the list of tag name
@@ -355,6 +359,8 @@ paths:
       operationId: listTagObjects
       parameters:
         - $ref: "#/components/parameters/tagValue"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of metadata objects associated with specified tag
@@ -391,6 +397,8 @@ paths:
       operationId: listPoliciesForTag
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns policy names or detailed policy-tag associations
@@ -745,6 +753,8 @@ components:
         - code
         - associations
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -796,6 +806,8 @@ components:
     TagListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -835,6 +847,8 @@ components:
     MetadataObjectListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

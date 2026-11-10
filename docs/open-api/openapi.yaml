@@ -298,6 +298,14 @@ components:
 
   schemas:
 
+    NextPageToken:
+      type: string
+      description: >-
+        Opaque token for the next page. Present only on a paged response (a request with `pageSize`
+        or `pageToken`) when more visible entries remain. Pass it as `pageToken` to read the next
+        page.
+
+
     Audit:
       type: object
       description: Audit information for a Gravitino resource.
@@ -369,6 +377,8 @@ components:
     NameListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -401,10 +411,7 @@ components:
                 items:
                   $ref: "#/components/schemas/NameIdentifier"
               nextPageToken:
-                type: string
-                description: >-
-                  Token for the next page. Present only on a paged response when more visible
-                  entries remain.
+                $ref: "#/components/schemas/NextPageToken"
           examples:
             CatalogListResponse:
               $ref: "./catalogs.yaml#/components/examples/CatalogListResponse"

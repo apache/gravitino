@@ -30,6 +30,9 @@ paths:
         - fileset
       summary: List filesets
       operationId: listFilesets
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
@@ -292,6 +295,8 @@ paths:
             The location name in the fileset. When omitted, the server uses the only storage
             location, or properties.default-location-name if there are multiple locations.
             An unknown name returns HTTP 404 with NoSuchLocationNameException.
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "#/components/responses/FileInfoListResponse"
@@ -735,6 +740,8 @@ components:
           schema:
             type: object
             properties:
+              nextPageToken:
+                $ref: "./openapi.yaml#/components/schemas/NextPageToken"
               code:
                 type: integer
                 format: int32

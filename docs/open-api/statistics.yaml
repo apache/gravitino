@@ -30,6 +30,9 @@ paths:
         - statistics
       summary: List statistics
       operationId: listStatistics
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
 
       responses:
         "200":
@@ -183,6 +186,8 @@ paths:
         - $ref: "#/components/parameters/to"
         - $ref: "#/components/parameters/fromInclusive"
         - $ref: "#/components/parameters/toInclusive"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the partition statistics for the specified metadata object
@@ -500,6 +505,8 @@ components:
     StatisticListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -514,6 +521,8 @@ components:
     PartitionStatisticsListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

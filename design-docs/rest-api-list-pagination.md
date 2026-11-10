@@ -176,9 +176,10 @@ never used, so the order is the same on every node and every JVM.
 
 | Endpoint | Sort key |
 | -------- | -------- |
-| listMetalakes, listCatalogs, listSchemas, listTables, listViews, listFunctions, listFilesets, listModels, listTopics, listSemanticModels, listMetrics | entity name |
+| listMetalakes, listCatalogs, listSchemas, listTables, listViews, listFunctions, listFilesets, listModels, listTopics, listSemanticModels | entity name |
+| listMetrics | full metric identifier |
 | listUsers, listGroups, listRoles, listTags, listPolicies, listJobTemplates, listSecretProviders | name |
-| listJobs | job ID |
+| listJobs | the requested `sortBy` time in the requested `sortOrder` (jobs without that time last), then job ID; the time is encoded as a zero-padded number so string order matches the existing comparator |
 | listModelVersions | version number, compared numerically (encoded zero-padded in `k`) |
 | listFiles | file name within the listed sub path |
 | listPartitionNames, listPartitionStatistics | partition name |
@@ -188,7 +189,12 @@ never used, so the order is the same on every node and every JVM.
 | metadata objects for a tag | object type, then full name |
 
 A list whose entries share a sort key is impossible for every endpoint above, because the key is
-the entry's unique name within its parent (or the object type plus full name).
+the entry's unique name within its parent (or the object type plus full name, or the job ID
+appended to the job's time).
+
+Filters and ordering options that a list endpoint already accepts (for example `listJobs`'s
+template, time filters, `sortBy` and `sortOrder`) are part of the token scope, so a token cannot
+be replayed against a differently filtered or ordered list.
 
 ### 4.2 Authorization before the cut
 
@@ -230,13 +236,27 @@ A permission change during the walk applies from the next page on.
 | --------- | ------ | ---- |
 | `PageToken` | `server-common` | Encodes and decodes the token, computes and checks the scope hash. |
 | `ListPager` | `server-common` | Validates parameters, sorts, applies the cursor, runs the chunked authorization loop, builds the next token. |
-| `PaginatedResponse` | `common` | Interface for list response DTOs exposing `nextPageToken()`; each list response class gains the field with `@JsonInclude(NON_NULL)`. |
+| `BaseListResponse` | `common` | Abstract base class for every list response DTO, extending `BaseResponse`. Holds `nextPageToken` with `@JsonInclude(NON_NULL)` and a fluent `withNextPageToken`, so each DTO gains the field without its own code. |
 | `Configs.LIST_MAX_PAGE_SIZE` | `core` | The cap in section 3.5. |
 | `Page<T>`, `PageRequest` | `api` | Client-facing paging types (section 5). |
 
 Each handler gains the two `@QueryParam`s and replaces its filter-and-wrap step with a
 `ListPager` call. When neither parameter is present, the handler runs exactly the code path it
 runs today, so the unpaged behavior and its performance do not change.
+
+Two groups of endpoints need more than the standard call:
+
+- **Response fields that describe the whole list.** `listJobs` returns per-status counts. They are
+  computed over every job that matches the filters before the page is cut, so each page reports
+  the same totals.
+- **Tags and policies for a metadata object.** These responses carry `hasInaccessibleTags` /
+  `hasInaccessiblePolicies`, which must reflect the whole list. The handler authorizes the full
+  list first, sets the flag, then pages the visible entries. The authorization cost of these
+  lists is therefore not reduced by paging; they are short in practice.
+
+Paged results returned from a catalog through the operation dispatcher are copied out of the
+connector's lease (`ConnectorObjectSnapshot.detach` handles `Page`), as other returned objects
+already are.
 
 ### 4.5 Phase 2: pushing pages down to the source
 
@@ -292,11 +312,23 @@ while (true) {
 }
 ```
 
-The existing array-returning methods are unchanged.
+The existing array-returning methods are unchanged. Paged overloads exist for every list in
+section 6 that the Java client already exposes, including users, groups and roles on
+`GravitinoMetalake`, the tag and policy association lists, and `Tag.AssociatedObjects`.
+`listFiles` and `listSecretProviders` have no client method today, so they are paged at the REST
+level only.
+
+**Source compatibility.** Adding an overload makes a call with a literal `null` as the only
+argument ambiguous for `listSchemas` and `listJobs` (for example `listSchemas(null)`); callers must
+cast (`(String) null`). Binary compatibility and every non-literal-null call are unaffected.
 
 ### 5.2 Python
 
-Each list method gains a `_page` variant returning a `Page` with `items` and `next_page_token`:
+Each list method gains a `_page` variant returning a `Page` with `items` and `next_page_token`.
+`page_size` and `page_token` are keyword-only, so they never collide with existing optional
+positional arguments. List response DTOs share a `BaseListResponse` base with an optional
+`nextPageToken`. The abstract API methods raise `UnsupportedOperationException` by default, as in
+Java:
 
 ```python
 page = catalog.as_table_catalog().list_tables_page(namespace, page_size=500)
@@ -319,15 +351,14 @@ while page.next_page_token:
 
 | PR | Content |
 | -- | ------- |
-| 1 | This design. `PageToken`, `ListPager`, `PaginatedResponse`, the config key, the client paging types. `listTables` end to end on the server, Java client and Python client, with the unit, REST and client tests in section 8. |
-| 2 | The remaining metadata lists, and the integration tests in section 8. |
-| 3 | Access control, tags, policies, jobs, secrets and statistics. |
-| 4 | Association lists. |
-| 5 | Phase 2 keyset reads in the entity store, replacing the offset paging in core. |
-| 6 | `SupportsPagedListing` for JDBC catalogs. |
+| 1 | This design and all of phase 1: `PageToken`, `ListPager`, `BaseListResponse`, the config key, the client paging types, every endpoint in section 6 on the server, the Java client and the Python client, the OpenAPI spec, and the tests in section 8. |
+| 2 | Phase 2 keyset reads in the entity store, replacing the offset paging in core. |
+| 3 | `SupportsPagedListing` for JDBC catalogs. |
 
-PRs 2 to 4 are mechanical once PR 1 lands: two query parameters and one `ListPager` call per
-handler, one field per response DTO, one overload per client method.
+Phase 1 is a single PR because the per-endpoint changes are mechanical (two query parameters and
+one `ListPager` call per handler, one base class for the response DTOs, one overload per client
+method) and splitting them would leave the API half paged between releases. Phase 2 changes no
+REST or client contract, so PRs 2 and 3 can land independently.
 
 ## 8. Testing
 
@@ -345,8 +376,18 @@ Unit tests for `PageToken` and `ListPager`:
   satisfy section 4.3.
 
 Server REST tests for the paged handlers, covering unpaged requests (unchanged responses), paged
-walks, `details=true`, and the 400 cases.
+walks, `details=true`, and the 400 cases, plus the endpoint-specific behavior in section 4.4
+(job status counts over the whole list, the inaccessible-entry flags).
 
-Integration tests against a running server, through the Java and Python clients, walking a
-schema with more tables than one page and with tables hidden from the caller, and running the
-walk while another client creates and drops tables concurrently.
+Client tests check that every paged Java and Python method sends `pageSize` and `pageToken` and
+returns the server's `nextPageToken`, and a coverage test fails if a list method in the Java
+client lacks a paged overload.
+
+An integration test against a running server with authorization enabled
+(`TablePaginationAuthorizationIT`), through the Java client: the owner walks a schema with more
+tables than one page; a restricted user walks it with hidden tables on page boundaries and in a
+trailing run; a user who sees nothing gets an empty page with no token; malformed and
+cross-scope tokens are rejected; and tables are created and dropped between page requests, before
+and after the cursor, with the results checked against section 4.3. The Python client is covered
+by unit tests against a mocked server, since it shares the REST contract the integration test
+exercises.

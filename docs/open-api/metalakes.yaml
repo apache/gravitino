@@ -26,6 +26,9 @@ paths:
         - metalake
       summary: List metalakes
       operationId: listMetalakes
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       description: Returns a list of all metalakes.
       responses:
         "200":
@@ -368,6 +371,8 @@ components:
           schema:
             type: object
             properties:
+              nextPageToken:
+                $ref: "./openapi.yaml#/components/schemas/NextPageToken"
               code:
                 type: integer
                 format: int32

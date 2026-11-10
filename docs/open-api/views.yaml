@@ -30,6 +30,9 @@ paths:
         - view
       summary: List views
       operationId: listViews
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       description: >
         Lists views after authorizing access to the schema. When authorization is enabled, the
         returned identifiers are filtered to views the caller owns or can read with SELECT_VIEW.

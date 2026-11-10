@@ -31,6 +31,8 @@ paths:
       operationId: listSchemas
       parameters:
         - $ref: "#/components/parameters/parentSchema"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
