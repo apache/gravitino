@@ -631,8 +631,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
           Column.of("age", Types.IntegerType.get(), null)
         },
         new SQLRepresentation[] {sparkRep},
-        getCatalogName(),
-        schemaName,
+        null,
+        null,
         ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
@@ -811,8 +811,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
         null,
         new Column[0],
         new SQLRepresentation[] {sparkRep},
-        getCatalogName(),
-        schemaName,
+        null,
+        null,
         ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
