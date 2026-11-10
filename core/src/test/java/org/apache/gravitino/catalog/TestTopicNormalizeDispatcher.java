@@ -112,12 +112,11 @@ public class TestTopicNormalizeDispatcher extends TestOperationDispatcher {
 
     NameIdentifier tooLongIdent =
         NameIdentifier.of(topicNs, StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH + 1));
-    Exception exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> topicNormalizeDispatcher.createTopic(tooLongIdent, "comment", null, props));
-    Assertions.assertEquals(
-        "The name of the topic must not exceed 128 characters", exception.getMessage());
+    // The catalog capability may reject the name with its own message first, either way the topic
+    // must be rejected before it is created.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> topicNormalizeDispatcher.createTopic(tooLongIdent, "comment", null, props));
     Assertions.assertFalse(topicNormalizeDispatcher.topicExists(tooLongIdent));
   }
 

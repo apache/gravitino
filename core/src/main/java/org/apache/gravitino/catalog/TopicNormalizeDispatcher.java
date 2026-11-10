@@ -75,10 +75,12 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    // Check the name and comment before the underlying catalog creates the topic.
-    TopicEntity.NAME.validate(ident.name(), Entity.EntityType.TOPIC);
+    // Check the name and comment before the underlying catalog creates the topic. The name is
+    // checked after the catalog capability, which may reject it with a more specific message.
+    NameIdentifier normalizedIdent = normalizeNameIdentifier(ident);
+    TopicEntity.NAME.validate(normalizedIdent.name(), Entity.EntityType.TOPIC);
     checkCommentLength(comment);
-    return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayout, properties);
+    return dispatcher.createTopic(normalizedIdent, comment, dataLayout, properties);
   }
 
   @Override
