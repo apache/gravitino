@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -210,6 +211,27 @@ class TestDomainAuthzHelper {
     assertFalse(DomainAuthzHelper.visible("lake", child));
     assertThrows(
         ForbiddenException.class, () -> DomainAuthzHelper.requireBackingTag("lake", "tag", true));
+  }
+
+  @Test
+  void readFilteringSharesContextButManagementChecksRemainIndependent() {
+    Set<AuthorizationRequestContext> contexts = new HashSet<>();
+    doAnswer(
+            call -> {
+              contexts.add(call.getArgument(3));
+              return false;
+            })
+        .when(authorizer)
+        .isOwner(any(), anyString(), any(), any());
+    allows.add("lake:USE_DOMAIN");
+    DomainEntity[] domains = {domain("Finance", null, Domain.Status.PUBLISHED), child};
+    assertEquals(2, DomainAuthzHelper.filterDomains("lake", domains).length);
+    assertEquals(1, contexts.size());
+    contexts.clear();
+    allows.add("lake:MANAGE_DOMAIN");
+    DomainAuthzHelper.requireManage("lake", child);
+    DomainAuthzHelper.requireManage("lake", child);
+    assertEquals(2, contexts.size());
   }
 
   private boolean permitted(Privilege.Name privilege) {

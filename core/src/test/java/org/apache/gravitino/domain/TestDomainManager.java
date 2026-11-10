@@ -247,6 +247,23 @@ public class TestDomainManager {
     }
   }
 
+  /** Verifies reserved names cannot be persisted through creation or renaming. */
+  @Test
+  public void testReservedDomainNamesAreRejectedBeforeWrite() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createDomain(
+                METALAKE, "*", null, null, TagValue.noValue("reserved-tag"), true));
+    Assertions.assertEquals(0, domainManager.listDomains(METALAKE).length);
+    domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.rename("*")));
+    Assertions.assertEquals("Finance", domainManager.getDomain(METALAKE, "Finance").name());
+    Assertions.assertArrayEquals(new String[] {"Finance"}, domainManager.listDomains(METALAKE));
+  }
+
   /** Verifies membership lookups against live stored tags and object lifecycles. */
   @Test
   public void testMembershipQueriesWithStoredInheritanceAndLifecycle() throws IOException {

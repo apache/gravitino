@@ -67,6 +67,9 @@ import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.hook.DomainHookDispatcher;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -163,6 +166,14 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
                 .build());
     when(store.get(any(NameIdentifier.class), eq(EntityType.DOMAIN), eq(DomainEntity.class)))
         .thenAnswer(call -> current.get());
+    for (String parent : new String[] {"Finance", "Markets"}) {
+      doReturn(domain(parent, null, Domain.Status.PUBLISHED))
+          .when(store)
+          .get(
+              eq(NameIdentifierUtil.ofDomain("lake", parent)),
+              eq(EntityType.DOMAIN),
+              eq(DomainEntity.class));
+    }
     when(store.list(NamespaceUtil.ofDomain("lake"), DomainEntity.class, EntityType.DOMAIN))
         .thenAnswer(call -> Arrays.asList(current.get()));
     when(authorizer.isOwner(any(), anyString(), any(), any()))
@@ -365,6 +376,76 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   }
 
   @Test
+  void reservedNamesCannotBreakDomainReads() throws Exception {
+    allows.add("lake:MANAGE_DOMAIN");
+    allows.add("lake:CREATE_TAG");
+    expect("POST", BASE, "{\"name\":\"*\",\"backingTag\":{\"name\":\"tag\",\"create\":true}}", 400);
+    when(store.update(any(), eq(DomainEntity.class), eq(EntityType.DOMAIN), any()))
+        .thenAnswer(
+            call -> call.<Function<DomainEntity, DomainEntity>>getArgument(3).apply(current.get()));
+    expect(
+        "PUT", BASE + "/Trading", "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"*\"}]}", 400);
+    assertEquals("Trading", current.get().name());
+    expect("GET", BASE, null, 200);
+    verify(transactions, never()).insertDomainWithNewBackingTag(any(), any(), any());
+  }
+
+  @Test
+  void hiddenParentIsRejectedBeforeBackingTagConflict() throws Exception {
+    doReturn(domain("Finance", null, Domain.Status.DRAFT))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "Finance")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    doThrow(new NoSuchEntityException("Missing parent"))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "missing")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    doThrow(new TagAlreadyExistsException("Tag already exists"))
+        .when(transactions)
+        .insertDomainWithNewBackingTag(any(), any(), any());
+    allows.add("lake:MANAGE_DOMAIN");
+    allows.add("lake:CREATE_TAG");
+    denies.add("Finance:MANAGE_DOMAIN");
+    for (String parent : new String[] {"Finance", "missing"}) {
+      expect(
+          "POST",
+          BASE,
+          "{\"name\":\"New\",\"parent\":\""
+              + parent
+              + "\",\"backingTag\":{\"name\":\"tag\",\"create\":true}}",
+          404);
+    }
+    verify(transactions, never()).insertDomainWithNewBackingTag(any(), any(), any());
+  }
+
+  @Test
+  void hiddenSourceIsRejectedBeforeParentOrTagResolution() throws Exception {
+    doThrow(new NoSuchEntityException("Missing domain"))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "missing")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    doThrow(new NoSuchEntityException("Missing parent"))
+        .when(transactions)
+        .setDomainParentAndGet(any(), any(), any(), any());
+    doThrow(new NoSuchTagException("Missing tag"))
+        .when(transactions)
+        .updateDomainBackingTagAndGet(any(), any(), any(), any());
+    for (String name : new String[] {"Trading", "missing"}) {
+      expect("PUT", BASE + "/" + name + "/parent", "{\"parent\":\"unknown\"}", 404);
+      expect(
+          "PUT", BASE + "/" + name + "/backingTag", "{\"backingTag\":{\"name\":\"unknown\"}}", 404);
+    }
+    verify(transactions, never()).setDomainParentAndGet(any(), any(), any(), any());
+    verify(transactions, never()).updateDomainBackingTagAndGet(any(), any(), any(), any());
+  }
+
+  @Test
   void createChecksMetalakeManagementBeforeNameCollision() throws Exception {
     current.set(domain("Hidden", null, Domain.Status.DRAFT));
     doThrow(new EntityAlreadyExistsException("Name already exists"))
@@ -490,9 +571,11 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
       if (status >= 400) {
         assertEquals(MediaType.APPLICATION_JSON_TYPE, response.getMediaType());
         assertEquals(
-            status == 404
-                ? "NoSuchDomainException"
-                : status == 409 ? "DomainAlreadyExistsException" : "ForbiddenException",
+            status == 400
+                ? "IllegalArgumentException"
+                : status == 404
+                    ? "NoSuchDomainException"
+                    : status == 409 ? "DomainAlreadyExistsException" : "ForbiddenException",
             response.readEntity(ErrorResponse.class).getType());
       }
     }

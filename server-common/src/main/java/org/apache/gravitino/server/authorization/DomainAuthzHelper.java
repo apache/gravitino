@@ -150,18 +150,7 @@ public final class DomainAuthzHelper {
    */
   public static boolean allowed(
       String metalake, @Nullable DomainEntity domain, Privilege.Name privilege) {
-    if (!enabled()) {
-      return true;
-    }
-    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
-    return authorizer != null
-        && allowed(
-            authorizer,
-            PrincipalUtils.getCurrentPrincipal(),
-            metalake,
-            scopes(metalake, domain),
-            privilege,
-            new AuthorizationRequestContext());
+    return allowed(metalake, domain, privilege, new AuthorizationRequestContext());
   }
 
   /**
@@ -186,12 +175,7 @@ public final class DomainAuthzHelper {
    * @return Whether the caller can see the domain.
    */
   public static boolean visible(String metalake, DomainEntity domain) {
-    return allowed(
-        metalake,
-        domain,
-        domain.status() == Domain.Status.DRAFT
-            ? Privilege.Name.MANAGE_DOMAIN
-            : Privilege.Name.USE_DOMAIN);
+    return visible(metalake, domain, new AuthorizationRequestContext());
   }
 
   /**
@@ -201,13 +185,7 @@ public final class DomainAuthzHelper {
    * @param domain The domain snapshot.
    */
   public static void requireVisible(String metalake, DomainEntity domain) {
-    if (!visible(metalake, domain)) {
-      if (domain.status() == Domain.Status.DRAFT) {
-        throw new NoSuchDomainException(
-            "Domain %s under metalake %s does not exist", domain.name(), metalake);
-      }
-      throw new ForbiddenException("Cannot use domain %s", domain.name());
-    }
+    requireVisible(metalake, domain, new AuthorizationRequestContext());
   }
 
   /**
@@ -223,6 +201,19 @@ public final class DomainAuthzHelper {
             "Domain %s under metalake %s does not exist", domain.name(), metalake);
       }
       throw new ForbiddenException("Cannot manage domains in metalake %s", metalake);
+    }
+  }
+
+  /**
+   * Checks management before storage resolves other objects named in a request.
+   *
+   * @param dispatcher The domain dispatcher.
+   * @param metalake The metalake name.
+   * @param name The requested domain name.
+   */
+  public static void requireManage(DomainDispatcher dispatcher, String metalake, String name) {
+    if (enabled()) {
+      requireManage(metalake, dispatcher.getDomain(metalake, name));
     }
   }
 
@@ -288,12 +279,7 @@ public final class DomainAuthzHelper {
    * @return The visible domains.
    */
   public static DomainEntity[] filterDomains(String metalake, DomainEntity[] domains) {
-    if (!enabled()) {
-      return domains;
-    }
-    return Arrays.stream(domains)
-        .filter(domain -> visible(metalake, domain))
-        .toArray(DomainEntity[]::new);
+    return filterDomains(metalake, domains, new AuthorizationRequestContext());
   }
 
   /**
@@ -323,14 +309,15 @@ public final class DomainAuthzHelper {
     if (!enabled()) {
       return dispatcher.listMembers(metalake, name, filter);
     }
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
     DomainEntity domain = dispatcher.getDomain(metalake, name);
-    requireVisible(metalake, domain);
+    requireVisible(metalake, domain, context);
     Set<String> visibleNames = new HashSet<>();
     visibleNames.add(domain.name());
     DomainEntity[] subdomains =
         domain.parent().isPresent()
             ? new DomainEntity[0]
-            : filterDomains(metalake, dispatcher.listSubdomainInfos(metalake, name));
+            : filterDomains(metalake, dispatcher.listSubdomainInfos(metalake, name), context);
     Arrays.stream(subdomains).map(DomainEntity::name).forEach(visibleNames::add);
     DomainMemberFilter effectiveFilter = filter;
     if (!filter.domains().isEmpty()) {
@@ -392,6 +379,57 @@ public final class DomainAuthzHelper {
                     .withRelations(filterRelations(domain.relations(), visibleNames))
                     .build())
         .filter(domain -> domain.relations().length > 0)
+        .toArray(DomainEntity[]::new);
+  }
+
+  private static boolean allowed(
+      String metalake,
+      @Nullable DomainEntity domain,
+      Privilege.Name privilege,
+      AuthorizationRequestContext context) {
+    if (!enabled()) {
+      return true;
+    }
+    GravitinoAuthorizer authorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    return authorizer != null
+        && allowed(
+            authorizer,
+            PrincipalUtils.getCurrentPrincipal(),
+            metalake,
+            scopes(metalake, domain),
+            privilege,
+            context);
+  }
+
+  private static boolean visible(
+      String metalake, DomainEntity domain, AuthorizationRequestContext context) {
+    return allowed(
+        metalake,
+        domain,
+        domain.status() == Domain.Status.DRAFT
+            ? Privilege.Name.MANAGE_DOMAIN
+            : Privilege.Name.USE_DOMAIN,
+        context);
+  }
+
+  private static void requireVisible(
+      String metalake, DomainEntity domain, AuthorizationRequestContext context) {
+    if (!visible(metalake, domain, context)) {
+      if (domain.status() == Domain.Status.DRAFT) {
+        throw new NoSuchDomainException(
+            "Domain %s under metalake %s does not exist", domain.name(), metalake);
+      }
+      throw new ForbiddenException("Cannot use domain %s", domain.name());
+    }
+  }
+
+  private static DomainEntity[] filterDomains(
+      String metalake, DomainEntity[] domains, AuthorizationRequestContext context) {
+    if (!enabled()) {
+      return domains;
+    }
+    return Arrays.stream(domains)
+        .filter(domain -> visible(metalake, domain, context))
         .toArray(DomainEntity[]::new);
   }
 

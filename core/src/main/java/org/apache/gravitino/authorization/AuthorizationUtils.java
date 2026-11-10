@@ -130,7 +130,13 @@ public class AuthorizationUtils {
           Privilege.Name.USE_SEMANTIC_MODEL,
           Privilege.Name.MODIFY_SEMANTIC_MODEL);
 
-  private static final Set<Privilege.Name> SKIP_APPLY_PRIVILEGES = SEMANTIC_MODEL_PRIVILEGES;
+  private static final Set<Privilege.Name> SKIP_APPLY_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_SEMANTIC_MODEL,
+          Privilege.Name.USE_SEMANTIC_MODEL,
+          Privilege.Name.MODIFY_SEMANTIC_MODEL,
+          Privilege.Name.MANAGE_DOMAIN,
+          Privilege.Name.USE_DOMAIN);
 
   private AuthorizationUtils() {}
 

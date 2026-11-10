@@ -143,6 +143,9 @@ public class DomainOperations {
           validateRequest(request);
           DomainCreateRequest.BackingTag tag = request.getBackingTag();
           DomainAuthzHelper.requireManage(metalake, null);
+          if (request.getParent() != null) {
+            DomainAuthzHelper.requireManage(domainDispatcher, metalake, request.getParent());
+          }
           if (tag.isCreate()) {
             DomainAuthzHelper.requireBackingTag(metalake, tag.getName(), true);
           }
@@ -332,6 +335,8 @@ public class DomainOperations {
         domain,
         () -> {
           validateRequest(request);
+          DomainAuthzHelper.requireManage(domainDispatcher, metalake, domain);
+          DomainAuthzHelper.requireManage(domainDispatcher, metalake, request.getParent());
           return domainResponse(
               DomainAuthzHelper.checked(
                       domainDispatcher,
@@ -396,6 +401,7 @@ public class DomainOperations {
         domain,
         () -> {
           validateRequest(request);
+          DomainAuthzHelper.requireManage(domainDispatcher, metalake, domain);
           return domainResponse(
               DomainAuthzHelper.checked(
                       domainDispatcher,
