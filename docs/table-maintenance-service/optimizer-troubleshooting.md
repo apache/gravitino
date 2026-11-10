@@ -75,7 +75,25 @@ spark.hadoop.fs.defaultFS=file:///
 `spark.jars` in `spark_conf` replaces a `spark.jars` default of the k8s job executor, so if that
 default provides the Iceberg runtime, list it in `spark_conf` as well.
 
-**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
+**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino
+endpoint needs CLI `gravitino.optimizer.auth.*` (for `submit-strategy-jobs`) and/or
+`auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options`
+for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in
+`spark-conf` for any built-in job that reads the table. Object-store writes also need
+`spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials`. See
+[Configuration](./optimizer-configuration.md) and
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
+
+**`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)
+URI. For REST catalogs use the Gravitino **catalog name** instead.
+
+**Direct rewrite `runJob` returns HTTP 400 listing missing keys** — include `strategy`,
+`sort_order`, and `where_clause` in `jobConf` even when empty. Empty string rewrites the whole
+table for `where_clause`.
+
+**Rewrite succeeds with `Rewritten data files: 0`** — Iceberg's default `min-input-files` is 5.
+One small file per partition is not enough for a non-empty rewrite. Add more small files or pass
+rewrite options that lower the threshold, then re-run.
 
 **Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
 Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
@@ -117,5 +135,5 @@ Observed in `1.2.0`:
 
 - [Table Maintenance Service](./optimizer.md)
 - [Configuration](./optimizer-configuration.md)
-- [Quick Start](./optimizer.md#walkthrough)
-- [CLI Reference](./optimizer-configuration.md)
+- [Walkthrough](./optimizer.md#walkthrough)
+- [CLI Reference](./optimizer-cli-reference.md)

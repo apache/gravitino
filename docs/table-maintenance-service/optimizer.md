@@ -56,31 +56,13 @@ Three identifiers look interchangeable and are not.
 
 `--strategy-name` takes the **policy name**, despite what it is called. Passing either of the other two reports no matching identifiers rather than naming the mistake.
 
-## Orphan File Cleanup
-
-For policy-driven submission, use `system_iceberg_orphan_file_removal` and register
-the handler described in [Orphan cleanup policy integration](./optimizer-configuration.md#orphan-cleanup-policy-integration).
-Each explicit optimizer invocation evaluates the enabled policy at table level;
-it does not require partition statistics or configure a periodic schedule.
-
-Submit `builtin-iceberg-remove-orphan-files` through the jobs REST API to reclaim
-unreferenced files. Start with `dry_run: "true"` and review the candidate paths
-in the job logs before allowing deletion. The default cutoff is three days ago;
-explicit cutoffs must be at least 24 hours old, including for dry runs. A custom
-scan location must remain within the target table's storage location.
-
-Direct submission remains available alongside policy-driven submission. See
-[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for the
-submission example and [Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration)
-for the per-job options.
-
 ## Walkthrough
 
-This takes one Iceberg table through the whole workflow: create it, fill it with small files, apply a compaction policy through a tag, collect statistics, and let the service decide to compact it. It runs against a local Spark and takes about fifteen minutes.
+The sections below share one set of prerequisites, then walk each built-in maintenance task on its own. Compaction has the full end-to-end path (create table → statistics → policy → rewrite). Manifest rewrite, snapshot expiry, and orphan cleanup point at the same secured-cluster settings and their CLI submission examples.
 
-Each step ends with a check. If a check fails, stop there, since every step depends on the one before it.
+Each compaction step ends with a check. If a check fails, stop there, since every step depends on the one before it.
 
-### Prerequisites
+### Shared prerequisites
 
 - A running Gravitino server with a metalake. The examples use `test`.
 - Spark available to the job executor. The [local job executor](../local-job-executor.md) needs either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`, and the [Kubernetes job executor](../k8s-job-executor.md) needs a Spark image.
@@ -106,7 +88,40 @@ Each step ends with a check. If a check fails, stop there, since every step depe
 
 If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.
 
-### Step 1: Confirm the Job Templates Exist
+#### Secured Gravitino and Iceberg REST (object storage)
+
+The local `file:///` samples below omit authentication. Against a secured evaluation cluster (basic auth + Iceberg REST on S3 or similar), also set:
+
+1. **CLI → Gravitino auth** — when the server enables basic auth, add credentials to the optimizer conf (or the equivalent short names in `updater_options`):
+
+```properties
+gravitino.optimizer.auth.type = basic
+gravitino.optimizer.auth.username = admin
+gravitino.optimizer.auth.password = YourSecureGravitinoPassword
+```
+
+Without them, `submit-strategy-jobs` and update-stats callbacks fail with unauthorized / “credentials did not support”. See [CLI Configuration](./optimizer-configuration.md#cli-configuration).
+
+2. **REST `warehouse_location`** — for Iceberg REST catalogs this must be the **Gravitino catalog name** (for example `catalog_iceberg_s3`), not an `s3://...` URI. An object-store URI yields `NoSuchWarehouse`. Leave it empty only for local filesystem demos.
+
+3. **Object-store data plane** — Spark needs Iceberg vended credentials (and IRC `rest.auth.*` when the REST catalog is secured), for example inside `spark_conf`:
+
+```json
+{
+  "spark.sql.catalog.rest_catalog.header.X-Iceberg-Access-Delegation": "vended-credentials",
+  "spark.sql.catalog.rest_catalog.rest.auth.type": "basic",
+  "spark.sql.catalog.rest_catalog.rest.auth.basic.username": "admin",
+  "spark.sql.catalog.rest_catalog.rest.auth.basic.password": "YourSecureIrcPassword"
+}
+```
+
+Without vended credentials, inserts and rewrites fail on the cloud credential chain. See [Configuration](./optimizer-configuration.md) and [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+
+### Compaction
+
+This takes one Iceberg table through the whole compaction workflow: create it, fill it with small files, apply a compaction policy through a tag, collect statistics, and let the service decide to compact it. Against local Spark it takes about fifteen minutes.
+
+#### Step 1: Confirm the Job Templates Exist
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test" | jq
@@ -116,7 +131,7 @@ curl -sS "http://localhost:8090/api/metalakes/test/jobs/templates?details=true" 
 
 The template list must include `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files`. If it does not, the `gravitino-jobs` JAR is missing from `auxlib`. Add it and restart the server before going on.
 
-### Step 2: Create the Demo Catalog, Schema, and Table
+#### Step 2: Create the Demo Catalog, Schema, and Table
 
 ```bash
 # Catalog. An "already exists" error here is fine.
@@ -155,9 +170,9 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas/db/tables
 ```
 
-### Step 3: Create Something Worth Compacting
+#### Step 3: Create Something Worth Compacting
 
-An empty table gives the policy nothing to react to, so write 100,000 rows capped at 1,000 rows per file. That produces the many small files compaction exists to merge.
+An empty table gives the policy nothing to react to, so write 100,000 rows capped at 1,000 rows per file. That produces the many small files compaction exists to merge. Iceberg's rewrite procedure defaults to `min-input-files` of 5: one file per partition can finish successfully with `Rewritten data files: 0`. You need enough small files (or explicit rewrite options) for a non-zero rewrite count in the verification step.
 
 ```bash
 ${SPARK_HOME}/bin/spark-sql \
@@ -171,9 +186,9 @@ ${SPARK_HOME}/bin/spark-sql \
       SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
 ```
 
-Without `spark.hadoop.fs.defaultFS=file:///`, Spark reaches for `hdfs://localhost:9000` and fails.
+Without `spark.hadoop.fs.defaultFS=file:///`, Spark reaches for `hdfs://localhost:9000` and fails. On object storage, add the vended-credentials / `rest.auth.*` settings from [Secured Gravitino and Iceberg REST](#secured-gravitino-and-iceberg-rest-object-storage).
 
-### Step 4: Configure a Compaction Policy Through a Tag
+#### Step 4: Configure a Compaction Policy Through a Tag
 
 Creating the policy is not enough. Associate it with a tag, then assign that tag to the table. The
 service resolves the table's effective policies from its effective tags.
@@ -216,7 +231,7 @@ Confirm the derived policy before moving on:
 curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
 ```
 
-### Step 5: Collect Statistics
+#### Step 5: Collect Statistics
 
 ```bash
 update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -244,6 +259,8 @@ update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+
 echo "update-stats job id: ${update_stats_job_id}"
 ```
 
+For a secured server, put `auth_type` / `username` / `password` (or OAuth fields) inside `updater_options`. For REST on object storage, set `warehouse_location` to the catalog name and add vended-credentials to `spark_conf` as in the shared prerequisites.
+
 Wait for it to finish, then confirm the statistics landed:
 
 ```bash
@@ -252,7 +269,7 @@ curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db
 
 The response must include `custom-data-file-mse` and `custom-delete-file-number`. Those two are what the compaction policy evaluates, so if they are absent the next step has nothing to decide on.
 
-### Step 6: Evaluate and Submit
+#### Step 6: Evaluate and Submit
 
 Write the CLI configuration first. `--strategy-name` takes the **policy name**, not the policy type or the strategy type.
 
@@ -274,11 +291,13 @@ gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
-# Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
+# Local demo: leave empty. Iceberg REST: set to the Gravitino catalog name (not s3://...).
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 EOF_CONF
 ```
+
+On a secured cluster, add `gravitino.optimizer.auth.*` and the object-store `spark_conf` keys from [Secured Gravitino and Iceberg REST](#secured-gravitino-and-iceberg-rest-object-storage).
 
 Preview first. A dry run evaluates the policy and prints what it would do without submitting anything.
 
@@ -310,7 +329,9 @@ strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).
 echo "strategy rewrite job id: ${strategy_job_id}"
 ```
 
-### Step 7: Verify the Rewrite
+When you submit `builtin-iceberg-rewrite-data-files` **directly** with `POST .../jobs/runs` (instead of through `submit-strategy-jobs`), `jobConf` must include `strategy`, `sort_order`, and `where_clause` even when empty (`""` is fine). Omitting them returns HTTP 400. The strategy adapter fills these for policy-driven submits. See [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
+
+#### Step 7: Verify the Rewrite
 
 ```bash
 curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${update_stats_job_id}" | jq
@@ -320,17 +341,20 @@ log_dir="/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${s
 grep -E "Rewritten data files|Added data files|completed successfully" "${log_dir}/output.log"
 ```
 
-`Rewritten data files: N` with `N` greater than zero means the workflow worked end to end. The staging path comes from `gravitino.job.stagingDir`, which defaults to `/tmp/gravitino/jobs/staging`.
+`Rewritten data files: N` with `N` greater than zero means the workflow compacted data. A successful job with `N = 0` usually means fewer than Iceberg's `min-input-files` (default 5) eligible files per rewrite group — add more small files or pass rewrite options, then re-run. The staging path comes from `gravitino.job.stagingDir`, which defaults to `/tmp/gravitino/jobs/staging`.
 
 REST job status is polled rather than pushed, so it lags the real Spark process by up to one poll interval. That is why the prerequisites lower it to ten seconds.
 
-## Rewriting Iceberg Manifests
+### Manifest rewrite
 
 `builtin-iceberg-rewrite-manifests` consolidates manifest metadata for one existing partition
 spec to improve scan planning. It leaves data files and other specs' manifests unchanged.
-Submit it directly with `POST /api/metalakes/{metalake}/jobs/runs`, setting
-`jobTemplateName` to `builtin-iceberg-rewrite-manifests` and providing `catalog_name`,
-`table_identifier`, and the Spark/catalog settings in `jobConf`.
+
+Use the same [shared prerequisites](#shared-prerequisites) (including secured auth, catalog-name
+`warehouse_location`, and vended credentials when on object storage). Submit directly with
+`POST /api/metalakes/{metalake}/jobs/runs`, setting `jobTemplateName` to
+`builtin-iceberg-rewrite-manifests` and providing `catalog_name`, `table_identifier`, and the
+Spark/catalog settings in `jobConf`.
 
 Omit `spec_id` to maintain the current partition spec, or supply an existing spec ID to
 maintain that spec. Optional `use_caching` controls Spark caching during the rewrite.
@@ -340,6 +364,40 @@ for the job keys. Results appear in the job's `output.log`.
 
 Policy-driven manifest maintenance through Policy -> Strategy -> Adapter is a follow-up;
 `submit-strategy-jobs` does not yet select this job automatically.
+
+### Snapshot expiry
+
+`builtin-iceberg-expire-snapshots` removes old Iceberg snapshots and related metadata files.
+Compaction and other rewrites create snapshots; without expiry, metadata accumulates.
+
+Apply the same [shared prerequisites](#shared-prerequisites). Submit
+`builtin-iceberg-expire-snapshots` through the jobs REST API with `catalog_name`,
+`table_identifier`, and the Spark/catalog settings. Prefer starting with `retain_last` alone
+before combining it with `older_than`.
+
+See [Expire Snapshots](./optimizer-cli-reference.md#expire-snapshots) for parameters, a
+submission example, and how to verify deleted data/manifest counts in `output.log`. Policy
+handler wiring is under
+[Snapshot expiration policy integration](./optimizer-configuration.md#snapshot-expiration-policy-integration).
+
+### Orphan file cleanup
+
+For policy-driven submission, use `system_iceberg_orphan_file_removal` and register
+the handler described in [Orphan cleanup policy integration](./optimizer-configuration.md#orphan-cleanup-policy-integration).
+Each explicit optimizer invocation evaluates the enabled policy at table level;
+it does not require partition statistics or configure a periodic schedule.
+
+Submit `builtin-iceberg-remove-orphan-files` through the jobs REST API to reclaim
+unreferenced files. Start with `dry_run: "true"` and review the candidate paths
+in the job logs before allowing deletion. The default cutoff is three days ago;
+explicit cutoffs must be at least 24 hours old, including for dry runs. A custom
+scan location must remain within the target table's storage location.
+
+Use the same [shared prerequisites](#shared-prerequisites) for auth and object storage.
+Direct submission remains available alongside policy-driven submission. See
+[Remove Orphan Files](./optimizer-cli-reference.md#remove-orphan-files) for the
+submission example and [Configuration](./optimizer-configuration.md#orphan-file-cleanup-job-configuration)
+for the per-job options.
 
 ## Related
 

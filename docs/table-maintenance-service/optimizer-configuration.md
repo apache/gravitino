@@ -207,10 +207,24 @@ gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
 gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
 gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
-# Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
+# Local filesystem: leave empty. Iceberg REST: Gravitino catalog name (not s3://...).
 gravitino.optimizer.jobSubmitterConfig.warehouse_location =
 gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.hadoop.fs.defaultFS":"file:///"}
 ```
+
+When the Gravitino server enables authentication, add CLI client credentials (used by
+`submit-strategy-jobs` and related providers). Short names in `updater_options` (`auth_type`,
+`username`, `password`, …) are equivalent for update-stats jobs:
+
+```properties
+gravitino.optimizer.auth.type = basic
+gravitino.optimizer.auth.username = admin
+gravitino.optimizer.auth.password = YourSecureGravitinoPassword
+```
+
+For Iceberg REST on object storage, set `warehouse_location` to the catalog name and put
+vended credentials (plus IRC `rest.auth.*` when required) in `spark_conf`. See
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
 
 For manifest rewrite policies, the mapping
 `gravitino.optimizer.strategyHandler.iceberg-rewrite-manifests.className` is optional. When
@@ -285,7 +299,15 @@ after it starts. Match the artifact to
 your Spark, Scala, and Iceberg versions. Details are under
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
-`warehouse_location` may be empty for local filesystem testing. Set it to the warehouse URI for HDFS or cloud object storage.
+`warehouse_location` may be empty for local filesystem testing. For Iceberg REST catalogs, set it
+to the **Gravitino catalog name** (for example `rest_catalog` or `catalog_iceberg_s3`), not an
+`s3://` or other object-store URI — that URI form yields `NoSuchWarehouse`. For non-REST backends
+that expect a storage root, use the warehouse URI those backends document.
+
+Direct `runJob` for `builtin-iceberg-rewrite-data-files` must include `strategy`, `sort_order`, and
+`where_clause` in `jobConf` even when empty (`""` is accepted). Omitting them returns HTTP 400.
+Policy-driven `submit-strategy-jobs` fills these through the compaction adapter. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
 ### Rewrite Manifests Job
 
@@ -325,7 +347,9 @@ Four things are worth confirming before assuming a configuration problem is a co
 - `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the job template list.
 - The policy is associated with a tag assigned to the target table or one of its ancestors.
 - `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing.
-- The rewrite log shows `Rewritten data files: N` with `N` greater than zero for a non-empty table.
+- The rewrite log shows `Rewritten data files: N` with `N` greater than zero when enough small
+  files exist (`min-input-files`, default 5). A successful job with `N = 0` is usually a data
+  shape issue, not a failed submit.
 
 ## Related
 
