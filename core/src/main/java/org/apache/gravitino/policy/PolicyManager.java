@@ -31,9 +31,12 @@ import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -271,10 +274,9 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
@@ -315,10 +317,8 @@ public class PolicyManager implements PolicyDispatcher {
         "Cannot associate policies for unsupported metadata object type %s",
         metadataObject.type());
 
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
 
     // Remove all the policies that are both set to add and remove
     Set<String> policiesToAddSet =
@@ -381,11 +381,10 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity getPolicyForMetadataObject(
       String metalake, MetadataObject metadataObject, String policyName) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    NameIdentifier entityIdent = checkAndNormalizeMetadataObject(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
     return TreeLockUtils.doWithTreeLock(
@@ -415,6 +414,30 @@ public class PolicyManager implements PolicyDispatcher {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  private NameIdentifier checkAndNormalizeMetadataObject(
+      String metalake, MetadataObject metadataObject) {
+    // Keep existence checks on the original request: quoted names must not be folded twice.
+    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
+    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+    switch (metadataObject.type()) {
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case VIEW:
+      case FUNCTION:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+        return CapabilityHelpers.normalizeMetadataIdentifier(
+            identifier,
+            Capability.Scope.valueOf(metadataObject.type().name()),
+            GravitinoEnv.getInstance().catalogManager(),
+            () -> entityStore);
+      default:
+        return identifier;
+    }
   }
 
   private void changePolicyEnabledState(
