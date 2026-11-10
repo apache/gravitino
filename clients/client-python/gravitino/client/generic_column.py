@@ -70,6 +70,9 @@ class GenericColumn(Column, SupportsTags):
     def default_value(self) -> Expression:
         return self._internal_column.default_value()
 
+    def initial_default_value(self) -> Expression:
+        return self._internal_column.initial_default_value()
+
     def __hash__(self) -> int:
         return hash(self._internal_column)
 

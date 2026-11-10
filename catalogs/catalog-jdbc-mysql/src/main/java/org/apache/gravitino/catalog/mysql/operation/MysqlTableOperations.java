@@ -48,6 +48,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -67,7 +68,6 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
   private static final MysqlTablePropertiesMetadata TABLE_PROPERTIES_METADATA =
       new MysqlTablePropertiesMetadata();
-  private static final String BACK_QUOTE = "`";
   private static final String MYSQL_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String MYSQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "Mysql does not support nested column names.";
@@ -98,22 +98,12 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     validateIncrementCol(columns, indexes);
     StringBuilder sqlBuilder = new StringBuilder();
-    sqlBuilder
-        .append("CREATE TABLE ")
-        .append(BACK_QUOTE)
-        .append(tableName)
-        .append(BACK_QUOTE)
-        .append(" (\n");
+    sqlBuilder.append("CREATE TABLE ").append(quote(tableName)).append(" (\n");
 
     // Add columns
     for (int i = 0; i < columns.length; i++) {
       JdbcColumn column = columns[i];
-      sqlBuilder
-          .append(SPACE)
-          .append(SPACE)
-          .append(BACK_QUOTE)
-          .append(column.name())
-          .append(BACK_QUOTE);
+      sqlBuilder.append(SPACE).append(SPACE).append(quote(column.name()));
 
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
@@ -162,7 +152,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         case UNIQUE_KEY:
           sqlBuilder.append("CONSTRAINT ");
           if (null != index.name()) {
-            sqlBuilder.append(BACK_QUOTE).append(index.name()).append(BACK_QUOTE);
+            sqlBuilder.append(quote(index.name()));
           }
           sqlBuilder.append(" UNIQUE (").append(fieldStr).append(")");
           break;
@@ -462,7 +452,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    String result = "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", alterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
@@ -511,11 +501,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(column.comment())
             .withAutoIncrement(change.isAutoIncrement())
             .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   @VisibleForTesting
@@ -527,7 +513,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
               .anyMatch(index -> index.name().equals(deleteIndex.getName())),
           "Index does not exist");
     }
-    return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
+    return "DROP INDEX " + quote(deleteIndex.getName());
   }
 
   private String updateColumnNullabilityDefinition(
@@ -535,11 +521,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
     JdbcColumn updateColumn = withPendingDefaultValueAndNullability(column, changes);
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   @VisibleForTesting
@@ -556,11 +538,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         sqlBuilder.append("PRIMARY KEY ");
         break;
       case UNIQUE_KEY:
-        sqlBuilder
-            .append("UNIQUE INDEX ")
-            .append(BACK_QUOTE)
-            .append(addIndex.getName())
-            .append(BACK_QUOTE);
+        sqlBuilder.append("UNIQUE INDEX ").append(quote(addIndex.getName()));
         break;
       default:
         break;
@@ -607,11 +585,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
             .withComment(newComment)
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return MODIFY_COLUMN
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
-        + appendColumnDefinition(updateColumn, new StringBuilder());
+    return MODIFY_COLUMN + quote(col) + appendColumnDefinition(updateColumn, new StringBuilder());
   }
 
   private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
@@ -624,9 +598,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
+        .append(quote(col))
         .append(SPACE)
         .append(dataType)
         .append(SPACE);
@@ -662,11 +634,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition
-          .append(AFTER)
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append(AFTER).append(quote(afterPosition.getColumn()));
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing, follow the default behavior of mysql
     } else {
@@ -685,15 +653,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
     String newColumnName = renameColumn.getNewName();
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, oldColumnName);
     StringBuilder sqlBuilder =
-        new StringBuilder(
-            "CHANGE COLUMN "
-                + BACK_QUOTE
-                + oldColumnName
-                + BACK_QUOTE
-                + SPACE
-                + BACK_QUOTE
-                + newColumnName
-                + BACK_QUOTE);
+        new StringBuilder("CHANGE COLUMN " + quote(oldColumnName) + SPACE + quote(newColumnName));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(newColumnName)
@@ -749,7 +709,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+    return "DROP COLUMN " + quote(col);
   }
 
   private String updateColumnDefaultValueFieldDefinition(
@@ -813,7 +773,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
   }
 
   private static String quote(String name) {
-    return BACK_QUOTE + name + BACK_QUOTE;
+    return JdbcConnectorUtils.quoteIdentifier(name, '`');
   }
 
   /**

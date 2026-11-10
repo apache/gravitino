@@ -142,7 +142,14 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
       throw new NoSuchCatalogException(
           "Couldn't find Iceberg configuration for catalog %s", catalogName);
     }
-    return createCatalogWrapper(catalogName, icebergConfig.get());
+    CatalogWrapperForREST wrapper = createCatalogWrapper(catalogName, icebergConfig.get());
+    try {
+      wrapper.validateServerContext(serverContext);
+      return wrapper;
+    } catch (RuntimeException e) {
+      closeIcebergCatalogWrapper(wrapper);
+      throw e;
+    }
   }
 
   // Overriding this method to create a new CatalogWrapperForREST for test;
@@ -167,8 +174,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     AuthenticationConfig authenticationConfig =
         new AuthenticationConfig(enrichedConfig.getAllConfig());
     if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
-      return (CatalogWrapperForREST)
-          new KerberosAwareIcebergCatalogProxy(rest).getProxy(catalogName, enrichedConfig);
+      return (CatalogWrapperForREST) new KerberosAwareIcebergCatalogProxy(rest).getProxy();
     }
 
     return rest;

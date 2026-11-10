@@ -62,6 +62,7 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticQuery;
 import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.gravitino.semantic.SemanticQueryResolver;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -427,13 +428,15 @@ public class SemanticModelOperations {
                 .anyMatch(change -> change instanceof SemanticModelChange.ReplaceDefinition)) {
               dispatcher.loadSemanticModel(ident);
             }
+            SemanticModelSourceUpdate sourceUpdate = SemanticModelSourceUpdate.preserve();
             for (SemanticModelChange change : changes) {
               if (change instanceof SemanticModelChange.ReplaceDefinition) {
-                sourceValidator.validate(
-                    metalake, ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
+                sourceUpdate =
+                    sourceValidator.validate(
+                        metalake, ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
               }
             }
-            SemanticModel altered = dispatcher.alterSemanticModel(ident, changes);
+            SemanticModel altered = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
             LOG.info(
                 "Semantic Model altered: {}.{}.{}.{}", metalake, catalog, schema, altered.name());
             return Utils.ok(new SemanticModelResponse(DTOConverters.toDTO(altered)));
@@ -556,14 +559,15 @@ public class SemanticModelOperations {
       String metalake, String catalog, String schema, SemanticModelCreateRequest request) {
     request.validate();
     SemanticModelDefinition definition = request.toDefinition();
-    sourceValidator.validate(metalake, definition);
+    SemanticModelSourceUpdate sourceUpdate = sourceValidator.validate(metalake, definition);
     NameIdentifier ident =
         NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, request.getName());
     return dispatcher.createSemanticModel(
         ident,
         request.getComment(),
         definition,
-        request.getProperties() == null ? Collections.emptyMap() : request.getProperties());
+        request.getProperties() == null ? Collections.emptyMap() : request.getProperties(),
+        sourceUpdate);
   }
 
   private static OssieFormat parseOssieFormat(String format) {

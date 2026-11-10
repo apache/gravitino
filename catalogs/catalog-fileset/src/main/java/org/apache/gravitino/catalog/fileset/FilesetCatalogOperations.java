@@ -464,6 +464,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           if (StringUtils.isBlank(name)) {
             throw new IllegalArgumentException("Location name must not be blank");
           }
+          EntityFieldLimits.checkMaxLength(
+              name,
+              EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+              "storage location name",
+              Entity.EntityType.FILESET);
           if (StringUtils.isBlank(path)) {
             throw new IllegalArgumentException(
                 "Storage location must not be blank for location name: " + name);
@@ -521,6 +526,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Map<String, Path> filesetPaths =
         calculateFilesetPaths(
             schemaIdent.name(), ident.name(), storageLocations, schemaPaths, properties);
+    // The names inherited from the catalog or schema locations are only known now, check them
+    // before any directory is created.
+    filesetPaths
+        .keySet()
+        .forEach(
+            name ->
+                EntityFieldLimits.checkMaxLength(
+                    name,
+                    EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+                    "storage location name",
+                    Entity.EntityType.FILESET));
     properties = setDefaultLocationIfAbsent(properties, filesetPaths);
 
     ImmutableMap.Builder<String, Path> filesetPathsBuilder = ImmutableMap.builder();
@@ -1612,7 +1628,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       executeFileSystemTask(
           () -> {
             try (FileSystem fileSystem =
-                createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
+                createProbeFileSystem(path, probeConf, scheme, fileSystemProvider)) {
               Path qualifiedPath =
                   path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
               try {
@@ -1725,6 +1741,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return provider.getFileSystem(path, config);
   }
 
+  private FileSystem createProbeFileSystem(
+      Path path, Map<String, String> config, String scheme, FileSystemProvider provider)
+      throws IOException {
+    try {
+      return createFileSystem(path, config, scheme, provider);
+    } catch (Exception e) {
+      throw new ProbeInitializationException(e);
+    }
+  }
+
   private String displayLocationName(String locationName) {
     return LOCATION_NAME_UNKNOWN.equals(locationName) ? "location" : "location-" + locationName;
   }
@@ -1741,6 +1767,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   private String failureCategory(Throwable throwable) {
+    boolean initializationFailure = throwable instanceof ProbeInitializationException;
     Throwable current = throwable;
     while (current != null) {
       String simpleName = current.getClass().getSimpleName().toLowerCase(Locale.ROOT);
@@ -1762,7 +1789,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         return "access denied";
       }
       if (simpleName.contains("filenotfound") || simpleName.contains("notfound")) {
-        return "location not found";
+        return initializationFailure
+            ? "filesystem initialization failed; check credentials and configuration"
+            : "location not found";
       }
       if (current instanceof ConnectionFailedException) {
         return "credential generation failed";
@@ -1970,6 +1999,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         targetLocationName,
         fileset.name());
     return targetLocation;
+  }
+
+  private static final class ProbeInitializationException extends IOException {
+
+    private ProbeInitializationException(Throwable cause) {
+      super("Failed to initialize filesystem for connection test", cause);
+    }
   }
 
   private static final class InvalidProbeLocationException extends IllegalArgumentException {

@@ -41,6 +41,8 @@ public enum OperationType {
   LIST_SEMANTIC_MODEL_METRICS,
   /** An operation to plan a Semantic Model query without executing it. */
   PLAN_SEMANTIC_QUERY,
+  /** An operation to list Semantic Model datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
   LINK, // An operation to link a version to a model
   RUN, // An operation to run a job
   CANCEL, // An operation to cancel a job

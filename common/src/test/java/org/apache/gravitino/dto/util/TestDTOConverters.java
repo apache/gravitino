@@ -22,6 +22,7 @@ package org.apache.gravitino.dto.util;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import com.google.common.io.BaseEncoding;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +33,8 @@ import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.policy.PolicyContentDTO;
+import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.dto.rel.expressions.FunctionArg;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
 import org.apache.gravitino.dto.rel.partitioning.ListPartitioningDTO;
 import org.apache.gravitino.dto.rel.partitioning.RangePartitioningDTO;
@@ -42,9 +45,12 @@ import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.policy.AccessControlContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -57,8 +63,43 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestDTOConverters {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"4142", "0080ff", ""})
+  void testBinaryLiteralBytesUseHex(String hex) {
+    byte[] bytes = BaseEncoding.base16().lowerCase().decode(hex);
+    LiteralDTO dto =
+        (LiteralDTO) DTOConverters.toFunctionArg(Literals.of(bytes, Types.BinaryType.get()));
+    Assertions.assertEquals(Types.BinaryType.get(), dto.dataType());
+    Assertions.assertEquals("0x" + hex, dto.value());
+    Assertions.assertArrayEquals(
+        bytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(dto)).value());
+  }
+
+  @Test
+  void testBinaryOrFixedLiteralKeepsUnprefixedWireValue() {
+    LiteralDTO unprefixedBinary =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("AB").build();
+    Literal<?> binaryLiteral = (Literal<?>) DTOConverters.fromFunctionArg(unprefixedBinary);
+    Assertions.assertEquals(Types.BinaryType.get(), binaryLiteral.dataType());
+    Assertions.assertEquals("AB", binaryLiteral.value());
+
+    LiteralDTO unprefixedFixed =
+        LiteralDTO.builder().withDataType(Types.FixedType.of(3)).withValue("legacy").build();
+    Literal<?> fixedLiteral = (Literal<?>) DTOConverters.fromFunctionArg(unprefixedFixed);
+    Assertions.assertEquals(Types.FixedType.of(3), fixedLiteral.dataType());
+    Assertions.assertEquals("legacy", fixedLiteral.value());
+
+    // byte[] still round-trips through the 0x wire form.
+    Assertions.assertEquals(
+        "legacy",
+        ((LiteralDTO) DTOConverters.toFunctionArg(Literals.of("legacy", Types.BinaryType.get())))
+            .value());
+  }
 
   @Test
   void testIdentityPartitionDTOConvert() {
@@ -395,5 +436,44 @@ public class TestDTOConverters {
     PolicyContent roundTripped = DTOConverters.fromDTO(contentDTO);
     Assertions.assertInstanceOf(AccessControlContent.class, roundTripped);
     Assertions.assertEquals(content, roundTripped);
+  }
+
+  @Test
+  void testBinaryAndFixedLiteralsUseHexEncoding() throws Exception {
+    byte[] bytes = new byte[] {1, 2, 3};
+    Expression binaryLiteral = Literals.of(bytes, Types.BinaryType.get());
+    Expression fixedLiteral = Literals.of(bytes, Types.FixedType.of(3));
+
+    FunctionArg binaryArg = DTOConverters.toFunctionArg(binaryLiteral);
+    FunctionArg fixedArg = DTOConverters.toFunctionArg(fixedLiteral);
+    Assertions.assertInstanceOf(LiteralDTO.class, binaryArg);
+    Assertions.assertInstanceOf(LiteralDTO.class, fixedArg);
+    // Wire format: 0x + lowercase hex (#14609); reversible encoding of Iceberg-style bytes.
+    Assertions.assertEquals("0x010203", ((LiteralDTO) binaryArg).value());
+    Assertions.assertEquals("0x010203", ((LiteralDTO) fixedArg).value());
+    Assertions.assertFalse(((LiteralDTO) binaryArg).value().contains("[B@"));
+
+    Literal<?> roundTripBinary = (Literal<?>) DTOConverters.fromFunctionArg(binaryArg);
+    Literal<?> roundTripFixed = (Literal<?>) DTOConverters.fromFunctionArg(fixedArg);
+    Assertions.assertArrayEquals(bytes, (byte[]) roundTripBinary.value());
+    Assertions.assertArrayEquals(bytes, (byte[]) roundTripFixed.value());
+
+    // Uppercase hex after 0x must also parse.
+    byte[] mixedCaseBytes = new byte[] {0x0a, 0x1b, (byte) 0x2c};
+    LiteralDTO uppercase =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0x0A1B2C").build();
+    Assertions.assertArrayEquals(
+        mixedCaseBytes, (byte[]) ((Literal<?>) DTOConverters.fromFunctionArg(uppercase)).value());
+
+    ColumnDTO viaConverters =
+        DTOConverters.toDTO(
+            Column.of(
+                "bin_col", Types.BinaryType.get(), null, true, false, binaryLiteral, fixedLiteral));
+    String json = JsonUtils.objectMapper().writeValueAsString(viaConverters);
+    Assertions.assertTrue(json.contains("\"0x010203\""));
+    Assertions.assertFalse(json.contains("[B@"));
+    ColumnDTO deser = JsonUtils.objectMapper().readValue(json, ColumnDTO.class);
+    Assertions.assertEquals("0x010203", ((LiteralDTO) deser.defaultValue()).value());
+    Assertions.assertEquals("0x010203", ((LiteralDTO) deser.initialDefaultValue()).value());
   }
 }

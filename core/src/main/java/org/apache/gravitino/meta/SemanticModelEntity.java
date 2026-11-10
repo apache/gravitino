@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.meta;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -32,6 +33,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
 /** A metadata-store entity representing a schema-scoped Semantic Model. */
 @ToString
@@ -83,9 +85,20 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
   private long version;
   private AuditInfo auditInfo;
 
+  @JsonIgnore @ToString.Exclude
+  private transient SemanticModelSourceUpdate sourceUpdate = SemanticModelSourceUpdate.preserve();
+
   @Nullable private String comment;
 
   private SemanticModelEntity() {}
+
+  /**
+   * @return The internal association update instruction for this write.
+   */
+  @JsonIgnore
+  public SemanticModelSourceUpdate sourceUpdate() {
+    return sourceUpdate == null ? SemanticModelSourceUpdate.preserve() : sourceUpdate;
+  }
 
   /**
    * Returns the fields and values of this Semantic Model entity.
@@ -315,6 +328,17 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
      */
     public Builder withDefinition(SemanticModelDefinition definition) {
       semanticModel.definition = definition;
+      return this;
+    }
+
+    /**
+     * Attaches the source associations resolved for this write; they are not snapshot fields.
+     *
+     * @param update The explicit replacement or preserve instruction.
+     * @return This builder.
+     */
+    public Builder withSourceUpdate(SemanticModelSourceUpdate update) {
+      semanticModel.sourceUpdate = Objects.requireNonNull(update, "sourceUpdate");
       return this;
     }
 

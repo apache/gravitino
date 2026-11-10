@@ -29,9 +29,46 @@ import org.apache.gravitino.SchemaChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
+
+  @Test
+  void testOversizedCommentRejectedBeforeCatalogMutation() {
+    SchemaDispatcher delegate = Mockito.mock(SchemaDispatcher.class);
+    SchemaNormalizeDispatcher dispatcher = new SchemaNormalizeDispatcher(delegate, catalogManager);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "oversized_comment");
+    String comment = "c".repeat(257);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> dispatcher.createSchema(ident, comment, ImmutableMap.of()));
+    Assertions.assertTrue(error.getMessage().contains("comment"));
+    Assertions.assertTrue(error.getMessage().contains("256"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createSchema(
+                ident, comment, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
+    Mockito.verifyNoInteractions(delegate);
+  }
+
+  @Test
+  void testCommentLengthBoundary() {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "comment_boundary");
+    String comment = "c".repeat(256);
+    Schema schema =
+        schemaNormalizeDispatcher.createSchema(
+            ident, comment, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Assertions.assertEquals(comment, schema.comment());
+    Schema altered =
+        schemaNormalizeDispatcher.alterSchema(ident, SchemaChange.setProperty("k1", "updated"));
+    Assertions.assertEquals("updated", altered.properties().get("k1"));
+    Assertions.assertEquals(comment, altered.comment());
+    Assertions.assertEquals(comment, schemaNormalizeDispatcher.loadSchema(ident).comment());
+    Assertions.assertTrue(schemaNormalizeDispatcher.dropSchema(ident, false));
+  }
 
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {

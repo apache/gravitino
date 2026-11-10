@@ -37,6 +37,11 @@ from tests.unit.tools import MockOperation
 
 _NAMESPACE = {"catalog_name": "sales", "schema_name": "mart"}
 _MODEL_ARGS = {**_NAMESPACE, "semantic_model_name": "sales_model"}
+_SOURCE_ARGS = {
+    **_NAMESPACE,
+    "source_type": "table",
+    "source_name": "orders",
+}
 _MODELS_PATH = (
     "/api/metalakes/test_metalake/catalogs/sales/schemas/mart/semantic-models"
 )
@@ -116,7 +121,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             return client
 
         with patch(
-            "mcp_server.client.plain.plain_rest_client_operation.httpx.AsyncClient",
+            "mcp_server.client.plain.plain_rest_client_operation._GravitinoAsyncClient",
             side_effect=create_http_client,
         ):
             return PlainRESTClientOperation(*args, **kwargs)
@@ -166,6 +171,174 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(1, len(self.requests))
         self._assert_request("GET", _METRICS_PATH + "?details=false")
+
+    async def test_source_lookup_preserves_identifiers_and_server_order(self):
+        namespace = ["test_metalake", "models", "semantic", "a"]
+        identifiers = [
+            {"namespace": namespace, "name": name}
+            for name in ("Orders.raw", "orders.raw", "\U00010000", "\ue000")
+        ] + [
+            {
+                "namespace": ["test_metalake", "other", "schema", "model"],
+                "name": "orders.raw",
+            }
+        ]
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                self.requests.clear()
+                self.response = {"code": 0, "identifiers": identifiers}
+                result = await self._call(
+                    "list_semantic_model_datasets",
+                    {**_SOURCE_ARGS, "source_type": source_type},
+                )
+                self.assertEqual(identifiers, result)
+                self.assertEqual(1, len(self.requests))
+                self._assert_request(
+                    "GET",
+                    f"/api/metalakes/test_metalake/objects/{source_type}/"
+                    "sales.mart.orders/semantic-model-datasets",
+                )
+
+    async def test_source_lookup_empty_results(self):
+        self.response = {"code": 0, "identifiers": []}
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                self.assertEqual(
+                    [],
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {**_SOURCE_ARGS, "source_type": source_type},
+                    ),
+                )
+
+    async def test_source_lookup_path_encoding_and_request_scope(self):
+        self.response = {"code": 0, "identifiers": []}
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                with patch(
+                    "mcp_server.core.context._get_request_authorization",
+                    return_value="Bearer request-test-token",
+                ):
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {
+                            "metalake": "ml/雪",
+                            "source_type": source_type,
+                            "catalog_name": "cat?",
+                            "schema_name": "sch #+%",
+                            "source_name": "orders/雪",
+                        },
+                    )
+                request = self.requests[-1]
+                self.assertEqual(
+                    f"/api/metalakes/ml%2F%E9%9B%AA/objects/{source_type}/"
+                    "cat%3F.sch%20%23%2B%25.orders%2F%E9%9B%AA/semantic-model-datasets",
+                    request.url.raw_path.decode(),
+                )
+                self.assertEqual(
+                    "Bearer request-test-token",
+                    request.headers["Authorization"],
+                )
+                await self._call("list_semantic_model_datasets", _SOURCE_ARGS)
+                self._assert_request(
+                    "GET",
+                    "/api/metalakes/test_metalake/objects/table/"
+                    "sales.mart.orders/semantic-model-datasets",
+                )
+
+    async def test_source_lookup_rejects_invalid_source_types(self):
+        for source_type in ("", "TABLE", "catalog", "table/view", None):
+            with self.subTest(source_type=source_type):
+                with self.assertRaisesRegex(ToolError, "source_type"):
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {**_SOURCE_ARGS, "source_type": source_type},
+                    )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_rejects_ambiguous_path_names(self):
+        for argument in (
+            "metalake",
+            "catalog_name",
+            "schema_name",
+            "source_name",
+        ):
+            invalid_names = (
+                (".", "..") if argument == "metalake" else ("", ".", "..")
+            )
+            for name in invalid_names:
+                with self.subTest(argument=argument, name=name):
+                    with self.assertRaisesRegex(ToolError, "REST path names"):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {**_SOURCE_ARGS, argument: name},
+                        )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_rejects_dots_in_source_components(self):
+        for source_type in ("table", "view"):
+            for argument in ("catalog_name", "schema_name", "source_name"):
+                with self.subTest(source_type=source_type, argument=argument):
+                    with self.assertRaisesRegex(
+                        ToolError, "Source lookup does not support dots"
+                    ):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {
+                                **_SOURCE_ARGS,
+                                "source_type": source_type,
+                                argument: "name.with.dot",
+                            },
+                        )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_propagates_rest_failures(self):
+        for source_type in ("table", "view"):
+            for status, code, error_type in (
+                (400, 1001, "IllegalArgumentException"),
+                (401, 1011, "UnauthorizedException"),
+                (403, 1008, "ForbiddenException"),
+                (404, 1003, "NoSuchMetadataObjectException"),
+                (404, 1003, "NotFoundException"),
+                (500, 1002, "RuntimeException"),
+            ):
+                with self.subTest(source_type=source_type, status=status):
+                    self.status = status
+                    self.response = {
+                        "code": code,
+                        "type": error_type,
+                        "message": "Source lookup rejected",
+                        "identifiers": [],
+                    }
+                    with self.assertRaisesRegex(ToolError, error_type):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {**_SOURCE_ARGS, "source_type": source_type},
+                        )
+
+    async def test_source_lookup_rejects_invalid_responses(self):
+        for body in (
+            [],
+            {},
+            {"identifiers": []},
+            {"code": 0},
+            {"code": 0, "identifiers": None},
+            {"code": 0, "identifiers": {}},
+            {"code": 0, "identifiers": "[]"},
+            b"not JSON",
+        ):
+            with self.subTest(body=body):
+                self.response = body
+                with self.assertRaisesRegex(
+                    ToolError, "Invalid Gravitino response"
+                ):
+                    await self._call(
+                        "list_semantic_model_datasets", _SOURCE_ARGS
+                    )
+        self.status = 502
+        self.response = {"code": 0, "identifiers": []}
+        with self.assertRaisesRegex(ToolError, "502"):
+            await self._call("list_semantic_model_datasets", _SOURCE_ARGS)
 
     async def test_metric_infos_preserve_complete_metrics_and_numbers(self):
         metric = {
@@ -662,6 +835,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "list_of_semantic_models",
                 "list_metrics",
                 "list_metric_infos",
+                "list_semantic_model_datasets",
                 "load_semantic_model",
                 "create_semantic_model",
                 "alter_semantic_model",
@@ -681,12 +855,22 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             "list_of_semantic_models",
             "list_metrics",
             "list_metric_infos",
+            "list_semantic_model_datasets",
             "load_semantic_model",
         ):
             tool = tools[name]
             self.assertTrue(tool.annotations.readOnlyHint)
             self.assertTrue(tool.annotations.idempotentHint)
             self.assertFalse(tool.annotations.destructiveHint)
+        source_tool = tools["list_semantic_model_datasets"]
+        self.assertEqual(
+            {"source_type", "catalog_name", "schema_name", "source_name"},
+            set(source_tool.inputSchema["required"]),
+        )
+        self.assertEqual(
+            ["table", "view"],
+            source_tool.inputSchema["properties"]["source_type"]["enum"],
+        )
         self.assertEqual(
             set(tools["create_semantic_model"].inputSchema["required"]),
             {"catalog_name", "schema_name", "name", "definition"},
@@ -716,6 +900,7 @@ class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
             ("list_of_semantic_models", _NAMESPACE, []),
             ("list_metrics", _NAMESPACE, []),
             ("list_metric_infos", _NAMESPACE, []),
+            ("list_semantic_model_datasets", _SOURCE_ARGS, []),
             ("load_semantic_model", model_args, model),
             (
                 "create_semantic_model",

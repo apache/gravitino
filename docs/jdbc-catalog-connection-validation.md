@@ -65,7 +65,7 @@ it, and closes it. If it fails, the create is rejected and rolled back (the cata
 persisted), and the caller receives a connection error that names the backend `host:port` and the
 underlying driver message.
 
-To register a catalog whose backend is temporarily unavailable, set the hidden catalog property
+To register a catalog whose backend is temporarily unavailable, set the catalog property
 `verify-on-create` to `false`, which skips the create-time check:
 
 ```json
@@ -73,6 +73,11 @@ To register a catalog whose backend is temporarily unavailable, set the hidden c
   "verify-on-create": "false"
 }
 ```
+
+This setting skips only the backend connection probe. Driver/URL compatibility, boolean values,
+and pool bounds are still checked on catalog creation and alteration, without opening a database
+connection. Invalid alterations leave the stored configuration unchanged.
+
 
 The default is `true` (verify on create). The connection is still opened lazily on first use when
 the check is skipped.
@@ -87,7 +92,9 @@ unit:
 - MySQL Connector/J — also used by the Doris, StarRocks, and OceanBase catalogs: `connectTimeout`
   and `socketTimeout` in milliseconds.
 - PostgreSQL — also used by the Hologres catalog: `connectTimeout`, `socketTimeout` and
-  `loginTimeout` in seconds (rounded up, minimum 1).
+  `loginTimeout` in seconds (rounded up, minimum 1, maximum `2147483`). The upper cap avoids
+  overflow when the driver converts seconds back to integer milliseconds; near the millisecond
+  upper bound, it shortens the configured timeout by less than one second.
 - ClickHouse: `connect_timeout` and `socket_timeout` in milliseconds (note the underscore names).
 
 It is applied differently to the two kinds of connection:
@@ -105,3 +112,55 @@ A timeout value you set directly on the connection or in the `jdbc-url` query st
 overridden; drivers whose family is not recognized are left unbounded by Gravitino. The pooled
 timeout is applied as a per-connection bound, so the pool stays lazy and no connection is opened
 until the first real round trip.
+
+## Driver adapter for physical connection deadlines
+
+Connector implementations can opt into `org.apache.gravitino.utils.BoundedConnectionDriver`
+when their JDBC driver does not enforce a login timeout. Wrap the driver with a positive
+timeout in milliseconds and pass the wrapper to the connection pool as its driver. No
+existing connector is automatically switched to this adapter by this addition.
+
+Only `Driver.connect` runs on a worker. Metadata, validation and SQL remain on the caller;
+this does not introduce delayed DDL or an automatic retry. A connection returned after
+timeout/interruption is closed by the worker and never handed to the caller or pool.
+While an abandoned attempt is connecting, waiting for an in-flight interrupt callback, or closing,
+new attempts through that wrapper fail immediately. Pool waits, connection validation, SQL and total request duration retain
+their own budgets.
+
+The core-loaded adapter shares at most 64 daemon connection workers and 64 daemon cancellation
+threads per server JVM, with no queue in either pool. A single additional daemon thread dispatches
+bounded cancellation retries without running driver code. Saturation fails new connects with `SQLTransientConnectionException`, including otherwise
+healthy connects. An abandoned attempt's worker is interrupted from a separate cancellation thread,
+not the cancelling caller, because a driver's interrupt callback can block synchronously; the
+interrupt is delivered only while the worker is still connecting. It releases the worker only from
+interruptible waits: blocking `java.net` socket I/O is not interruptible on JDK 17, so a driver
+blocked in a socket connect or read keeps its worker until its own socket timeout, and a driver or
+close that never returns keeps it until the server restarts.
+Abandoned and completed-after-abandonment attempts are logged at INFO; worker-admission rejections
+are aggregated into at most one WARN log line a minute. A rejected cancellation can be submitted up to three more times, after delays of 10, 20 and 40 ms,
+with at most 64 attempts pending retry across the adapter. Only cancellation admission is retried;
+`Driver.connect` and SQL are never replayed. The retry dispatcher never interrupts a worker itself.
+Retries stop when the driver returns. Retry exhaustion, full retry capacity or a rejected retry
+schedule is logged at WARN. Its worker remains quarantined until the driver and cleanup return;
+if they never return, recovery requires a server restart. Cancellation is best-effort, not
+forced thread termination. Completed workers
+restore their context class loader. The adapter does not bound arbitrary driver constructor
+work or clean up driver-owned global threads.
+
+Each attempt, its driver interrupt callback, and its late connection cleanup use the submitting
+caller's access-control context, JAAS subject, and context class loader. Cancellation threads
+restore their prior context after the callback. Interrupts consumed while waiting for cancellation
+are restored after connection cleanup. Shared workers are created without inheriting the first
+caller's subject, so reusing a worker does not reuse that caller's JAAS subject.
+
+This guarantee covers access-control contexts and JAAS subjects, not arbitrary `ThreadLocal`
+or `InheritableThreadLocal` state. Drivers using the shared workers must clean up their own
+thread-local state and must not depend on inherited thread locals for caller authentication.
+Drivers that cannot meet these requirements must not opt into this adapter. Isolating workers
+by catalog alone would not isolate different users of the same catalog.
+
+A JDBC catalog whose driver does not enforce a login timeout can also bound its runtime physical
+connections with this adapter by overriding `JdbcCatalogOperations#configureDataSource` and
+installing it as the data source's driver. The hook must not borrow connections, start the pool,
+retain the data source, or change its validated URL, credentials and pool settings. Pool waits, SQL
+execution and tree-lock acquisition are separate from this physical connection deadline.

@@ -221,6 +221,8 @@ dependencies {
   // Keep optional Hadoop S3A dependencies available only to tests.
   s3aTestRuntime(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
+  // The embedded JDBC credential integration test loads this driver by class name.
+  testRuntimeOnly(libs.sqlite.jdbc)
 }
 
 val s3aTestLibDirectory =

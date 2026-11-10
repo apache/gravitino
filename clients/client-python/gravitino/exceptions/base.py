@@ -30,6 +30,36 @@ class RESTException(RuntimeError):
         super().__init__(message % args)
 
 
+class HTTPResponseException(RESTException):
+    """An HTTP failure whose response cannot be used as a domain error.
+
+    Attributes:
+        status_code: The HTTP status received from the server.
+        request_method: The original client request's HTTP method.
+        endpoint: The request origin, without credentials, path or query parameters.
+    """
+
+    def __init__(
+        self, status_code: int, request_method: str, endpoint: str, reason: str
+    ):
+        """Create an error from safe context and a fixed diagnostic reason."""
+        self.status_code = status_code
+        self.request_method = request_method
+        self.endpoint = endpoint
+        self._reason = reason
+        super().__init__(
+            "HTTP %s for %s %s: %s", status_code, request_method, endpoint, reason
+        )
+
+    def __reduce__(self):
+        """Reconstruct the exception with its safe context and instance state."""
+        return (
+            type(self),
+            (self.status_code, self.request_method, self.endpoint, self._reason),
+            self.__dict__,
+        )
+
+
 class IllegalArgumentException(ValueError):
     """Base class for all exceptions thrown when arguments are invalid."""
 
@@ -187,6 +217,18 @@ class TagAlreadyExistsException(AlreadyExistsException):
 
 class TagAlreadyAssociatedException(AlreadyExistsException):
     """Exception thrown when a tag with specified name already associated to a metadata object."""
+
+
+class NoSuchPolicyException(NotFoundException):
+    """An exception thrown when a policy with specified name is not existed."""
+
+
+class PolicyAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a policy with specified name already exists."""
+
+
+class PolicyAlreadyAssociatedException(AlreadyExistsException):
+    """Exception thrown when a policy with specified name already associated to a tag."""
 
 
 class JobTemplateAlreadyExistsException(AlreadyExistsException):

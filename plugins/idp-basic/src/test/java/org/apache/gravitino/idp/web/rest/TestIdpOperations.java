@@ -56,8 +56,10 @@ import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
 import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -74,6 +76,8 @@ class TestIdpOperations extends JerseyTest {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
+  private static final IdpUserGroupEventDispatcher DISPATCHER =
+      new IdpUserGroupEventDispatcher(new EventBus(Collections.emptyList()), MANAGER);
 
   private static Config previousConfig;
 
@@ -117,11 +121,20 @@ class TestIdpOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(MANAGER).to(IdpUserGroupManager.class);
+            bind(DISPATCHER).to(IdpUserGroupEventDispatcher.class);
             bind(request).to(HttpServletRequest.class);
           }
         });
     return resourceConfig;
+  }
+
+  @Test
+  void testNullRequestBodyReturnsBadRequest() {
+    assertNullBody(postNull("/idp/users"));
+    assertNullBody(putNull("/idp/users/user1/password"));
+    assertNullBody(putNull("/idp/users/user1/enabled"));
+    assertNullBody(postNull("/idp/groups"));
+    assertNullBody(putNull("/idp/groups/group1/users"));
   }
 
   @Test
@@ -295,8 +308,16 @@ class TestIdpOperations extends JerseyTest {
     return request(path).post(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response postNull(String path) {
+    return request(path).post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response put(String path, Object body) {
     return request(path).put(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response putNull(String path) {
+    return request(path).put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response delete(String path) {
@@ -310,6 +331,13 @@ class TestIdpOperations extends JerseyTest {
   private void assertError(Response.Status expected, Response response, int code) {
     assertStatus(expected, response);
     Assertions.assertEquals(code, response.readEntity(ErrorResponse.class).getCode());
+  }
+
+  private void assertNullBody(Response response) {
+    assertStatus(Response.Status.BAD_REQUEST, response);
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+    Assertions.assertTrue(error.getMessage().contains("Request body cannot be null"));
   }
 
   private IdpUser buildUser(String user) {
