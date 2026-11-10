@@ -478,9 +478,6 @@ public class DomainMetaService {
    * @return True if the domain is deleted, false if it does not exist.
    * @throws NonEmptyEntityException If the domain has sub-domains.
    */
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteDomain")
   public boolean deleteDomain(NameIdentifier identifier) {
     return deleteDomain(identifier, domain -> {});
   }
@@ -492,6 +489,9 @@ public class DomainMetaService {
    * @param check The check against the current domain and parent.
    * @return Whether the domain was deleted.
    */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteDomain")
   public boolean deleteDomain(NameIdentifier identifier, Consumer<DomainEntity> check) {
     DomainPO domainPO;
     try {
