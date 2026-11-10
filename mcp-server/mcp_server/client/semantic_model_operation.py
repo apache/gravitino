@@ -37,7 +37,7 @@ class SemanticModelOperation(ABC):
         schema_name: str,
         source_name: str,
     ) -> str:
-        """Return visible dataset identifiers associated with a table or View."""
+        """Return visible dataset identifiers associated with a table or view."""
         pass
 
     @abstractmethod

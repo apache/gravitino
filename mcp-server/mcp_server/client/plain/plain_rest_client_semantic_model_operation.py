@@ -56,10 +56,16 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
         schema_name: str,
         source_name: str,
     ) -> str:
-        full_name = ".".join(
+        encoded_names = [
             encode_path_segment(name)
             for name in (catalog_name, schema_name, source_name)
-        )
+        ]
+        # The REST fullName format has no escape for dots within a component.
+        if any("." in name for name in encoded_names):
+            raise ValueError(
+                "Source lookup does not support dots in catalog, schema, or table/view names"
+            )
+        full_name = ".".join(encoded_names)
         response = await self.rest_client.get(
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
             f"/objects/{encode_path_segment(source_type)}/{full_name}"

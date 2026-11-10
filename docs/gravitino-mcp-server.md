@@ -141,7 +141,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
 | `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
 | `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
-| `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or View.         | `semantic_model` |
+| `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
@@ -176,13 +176,17 @@ Both modes follow containing-model visibility and sort by model identifier, then
 case-sensitive metric name. An empty result is `[]`; failures propagate as tool
 errors. These tools discover definitions and do not execute metric queries.
 
-`list_semantic_model_datasets` discovers datasets directly associated with a table or
-View using one REST request. Pass `source_type` (`table` or `view`), the source's
-`catalog_name`, `schema_name`, and `source_name`, and optionally `metalake`:
+`list_semantic_model_datasets` discovers datasets directly associated with a
+table or view using one REST request. Pass `source_type` (`table` or `view`),
+the source's `catalog_name`, `schema_name`, and `source_name`, and optionally `metalake`:
 
 ```json
 {"metalake": "prod", "source_type": "table", "catalog_name": "sales", "schema_name": "raw", "source_name": "orders"}
 ```
+
+Source `catalog_name`, `schema_name`, and `source_name` must not contain literal
+dots: the REST source lookup route uses `catalog.schema.name` without component
+escaping. The tool rejects these inputs before sending a request.
 
 The result is a JSON array of identifiers with `namespace`
 `[metalake, catalog, schema, semanticModel]` and the exact dataset `name`. Results

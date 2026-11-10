@@ -275,6 +275,23 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                         )
         self.assertEqual([], self.requests)
 
+    async def test_source_lookup_rejects_dots_in_source_components(self):
+        for source_type in ("table", "view"):
+            for argument in ("catalog_name", "schema_name", "source_name"):
+                with self.subTest(source_type=source_type, argument=argument):
+                    with self.assertRaisesRegex(
+                        ToolError, "Source lookup does not support dots"
+                    ):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {
+                                **_SOURCE_ARGS,
+                                "source_type": source_type,
+                                argument: "name.with.dot",
+                            },
+                        )
+        self.assertEqual([], self.requests)
+
     async def test_source_lookup_propagates_rest_failures(self):
         for source_type in ("table", "view"):
             for status, code, error_type in (

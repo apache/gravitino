@@ -156,6 +156,10 @@ def load_semantic_model_tools(mcp: FastMCP):
         schemas in the selected metalake and include only models the caller can
         load. Preserves the server's component-wise, case-sensitive UTF-16 order.
 
+        Source catalog, schema, and table/view names must not contain literal
+        dots. The REST source lookup route uses catalog.schema.name without
+        component escaping; these inputs are rejected before sending a request.
+
         Associations reflect the latest definition write, not model execution
         validity or transitive dependencies. An empty result does not establish
         that changing or deleting the source is safe.
@@ -165,7 +169,7 @@ def load_semantic_model_tools(mcp: FastMCP):
             source_type: The source kind, either table or view.
             catalog_name: Name of the source catalog.
             schema_name: Name of the source schema.
-            source_name: Name of the source table or View.
+            source_name: Name of the source table or view.
 
         Returns:
             A JSON array of identifiers with namespace
