@@ -366,9 +366,10 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
+    // Index names are case-insensitive in MySQL.
     boolean indexExists =
         Arrays.stream(lazyLoadTable.index())
-            .anyMatch(index -> index.name().equals(deleteIndex.getName()));
+            .anyMatch(index -> index.name().equalsIgnoreCase(deleteIndex.getName()));
     if (!indexExists) {
       // A missing index is a no-op when ifExists is set; return empty SQL to skip it.
       Preconditions.checkArgument(deleteIndex.isIfExists(), "Index does not exist");

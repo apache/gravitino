@@ -1411,6 +1411,14 @@ public class TestMysqlTableOperations extends TestMysql {
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex3);
     Assertions.assertEquals("DROP INDEX `uk_2`", sql);
+
+    // Index names are matched case-insensitively.
+    TableChange.DeleteIndex deleteIndex4 = new TableChange.DeleteIndex("UK_2", true);
+    sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex4);
+    Assertions.assertEquals("DROP INDEX `UK_2`", sql);
+    TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, deleteIndex4);
+    Assertions.assertEquals(
+        0, TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName).index().length);
   }
 
   @Test
