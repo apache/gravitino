@@ -28,6 +28,8 @@ import java.util.function.Supplier;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
@@ -35,10 +37,12 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata.RequestType;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.BadRequestException;
+import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.rest.RESTUtil;
 
 /** Shared helper for Iceberg load table/view authorization handlers. */
@@ -84,10 +88,25 @@ final class IcebergLoadAuthzHandlerHelper {
     return new LoadContext(catalogId.namespace().level(0), catalogId.name(), schemaId.name());
   }
 
-  static IcebergCatalogWrapper getCatalogWrapper(String catalog) {
-    return IcebergRESTServerContext.getInstance()
-        .catalogWrapperManager()
-        .getCatalogWrapper(catalog);
+  static IcebergCatalogWrapper getCatalogWrapper(
+      String catalog, Map<EntityType, NameIdentifier> nameIdentifierMap) {
+    try {
+      return IcebergRESTServerContext.getInstance()
+          .catalogWrapperManager()
+          .getCatalogWrapper(catalog);
+    } catch (NoSuchCatalogException | IllegalArgumentException e) {
+      // A load handler resolves the backend before evaluating table/view privileges. Do not
+      // disclose catalog existence or its provider to a caller who cannot see the catalog.
+      if (!isAllowed(
+          nameIdentifierMap,
+          AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION)) {
+        throw new ForbiddenException("Not authorized to access catalog '%s'", catalog);
+      }
+      if (e instanceof NoSuchCatalogException) {
+        throw new NoSuchNamespaceException(e, "No Iceberg configuration for catalog '%s'", catalog);
+      }
+      throw new BadRequestException(e, "%s", e.getMessage());
+    }
   }
 
   static String resolveExpression(

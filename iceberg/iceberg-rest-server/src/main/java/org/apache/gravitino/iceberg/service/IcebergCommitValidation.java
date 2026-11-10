@@ -358,10 +358,10 @@ public final class IcebergCommitValidation implements UpdateRequirement {
 
   /**
    * An added schema must keep the data already written readable: a field id that exists in the
-   * current schema keeps its kind and may only change type by an allowed promotion, a field id not
-   * in the current schema must be new (above last-column-id) or identical to the field that had the
-   * id before, and a new required field needs a default. A replace (which removes main) starts from
-   * no data, so only the id rule applies to it.
+   * current schema keeps its kind, may only change type by an allowed promotion and cannot go from
+   * optional to required, a field id not in the current schema must be new (above last-column-id)
+   * or identical to the field that had the id before, and a new required field needs a default. A
+   * replace (which removes main) starts from no data, so only the id rule applies to it.
    */
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
@@ -386,6 +386,7 @@ public final class IcebergCommitValidation implements UpdateRequirement {
           checkNewField(base, field, hasData && !replacesTable);
         } else if (hasData && !replacesTable) {
           checkTypeChange(existing, field, updated.formatVersion());
+          checkNullabilityChange(existing, field);
         }
       }
     }
@@ -451,6 +452,17 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     } else if (from.typeId() != to.typeId()) {
       throw new ValidationException(
           "Invalid schema: field %s cannot change from %s to %s", field.name(), from, to);
+    }
+  }
+
+  /**
+   * An optional field cannot become required once data exists: files already written may hold nulls
+   * for it, or lack it entirely, and readers then fail on them.
+   */
+  private static void checkNullabilityChange(Types.NestedField existing, Types.NestedField field) {
+    if (existing.isOptional() && field.isRequired()) {
+      throw new ValidationException(
+          "Invalid schema: field %s cannot change from optional to required", field.name());
     }
   }
 

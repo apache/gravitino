@@ -155,6 +155,55 @@ class TestIcebergTableValidation {
             .toArray(String[]::new));
   }
 
+  @Test
+  void testMultipleSingleFieldBucketTransformsArePreserved() {
+    create(
+        "multiple_buckets",
+        new Column[] {
+          Column.of("a", Types.IntegerType.get()), Column.of("b", Types.StringType.get())
+        },
+        Transforms.bucket(16, new String[] {"a"}),
+        Transforms.bucket(8, new String[] {"b"}));
+    Transform[] partitioning = operations.loadTable(table("multiple_buckets")).partitioning();
+    assertEquals(2, partitioning.length);
+    assertEquals(Transforms.bucket(16, new String[] {"a"}), partitioning[0]);
+    assertEquals(Transforms.bucket(8, new String[] {"b"}), partitioning[1]);
+  }
+
+  @ParameterizedTest
+  @MethodSource("versionThreeTypes")
+  void testVersionThreeTypeWithVersionTwoIsBadRequest(Type type) {
+    Exception failure =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> create("unsupported_type", new Column[] {Column.of("value", type)}));
+    assertEquals(400, tableError(OperationType.CREATE, failure));
+    assertFalse(operations.tableExists(table("unsupported_type")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("versionThreeTypes")
+  void testVersionThreeTypeRoundTrip(Type type) {
+    operations.createTable(
+        table("version_three"),
+        new Column[] {Column.of("value", type)},
+        "",
+        Map.of("format-version", "3"),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+    assertEquals(type, operations.loadTable(table("version_three")).columns()[0].dataType());
+  }
+
+  private static Stream<Type> versionThreeTypes() {
+    return Stream.of(
+        Types.NullType.get(),
+        Types.VariantType.get(),
+        Types.GeometryType.of("OGC:CRS84"),
+        Types.GeographyType.of("OGC:CRS84", "spherical"));
+  }
+
   private static Stream<Arguments> incompatiblePartitionTransforms() {
     return Stream.of(
         Arguments.of(Types.StringType.get(), Transforms.year("value")),

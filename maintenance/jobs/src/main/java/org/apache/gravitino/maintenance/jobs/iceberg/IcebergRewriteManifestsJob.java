@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -28,8 +30,14 @@ import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.iceberg.ManifestFile;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for rewriting Iceberg table manifest files.
@@ -37,11 +45,13 @@ import org.apache.spark.sql.SparkSession;
  * <p>This job leverages Iceberg's RewriteManifestsProcedure to consolidate small manifest files and
  * cluster manifest entries within an existing partition spec to improve scan planning.
  */
-public class IcebergRewriteManifestsJob implements BuiltInJob {
+public class IcebergRewriteManifestsJob implements BuiltInJob, IcebergMaintenanceAction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRewriteManifestsJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-manifests";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v1";
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -104,7 +114,30 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
 
   static int run(String[] args) {
     try {
-      execute(args);
+      Map<String, String> argMap = parseArguments(args);
+      Map<String, String> configs =
+          IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
+      SparkSession.Builder builder =
+          SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
+      configs.forEach(builder::config);
+
+      try (SparkSession spark = builder.getOrCreate()) {
+        IcebergJobUtils.requireIcebergSparkRuntime();
+        List<Row> results =
+            execute(
+                spark,
+                argMap.get("catalog"),
+                argMap.get("table"),
+                argMap.get("use-caching"),
+                argMap.get("spec-id"));
+        if (!results.isEmpty()) {
+          Row result = results.get(0);
+          System.out.printf(
+              "Rewrite Manifests Results: Rewritten manifests: %d, Added manifests: %d%n",
+              ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
+        }
+        System.out.println("Rewrite manifests job completed successfully");
+      }
       return 0;
     } catch (Exception e) {
       System.err.println("Error rewriting manifests: " + e.getMessage());
@@ -202,31 +235,69 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
     }
   }
 
-  private static void execute(String[] args) {
-    Map<String, String> argMap = parseArguments(args);
-    String sql =
-        buildProcedureCall(
-            argMap.get("catalog"),
-            argMap.get("table"),
-            argMap.get("use-caching"),
-            argMap.get("spec-id"));
-    Map<String, String> configs = IcebergJobUtils.parseCustomSparkConfigs(argMap.get("spark-conf"));
-    SparkSession.Builder builder =
-        SparkSession.builder().appName("Gravitino Built-in Iceberg Rewrite Manifests");
-    configs.forEach(builder::config);
+  /**
+   * Runs {@code rewrite_manifests} on an existing Spark session. Shared by CLI and TMS {@link
+   * IcebergMaintenanceJob}.
+   *
+   * @return procedure result rows
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String useCaching,
+      @Nullable String specId) {
+    validateUseCaching(useCaching);
+    validateSpecId(specId);
+    String sql = buildProcedureCall(catalogName, tableIdentifier, useCaching, specId);
+    LOG.info("Executing Iceberg rewrite_manifests: {}", sql);
+    return spark.sql(sql).collectAsList();
+  }
 
-    try (SparkSession spark = builder.getOrCreate()) {
-      IcebergJobUtils.requireIcebergSparkRuntime();
-      System.out.println("Executing Iceberg rewrite_manifests procedure: " + sql);
-      List<Row> results = spark.sql(sql).collectAsList();
-      if (!results.isEmpty()) {
-        Row result = results.get(0);
-        System.out.printf(
-            "Rewrite Manifests Results: Rewritten manifests: %d, Added manifests: %d%n",
-            ((Number) result.get(0)).longValue(), ((Number) result.get(1)).longValue());
-      }
-      System.out.println("Rewrite manifests job completed successfully");
+  @Override
+  public boolean hasBeforeMetrics() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload = collectManifestBeforeMetrics(spark, catalogName, tableIdentifier);
+    return TableSnapshotMetrics.of(snapshotId, payload);
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before) {
+    List<Row> results =
+        execute(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("use-caching")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("spec-id")));
+    long rewritten = 0L;
+    if (!results.isEmpty()) {
+      Row result = results.get(0);
+      rewritten = ((Number) result.get(0)).longValue();
+      LOG.info(
+          "Rewrite manifests results: rewritten={}, added={}",
+          rewritten,
+          ((Number) result.get(1)).longValue());
     }
+    return TableSnapshotMetrics.of(
+        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier),
+        manifestAfterMetrics(rewritten));
   }
 
   private static void printUsage() {
@@ -262,5 +333,45 @@ public class IcebergRewriteManifestsJob implements BuiltInJob {
    */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main})
+  // -------------------------------------------------------------------------
+
+  /**
+   * Collects manifest inventory for TMS S0. Reads the current snapshot's manifests via Iceberg API.
+   * CLI entry points never call this.
+   */
+  @VisibleForTesting
+  static Map<String, Object> collectManifestBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Table table = IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier);
+    Snapshot snapshot = table.currentSnapshot();
+    long count = 0L;
+    long totalSize = 0L;
+    if (snapshot != null) {
+      for (ManifestFile manifest : snapshot.allManifests(table.io())) {
+        count++;
+        totalSize += manifest.length();
+      }
+    }
+    return manifestBeforeMetrics(count, count == 0L ? 0D : (double) totalSize / count);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestBeforeMetrics(long manifestNumber, double avgManifestSize) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC, manifestNumber);
+    metrics.put(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC, avgManifestSize);
+    return metrics;
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> manifestAfterMetrics(long rewrittenManifestNumber) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(
+        IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC, rewrittenManifestNumber);
+    return metrics;
   }
 }

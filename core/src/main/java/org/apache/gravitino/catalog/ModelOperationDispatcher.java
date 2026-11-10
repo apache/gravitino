@@ -56,6 +56,25 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
     super(catalogManager, store, idGenerator, secretManager);
   }
 
+  /**
+   * Checks whether a model exists, treating catalogs without model operations as empty.
+   *
+   * <p>Metadata-object validation uses this probe to report a missing model as a client error.
+   * Model operations such as {@link #getModel(NameIdentifier)} still reject unsupported catalogs.
+   *
+   * @param ident the model identifier
+   * @return whether the model exists
+   */
+  @Override
+  public boolean modelExists(NameIdentifier ident) {
+    boolean supportsModels =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof ModelCatalog),
+            RuntimeException.class);
+    return supportsModels && ModelDispatcher.super.modelExists(ident);
+  }
+
   @Override
   public NameIdentifier[] listModels(Namespace namespace) throws NoSuchSchemaException {
     return doWithCatalog(

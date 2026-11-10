@@ -38,25 +38,24 @@ public class JdbcExceptionConverter {
    * @return The best attempt at a corresponding connector exception or generic with the
    *     SQLException as the cause
    */
-  @SuppressWarnings("FormatStringAnnotation")
   public GravitinoRuntimeException toGravitinoException(final SQLException sqlException) {
     switch (sqlException.getErrorCode()) {
       case 1007:
-        return new SchemaAlreadyExistsException(sqlException, sqlException.getMessage());
+        return new SchemaAlreadyExistsException(sqlException, "%s", sqlException.getMessage());
       case 1050:
-        return new TableAlreadyExistsException(sqlException, sqlException.getMessage());
+        return new TableAlreadyExistsException(sqlException, "%s", sqlException.getMessage());
       case 1008:
       case 1049:
-        return new NoSuchSchemaException(sqlException, sqlException.getMessage());
+        return new NoSuchSchemaException(sqlException, "%s", sqlException.getMessage());
       case 1146:
       case 1051:
-        return new NoSuchTableException(sqlException, sqlException.getMessage());
+        return new NoSuchTableException(sqlException, "%s", sqlException.getMessage());
       default:
         if (sqlException.getMessage() != null
             && sqlException.getMessage().contains("Access denied")) {
-          return new ConnectionFailedException(sqlException, sqlException.getMessage());
+          return new ConnectionFailedException(sqlException, "%s", sqlException.getMessage());
         }
-        return new GravitinoRuntimeException(sqlException, sqlException.getMessage());
+        return new GravitinoRuntimeException(sqlException, "%s", sqlException.getMessage());
     }
   }
 }
