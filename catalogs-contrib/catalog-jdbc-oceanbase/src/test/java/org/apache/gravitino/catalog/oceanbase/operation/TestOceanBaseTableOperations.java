@@ -1195,11 +1195,22 @@ public class TestOceanBaseTableOperations extends TestOceanBase {
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
 
-    // If ifExists is set to true then the code should not throw an exception if the index doesn't
-    // exist.
+    // If ifExists is set to true and the index doesn't exist, no SQL should be generated.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
     sql = OceanBaseTableOperations.deleteIndexDefinition(load, deleteIndex);
-    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+    Assertions.assertEquals("", sql);
+    Assertions.assertDoesNotThrow(
+        () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME, tableName, deleteIndex));
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME,
+                tableName,
+                deleteIndex,
+                TableChange.updateComment("updated comment")));
+    JdbcTable altered = TABLE_OPERATIONS.load(TEST_DB_NAME, tableName);
+    Assertions.assertEquals("updated comment", altered.comment());
+    Assertions.assertEquals(1, altered.index().length);
 
     // The index existence check should only verify existence when ifExists is false, preventing
     // failures when dropping non-existent indexes.

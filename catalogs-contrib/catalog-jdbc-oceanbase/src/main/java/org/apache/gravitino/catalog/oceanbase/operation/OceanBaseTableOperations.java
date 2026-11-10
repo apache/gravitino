@@ -292,7 +292,11 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change));
+        String deleteIndexSql =
+            deleteIndexDefinition(lazyLoadTable, (TableChange.DeleteIndex) change);
+        if (StringUtils.isNotEmpty(deleteIndexSql)) {
+          alterSql.add(deleteIndexSql);
+        }
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
@@ -362,11 +366,13 @@ public class OceanBaseTableOperations extends JdbcTableOperations {
   @VisibleForTesting
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (!deleteIndex.isIfExists()) {
-      Preconditions.checkArgument(
-          Arrays.stream(lazyLoadTable.index())
-              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
-          "Index does not exist");
+    boolean indexExists =
+        Arrays.stream(lazyLoadTable.index())
+            .anyMatch(index -> index.name().equals(deleteIndex.getName()));
+    if (!indexExists) {
+      // A missing index is a no-op when ifExists is set; return empty SQL to skip it.
+      Preconditions.checkArgument(deleteIndex.isIfExists(), "Index does not exist");
+      return "";
     }
     return "DROP INDEX " + BACK_QUOTE + deleteIndex.getName() + BACK_QUOTE;
   }
