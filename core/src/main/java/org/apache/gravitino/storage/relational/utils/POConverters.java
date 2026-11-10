@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -1225,7 +1226,8 @@ public class POConverters {
                 .withUserId(userEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(userEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1327,7 +1329,8 @@ public class POConverters {
                 .withGroupId(groupEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(groupEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1533,12 +1536,34 @@ public class POConverters {
 
   public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
       Long tagId, Long metadataObjectId, String metadataObjectType, String tagValue) {
+    return initializeTagMetadataObjectRelPOWithVersion(
+        tagId, metadataObjectId, metadataObjectType, tagValue, null);
+  }
+
+  /**
+   * Builds a tag assignment with explicit creation audit metadata.
+   *
+   * @param tagId The tag ID.
+   * @param metadataObjectId The object ID.
+   * @param metadataObjectType The object type.
+   * @param tagValue The optional assignment value.
+   * @param audit The audit to preserve, or null to use the current principal and time.
+   * @return The initialized relation row.
+   */
+  public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
+      Long tagId,
+      Long metadataObjectId,
+      String metadataObjectType,
+      String tagValue,
+      @Nullable Audit audit) {
     try {
-      AuditInfo auditInfo =
-          AuditInfo.builder()
-              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-              .withCreateTime(Instant.now())
-              .build();
+      Audit auditInfo =
+          audit == null
+              ? AuditInfo.builder()
+                  .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                  .withCreateTime(Instant.now())
+                  .build()
+              : audit;
 
       return TagMetadataObjectRelPO.builder()
           .withTagId(tagId)
@@ -1918,6 +1943,21 @@ public class POConverters {
         .withOccVersion(occVersion)
         .withDeletedAt(DEFAULT_DELETED_AT)
         .withPolicyVersionPO(newPolicyVersionPO)
+        .build();
+  }
+
+  private static AuditInfo roleAssignmentAudit(AuditInfo principalAudit) {
+    // New relations are created by the principal mutation, rather than its original creation.
+    // Initial assignments on principal creation have no modification audit yet.
+    return AuditInfo.builder()
+        .withCreator(
+            principalAudit.lastModifier() != null
+                ? principalAudit.lastModifier()
+                : principalAudit.creator())
+        .withCreateTime(
+            principalAudit.lastModifiedTime() != null
+                ? principalAudit.lastModifiedTime()
+                : principalAudit.createTime())
         .build();
   }
 

@@ -28,11 +28,15 @@ import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.HttpMethod;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -119,6 +123,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
      *     standard expression-based authorization
      */
     boolean authorizationCompleted();
+
+    /**
+     * Entity type used to attribute denials and audit events for this handler. Called before {@link
+     * #process}.
+     *
+     * @return the access entity type this handler authorizes against
+     */
+    Entity.EntityType entityType();
   }
 
   /** Invokes the protocol operation after authorization succeeds. */
@@ -167,11 +179,16 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    * @param method REST method being invoked
    * @param parameters Method parameters
    * @param args Method arguments
+   * @param nameIdentifierMap identifiers resolved for this request; handlers may add to it before
+   *     {@link AuthorizationHandler#process} for denial attribution
    * @return Optional handler for custom authorization processing, or empty if standard
    *     authorization is sufficient
    */
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
-      Method method, Parameter[] parameters, Object[] args) {
+      Method method,
+      Parameter[] parameters,
+      Object[] args,
+      Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     return Optional.empty();
   }
 
@@ -184,6 +201,16 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
    */
   protected boolean isExceptionPropagate(Exception exception) {
     return false;
+  }
+
+  /**
+   * Identifies authorization denials, including a protocol's own forbidden exception.
+   *
+   * @param exception exception raised while authorizing the request
+   * @return whether the exception represents a denied request
+   */
+  protected boolean isAuthorizationDenial(Exception exception) {
+    return exception instanceof ForbiddenException;
   }
 
   /**
@@ -208,6 +235,17 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   protected boolean shouldSkipAuthorization(
       Method method, Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     return shouldSkipAuthorization(nameIdentifierMap);
+  }
+
+  /**
+   * Returns the server to which authorization denials are attributed in the audit log. A protocol
+   * that returns a source here records each denied request as an {@link
+   * AuthorizationDenialFailureEvent}, the same as the Gravitino API does.
+   *
+   * @return the event source of this protocol, or empty to record no denial events
+   */
+  protected Optional<EventSource> authorizationDenialEventSource() {
+    return Optional.empty();
   }
 
   /**
@@ -245,18 +283,23 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   private Object authorizeMethodInScope(
       Method method, Object[] args, MethodInvoker methodInvoker, AuthorizationRequestScope scope)
       throws Throwable {
+    // The object and expression a denial is recorded against, set as authorization proceeds.
+    NameIdentifier deniedObject = null;
+    String deniedExpression = "";
     try {
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
       if (expressionAnnotation != null) {
         String expression = expressionAnnotation.expression();
+        deniedExpression = expression;
         AuthorizationTarget target =
             resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
         boolean skipStandardCheck = shouldSkipAuthorization(method, nameIdentifierMap);
 
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
+        deniedObject = metalakeIdent;
         AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
 
         if (!skipStandardCheck && metalakeIdent != null) {
@@ -309,7 +352,10 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         }
 
         Optional<AuthorizationHandler> handler =
-            createAuthorizationHandler(method, parameters, args);
+            createAuthorizationHandler(method, parameters, args, nameIdentifierMap);
+        Entity.EntityType entityType =
+            handler.isPresent() ? handler.get().entityType() : target.entityType();
+        deniedObject = nameIdentifierMap.get(entityType);
 
         if (!skipStandardCheck && handler.isPresent()) {
           AuthorizationHandler authzHandler = handler.get();
@@ -351,7 +397,10 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         }
       }
     } catch (Exception ex) {
-      if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {
+      if (isAuthorizationDenial(ex)) {
+        dispatchAuthorizationDenial(deniedObject, method.getName(), deniedExpression);
+      }
+      if (isAuthorizationDenial(ex) || isExceptionPropagate(ex)) {
         return toErrorResponse(method, args, ex);
       }
       String currentUser = PrincipalUtils.getCurrentUserName();
@@ -368,6 +417,30 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
       return methodInvoker.proceed();
     } catch (Throwable e) {
       return toErrorResponse(method, args, e);
+    }
+  }
+
+  private void dispatchAuthorizationDenial(
+      NameIdentifier deniedObject, String methodName, String expression) {
+    Optional<EventSource> eventSource = authorizationDenialEventSource();
+    if (!eventSource.isPresent()) {
+      return;
+    }
+    String user = PrincipalUtils.getCurrentUserName();
+    // Recording the denial must never change the response the client gets.
+    try {
+      EventBus eventBus = GravitinoEnv.getInstance().eventBus();
+      if (eventBus != null) {
+        eventBus.dispatchEvent(
+            new AuthorizationDenialFailureEvent(
+                user, deniedObject, methodName, expression, eventSource.get()));
+      }
+    } catch (Exception e) {
+      LOG.error(
+          "Failed to dispatch authorization denial event for user {} on operation {}",
+          user,
+          methodName,
+          e);
     }
   }
 }

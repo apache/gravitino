@@ -64,7 +64,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import software.amazon.awssdk.services.glue.GlueClient;
+import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
+import software.amazon.awssdk.services.glue.model.DatabaseInput;
+import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
+import software.amazon.awssdk.services.glue.model.GetPartitionRequest;
 import software.amazon.awssdk.services.glue.model.GetTableRequest;
 import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 import software.amazon.awssdk.services.glue.model.TableInput;
@@ -191,6 +195,29 @@ abstract class AbstractGlueCatalogIT {
     return rawGlueClient;
   }
 
+  /**
+   * Creates the Glue entry of an Iceberg table directly through the Glue API, as another engine
+   * would. Its metadata file does not exist, so the table can be listed and dropped but not loaded.
+   */
+  private void createExternalIcebergTable(String schema, String name) {
+    glueClient()
+        .createTable(
+            CreateTableRequest.builder()
+                .databaseName(schema)
+                .tableInput(
+                    TableInput.builder()
+                        .name(name)
+                        .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
+                        .parameters(
+                            Map.of(
+                                GlueConstants.TABLE_TYPE_PARAM,
+                                GlueConstants.ICEBERG_TABLE_TYPE_VALUE,
+                                GlueConstants.METADATA_LOCATION,
+                                "s3://bucket/path/metadata/v1.metadata.json"))
+                        .build())
+                .build());
+  }
+
   /** Creates a Presto/Athena style view directly through the Glue API. */
   private void createGlueView(String schema, String name) {
     glueClient()
@@ -287,6 +314,52 @@ abstract class AbstractGlueCatalogIT {
     boolean dropped = ops.dropSchema(schemaIdent(schema), false);
     assertTrue(dropped);
     currentSchema = null;
+  }
+
+  @Test
+  void testDropMissingSchemaWithoutCascadeReturnsFalse() {
+    assertFalse(ops.dropSchema(schemaIdent("glue_it_missing_" + System.nanoTime()), false));
+  }
+
+  @Test
+  void testFormatFilterHidesExcludedTables() throws Exception {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    createHiveTable(schema, "hive_tbl");
+
+    Map<String, String> filteredConfig = new HashMap<>(catalogConfig());
+    filteredConfig.put(GlueConstants.TABLE_FORMAT_FILTER, "iceberg");
+    GlueCatalogOperations filteredOps = new GlueCatalogOperations();
+    try {
+      filteredOps.initialize(filteredConfig, null, null);
+      NameIdentifier ident = tableIdent(schema, "hive_tbl");
+
+      assertEquals(0, filteredOps.listTables(tableNs(schema)).length);
+      assertThrows(NoSuchTableException.class, () -> filteredOps.loadTable(ident));
+      assertThrows(
+          NoSuchTableException.class,
+          () -> filteredOps.alterTable(ident, TableChange.setProperty("k", "v")));
+      assertFalse(filteredOps.dropTable(ident));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              filteredOps.createTable(
+                  tableIdent(schema, "hidden_tbl"),
+                  hiveColumns(),
+                  null,
+                  hiveTableProps(),
+                  new Transform[0],
+                  Distributions.NONE,
+                  new SortOrder[0],
+                  new Index[0]));
+    } finally {
+      filteredOps.close();
+    }
+
+    // The table is untouched and still visible through the unfiltered catalog.
+    Table table = ops.loadTable(tableIdent(schema, "hive_tbl"));
+    assertFalse(table.properties().containsKey("k"));
+    assertThrows(NoSuchTableException.class, () -> ops.loadTable(tableIdent(schema, "hidden_tbl")));
   }
 
   @Test
@@ -424,34 +497,127 @@ abstract class AbstractGlueCatalogIT {
   // -------------------------------------------------------------------------
 
   @Test
-  void testCreateIcebergTable() {
+  void testRegisterIcebergTableWithBlankMetadataLocationIsRefused() {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
 
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_tbl"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-
-    Table loaded = ops.loadTable(tableIdent(schema, "iceberg_tbl"));
-    assertEquals("ICEBERG", loaded.properties().get(GlueConstants.TABLE_FORMAT));
-    assertEquals(
-        "s3://bucket/path/metadata/v1.metadata.json",
-        loaded.properties().get(GlueConstants.METADATA_LOCATION));
-    assertEquals(0, loaded.columns().length);
+    props.put(GlueConstants.METADATA_LOCATION, "   ");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                tableIdent(schema, "iceberg_tbl"),
+                new Column[0],
+                null,
+                props,
+                new Transform[0],
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]));
+    assertThrows(
+        NoSuchTableException.class, () -> ops.loadTable(tableIdent(schema, "iceberg_tbl")));
   }
 
   // -------------------------------------------------------------------------
   // Partition tests
   // -------------------------------------------------------------------------
+
+  @Test
+  void testAlterNativeTableKeepsFieldsGravitinoDoesNotModel() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    glueClient()
+        .createTable(
+            CreateTableRequest.builder()
+                .databaseName(schema)
+                .tableInput(
+                    TableInput.builder()
+                        .name("native_tbl")
+                        .owner("crawler")
+                        .tableType("EXTERNAL_TABLE")
+                        .parameters(Map.of("classification", "csv"))
+                        .storageDescriptor(
+                            StorageDescriptor.builder()
+                                .columns(
+                                    software.amazon.awssdk.services.glue.model.Column.builder()
+                                        .name("s")
+                                        .type("struct<Outer:int>")
+                                        .parameters(Map.of("stat", "1"))
+                                        .build())
+                                .location("s3://gravitino-test-bucket/" + schema + "/native_tbl")
+                                .parameters(Map.of("recordCount", "10"))
+                                .build())
+                        .build())
+                .build());
+
+    ops.alterTable(tableIdent(schema, "native_tbl"), TableChange.updateComment("altered"));
+
+    software.amazon.awssdk.services.glue.model.Table stored =
+        glueClient()
+            .getTable(GetTableRequest.builder().databaseName(schema).name("native_tbl").build())
+            .table();
+    assertEquals("altered", stored.description());
+    assertEquals("crawler", stored.owner());
+    assertEquals("csv", stored.parameters().get("classification"));
+    assertEquals("10", stored.storageDescriptor().parameters().get("recordCount"));
+    assertEquals("struct<Outer:int>", stored.storageDescriptor().columns().get(0).type());
+    assertEquals("1", stored.storageDescriptor().columns().get(0).parameters().get("stat"));
+  }
+
+  @Test
+  void testAlterSchemaKeepsNativeLocationUri() {
+    String schema = newSchema();
+    String location = "s3://gravitino-test-bucket/" + schema;
+    glueClient()
+        .createDatabase(
+            CreateDatabaseRequest.builder()
+                .databaseInput(DatabaseInput.builder().name(schema).locationUri(location).build())
+                .build());
+
+    ops.alterSchema(schemaIdent(schema), SchemaChange.setProperty("k", "v"));
+
+    assertEquals(
+        location,
+        glueClient()
+            .getDatabase(GetDatabaseRequest.builder().name(schema).build())
+            .database()
+            .locationUri());
+    assertEquals(
+        location, ops.loadSchema(schemaIdent(schema)).properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAddPartitionIsEscapedAndReadable() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    SupportsPartitions sp = createPartitionedTable(schema, "ptbl");
+
+    Partition added = sp.addPartition(identityPartition("2025/12/31"));
+
+    assertEquals("dt=2025%2F12%2F31", added.name());
+    assertTrue(Arrays.asList(sp.listPartitionNames()).contains("dt=2025%2F12%2F31"));
+    assertEquals("dt=2025%2F12%2F31", sp.getPartition("dt=2025%2F12%2F31").name());
+
+    software.amazon.awssdk.services.glue.model.Partition stored =
+        glueClient()
+            .getPartition(
+                GetPartitionRequest.builder()
+                    .databaseName(schema)
+                    .tableName("ptbl")
+                    .partitionValues("2025/12/31")
+                    .build())
+            .partition();
+    assertEquals(
+        "s3://gravitino-test-bucket/" + schema + "/ptbl/dt=2025%2F12%2F31",
+        stored.storageDescriptor().location());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS,
+        stored.storageDescriptor().serdeInfo().serializationLibrary());
+
+    assertTrue(sp.dropPartition("dt=2025%2F12%2F31"));
+  }
 
   @Test
   void testAddPartition() {
@@ -463,6 +629,16 @@ abstract class AbstractGlueCatalogIT {
 
     List<String> names = Arrays.asList(sp.listPartitionNames());
     assertTrue(names.contains("dt=2024-01-01"));
+  }
+
+  @Test
+  void testAddPartitionRejectsEmptyValue() {
+    String schema = newSchema();
+    ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
+    SupportsPartitions sp = createPartitionedTable(schema, "ptbl");
+
+    assertThrows(IllegalArgumentException.class, () -> sp.addPartition(identityPartition("")));
+    assertEquals(0, sp.listPartitionNames().length);
   }
 
   @Test
@@ -673,18 +849,7 @@ abstract class AbstractGlueCatalogIT {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
 
-    Map<String, String> props = new HashMap<>();
-    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_drop"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    createExternalIcebergTable(schema, "iceberg_drop");
 
     assertTrue(ops.dropTable(tableIdent(schema, "iceberg_drop")));
     assertFalse(ops.dropTable(tableIdent(schema, "iceberg_drop")));
@@ -697,18 +862,7 @@ abstract class AbstractGlueCatalogIT {
 
     createHiveTable(schema, "hive_mixed");
 
-    Map<String, String> icebergProps = new HashMap<>();
-    icebergProps.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    icebergProps.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_mixed"),
-        new Column[0],
-        null,
-        icebergProps,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    createExternalIcebergTable(schema, "iceberg_mixed");
 
     List<String> names =
         Arrays.stream(ops.listTables(tableNs(schema)))

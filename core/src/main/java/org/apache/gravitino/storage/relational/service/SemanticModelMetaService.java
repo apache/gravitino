@@ -24,15 +24,21 @@ import static org.apache.gravitino.storage.relational.po.SemanticModelPO.fromSem
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.initializeSemanticModelPO;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -40,9 +46,16 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.semantic.Metric;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSource;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
+import org.apache.gravitino.storage.relational.po.SemanticModelMetricPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -57,6 +70,8 @@ import org.slf4j.LoggerFactory;
 public class SemanticModelMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(SemanticModelMetaService.class);
+  private static final int METRIC_INSERT_BATCH_SIZE = 1000;
+  private static final int SOURCE_INSERT_BATCH_SIZE = 1000;
   private static final SemanticModelMetaService INSTANCE = new SemanticModelMetaService();
 
   private final BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops;
@@ -127,7 +142,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Inserts or overwrites a Semantic Model identity and its snapshot atomically.
+   * Inserts or overwrites a Semantic Model, its snapshot, metric identities, and supplied source
+   * associations atomically.
    *
    * @param semanticModelEntity The Semantic Model entity.
    * @param overwrite Whether to overwrite rows for the same stable ID or natural key.
@@ -173,6 +189,8 @@ public class SemanticModelMetaService {
                         }
                         persistedPO.set(replacementPO);
                       }),
+              () -> reconcileMetricIdentities(persistedPO.get(), semanticModelEntity.definition()),
+              () -> replaceSources(persistedPO.get(), semanticModelEntity),
               () ->
                   SessionUtils.doWithoutCommit(
                       SemanticModelVersionInfoMapper.class,
@@ -250,6 +268,16 @@ public class SemanticModelMetaService {
               throw semanticModelWriteFailure(identifier, oldSemanticModelPO);
             }
           },
+          () -> {
+            if (!Objects.equals(
+                    oldSemanticModelPO.getSemanticModelVersionInfoPO().metrics(),
+                    newSemanticModelPO.getSemanticModelVersionInfoPO().metrics())
+                && !metricNames(oldSemanticModelEntity.definition())
+                    .equals(metricNames(newEntity.definition()))) {
+              reconcileMetricIdentities(newSemanticModelPO, newEntity.definition());
+            }
+          },
+          () -> replaceSources(newSemanticModelPO, newEntity),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
@@ -273,7 +301,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Soft-deletes a Semantic Model identity and all of its version snapshots.
+   * Soft-deletes a Semantic Model, its metric identities, source associations, and version
+   * snapshots.
    *
    * @param identifier The Semantic Model identifier.
    * @return {@code true} when an active identity was deleted.
@@ -290,7 +319,8 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Permanently deletes soft-deleted Semantic Model identities and snapshots older than a timeline.
+   * Permanently deletes retired source associations, metric identities, and deleted models and
+   * snapshots older than a timeline.
    *
    * @param legacyTimeline The exclusive deletion timeline in epoch milliseconds.
    * @param limit The maximum rows to delete from each table.
@@ -300,6 +330,14 @@ public class SemanticModelMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSemanticModelMetasByLegacyTimeline")
   public int deleteSemanticModelMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int sourceDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            SemanticModelSourceMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
+    int metricDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            SemanticModelMetricMapper.class,
+            mapper -> mapper.deleteSemanticModelMetricsByLegacyTimeline(legacyTimeline, limit));
     int versionDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelVersionInfoMapper.class,
@@ -308,7 +346,7 @@ public class SemanticModelMetaService {
         SessionUtils.doWithCommitAndFetchResult(
             SemanticModelMetaMapper.class,
             mapper -> mapper.deleteSemanticModelMetasByLegacyTimeline(legacyTimeline, limit));
-    return versionDeletedCount + metaDeletedCount;
+    return sourceDeletedCount + metricDeletedCount + versionDeletedCount + metaDeletedCount;
   }
 
   /**
@@ -386,8 +424,98 @@ public class SemanticModelMetaService {
                 SemanticModelVersionInfoMapper.class,
                 mapper -> mapper.softDeleteSemanticModelVersionsBySemanticModelId(semanticModelId)),
         () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelMetricMapper.class,
+                mapper -> mapper.softDeleteSemanticModelMetricsBySemanticModelId(semanticModelId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SemanticModelSourceMapper.class,
+                mapper -> mapper.softDeleteByModelId(semanticModelId)),
+        () ->
             EntityChangeLogWriter.append(
                 semanticModelIdent, Entity.EntityType.SEMANTIC_MODEL, OperateType.DROP));
+  }
+
+  private void replaceSources(SemanticModelPO po, SemanticModelEntity entity) {
+    if (!entity.sourceUpdate().replacesSources()) {
+      return;
+    }
+    entity.sourceUpdate().validate(entity.definition());
+    SessionUtils.doWithoutCommit(
+        SemanticModelSourceMapper.class,
+        mapper -> {
+          mapper.softDeleteByModelId(po.getSemanticModelId());
+          List<SemanticModelSource> sources = entity.sourceUpdate().sources();
+          for (int start = 0; start < sources.size(); start += SOURCE_INSERT_BATCH_SIZE) {
+            mapper.insertSources(
+                po.getMetalakeId(),
+                po.getSemanticModelId(),
+                sources.subList(start, Math.min(start + SOURCE_INSERT_BATCH_SIZE, sources.size())));
+          }
+        });
+  }
+
+  private static void reconcileMetricIdentities(
+      SemanticModelPO model, SemanticModelDefinition definition) {
+    Set<String> names = metricNames(definition);
+
+    // The caller has already inserted or version-checked the model in this transaction. A locking
+    // read also observes the latest identities on backends using repeatable-read isolation.
+    SessionUtils.doWithoutCommit(
+        SemanticModelMetricMapper.class,
+        mapper -> {
+          Map<String, SemanticModelMetricPO> live =
+              mapper
+                  .selectSemanticModelMetricsByModelIdForUpdate(model.getSemanticModelId())
+                  .stream()
+                  .collect(
+                      Collectors.toMap(SemanticModelMetricPO::metricName, Function.identity()));
+          List<String> addedNames = new ArrayList<>();
+          for (String name : names) {
+            if (live.remove(name) == null) {
+              addedNames.add(name);
+            }
+          }
+          if (!addedNames.isEmpty()) {
+            IdGenerator generator = GravitinoEnv.getInstance().idGenerator();
+            Preconditions.checkState(
+                generator != null, "Metric identity ID generator is not initialized");
+            List<SemanticModelMetricPO> addedMetrics = new ArrayList<>(addedNames.size());
+            for (String name : addedNames) {
+              addedMetrics.add(
+                  SemanticModelMetricPO.builder()
+                      .withMetricId(generator.nextId())
+                      .withMetalakeId(model.getMetalakeId())
+                      .withCatalogId(model.getCatalogId())
+                      .withSchemaId(model.getSchemaId())
+                      .withSemanticModelId(model.getSemanticModelId())
+                      .withMetricName(name)
+                      .withDeletedAt(0L)
+                      .build());
+            }
+            Lists.partition(addedMetrics, METRIC_INSERT_BATCH_SIZE)
+                .forEach(mapper::insertSemanticModelMetrics);
+          }
+          if (!live.isEmpty()) {
+            mapper.softDeleteSemanticModelMetricsByIds(
+                model.getSemanticModelId(),
+                live.values().stream()
+                    .map(SemanticModelMetricPO::metricId)
+                    .collect(Collectors.toList()));
+          }
+        });
+  }
+
+  private static Set<String> metricNames(SemanticModelDefinition definition) {
+    Set<String> names = new LinkedHashSet<>();
+    Metric[] metrics = definition.metrics();
+    if (metrics != null) {
+      for (Metric metric : metrics) {
+        Preconditions.checkArgument(
+            names.add(metric.name()), "Duplicate metric name: %s", metric.name());
+      }
+    }
+    return names;
   }
 
   private SemanticModelPO updateSemanticModelPO(

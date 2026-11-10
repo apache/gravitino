@@ -30,7 +30,6 @@ import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
-import io.trino.spi.connector.ConnectorViewDefinition;
 import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.statistics.ComputedStatistics;
@@ -58,7 +57,7 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
       ConnectorTableHandle tableHandle,
       ColumnMetadata column,
       ColumnPosition position) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 
@@ -109,6 +108,16 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
   }
 
   @Override
+  public void finishTableExecute(
+      ConnectorSession session,
+      ConnectorTableExecuteHandle tableExecuteHandle,
+      Collection<Slice> fragments,
+      List<Object> tableExecuteState) {
+    internalMetadata.finishTableExecute(
+        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
+  }
+
+  @Override
   public void executeTableExecute(
       ConnectorSession session, ConnectorTableExecuteHandle tableExecuteHandle) {
     internalMetadata.executeTableExecute(session, GravitinoHandle.unWrap(tableExecuteHandle));
@@ -142,22 +151,5 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
         sourceTableHandles.stream().map(GravitinoHandle::unWrap).collect(Collectors.toList()),
         fragments,
         computedStatistics);
-  }
-
-  @Override
-  public void createView(
-      ConnectorSession session,
-      SchemaTableName viewName,
-      ConnectorViewDefinition definition,
-      Map<String, Object> viewProperties,
-      boolean replace) {
-    createViewInternal(viewName, definition, viewProperties, replace);
-  }
-
-  @Override
-  public boolean isView(ConnectorSession session, SchemaTableName viewName) {
-    return catalogConnectorMetadata
-        .getViewIfPresent(viewName.getSchemaName(), viewName.getTableName())
-        .isPresent();
   }
 }

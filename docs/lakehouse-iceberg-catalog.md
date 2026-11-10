@@ -87,6 +87,12 @@ The following properties tune REST backend behavior:
 | `data-access`                       | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       |
 | `rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       |
 | `rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       |
+| `rest-backend-auth-type`           | How the REST backend authenticates to the remote catalog: `user-token` forwards the calling user's token, `service-account` connects with `rest-backend-token` or `rest-backend-credential` and authorizes every request in Gravitino. | user-token    | No       |
+| `rest-backend-token`               | Static bearer token for a `service-account` connection. Hidden from catalog responses.                     | (none)        | No       |
+| `rest-backend-credential`          | OAuth2 client credential (`client_id:client_secret`) for a `service-account` connection. Hidden from catalog responses. | (none)        | No       |
+| `rest-backend-oauth2-server-uri`   | OAuth2 token endpoint for `rest-backend-credential`.                                                       | (none)        | No       |
+| `rest-backend-scope`               | OAuth2 scope requested with `rest-backend-credential`.                                                     | (none)        | No       |
+| `rest-backend-storage-credential-source`  | Who issues storage credentials through the Iceberg REST service: `remote` passes through the remote catalog's credentials, `local` issues them through this catalog's `credential-providers`. A `service-account` connection always uses `local`, regardless of this setting. | remote        | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -368,7 +374,19 @@ children: List[str] = catalog.as_schemas().list_schemas(parent_schema="a:b")
 
 ### Table Capabilities
 
-- Doesn't support column default value.
+- For format-version 3 tables, Iceberg column defaults in table metadata are
+  reported when the table is loaded:
+
+  | Iceberg field     | Column field           |
+  |-------------------|------------------------|
+  | `write-default`   | `defaultValue`         |
+  | `initial-default` | `initialDefaultValue`  |
+
+  Iceberg `timestamptz` defaults are exposed as a UTC `LocalDateTime` with
+  Gravitino type `timestamp_tz`. Clients should treat those `LocalDateTime`
+  fields as UTC when recovering the instant.
+
+- Setting column default values through the Gravitino API is not supported yet.
 
 ### Table Partitions
 

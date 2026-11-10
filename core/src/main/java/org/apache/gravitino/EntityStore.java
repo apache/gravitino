@@ -30,9 +30,38 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.utils.Executable;
 
 public interface EntityStore extends Closeable {
+
+  /**
+   * Reads metric identifiers in a schema without loading complete Semantic Models.
+   *
+   * @param namespace The full schema namespace.
+   * @return Metric identifiers from one consistent statement or read snapshot.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    throw new UnsupportedOperationException("Metric listing is not supported");
+  }
+
+  /**
+   * Reads complete metrics in a schema without loading unrelated definition fields.
+   *
+   * @param namespace The full schema namespace.
+   * @return Decoded metrics from one consistent statement or read snapshot, without authorization
+   *     filtering.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    throw new UnsupportedOperationException("Metric info listing is not supported");
+  }
 
   /**
    * Initialize the entity store.
@@ -114,6 +143,10 @@ public interface EntityStore extends Closeable {
    * Store the entity into the underlying storage. According to the {@code overwritten} flag, it
    * will overwrite the existing entity or throw an {@link EntityAlreadyExistsException}.
    *
+   * <p>Relational schema storage also rejects conflicting active identities when overwriting: a
+   * different ID at the same name, or an active ID owned by another catalog, requires explicit
+   * reconciliation. Overwrite does not authorize cascading deletion of the previous schema.
+   *
    * <p>Note. The implementation should be transactional, and should be able to handle concurrent
    * store of entities.
    *
@@ -122,7 +155,7 @@ public interface EntityStore extends Closeable {
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
-   *     set to false
+   *     set to false, or relational schema storage detects conflicting active identities
    */
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;

@@ -83,4 +83,10 @@
     <value>SERVICE_ACCOUNT_FILE</value>
   </property>
 
+  <!-- Resolve SerDe-derived storage schemas on Hive 3 HMS. Hive 2 ignores this setting. -->
+  <property>
+    <name>metastore.storage.schema.reader.impl</name>
+    <value>org.apache.hadoop.hive.metastore.SerDeStorageSchemaReader</value>
+  </property>
+
 </configuration>

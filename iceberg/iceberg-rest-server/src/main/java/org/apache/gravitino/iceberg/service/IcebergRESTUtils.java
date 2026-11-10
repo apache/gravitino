@@ -53,9 +53,11 @@ import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
@@ -115,6 +117,23 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
+
+  /**
+   * Checks that namespace levels can be represented in Gravitino metadata object names.
+   *
+   * @param namespace the decoded namespace to check
+   * @throws BadRequestException if a level contains the reserved qualified-name separator
+   */
+  public static void checkNamespaceLevels(Namespace namespace) {
+    for (String level : namespace.levels()) {
+      if (level.contains(".")) {
+        throw new BadRequestException(
+            "Invalid namespace %s: the level '%s' contains '.', which is reserved as the"
+                + " qualified-name separator",
+            namespace, level);
+      }
+    }
+  }
 
   /**
    * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
@@ -459,12 +478,44 @@ public class IcebergRESTUtils {
     includeErrorStackTrace = include;
   }
 
+  /**
+   * Checks that a request body was sent and passes the request's own validation, so a missing or
+   * incomplete body is answered with 400 instead of failing later with an internal error.
+   *
+   * @param request the deserialized request body, which is null when no body was sent
+   * @param requestType the request type named in the error message
+   * @throws BadRequestException if the body is missing or fails validation
+   */
+  public static void validateRequest(Object request, String requestType) {
+    if (request == null) {
+      throw new BadRequestException("Invalid request: a %s body is required", requestType);
+    }
+    if (request instanceof RESTRequest) {
+      try {
+        ((RESTRequest) request).validate();
+      } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+        throw new BadRequestException(
+            "Invalid %s: %s",
+            requestType, e.getMessage() == null ? "a required field is missing" : e.getMessage());
+      }
+    }
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
+    String message = ex.getMessage();
+    if (message == null) {
+      message =
+          httpStatus >= Status.INTERNAL_SERVER_ERROR.getStatusCode()
+              ? "Internal server error"
+              : Status.fromStatusCode(httpStatus) == null
+                  ? "Request failed"
+                  : Status.fromStatusCode(httpStatus).getReasonPhrase();
+    }
     ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage());
+            .withMessage(message);
     if (includeErrorStackTrace) {
       builder.withStackTrace(ex);
     }
@@ -518,12 +569,33 @@ public class IcebergRESTUtils {
     return catalogName;
   }
 
+  /**
+   * Copies an Iceberg REST request or response through its JSON form, so event listeners get an
+   * object detached from the one the server works on.
+   *
+   * <p>Events are built after the operation has been applied, so a copy that fails must not turn a
+   * completed operation into an error. Some valid requests cannot be serialized again by Iceberg,
+   * for example a partition field sent without its optional {@code field-id}; for those the
+   * original object, which Iceberg does not modify, is returned instead.
+   *
+   * @param message the object to copy
+   * @param className the class of the copy
+   * @param <T> the type of the copy
+   * @return the copy, or the original object if it cannot be copied
+   */
   public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
     ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
     try {
       byte[] values = icebergObjectMapper.writeValueAsBytes(message);
       return icebergObjectMapper.readValue(values, className);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
+      if (className.isInstance(message)) {
+        LOG.warn(
+            "Cannot copy {} for an event, the event carries the original object: {}",
+            className.getSimpleName(),
+            e.getMessage());
+        return className.cast(message);
+      }
       throw new RuntimeException(e);
     }
   }

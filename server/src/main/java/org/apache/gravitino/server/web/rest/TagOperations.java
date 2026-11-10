@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -60,8 +61,11 @@ import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -117,6 +121,7 @@ public class TagOperations {
               } else {
                 tagDTOs =
                     Arrays.stream(tags)
+                        .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
                         .map(t -> DTOConverters.toDTO(t, Optional.empty()))
                         .toArray(TagDTO[]::new);
               }
@@ -133,6 +138,10 @@ public class TagOperations {
             } else {
               String[] tagNames = tagDispatcher.listTags(metalake);
               tagNames = tagNames == null ? new String[0] : tagNames;
+              tagNames =
+                  Arrays.stream(tagNames)
+                      .filter(name -> !HiddenPolicyTag.isReservedName(name))
+                      .toArray(String[]::new);
               tagNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
@@ -175,6 +184,7 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
+            validateTagName(metalake, request.getName());
             Tag tag =
                 tagDispatcher.createTag(
                     metalake,
@@ -209,6 +219,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, name);
             Tag tag = tagDispatcher.getTag(metalake, name);
             LOG.info("Get tag: {} under metalake: {}", name, metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
@@ -243,11 +254,16 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
-
+            checkVisibleTag(metalake, name);
             TagChange[] changes =
                 request.getUpdates().stream()
                     .map(TagUpdateRequest::tagChange)
                     .toArray(TagChange[]::new);
+            for (TagChange change : changes) {
+              if (change instanceof TagChange.RenameTag) {
+                validateTagName(metalake, ((TagChange.RenameTag) change).getNewName());
+              }
+            }
             Tag tag = tagDispatcher.alterTag(metalake, name, changes);
 
             LOG.info("Altered tag: {} under metalake: {}", name, metalake);
@@ -274,6 +290,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, name);
             boolean deleted = tagDispatcher.deleteTag(metalake, name);
             if (!deleted) {
               LOG.warn("Cannot find to be deleted tag {} under metalake {}", name, metalake);
@@ -311,6 +328,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, tagName);
             MetadataObject[] objects =
                 tagDispatcher.listMetadataObjectsForTag(metalake, tagName, value);
             objects = objects == null ? new MetadataObject[0] : objects;
@@ -349,6 +367,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, tagName);
             RelationalEntity<?>[] associations =
                 tagDispatcher.listPolicyAssociationsForTag(metalake, tagName);
             associations =
@@ -404,6 +423,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, tagName);
             PolicyTagAddRequest effectiveRequest =
                 request == null ? new PolicyTagAddRequest() : request;
             effectiveRequest.validate();
@@ -443,6 +463,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, tagName);
             tagDispatcher.removePolicyFromTag(metalake, tagName, policyName);
             return Response.noContent().build();
           });
@@ -536,5 +557,27 @@ public class TagOperations {
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
+  }
+
+  static void checkVisibleTag(String metalake, String name) {
+    if (HiddenPolicyTag.isReservedName(name)) {
+      throw new NoSuchTagException(
+          "Tag with name %s under metalake %s does not exist", name, metalake);
+    }
+  }
+
+  static void checkVisibleTag(String metalake, MetadataObject object) {
+    if (object.type() == MetadataObject.Type.TAG
+        && HiddenPolicyTag.isReservedName(object.fullName())) {
+      throw new NoSuchMetadataObjectException(
+          "Tag with name %s under metalake %s does not exist", object.fullName(), metalake);
+    }
+  }
+
+  private static void validateTagName(String metalake, String name) {
+    Preconditions.checkArgument(
+        !HiddenPolicyTag.isReservedName(name), "Tag name is reserved for internal policy bindings");
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
   }
 }

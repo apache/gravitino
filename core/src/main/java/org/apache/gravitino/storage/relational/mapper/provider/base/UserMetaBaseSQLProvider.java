@@ -392,4 +392,25 @@ public class UserMetaBaseSQLProvider {
 
     return "<script>" + userBranch + userRoleBranch + groupBranch + groupRoleBranch + "</script>";
   }
+  /**
+   * Returns a single-statement principal and membership snapshot.
+   *
+   * @param metalakeId the metalake ID
+   * @param userName the principal name
+   * @return the aggregate select SQL
+   */
+  public String selectUserWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
+    return "SELECT p.*, r.role_id AS role_roleId, r.role_name AS role_roleName,"
+        + " r.metalake_id AS role_metalakeId, r.properties AS role_properties,"
+        + " r.audit_info AS role_auditInfo, r.current_version AS role_currentVersion,"
+        + " r.last_version AS role_lastVersion, r.deleted_at AS role_deletedAt FROM ("
+        + selectUserMetaByMetalakeIdAndName(metalakeId, userName)
+        + ") p LEFT JOIN "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " rel"
+        + " ON rel.user_id = p.userId AND rel.deleted_at = 0 LEFT JOIN "
+        + ROLE_TABLE_NAME
+        + " r ON r.role_id = rel.role_id AND r.deleted_at = 0";
+  }
 }

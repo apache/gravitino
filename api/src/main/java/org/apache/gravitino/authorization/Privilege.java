@@ -162,14 +162,16 @@ public interface Privilege {
     VIEW_SECRET_PROVIDERS(0L, 1L << 36),
     /**
      * The privilege required to call {@code getSecrets}. Without {@link
-     * #INCLUDE_CREDENTIAL_SECRETS}, cloud access-key pairs are omitted from the result. Does not
-     * authorize {@code getCredentials}.
+     * #INCLUDE_CREDENTIAL_SECRETS}, cloud access-key pairs are omitted from the result. Both
+     * privileges are also required for catalog {@code getCredentials}, unless the caller owns the
+     * metalake.
      */
     USE_SECRETS(0L, 1L << 37),
     /**
      * When held together with {@link #USE_SECRETS}, includes cloud access-key pairs and other
      * credential secrets in the {@code getSecrets} result. Alone it does not authorize {@code
-     * getSecrets}. Does not authorize {@code getCredentials}.
+     * getSecrets}. Both privileges are also required for catalog {@code getCredentials}, unless the
+     * caller owns the metalake.
      */
     INCLUDE_CREDENTIAL_SECRETS(0L, 1L << 38),
     /** The privilege to create a semantic model. */
