@@ -93,6 +93,7 @@ public class MetadataObjectPolicyOperations {
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            TagOperations.checkVisibleTag(metalake, object);
 
             PolicyEntity[] policies =
                 policyDispatcher.listPolicyInfosForMetadataObject(metalake, object);

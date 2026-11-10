@@ -219,6 +219,8 @@ public enum OperationType {
   LIST_SEMANTIC_MODEL,
   /** List identifiers of metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC,
+  /** Lists datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
   /** List complete metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC_INFOS,
   /** Import a Semantic Model from an Ossie document. */

@@ -109,6 +109,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
@@ -4121,12 +4122,13 @@ public class TestJcasbinAuthorizer {
     SemanticModel renamed = mock(SemanticModel.class);
     when(renamed.name()).thenReturn(newIdent.name());
     SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
-    when(dispatcher.alterSemanticModel(oldIdent, rename)).thenReturn(renamed);
+    when(dispatcher.alterSemanticModel(oldIdent, SemanticModelSourceUpdate.preserve(), rename))
+        .thenReturn(renamed);
     when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
     when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
     SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
     try {
-      hook.alterSemanticModel(oldIdent, rename);
+      hook.alterSemanticModel(oldIdent, SemanticModelSourceUpdate.preserve(), rename);
       metadataIdConverterMockedStatic
           .when(
               () ->

@@ -52,6 +52,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -97,6 +98,68 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 class TestHiveCatalogOperations {
+  @Test
+  void testDerivedSchemaMetadataAltersPreserveMarkerAndRejectColumnChanges() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+    CachedClientPool pool = mock(CachedClientPool.class);
+    HiveClient client = mock(HiveClient.class);
+    when(pool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(client);
+            });
+    op.clientPool = pool;
+    HiveTable derived =
+        HiveTable.builder()
+            .withName("csv")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[] {Column.of("value", Types.StringType.get())})
+            .withProperties(Maps.newHashMap())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    derived.setOriginalStorageColumns(
+        List.of(
+            Column.of("value", Types.UnparsedType.of("<derived from deserializer>"), "original")));
+    when(client.getTable(anyString(), anyString(), anyString())).thenReturn(derived);
+    ArgumentCaptor<HiveTable> altered = ArgumentCaptor.forClass(HiveTable.class);
+    doNothing()
+        .when(client)
+        .alterTable(anyString(), eq("db"), eq("csv"), altered.capture(), anyBoolean());
+
+    op.alterTable(
+        NameIdentifier.of("db", "csv"),
+        TableChange.setProperty("key", "value"),
+        TableChange.updateComment("updated"));
+    HiveTable metadataOnly = altered.getValue();
+    Assertions.assertEquals("value", metadataOnly.properties().get("key"));
+    Assertions.assertEquals("updated", metadataOnly.comment());
+    Assertions.assertEquals(
+        "<derived from deserializer>",
+        ((Types.UnparsedType) metadataOnly.originalStorageColumns().get(0).dataType())
+            .unparsedType());
+    op.alterTable(NameIdentifier.of("db", "csv"), TableChange.rename("renamed"));
+    Assertions.assertEquals("renamed", altered.getValue().name());
+    Assertions.assertEquals(
+        derived.originalStorageColumns(), altered.getValue().originalStorageColumns());
+
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterTable(
+                    NameIdentifier.of("db", "csv"),
+                    TableChange.addColumn(
+                        new String[] {"added"},
+                        Types.StringType.get(),
+                        TableChange.ColumnPosition.defaultPos())));
+    Assertions.assertTrue(failure.getMessage().contains("SerDe-derived table"));
+    verify(client, times(2)).alterTable(anyString(), anyString(), anyString(), any(), anyBoolean());
+  }
+
   @Test
   void testPropertyMeta() {
     Map<String, PropertyEntry<?>> propertyEntryMap =
@@ -743,6 +806,48 @@ class TestHiveCatalogOperations {
 
     Assertions.assertTrue(
         exception.getMessage().contains("does not support non-null defaultCatalog/defaultSchema"));
+  }
+
+  @Test
+  void testCreateSparkViewRejectsNonNullDefaultCatalogOrSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    String[][] defaults = {{"analytics", "mart"}, {"analytics", null}, {null, "mart"}};
+    for (String[] pair : defaults) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  op.createView(
+                      NameIdentifier.of("db", "v_spark"),
+                      null,
+                      new Column[0],
+                      new SQLRepresentation[] {
+                        SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+                      },
+                      pair[0],
+                      pair[1],
+                      Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3"))));
+
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not support non-null defaultCatalog/defaultSchema"));
+    }
+    verify(hiveClient, never()).createTable(any());
   }
 
   @Test
@@ -1993,6 +2098,59 @@ class TestHiveCatalogOperations {
                         new SQLRepresentation[] {
                           SQLRepresentation.builder()
                               .withDialect("hive")
+                              .withSql("SELECT 2")
+                              .build()
+                        },
+                        "analytics",
+                        "mart",
+                        null)));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not support non-null defaultCatalog/defaultSchema"));
+  }
+
+  @Test
+  void testAlterSparkViewReplaceRejectsNonNullDefaultCatalogAndSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_spark")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "spark.sql.create.version",
+                        "3.5.3")))
+            .withViewOriginalText("SELECT 1")
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterView(
+                    NameIdentifier.of("db", "v_spark"),
+                    ViewChange.replaceView(
+                        new Column[0],
+                        new SQLRepresentation[] {
+                          SQLRepresentation.builder()
+                              .withDialect("spark")
                               .withSql("SELECT 2")
                               .build()
                         },

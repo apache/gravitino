@@ -142,9 +142,24 @@ String unparsedValue = ((UnparsedType) type).unparsedType();
 
 #### Table Column Default Value
 
-A column default can be a [literal](./expression.md#literal) or an
-[expression](./expression.md). The underlying catalog applies it to new rows, and support depends
-on the catalog provider.
+A column may expose two defaults. Either value can be a [literal](./expression.md#literal) or an
+[expression](./expression.md). Support depends on the catalog provider; when a catalog does not
+support a given default, the corresponding field is unset (`DEFAULT_VALUE_NOT_SET` /
+`INITIAL_DEFAULT_VALUE_NOT_SET`).
+
+| Field                  | Meaning                                                                                          |
+|------------------------|--------------------------------------------------------------------------------------------------|
+| `defaultValue`         | Applied to new records that omit the column                                                      |
+| `initialDefaultValue`  | Assumed when reading stored records that lack the column, such as rows written before it existed |
+
+Setting `initialDefaultValue` through create or alter is not supported yet. Gravitino currently
+exposes it on load when the underlying catalog provides it. Setting `defaultValue` remains
+provider-specific as below.
+
+For example, Iceberg format-version 3 maps `write-default` to `defaultValue` and
+`initial-default` to `initialDefaultValue`. An Iceberg `timestamptz` default is exposed as a
+UTC `LocalDateTime` with type `timestamp_tz` (with time zone): clients should treat the
+`LocalDateTime` fields as UTC when recovering the instant.
 
 PostgreSQL, MySQL, Doris, StarRocks, OceanBase, and Hologres share function-default write
 validation: function names must be unquoted identifiers (optionally qualified), and arguments
