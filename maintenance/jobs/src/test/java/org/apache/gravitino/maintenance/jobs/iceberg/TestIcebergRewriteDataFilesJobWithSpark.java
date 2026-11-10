@@ -432,4 +432,74 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
         sql.contains("'description', 'Rewrite with \"quoted\" text'")
             || sql.contains("description"));
   }
+
+  @Test
+  public void testEmptyWhereRewriteOnIdentityPlusDaysPartitionSucceeds() {
+    String table = catalogName + ".db.id_day_table";
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (p STRING, ts TIMESTAMP, v INT) USING iceberg "
+            + "PARTITIONED BY (p, days(ts))");
+    // Several small files so rewrite can find input (min-input-files default is 5).
+    for (int i = 0; i < 6; i++) {
+      spark.sql(
+          "INSERT INTO "
+              + table
+              + " VALUES ('a', TIMESTAMP '2024-01-0"
+              + (i + 1)
+              + " 00:00:00', "
+              + i
+              + ")");
+    }
+
+    String sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            catalogName, "db.id_day_table", "binpack", null, "", "{\"min-input-files\":\"2\"}");
+    Dataset<Row> result = spark.sql(sql);
+    Row[] rows = (Row[]) result.collect();
+    assertNotNull(rows);
+    assertTrue(rows.length > 0);
+    assertEquals(0, rows[0].getInt(3), "failed_data_files_count");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+  }
+
+  @Test
+  public void testDayTransformWhereClauseFailsToTranslate() {
+    String table = catalogName + ".db.day_where_table";
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (p STRING, ts TIMESTAMP, v INT) USING iceberg "
+            + "PARTITIONED BY (p, days(ts))");
+    spark.sql(
+        "INSERT INTO "
+            + table
+            + " VALUES ('a', TIMESTAMP '2024-01-01 00:00:00', 1), "
+            + "('a', TIMESTAMP '2024-01-01 01:00:00', 2)");
+
+    // Strategy-style predicate: PartitionUtils emits day(col) = <int> for DayTransform.
+    String sql =
+        IcebergRewriteDataFilesJob.buildProcedureCall(
+            catalogName,
+            "db.day_where_table",
+            "binpack",
+            null,
+            "p = \"a\" AND day(ts) = 19723",
+            null);
+    Exception thrown = null;
+    try {
+      spark.sql(sql).collect();
+    } catch (Exception e) {
+      thrown = e;
+    }
+    assertNotNull(thrown, "day(ts) partition where should fail Spark filter translation");
+    String message = thrown.getMessage() == null ? "" : thrown.getMessage();
+    assertTrue(
+        message.contains("Cannot translate") || message.contains("day"),
+        "unexpected error: " + message);
+    spark.sql("DROP TABLE IF EXISTS " + table);
+  }
 }

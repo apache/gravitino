@@ -114,18 +114,17 @@ With the local job executor, `spark.jars` in `spark_conf` doesn't add it: the dr
 Use the Spark, Scala, and Iceberg versions that match your cluster. See
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
-**Multi-level / non-identity partition rewrite** — a **direct**
-`builtin-iceberg-rewrite-data-files` submit with an empty `where_clause` can succeed on layouts
-beyond pure identity partitions (for example `PARTITIONED BY (p, days(ts))` with a non-zero
-rewrite count). Pure `days(ts)` / `bucket` tables may also complete, often with
-`Rewritten data files: 0` when files are not rewrite-eligible.
+**Multi-level / non-identity partition rewrite** — the rewrite **job** does not reject these
+layouts. A **direct** `builtin-iceberg-rewrite-data-files` submit with an empty `where_clause`
+rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and similar). You may
+still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
-If the job fails with a Spark expression error such as
-`Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter`, check
-whether the submit used a **strategy-generated partition `where_clause`** rather than a
-whole-table empty filter. Confirm in job run status and `error.log` under
-`builtin-iceberg-rewrite-data-files`. The built-in compaction **strategy** still targets
-identity-partitioned tables; broader layouts are a direct-submit path.
+The failure mode
+`Cannot translate Spark expression ... day(...) ... to data source filter` still happens when
+the submit uses a **partition `where_clause` that applies time/bucket transforms** — the form
+the compaction adapter builds via `PartitionUtils` (for example `p = "a" AND day(ts) = 19723`).
+That is a strategy-generated filter path, not a limitation of empty-`where_clause` direct
+submits. Confirm in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 
 ## Related
 
