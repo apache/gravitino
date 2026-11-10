@@ -281,12 +281,15 @@ and an implementation within a definition by its runtime.
 
 | Change                    | JSON `@type`       | Other JSON fields                         | Java                                                        |
 |---------------------------|--------------------|-------------------------------------------|-------------------------------------------------------------|
-| Update the comment        | `updateComment`    | `newComment`                              | `FunctionChange.updateComment(newComment)`                  |
+| Update the comment        | `updateComment`    | `newComment`                              | `FunctionChange.updateComment("new comment")`               |
 | Add a definition          | `addDefinition`    | `definition`                              | `FunctionChange.addDefinition(definition)`                  |
 | Remove a definition       | `removeDefinition` | `parameters`                              | `FunctionChange.removeDefinition(parameters)`               |
 | Add an implementation     | `addImpl`          | `parameters`, `implementation`            | `FunctionChange.addImpl(parameters, implementation)`        |
 | Replace an implementation | `updateImpl`       | `parameters`, `runtime`, `implementation` | `FunctionChange.updateImpl(parameters, runtime, implementation)` |
 | Remove an implementation  | `removeImpl`       | `parameters`, `runtime`                   | `FunctionChange.removeImpl(parameters, runtime)`            |
+
+In the Java column, `definition` is a `FunctionDefinition`, `parameters` is a `FunctionParam[]`,
+`runtime` is a `FunctionImpl.RuntimeType` and `implementation` is a `FunctionImpl`.
 
 `newComment` must not be null or blank; a function's comment cannot be cleared with `updateComment`.
 
