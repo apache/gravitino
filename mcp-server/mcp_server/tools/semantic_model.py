@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Optional
+from typing import Literal, Optional
 
 from fastmcp import Context, FastMCP
 from mcp.types import ToolAnnotations
@@ -135,6 +135,47 @@ def load_semantic_model_tools(mcp: FastMCP):
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_semantic_model_operation().load_semantic_model(
             catalog_name, schema_name, semantic_model_name
+        )
+
+    @mcp.tool(
+        tags={"semantic_model"},
+        annotations=ToolAnnotations(
+            readOnlyHint=True, destructiveHint=False, idempotentHint=True
+        ),
+    )
+    async def list_semantic_model_datasets(
+        ctx: Context,
+        source_type: Literal["table", "view"],
+        catalog_name: str,
+        schema_name: str,
+        source_name: str,
+    ) -> str:
+        """List visible Semantic Model datasets directly associated with a source.
+
+        Requires access to the source metadata. Results may span catalogs and
+        schemas in the selected metalake and include only models the caller can
+        load. Preserves the server's component-wise, case-sensitive UTF-16 order.
+
+        Associations reflect the latest definition write, not model execution
+        validity or transitive dependencies. An empty result does not establish
+        that changing or deleting the source is safe.
+
+        Args:
+            ctx: The request context.
+            source_type: The source kind, either table or view.
+            catalog_name: Name of the source catalog.
+            schema_name: Name of the source schema.
+            source_name: Name of the source table or View.
+
+        Returns:
+            A JSON array of identifiers with namespace
+            [metalake, catalog, schema, semanticModel] and the exact dataset
+            name, including any literal dots. No visible matches returns [];
+            failed requests raise tool errors.
+        """
+        client = ctx.request_context.lifespan_context.rest_client()
+        return await client.as_semantic_model_operation().list_semantic_model_datasets(
+            source_type, catalog_name, schema_name, source_name
         )
 
     @mcp.tool(tags={"semantic_model"})
