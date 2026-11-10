@@ -20,18 +20,23 @@
 package org.apache.gravitino.iceberg.common.ops;
 
 import java.lang.reflect.Method;
+import net.sf.cglib.proxy.Callback;
 import net.sf.cglib.proxy.Enhancer;
+import net.sf.cglib.proxy.Factory;
 import net.sf.cglib.proxy.MethodInterceptor;
 import net.sf.cglib.proxy.MethodProxy;
-import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.iceberg.catalog.Catalog;
+import org.objenesis.Objenesis;
+import org.objenesis.ObjenesisStd;
 
 /**
  * A proxy class for IcebergCatalogWrapper to handle Kerberos authentication or other cross-cutting
  * concerns.
  */
 public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
+  private static final Objenesis OBJENESIS = new ObjenesisStd();
+
   private final IcebergCatalogWrapper target;
   private final Catalog catalog;
 
@@ -51,31 +56,23 @@ public class KerberosAwareIcebergCatalogProxy implements MethodInterceptor {
     return method.invoke(target, objects);
   }
 
-  public IcebergCatalogWrapper getProxy(IcebergConfig config) {
-    Enhancer e = new Enhancer();
-    e.setClassLoader(target.getClass().getClassLoader());
-    e.setSuperclass(target.getClass());
-    e.setCallback(this);
-
-    Class<?>[] argClass = new Class[] {IcebergConfig.class};
-    return (IcebergCatalogWrapper) e.create(argClass, new Object[] {config});
-  }
-
   /**
-   * Create a proxy instance with catalogName and config constructor. It's used for class
-   * CatalogWrapperForREST or its subclass.
+   * Create a proxy instance that delegates every call to the wrapped target. The proxy instance is
+   * allocated without running any constructor of the wrapper class, so no second catalog or
+   * Kerberos client (and its ticket refresh thread) is created. Closing the proxy closes the target
+   * exactly once.
    *
-   * @param catalogName Name of the catalog.
-   * @param config Iceberg configuration.
    * @return The proxy instance.
    */
-  public IcebergCatalogWrapper getProxy(String catalogName, IcebergConfig config) {
+  public IcebergCatalogWrapper getProxy() {
+    Class<?> targetClass = target.getClass();
     Enhancer e = new Enhancer();
-    e.setClassLoader(target.getClass().getClassLoader());
-    e.setSuperclass(target.getClass());
-    e.setCallback(this);
-
-    Class<?>[] argClass = new Class[] {String.class, IcebergConfig.class};
-    return (IcebergCatalogWrapper) e.create(argClass, new Object[] {catalogName, config});
+    e.setClassLoader(targetClass.getClassLoader());
+    e.setSuperclass(targetClass);
+    e.setCallbackType(KerberosAwareIcebergCatalogProxy.class);
+    Class<?> proxyClass = e.createClass();
+    Factory proxy = (Factory) OBJENESIS.newInstance(proxyClass);
+    proxy.setCallbacks(new Callback[] {this});
+    return (IcebergCatalogWrapper) proxy;
   }
 }

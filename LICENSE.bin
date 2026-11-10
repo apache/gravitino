@@ -354,6 +354,7 @@
    JBoss Logging
    RoaringBitmap
    cglib
+   Objenesis
    jmxutils
    SQLite JDBC
    SnakeYAML
