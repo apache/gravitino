@@ -581,12 +581,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       Table table, List<FileScanTask> fileScanTasks) {
-    return PlanTableScanResponse.builder()
-        .withPlanStatus(PlanStatus.COMPLETED)
-        .withFileScanTasks(fileScanTasks)
-        .withSpecsById(
+    return IcebergRESTUtils.scanPlanResponseBuilder(
             IcebergScanPlanHelper.sanitizeSpecsForSerialization(
                 table.specs(), fileScanTasks, table.schemas().values()))
+        .withPlanStatus(PlanStatus.COMPLETED)
+        .withFileScanTasks(fileScanTasks)
         .build();
   }
 

@@ -97,6 +97,76 @@ public interface TagDispatcher {
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
 
   /**
+<<<<<<< HEAD
+=======
+   * List policy names directly associated with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The directly associated policy names.
+   */
+  default String[] listPoliciesForTag(String metalake, String name) {
+    return Arrays.stream(listPolicyAssociationsForTag(metalake, name))
+        .map(association -> association.targetEntity().name())
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List policy associations, including selectors, for the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The policy-to-tag associations.
+   */
+  default RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    throw new UnsupportedOperationException("Listing policy associations is not supported");
+  }
+
+  /**
+   * Add one policy association for a tag.
+   *
+   * <p>A tag-value selector must satisfy the tag's value constraint. Validation and the association
+   * write occur in one storage transaction.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   * @param selector The non-null policy association selector.
+   * @throws IllegalArgumentException If the selector value violates the tag's value constraint.
+   */
+  default void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  }
+
+  /**
+   * Remove one policy association from a tag.
+   *
+   * <p>Removing a missing association is an idempotent no-op. The policy and tag must still exist.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   */
+  default void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    throw new UnsupportedOperationException("Removing a policy from a tag is not supported");
+  }
+
+  /**
+   * List all metadata objects associated with the specified tag and exact assignment value.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @param value The exact assignment value to match, or null to return all objects for the tag.
+   * @return The array of metadata objects associated with the specified tag and value.
+   */
+  default MetadataObject[] listMetadataObjectsForTag(
+      String metalake, String name, @Nullable String value) {
+    return listMetadataObjectsForTag(metalake, name);
+  }
+
+  /**
+>>>>>>> f38f3de65 ([#14749][#14424] fix: Support experimental scans and validate tag selectors (#14779))
    * List all tag names associated with the specified metadata object.
    *
    * @param metalake The name of the metalake

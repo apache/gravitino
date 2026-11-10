@@ -49,6 +49,7 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
+  implementation(libs.iceberg.common)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)
