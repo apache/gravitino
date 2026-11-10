@@ -52,6 +52,7 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+import static org.apache.gravitino.storage.GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mockStatic;
@@ -62,8 +63,10 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -82,6 +85,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -2751,6 +2755,95 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  void testTestConnectionReportsMissingGcsCredentialFile() throws IOException {
+    File credentialFile = new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-service-account.json");
+    Assertions.assertFalse(credentialFile.exists());
+    Map<String, String> properties =
+        ImmutableMap.of(
+            LOCATION,
+            "gs://test-connection-bucket/catalog",
+            GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+            credentialFile.getAbsolutePath());
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (filesystem initialization failed; "
+              + "check credentials and configuration)",
+          exception.getMessage());
+      Assertions.assertFalse(exception.getMessage().contains(credentialFile.getAbsolutePath()));
+      Assertions.assertNull(exception.getCause());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("fileSystemInitializationFailures")
+  void testTestConnectionClassifiesFileSystemInitializationFailure(
+      IOException failure, String expectedCategory) throws IOException, IllegalAccessException {
+    FileSystemProvider provider = Mockito.mock(FileSystemProvider.class);
+    when(provider.getFileSystem(any(), any())).thenThrow(failure);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, TEST_ROOT_PATH),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (" + expectedCategory + ")",
+          exception.getMessage());
+      Assertions.assertNull(exception.getCause());
+    }
+  }
+
+  @Test
+  void testTestConnectionPreservesLocationNotFoundAfterInitialization()
+      throws IOException, IllegalAccessException {
+    Path location = new Path(TEST_ROOT_PATH);
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    when(fileSystem.getUri()).thenReturn(location.toUri());
+    when(fileSystem.getWorkingDirectory()).thenReturn(new Path("/"));
+    when(fileSystem.listStatusIterator(any()))
+        .thenThrow(
+            new IOException("Cannot list location", new FileNotFoundException(TEST_ROOT_PATH)));
+    FileSystemProvider provider = Mockito.mock(FileSystemProvider.class);
+    when(provider.getFileSystem(any(), any())).thenReturn(fileSystem);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, TEST_ROOT_PATH),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (location not found)",
+          exception.getMessage());
+      Mockito.verify(fileSystem).close();
+    }
+  }
+
+  @Test
   public void testTestConnectionAggregatesLocationResolutionAndProbeFailures() throws IOException {
     String unsupportedLocation = "unsupported://archive/{{catalog}}";
     Map<String, String> properties =
@@ -5282,6 +5375,22 @@ public class TestFilesetCatalogOperations {
                 Mockito.mock(EntityStore.class), Mockito.mock(SecretManager.class)));
     doReturn(fileset).when(operations).loadFileset(PATH_VALIDATION_FILESET);
     return operations;
+  }
+
+  private static Stream<Arguments> fileSystemInitializationFailures() {
+    String missingConfiguration =
+        "filesystem initialization failed; check credentials and configuration";
+    return Stream.of(
+        Arguments.of(new FileNotFoundException("/private/credential.json"), missingConfiguration),
+        Arguments.of(
+            new IOException(
+                "Cannot initialize filesystem",
+                new FileNotFoundException("/private/credential.json")),
+            missingConfiguration),
+        Arguments.of(new AccessDeniedException("/private/credential.json"), "access denied"),
+        Arguments.of(
+            new IOException("Cannot initialize filesystem", new TimeoutException()), "timeout"),
+        Arguments.of(new IOException("Cannot initialize filesystem"), "probe failed"));
   }
 
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
