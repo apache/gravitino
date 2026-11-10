@@ -25,6 +25,7 @@ import java.security.PrivilegedAction;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.hive.HiveClientPool;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -98,6 +99,47 @@ public class TestIcebergHiveCachedClientPool {
             (PrivilegedAction<IcebergHiveCachedClientPool.Key>)
                 () -> IcebergHiveCachedClientPool.extractKey("ugi", configuration));
     Assertions.assertNotEquals(key9, key10);
+  }
+
+  @Test
+  void testClientPoolsIsolateSubjectsEvenWithUsernameCacheKey() throws Exception {
+    Configuration configuration = new Configuration(false);
+    configuration.set("hive.metastore.uris", "thrift://identity-test:9083");
+    UserGroupInformation login = UserGroupInformation.createRemoteUser("catalog");
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("catalog", login);
+    try (IcebergHiveCachedClientPool pool =
+        new IcebergHiveCachedClientPool(
+            configuration, Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"))) {
+      HiveClientPool loginPool = login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      HiveClientPool proxyPool = proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      Assertions.assertNotSame(loginPool, proxyPool);
+      Assertions.assertSame(
+          loginPool, login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+      Assertions.assertSame(
+          proxyPool, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+    }
+  }
+
+  @Test
+  void testClientPoolsIsolateDefaultSubjectsAndAuthenticationSettings() throws Exception {
+    Configuration simple = new Configuration(false);
+    simple.set("hive.metastore.uris", "thrift://authentication-test:9083");
+    Configuration kerberos = new Configuration(simple);
+    kerberos.setBoolean("hive.metastore.sasl.enabled", true);
+    kerberos.set("hive.metastore.kerberos.principal", "hive/_HOST@EXAMPLE.COM");
+    UserGroupInformation first = UserGroupInformation.createRemoteUser("first");
+    UserGroupInformation second = UserGroupInformation.createRemoteUser("second");
+    try (IcebergHiveCachedClientPool simplePool =
+            new IcebergHiveCachedClientPool(simple, Map.of());
+        IcebergHiveCachedClientPool kerberosPool =
+            new IcebergHiveCachedClientPool(kerberos, Map.of())) {
+      HiveClientPool firstPool =
+          first.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool);
+      Assertions.assertNotSame(
+          firstPool, second.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool));
+      Assertions.assertNotSame(
+          firstPool, first.doAs((PrivilegedAction<HiveClientPool>) kerberosPool::clientPool));
+    }
   }
 
   @Test

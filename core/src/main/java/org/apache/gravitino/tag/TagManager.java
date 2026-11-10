@@ -125,6 +125,8 @@ public class TagManager implements TagDispatcher {
       Map<String, String> properties,
       TagValueConstraint valueConstraint)
       throws TagAlreadyExistsException {
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     TagEntity tagEntity =
@@ -579,6 +581,8 @@ public class TagManager implements TagDispatcher {
     for (TagChange change : changes) {
       if (change instanceof TagChange.RenameTag) {
         newName = ((TagChange.RenameTag) change).getNewName();
+        NameIdentifierUtil.checkMetadataObjectName(
+            NameIdentifier.of(tagEntity.namespace(), newName), Entity.EntityType.TAG);
       } else if (change instanceof TagChange.UpdateTagComment) {
         newComment = ((TagChange.UpdateTagComment) change).getNewComment();
       } else if (change instanceof TagChange.SetProperty) {

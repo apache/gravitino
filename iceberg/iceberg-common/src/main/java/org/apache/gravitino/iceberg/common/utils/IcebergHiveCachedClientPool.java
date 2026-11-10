@@ -29,6 +29,7 @@ import com.google.common.collect.Sets;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -111,7 +112,16 @@ public class IcebergHiveCachedClientPool
 
   @VisibleForTesting
   HiveClientPool clientPool() {
-    Key key = extractKey(properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS), conf);
+    // A pooled Thrift connection retains the identity that opened it. A username alone cannot
+    // distinguish a proxy subject (or its delegation tokens) from a Kerberos login subject.
+    String cacheKeys = properties.get(CatalogProperties.CLIENT_POOL_CACHE_KEYS);
+    if (cacheKeys == null || cacheKeys.isEmpty()) {
+      cacheKeys = "UGI";
+    } else if (Arrays.stream(cacheKeys.split(","))
+        .noneMatch(element -> "UGI".equalsIgnoreCase(element.trim()))) {
+      cacheKeys += ",UGI";
+    }
+    Key key = extractKey(cacheKeys, conf);
     return clientPoolCache.get(
         key,
         k -> {
@@ -169,6 +179,12 @@ public class IcebergHiveCachedClientPool
     List<Object> elements = Lists.newArrayList();
     elements.add(conf.get(HiveConf.ConfVars.METASTOREURIS.varname, ""));
     elements.add(conf.get("HIVE_CONF_CATALOG", "hive"));
+    // The cache is shared across catalogs. Never reuse a connection opened with different
+    // authentication settings, even when the metastore URI and current subject match.
+    elements.add(conf.get("hadoop.security.authentication", "simple"));
+    elements.add(conf.getBoolean(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL.varname, false));
+    elements.add(conf.get(HiveConf.ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname, ""));
+    elements.add(conf.get(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE.varname, ""));
     if (cacheKeys == null || cacheKeys.isEmpty()) {
       return Key.of(elements);
     }

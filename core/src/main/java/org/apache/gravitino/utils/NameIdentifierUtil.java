@@ -649,7 +649,12 @@ public class NameIdentifierUtil {
       NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
-    checkMetadataObjectName(ident, entityType);
+    // Legacy tag/policy names must remain addressable for authorized cleanup. Their names are
+    // single-level metadata objects, so embedded dots do not introduce another parent scope.
+    // Managers enforce the name restriction before create and rename writes.
+    if (entityType != Entity.EntityType.TAG && entityType != Entity.EntityType.POLICY) {
+      checkMetadataObjectName(ident, entityType);
+    }
 
     Joiner dot = Joiner.on(".");
 

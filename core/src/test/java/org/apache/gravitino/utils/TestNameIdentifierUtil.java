@@ -197,6 +197,27 @@ public class TestNameIdentifierUtil {
         topicException.getMessage());
   }
 
+  /** Legacy tag/policy names retain their literal name and type for authorization and cleanup. */
+  @Test
+  public void testLegacyDottedTagAndPolicyMetadataObjects() {
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      NameIdentifier ident =
+          type == Entity.EntityType.TAG
+              ? NameIdentifierUtil.ofTag("metalake1", "legacy.with.dot")
+              : NameIdentifierUtil.ofPolicy("metalake1", "legacy.with.dot");
+      MetadataObject object = NameIdentifierUtil.toMetadataObject(ident, type);
+      assertEquals("legacy.with.dot", object.name());
+      assertEquals("legacy.with.dot", object.fullName());
+      assertEquals(MetadataObject.Type.valueOf(type.name()), object.type());
+      assertEquals(null, object.parent());
+      assertEquals(ident, MetadataObjectUtil.toEntityIdent("metalake1", object));
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.checkMetadataObjectName(ident, type));
+    }
+  }
+
   @Test
   void testOfUser() {
     String userName = "userA";
