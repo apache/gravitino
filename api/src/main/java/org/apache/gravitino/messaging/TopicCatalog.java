@@ -25,6 +25,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * The {@link TopicCatalog} interface defines the public API for managing topic objects in a schema.
@@ -106,4 +108,17 @@ public interface TopicCatalog {
    * @return true If the topic is dropped, false if the topic does not exist.
    */
   boolean dropTopic(NameIdentifier ident);
+
+  /**
+   * List one page of the topics in a namespace, in ascending order of name.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listTopics(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

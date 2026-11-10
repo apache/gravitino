@@ -72,6 +72,7 @@ from gravitino.exceptions.handlers.partition_error_handler import (
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 
 class RelationalTable(
@@ -186,6 +187,29 @@ class RelationalTable(
 
         return partition_name_list_resp.partition_names()
 
+    def list_partition_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_partition_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+
+        resp = self._rest_client.get(
+            endpoint=self._get_partition_request_path(),
+            params=page_params(page_size, page_token),
+            error_handler=PARTITION_ERROR_HANDLER,
+        )
+        partition_name_list_resp = PartitionNameListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        partition_name_list_resp.validate()
+
+        return Page(
+            items=list(partition_name_list_resp.partition_names()),
+            next_page_token=partition_name_list_resp.next_page_token(),
+        )
+
     def list_partitions(self) -> list[Partition]:
         """Get the partitions of the table.
 
@@ -205,6 +229,30 @@ class RelationalTable(
         partition_list_resp.validate()
 
         return partition_list_resp.get_partitions()
+
+    def list_partitions_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Partition]:
+        """Paged variant of ``list_partitions``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+
+        params = {"details": "true"}
+        resp = self._rest_client.get(
+            endpoint=self._get_partition_request_path(),
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=PARTITION_ERROR_HANDLER,
+        )
+        partition_list_resp = PartitionListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        partition_list_resp.validate()
+
+        return Page(
+            items=list(partition_list_resp.get_partitions()),
+            next_page_token=partition_list_resp.next_page_token(),
+        )
 
     def get_partition(self, partition_name: str) -> Partition:
         """Returns the partition with the given name.
@@ -280,11 +328,33 @@ class RelationalTable(
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._object_tag_operations.list_tags_info_with_visibility()
@@ -313,11 +383,33 @@ class RelationalTable(
     def list_policies(self) -> list[str]:
         return self._object_policy_operations.list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policies_with_visibility(self) -> PolicyList[str]:
         return self._object_policy_operations.list_policies_with_visibility()
 
     def list_policy_infos(self) -> list[Policy]:
         return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         return self._object_policy_operations.list_policy_infos_with_visibility()
@@ -331,8 +423,30 @@ class RelationalTable(
     def list_binding_role_names(self) -> list[str]:
         return self._object_role_operations.list_binding_role_names()
 
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_role_operations.list_binding_role_names_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_statistics(self) -> list[Statistic]:
         return self._object_statistics_operations.list_statistics()
+
+    def list_statistics_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Statistic]:
+        """Paged variant of ``list_statistics``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_statistics_operations.list_statistics_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def update_statistics(self, statistics: dict[str, StatisticValue[Any]]) -> None:
         self._object_statistics_operations.update_statistics(statistics)

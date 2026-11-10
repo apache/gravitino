@@ -25,6 +25,8 @@ import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Client interface for supporting metalakes. It includes methods for listing, loading, creating,
@@ -155,4 +157,16 @@ public interface SupportsMetalakes {
    * @throws NoSuchMetalakeException If the metalake does not exist.
    */
   void disableMetalake(String name) throws NoSuchMetalakeException;
+
+  /**
+   * List one page of the metalakes, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Metalake> listMetalakes(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

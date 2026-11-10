@@ -23,6 +23,8 @@ from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 _EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
 _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
@@ -63,6 +65,26 @@ class SupportsSchemas(ABC):
             A list of schema names under the namespace.
         """
         pass
+
+    def list_schemas_page(
+        self,
+        parent_schema: Optional[str] = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_schemas``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     def schema_exists(self, schema_name: str) -> bool:
         """Check if a schema exists.

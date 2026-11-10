@@ -19,13 +19,13 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.stats.statistic_dto import StatisticDTO
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class StatisticListResponse(BaseResponse):
+class StatisticListResponse(BaseListResponse):
     """Represents a response containing a list of statistics."""
 
     _statistics: list[StatisticDTO] = field(metadata=config(field_name="statistics"))

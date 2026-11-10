@@ -22,12 +22,12 @@ from dataclasses import dataclass, field
 from dataclasses_json import config
 
 from gravitino.dto.metadata_object_dto import MetadataObjectDTO
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.utils.precondition import Precondition
 
 
 @dataclass
-class MetadataObjectListResponse(BaseResponse):
+class MetadataObjectListResponse(BaseListResponse):
     """Represents a response containing a list of metadata objects."""
 
     _metadata_objects: list[MetadataObjectDTO] = field(

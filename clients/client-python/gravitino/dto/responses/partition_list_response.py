@@ -24,11 +24,11 @@ from gravitino.dto.rel.partitions.json_serdes.partition_dto_serdes import (
     PartitionDTOSerdes,
 )
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 
 
 @dataclass
-class PartitionListResponse(BaseResponse):
+class PartitionListResponse(BaseListResponse):
     """Represents a response for a list of partitions."""
 
     _partitions: list[PartitionDTO] = field(

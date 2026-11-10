@@ -28,6 +28,8 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagAssignment;
@@ -103,6 +105,22 @@ class GenericTag implements Tag, Tag.AssociatedObjects {
 
     resp.validate();
     return resp.getMetadataObjects();
+  }
+
+  @Override
+  public Page<MetadataObject> objects(PageRequest pageRequest) {
+    MetadataObjectListResponse resp =
+        restClient.get(
+            String.format(
+                "api/metalakes/%s/tags/%s/objects",
+                RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
+            PageParams.of(pageRequest),
+            MetadataObjectListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+
+    resp.validate();
+    return PageParams.page(resp.getMetadataObjects(), resp);
   }
 
   @Override

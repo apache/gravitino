@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from dataclasses_json import config, dataclass_json
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.tag_dto import TagDTO
 from gravitino.utils.precondition import Precondition
@@ -27,7 +28,7 @@ from gravitino.utils.precondition import Precondition
 
 @dataclass_json
 @dataclass
-class TagNamesListResponse(BaseResponse):
+class TagNamesListResponse(BaseListResponse):
     """Represents a response for a Tag Names List request."""
 
     _tags: list[str] = field(default_factory=list, metadata=config(field_name="names"))
@@ -54,7 +55,7 @@ class TagNamesListResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class TagListResponse(BaseResponse):
+class TagListResponse(BaseListResponse):
     """Represents a response for a Tag List request."""
 
     _tags: list[TagDTO] = field(

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -29,6 +30,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.pagination.Page;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.partitions.Partition;
@@ -62,6 +64,9 @@ final class ConnectorObjectSnapshot {
       return (R) DTOConverters.toDTOs((Partition[]) result);
     } else if (result instanceof FileInfo[]) {
       return (R) DTOConverters.toDTO((FileInfo[]) result);
+    } else if (result instanceof Page) {
+      Page<?> page = (Page<?>) result;
+      return (R) Page.of(new ArrayList<>(page.items()), page.nextPageToken().orElse(null));
     }
     return result;
   }

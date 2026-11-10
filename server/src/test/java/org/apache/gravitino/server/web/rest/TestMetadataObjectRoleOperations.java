@@ -22,11 +22,14 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -219,5 +222,25 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     Mockito.verify(tableDispatcher)
         .tableExists(NameIdentifier.of("metalake1", "catalog1", "schema1", "table1"));
     Mockito.verify(manager).listRoleNamesByObject(any(), any());
+  }
+
+  @Test
+  public void testListRoleNamesForObjectPaged() throws IOException {
+    doReturn(new String[] {"c", "a", "b"}).when(manager).listRoleNamesByObject(any(), any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+            target("/metalakes/metalake1/objects/metalake/metalake1/roles"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(
+        target("/metalakes/metalake1/objects/metalake/metalake1/roles"));
   }
 }

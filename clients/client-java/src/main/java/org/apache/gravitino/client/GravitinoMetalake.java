@@ -130,6 +130,8 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
@@ -208,6 +210,22 @@ public class GravitinoMetalake extends MetalakeDTO
     return Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new);
   }
 
+  @Override
+  public Page<String> listCatalogs(PageRequest pageRequest) throws NoSuchMetalakeException {
+
+    EntityListResponse resp =
+        restClient.get(
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers()).map(NameIdentifier::name).toArray(String[]::new), resp);
+  }
+
   /**
    * List all the catalogs with their information under this metalake.
    *
@@ -230,6 +248,26 @@ public class GravitinoMetalake extends MetalakeDTO
     return Arrays.stream(resp.getCatalogs())
         .map(c -> DTOConverters.toCatalog(this.name(), c, restClient))
         .toArray(Catalog[]::new);
+  }
+
+  @Override
+  public Page<Catalog> listCatalogsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    CatalogListResponse resp =
+        restClient.get(
+            String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
+            PageParams.with(params, pageRequest),
+            CatalogListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    return PageParams.page(
+        Arrays.stream(resp.getCatalogs())
+            .map(c -> DTOConverters.toCatalog(this.name(), c, restClient))
+            .toArray(Catalog[]::new),
+        resp);
   }
 
   /**
@@ -586,6 +624,19 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getNames();
   }
 
+  @Override
+  public Page<String> listTags(PageRequest pageRequest) throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    resp.validate();
+    return PageParams.page(resp.getNames(), resp);
+  }
+
   /**
    * List all the tags with detailed information under the current metalake.
    *
@@ -607,6 +658,25 @@ public class GravitinoMetalake extends MetalakeDTO
     return Arrays.stream(resp.getTags())
         .map(t -> new GenericTag(t, restClient, this.name()))
         .toArray(Tag[]::new);
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) throws NoSuchMetalakeException {
+    Map<String, String> params = ImmutableMap.of("details", "true");
+    TagListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.with(params, pageRequest),
+            TagListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.getTags())
+            .map(t -> new GenericTag(t, restClient, this.name()))
+            .toArray(Tag[]::new),
+        resp);
   }
 
   /**
@@ -754,6 +824,36 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public Page<String> listPolicyNamesForTag(String tagName, PageRequest pageRequest) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    NameListResponse response =
+        restClient.get(
+            policyTagPath(tagName),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    response.validate();
+    return PageParams.page(response.getNames(), response);
+  }
+
+  @Override
+  public Page<String> listTagNamesForPolicy(String policyName, PageRequest pageRequest) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    NameListResponse response =
+        restClient.get(
+            tagPolicyPath(policyName),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    response.validate();
+    return PageParams.page(response.getNames(), response);
+  }
+
+  @Override
   public PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
@@ -830,6 +930,19 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getNames();
   }
 
+  @Override
+  public Page<String> listPolicies(PageRequest pageRequest) throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+    return PageParams.page(resp.getNames(), resp);
+  }
+
   /**
    * List all the policies with detailed information under the current metalake.
    *
@@ -849,6 +962,23 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return Arrays.stream(resp.getPolicies()).map(p -> new GenericPolicy(p)).toArray(Policy[]::new);
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) throws NoSuchMetalakeException {
+    Map<String, String> params = ImmutableMap.of("details", "true");
+    PolicyListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.with(params, pageRequest),
+            PolicyListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.getPolicies()).map(p -> new GenericPolicy(p)).toArray(Policy[]::new),
+        resp);
   }
 
   /**
@@ -1123,6 +1253,30 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
+   * Lists one page of the users in the metalake, with their details, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of users and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  public Page<User> listUsers(PageRequest pageRequest) throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    UserListResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            PageParams.with(params, pageRequest),
+            UserListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return PageParams.<User>page(resp.getUsers(), resp);
+  }
+
+  /**
    * Lists the usernames.
    *
    * @return The username list.
@@ -1139,6 +1293,27 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return resp.getNames();
+  }
+
+  /**
+   * Lists one page of the user names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of user names and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  public Page<String> listUserNames(PageRequest pageRequest) throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return PageParams.page(resp.getNames(), resp);
   }
 
   /**
@@ -1238,6 +1413,29 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
+   * Lists one page of the groups in the metalake, with their details, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of groups and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  public Page<Group> listGroups(PageRequest pageRequest) throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+
+    GroupListResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            PageParams.with(params, pageRequest),
+            GroupListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return PageParams.<Group>page(resp.getGroups(), resp);
+  }
+
+  /**
    * Lists the group names
    *
    * @return The Group Name List
@@ -1253,6 +1451,26 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.groupErrorHandler());
     resp.validate();
     return resp.getNames();
+  }
+
+  /**
+   * Lists one page of the group names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of group names and the token for the next page, if any.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   */
+  public Page<String> listGroupNames(PageRequest pageRequest) throws NoSuchMetalakeException {
+    NameListResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+    return PageParams.page(resp.getNames(), resp);
   }
 
   /**
@@ -1357,6 +1575,26 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return resp.getNames();
+  }
+
+  /**
+   * Lists one page of the role names in the metalake, ordered by name.
+   *
+   * @param pageRequest The page size, and the token from the previous page to continue from.
+   * @return The page of role names and the token for the next page, if any.
+   */
+  public Page<String> listRoleNames(PageRequest pageRequest) {
+    NameListResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_ROLES_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            PageParams.of(pageRequest),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.roleErrorHandler());
+    resp.validate();
+
+    return PageParams.page(resp.getNames(), resp);
   }
 
   /**
@@ -1670,6 +1908,11 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    return metadataObjectRoleOperations.listBindingRoleNames(pageRequest);
+  }
+
+  @Override
   public List<JobTemplate> listJobTemplates() {
     JobTemplateListResponse resp =
         restClient.get(
@@ -1683,6 +1926,24 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.getJobTemplates().stream()
         .map(org.apache.gravitino.dto.util.DTOConverters::fromDTO)
         .collect(Collectors.toList());
+  }
+
+  @Override
+  public Page<JobTemplate> listJobTemplates(PageRequest pageRequest) {
+    JobTemplateListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_JOB_TEMPLATES_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.with(ImmutableMap.of("details", "true"), pageRequest),
+            JobTemplateListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.jobErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        resp.getJobTemplates().stream()
+            .map(org.apache.gravitino.dto.util.DTOConverters::fromDTO)
+            .collect(Collectors.toList()),
+        resp);
   }
 
   @Override
@@ -1781,6 +2042,25 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public Page<JobHandle> listJobs(String jobTemplateName, PageRequest pageRequest)
+      throws NoSuchJobTemplateException {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(jobTemplateName), "job template name must not be null or empty");
+
+    JobListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.with(ImmutableMap.of("jobTemplateName", jobTemplateName), pageRequest),
+            JobListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.jobErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        resp.getJobs().stream().map(GenericJobHandle::new).collect(Collectors.toList()), resp);
+  }
+
+  @Override
   public List<JobHandle> listJobs() {
     JobListResponse resp =
         restClient.get(
@@ -1792,6 +2072,21 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return resp.getJobs().stream().map(GenericJobHandle::new).collect(Collectors.toList());
+  }
+
+  @Override
+  public Page<JobHandle> listJobs(PageRequest pageRequest) {
+    JobListResponse resp =
+        restClient.get(
+            String.format(API_METALAKES_JOB_PATH, RESTUtils.encodeString(this.name())),
+            PageParams.with(Collections.emptyMap(), pageRequest),
+            JobListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.jobErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        resp.getJobs().stream().map(GenericJobHandle::new).collect(Collectors.toList()), resp);
   }
 
   @Override

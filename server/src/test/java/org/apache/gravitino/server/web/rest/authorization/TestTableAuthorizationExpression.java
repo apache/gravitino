@@ -84,7 +84,8 @@ public class TestTableAuthorizationExpression {
   @Test
   public void testListTable() throws NoSuchMethodException, OgnlException {
     Method method =
-        TableOperations.class.getMethod("listTables", String.class, String.class, String.class);
+        TableOperations.class.getMethod(
+            "listTables", String.class, String.class, String.class, Integer.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();

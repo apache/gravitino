@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.model.model import Model
@@ -51,6 +51,7 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 
 class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
@@ -111,6 +112,32 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
             NameIdentifier.of(ident.namespace().level(2), ident.name())
             for ident in entity_list_resp.identifiers()
         ]
+
+    def list_models_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_models``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_model_namespace(namespace)
+
+        model_full_ns = self._model_full_namespace(namespace)
+        resp = self.rest_client.get(
+            self._format_model_request_path(model_full_ns),
+            params=page_params(page_size, page_token),
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+
+        return Page(
+            items=[
+                NameIdentifier.of(ident.namespace().level(2), ident.name())
+                for ident in entity_list_resp.identifiers()
+            ],
+            next_page_token=entity_list_resp.next_page_token(),
+        )
 
     def get_model(self, ident: NameIdentifier) -> Model:
         """Get a model by its identifier.
@@ -223,6 +250,35 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
 
         return model_version_list_resp.versions()
 
+    def list_model_versions_page(
+        self,
+        model_ident: NameIdentifier,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[int]:
+        """Paged variant of ``list_model_versions``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_model_ident(model_ident)
+
+        model_full_ident = self._model_full_identifier(model_ident)
+        resp = self.rest_client.get(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
+            params=page_params(page_size, page_token),
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        model_version_list_resp = ModelVersionListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_list_resp.validate()
+
+        return Page(
+            items=list(model_version_list_resp.versions()),
+            next_page_token=model_version_list_resp.next_page_token(),
+        )
+
     def list_model_version_infos(
         self, model_ident: NameIdentifier
     ) -> List[ModelVersion]:
@@ -255,6 +311,39 @@ class GenericModelCatalog(BaseSchemaCatalog):  # pylint: disable=R0901
             GenericModelVersion(version)
             for version in model_version_info_list_resp.versions()
         ]
+
+    def list_model_version_infos_page(
+        self,
+        model_ident: NameIdentifier,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[ModelVersion]:
+        """Paged variant of ``list_model_version_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_model_ident(model_ident)
+        model_full_ident = self._model_full_identifier(model_ident)
+
+        params = {"details": "true"}
+        resp = self.rest_client.get(
+            f"{self._format_model_version_request_path(model_full_ident)}/versions",
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=MODEL_ERROR_HANDLER,
+        )
+        model_version_info_list_resp = ModelVersionInfoListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        model_version_info_list_resp.validate()
+
+        return Page(
+            items=[
+                GenericModelVersion(version)
+                for version in model_version_info_list_resp.versions()
+            ],
+            next_page_token=model_version_info_list_resp.next_page_token(),
+        )
 
     def get_model_version(
         self, model_ident: NameIdentifier, version: int

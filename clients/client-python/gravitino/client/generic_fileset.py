@@ -46,6 +46,7 @@ from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.fileset_dto import FilesetDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericFileset(
@@ -116,11 +117,33 @@ class GenericFileset(
     def list_policies(self) -> List[str]:
         return self._object_policy_operations.list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policies_with_visibility(self) -> PolicyList[str]:
         return self._object_policy_operations.list_policies_with_visibility()
 
     def list_policy_infos(self) -> List[Policy]:
         return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         return self._object_policy_operations.list_policy_infos_with_visibility()
@@ -137,6 +160,17 @@ class GenericFileset(
     def list_binding_role_names(self) -> List[str]:
         return self._object_role_operations.list_binding_role_names()
 
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_role_operations.list_binding_role_names_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def support_secrets(self) -> SupportsSecrets:
         return self
 
@@ -146,11 +180,33 @@ class GenericFileset(
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> List[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._object_tag_operations.list_tags_info_with_visibility()

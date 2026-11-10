@@ -33,6 +33,8 @@ paths:
       operationId: listPartitions
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns list of partition objects if {details} is true, else returns list of partition names
@@ -261,6 +263,8 @@ components:
     PartitionNameListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -277,6 +281,8 @@ components:
     PartitionListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

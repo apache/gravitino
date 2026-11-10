@@ -63,6 +63,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -92,7 +94,9 @@ public class CatalogOperations {
   public Response listCatalogs(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list catalog {} request for metalake: {}, ",
         verbose ? "infos" : "names",
@@ -104,28 +108,49 @@ public class CatalogOperations {
             Namespace catalogNS = NamespaceUtil.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
-              Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
-              catalogs =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.CATALOG,
-                      catalogs,
-                      (catalogEntity) ->
-                          NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
-              Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
-              LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
+              ListPager.ArrayPage<Catalog> page =
+                  ListPager.pageArray(
+                      catalogDispatcher.listCatalogsInfo(catalogNS),
+                      Catalog::name,
+                      catalogs ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants
+                                  .LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.CATALOG,
+                              catalogs,
+                              (catalogEntity) ->
+                                  NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name())),
+                      Catalog[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listCatalogs", metalake, "details"));
+              Response response =
+                  Utils.ok(
+                      new CatalogListResponse(DTOConverters.toDTOs(page.items()))
+                          .withNextPageToken(page.nextPageToken()));
+              LOG.info("List {} catalogs info under metalake: {}", page.items().length, metalake);
               return response;
             } else {
-              NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
-              idents =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.CATALOG,
-                      idents);
-              Response response = Utils.ok(new EntityListResponse(idents));
-              LOG.info("List {} catalogs under metalake: {}", idents.length, metalake);
+              ListPager.ArrayPage<NameIdentifier> page =
+                  ListPager.pageArray(
+                      catalogDispatcher.listCatalogs(catalogNS),
+                      NameIdentifier::name,
+                      idents ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants
+                                  .LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.CATALOG,
+                              idents),
+                      NameIdentifier[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listCatalogs", metalake, "names"));
+              Response response =
+                  Utils.ok(
+                      new EntityListResponse(page.items()).withNextPageToken(page.nextPageToken()));
+              LOG.info("List {} catalogs under metalake: {}", page.items().length, metalake);
               return response;
             }
           });

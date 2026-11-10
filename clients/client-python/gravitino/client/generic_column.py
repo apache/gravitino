@@ -27,6 +27,7 @@ from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericColumn(Column, SupportsTags):
@@ -88,11 +89,33 @@ class GenericColumn(Column, SupportsTags):
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._object_tag_operations.list_tags_info_with_visibility()

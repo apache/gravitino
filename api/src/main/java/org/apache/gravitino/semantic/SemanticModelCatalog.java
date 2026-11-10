@@ -27,6 +27,8 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /** The public catalog API for managing Semantic Models in a schema. */
 @Evolving
@@ -189,4 +191,45 @@ public interface SemanticModelCatalog {
    * @return {@code true} if the Semantic Model was dropped, or {@code false} if it did not exist.
    */
   boolean dropSemanticModel(NameIdentifier ident);
+
+  /**
+   * List one page of the semantic models in a namespace, in ascending order of name.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listSemanticModels(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the metrics of the semantic models in a namespace, in ascending order of full
+   * identifier.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listMetrics(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the metrics of the semantic models in a namespace with their details, in
+   * ascending order of full identifier.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<SemanticModelMetric> listMetricInfos(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

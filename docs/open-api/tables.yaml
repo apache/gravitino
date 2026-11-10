@@ -29,7 +29,14 @@ paths:
       tags:
         - table
       summary: List tables
+      description: >-
+        Lists the tables in a schema. With `pageSize` or `pageToken`, returns one page in
+        ascending order of table name, holding only tables the caller may see, and a
+        `nextPageToken` when more remain.
       operationId: listTables
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"

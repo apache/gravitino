@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.job.JobDTO;
 /** Represents a response containing a list of jobs. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
-public class JobListResponse extends BaseResponse {
+public class JobListResponse extends BaseListResponse {
 
   @JsonProperty("jobs")
   private final List<JobDTO> jobs;

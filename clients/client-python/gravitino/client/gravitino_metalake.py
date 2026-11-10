@@ -86,6 +86,7 @@ from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
 from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
 from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
+from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
@@ -141,6 +142,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
+from gravitino.api.pagination import Page, page_params
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +229,26 @@ class GravitinoMetalake(
         entity_list.validate()
         return [identifier.name() for identifier in entity_list.identifiers()]
 
+    def list_catalogs_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_catalogs``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=CATALOG_ERROR_HANDLER,
+        )
+        entity_list = EntityListResponse.from_json(response.body, infer_missing=True)
+        entity_list.validate()
+        return Page(
+            items=[identifier.name() for identifier in entity_list.identifiers()],
+            next_page_token=entity_list.next_page_token(),
+        )
+
     def list_catalogs_info(self) -> List[Catalog]:
         """List all the catalogs with their information under this metalake.
 
@@ -247,6 +269,30 @@ class GravitinoMetalake(
             DTOConverters.to_catalog(self.name(), catalog, self.rest_client)
             for catalog in catalog_list.catalogs()
         ]
+
+    def list_catalogs_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Catalog]:
+        """Paged variant of ``list_catalogs_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        params = {"details": "true"}
+        url = f"api/metalakes/{encode_string(self.name())}/catalogs"
+        response = self.rest_client.get(
+            url,
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=CATALOG_ERROR_HANDLER,
+        )
+        catalog_list = CatalogListResponse.from_json(response.body, infer_missing=True)
+
+        return Page(
+            items=[
+                DTOConverters.to_catalog(self.name(), catalog, self.rest_client)
+                for catalog in catalog_list.catalogs()
+            ],
+            next_page_token=catalog_list.next_page_token(),
+        )
 
     def load_catalog(self, name: str) -> Catalog:
         """Load the catalog with specified name.
@@ -478,6 +524,30 @@ class GravitinoMetalake(
             DTOConverters.from_job_template_dto(dto) for dto in resp.job_templates()
         ]
 
+    def list_job_templates_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[JobTemplate]:
+        """Paged variant of ``list_job_templates``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        params = {"details": "true"}
+        url = self.API_METALAKES_JOB_TEMPLATES_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=JOB_ERROR_HANDLER,
+        )
+        resp = JobTemplateListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return Page(
+            items=[
+                DTOConverters.from_job_template_dto(dto) for dto in resp.job_templates()
+            ],
+            next_page_token=resp.next_page_token(),
+        )
+
     def register_job_template(self, job_template: JobTemplate) -> None:
         """Register a job template with the specified job template to Gravitino. The registered
         job template will be maintained in Gravitino, allowing it to be executed later.
@@ -609,6 +679,32 @@ class GravitinoMetalake(
 
         return [GenericJobHandle(dto) for dto in resp.jobs()]
 
+    def list_jobs_page(
+        self,
+        job_template_name: str = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[JobHandle]:
+        """Paged variant of ``list_jobs``: one page, newest queued first.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        params = {"jobTemplateName": job_template_name} if job_template_name else {}
+        url = self.API_METALAKES_JOB_RUNS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=JOB_ERROR_HANDLER,
+        )
+        resp = JobListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return Page(
+            items=[GenericJobHandle(dto) for dto in resp.jobs()],
+            next_page_token=resp.next_page_token(),
+        )
+
     def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
         """Retrieves a job by its ID, optionally including its captured stdout/stderr output.
 
@@ -710,6 +806,28 @@ class GravitinoMetalake(
 
         return resp.tag_names()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        resp = TagNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return Page(
+            items=list(resp.tag_names()),
+            next_page_token=resp.next_page_token(),
+        )
+
     def list_tags_info(self) -> List[Tag]:
         """
         List tags information under a metalake.
@@ -738,6 +856,35 @@ class GravitinoMetalake(
             )
             for tag_dto in list_info_resp.tags()
         ]
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_TAGS_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
+        list_info_resp.validate()
+
+        return Page(
+            items=[
+                GenericTag(
+                    self.name(),
+                    tag_dto,
+                    self.rest_client,
+                )
+                for tag_dto in list_info_resp.tags()
+            ],
+            next_page_token=list_info_resp.next_page_token(),
+        )
 
     def get_tag(self, tag_name) -> Tag:
         """
@@ -915,6 +1062,25 @@ class GravitinoMetalake(
             for association in resp.associations()
         ]
 
+    def list_policy_names_for_tag_page(
+        self, tag_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """List one page of the names of the policies associated with a tag, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_TAG_POLICIES_PATH.format(
+            encode_string(self.name()), encode_string(tag_name)
+        )
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=TAG_ERROR_HANDLER,
+        )
+        resp = NameListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(items=resp.names, next_page_token=resp.next_page_token())
+
     def add_policy_for_tag(
         self,
         tag_name,
@@ -1010,6 +1176,28 @@ class GravitinoMetalake(
 
         return resp.names
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_POLICIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        resp = PolicyNameListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+
+        return Page(
+            items=list(resp.names),
+            next_page_token=resp.next_page_token(),
+        )
+
     def list_policy_infos(self) -> List[Policy]:
         """
         List policies information under a metalake.
@@ -1031,6 +1219,30 @@ class GravitinoMetalake(
         list_info_resp.validate()
 
         return [GenericPolicy(policy_dto) for policy_dto in list_info_resp.policies()]
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_POLICIES_PATH.format(encode_string(self.name()))
+
+        response = self.rest_client.get(
+            url,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        list_info_resp = PolicyListResponse.from_json(response.body, infer_missing=True)
+        list_info_resp.validate()
+
+        return Page(
+            items=[
+                GenericPolicy(policy_dto) for policy_dto in list_info_resp.policies()
+            ],
+            next_page_token=list_info_resp.next_page_token(),
+        )
 
     def get_policy(self, policy_name) -> Policy:
         """
@@ -1250,6 +1462,25 @@ class GravitinoMetalake(
             for association in resp.associations()
         ]
 
+    def list_tag_names_for_policy_page(
+        self, policy_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """List one page of the names of the tags associated with a policy, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_POLICY_TAGS_PATH.format(
+            encode_string(self.name()), encode_string(policy_name)
+        )
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        resp = NameListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(items=resp.names, next_page_token=resp.next_page_token())
+
     #########
     # Owner operations
     #########
@@ -1392,6 +1623,26 @@ class GravitinoMetalake(
         resp.validate()
         return resp.users()
 
+    def list_users_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[User]:
+        """Paged variant of ``list_users``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_USERS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=USER_ERROR_HANDLER,
+        )
+        resp = UserListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(
+            items=list(resp.users()),
+            next_page_token=resp.next_page_token(),
+        )
+
     def list_user_names(self) -> list[str]:
         """List all user names under this metalake.
 
@@ -1406,6 +1657,26 @@ class GravitinoMetalake(
         resp = UserNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
         return resp.names()
+
+    def list_user_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_user_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_USERS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=USER_ERROR_HANDLER,
+        )
+        resp = UserNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(
+            items=list(resp.names()),
+            next_page_token=resp.next_page_token(),
+        )
 
     #####################
     # Group operations
@@ -1501,6 +1772,26 @@ class GravitinoMetalake(
         resp.validate()
         return resp.groups()
 
+    def list_groups_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Group]:
+        """Paged variant of ``list_groups``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_GROUPS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=GROUP_ERROR_HANDLER,
+        )
+        resp = GroupListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(
+            items=list(resp.groups()),
+            next_page_token=resp.next_page_token(),
+        )
+
     def list_group_names(self) -> list[str]:
         """List all group names under this metalake.
 
@@ -1515,6 +1806,26 @@ class GravitinoMetalake(
         resp = GroupNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
         return resp.names()
+
+    def list_group_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_group_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_GROUPS_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=GROUP_ERROR_HANDLER,
+        )
+        resp = GroupNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(
+            items=list(resp.names()),
+            next_page_token=resp.next_page_token(),
+        )
 
     #####################
     # Role operations
@@ -1628,8 +1939,39 @@ class GravitinoMetalake(
         resp.validate()
         return resp.names()
 
+    def list_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        url = self.API_METALAKES_ROLES_PATH.format(encode_string(self.name()))
+        response = self.rest_client.get(
+            url,
+            params=page_params(page_size, page_token),
+            error_handler=ROLE_ERROR_HANDLER,
+        )
+        resp = RoleNamesListResponse.from_json(response.body, infer_missing=True)
+        resp.validate()
+        return Page(
+            items=list(resp.names()),
+            next_page_token=resp.next_page_token(),
+        )
+
     def list_binding_role_names(self) -> List[str]:
         return self._metadata_object_role_operations.list_binding_role_names()
+
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._metadata_object_role_operations.list_binding_role_names_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def grant_roles_to_user(self, role_names: List[str], user_name: str) -> User:
         """Grant roles to a user.

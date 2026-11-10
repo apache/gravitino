@@ -25,6 +25,7 @@ from gravitino.api.policy.policy_tag_association import PolicyTagAssociation
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_change import TagChange
 from gravitino.exceptions.base import UnsupportedOperationException
+from gravitino.api.pagination import Page
 
 
 class TagOperations(ABC):
@@ -46,6 +47,22 @@ class TagOperations(ABC):
         """
         pass
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_tags``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     @abstractmethod
     def list_tags_info(self) -> list[Tag]:
         """
@@ -58,6 +75,22 @@ class TagOperations(ABC):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         pass
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """One page of ``list_tags_info``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Tag]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     @abstractmethod
     def get_tag(self, tag_name: str) -> Tag:
@@ -200,3 +233,20 @@ class TagOperations(ABC):
                 support policy associations for tags.
         """
         raise UnsupportedOperationException("removePolicyFromTag is not supported")
+
+    def list_policy_names_for_tag_page(
+        self, tag_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of the names of the policies associated with a tag, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            tag_name: The tag name.
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")

@@ -31,7 +31,7 @@ import org.apache.gravitino.dto.authorization.GroupDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class GroupListResponse extends BaseResponse {
+public class GroupListResponse extends BaseListResponse {
 
   @JsonProperty("groups")
   private final GroupDTO[] groups;

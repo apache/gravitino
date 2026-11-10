@@ -32,6 +32,8 @@ import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchModelVersionURINameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * The ModelCatalog interface defines the public API for managing model objects in a schema. If the
@@ -380,4 +382,43 @@ public interface ModelCatalog {
    */
   ModelVersion alterModelVersion(NameIdentifier ident, String alias, ModelVersionChange... changes)
       throws NoSuchModelException, IllegalArgumentException;
+
+  /**
+   * List one page of the models in a namespace, in ascending order of name.
+   *
+   * @param namespace A namespace.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<NameIdentifier> listModels(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the version numbers of a model, in ascending order.
+   *
+   * @param ident The model identifier.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Integer> listModelVersions(NameIdentifier ident, PageRequest pageRequest)
+      throws NoSuchModelException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the versions of a model with their details, in ascending order of version.
+   *
+   * @param ident The model identifier.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<ModelVersion> listModelVersionInfos(NameIdentifier ident, PageRequest pageRequest)
+      throws NoSuchModelException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

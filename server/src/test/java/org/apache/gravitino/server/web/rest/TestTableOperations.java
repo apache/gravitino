@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -126,6 +127,7 @@ public class TestTableOperations extends BaseOperationsTest {
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
+    Mockito.doReturn(3).when(config).get(LIST_MAX_PAGE_SIZE);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     Mockito.doReturn(true).when(schemaDispatcher).schemaExists(any());
@@ -274,6 +276,118 @@ public class TestTableOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testListTablesPaged() {
+    NameIdentifier[] tables = new NameIdentifier[5];
+    for (int i = 0; i < 5; i++) {
+      tables[i] = NameIdentifier.of(metalake, catalog, schema, "table" + (i + 1));
+    }
+    // The source returns tables in no particular order; pages come back sorted by name.
+    when(dispatcher.listTables(any()))
+        .thenReturn(new NameIdentifier[] {tables[2], tables[0], tables[4], tables[1], tables[3]});
+
+    EntityListResponse page1 = listTablesPage(2, null);
+    Assertions.assertArrayEquals(new NameIdentifier[] {tables[0], tables[1]}, page1.identifiers());
+    Assertions.assertNotNull(page1.nextPageToken());
+
+    EntityListResponse page2 = listTablesPage(2, page1.nextPageToken());
+    Assertions.assertArrayEquals(new NameIdentifier[] {tables[2], tables[3]}, page2.identifiers());
+    Assertions.assertNotNull(page2.nextPageToken());
+
+    EntityListResponse page3 = listTablesPage(2, page2.nextPageToken());
+    Assertions.assertArrayEquals(new NameIdentifier[] {tables[4]}, page3.identifiers());
+    Assertions.assertNull(page3.nextPageToken());
+
+    // A page size above the server maximum (3 in this test) is clamped to the maximum.
+    EntityListResponse clamped = listTablesPage(10, null);
+    Assertions.assertArrayEquals(
+        new NameIdentifier[] {tables[0], tables[1], tables[2]}, clamped.identifiers());
+    Assertions.assertNotNull(clamped.nextPageToken());
+
+    // A token without a page size returns a page of the server maximum.
+    EntityListResponse tokenOnly = listTablesPage(null, page1.nextPageToken());
+    Assertions.assertArrayEquals(
+        new NameIdentifier[] {tables[2], tables[3], tables[4]}, tokenOnly.identifiers());
+    Assertions.assertNull(tokenOnly.nextPageToken());
+  }
+
+  @Test
+  public void testListTablesUnpagedResponseUnchanged() {
+    NameIdentifier table1 = NameIdentifier.of(metalake, catalog, schema, "table1");
+    NameIdentifier table2 = NameIdentifier.of(metalake, catalog, schema, "table2");
+    when(dispatcher.listTables(any())).thenReturn(new NameIdentifier[] {table2, table1});
+
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    String body = resp.readEntity(String.class);
+    Assertions.assertFalse(body.contains("nextPageToken"), body);
+    // An unpaged request keeps the source order, as before paging existed.
+    Assertions.assertTrue(body.indexOf("table2") < body.indexOf("table1"), body);
+  }
+
+  @Test
+  public void testListTablesPagedRejectsInvalidParameters() {
+    when(dispatcher.listTables(any()))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of(metalake, catalog, schema, "t1")});
+
+    assertBadRequestNaming(listTablesResponse(0, null), "pageSize");
+    assertBadRequestNaming(listTablesResponse(-1, null), "pageSize");
+    assertBadRequestNaming(listTablesResponse(2, "not-a-token"), "pageToken");
+
+    // A token issued for one schema is rejected by another.
+    NameIdentifier[] two = {
+      NameIdentifier.of(metalake, catalog, schema, "t1"),
+      NameIdentifier.of(metalake, catalog, schema, "t2")
+    };
+    when(dispatcher.listTables(any())).thenReturn(two);
+    String token = listTablesPage(1, null).nextPageToken();
+    Assertions.assertNotNull(token);
+    Response otherSchema =
+        target(tablePath(metalake, catalog, "other_schema"))
+            .queryParam("pageSize", 1)
+            .queryParam("pageToken", token)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    assertBadRequestNaming(otherSchema, "pageToken");
+  }
+
+  private Response listTablesResponse(Integer pageSize, String pageToken) {
+    javax.ws.rs.client.WebTarget target = target(tablePath(metalake, catalog, schema));
+    if (pageSize != null) {
+      target = target.queryParam("pageSize", pageSize);
+    }
+    if (pageToken != null) {
+      target = target.queryParam("pageToken", pageToken);
+    }
+    return target
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept("application/vnd.gravitino.v1+json")
+        .get();
+  }
+
+  private EntityListResponse listTablesPage(Integer pageSize, String pageToken) {
+    Response resp = listTablesResponse(pageSize, pageToken);
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    EntityListResponse listResp = resp.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, listResp.getCode());
+    return listResp;
+  }
+
+  private static void assertBadRequestNaming(Response resp, String parameter) {
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp.getType());
+    Assertions.assertTrue(
+        errorResp.getMessage().contains(parameter),
+        "expected the message to name " + parameter + ": " + errorResp.getMessage());
   }
 
   private DistributionDTO createMockDistributionDTO(String columnName, int bucketNum) {

@@ -22,6 +22,8 @@ package org.apache.gravitino.tag;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Interface for supporting getting or associate tags to objects. This interface will be mixed with
@@ -105,5 +107,29 @@ public interface SupportsTags {
       throws TagAlreadyAssociatedException {
     throw new UnsupportedOperationException(
         "The associateTags(TagValue[], TagValue[]) method is not supported.");
+  }
+
+  /**
+   * List one page of the names of the tags associated with the object, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listTags(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the tags associated with the object, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
   }
 }

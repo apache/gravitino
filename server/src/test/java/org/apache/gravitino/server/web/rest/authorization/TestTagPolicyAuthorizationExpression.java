@@ -83,7 +83,9 @@ public class TestTagPolicyAuthorizationExpression {
             String.class,
             String.class,
             String.class,
-            boolean.class);
+            boolean.class,
+            Integer.class,
+            String.class);
 
     AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
     assertEquals(CAN_ACCESS_METADATA, annotation.expression());

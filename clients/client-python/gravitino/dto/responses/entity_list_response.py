@@ -20,13 +20,13 @@ from typing import List
 
 from dataclasses_json import config
 
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.name_identifier import NameIdentifier
 
 
 @dataclass
-class EntityListResponse(BaseResponse):
+class EntityListResponse(BaseListResponse):
     """Represents a response containing a list of catalogs."""
 
     _idents: List[NameIdentifier] = field(metadata=config(field_name="identifiers"))

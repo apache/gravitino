@@ -59,6 +59,8 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
@@ -94,6 +96,10 @@ class RelationalCatalog extends BaseSchemaCatalog
         SupportsSecrets {
 
   public static final String PRIVILEGES = "privileges";
+
+  static final String PAGE_SIZE = "pageSize";
+
+  static final String PAGE_TOKEN = "pageToken";
 
   private final SemanticModelCatalogOperations semanticModelOperations;
 
@@ -132,16 +138,31 @@ class RelationalCatalog extends BaseSchemaCatalog
     return semanticModelOperations.listSemanticModels(namespace);
   }
 
+  @Override
+  public Page<NameIdentifier> listSemanticModels(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listSemanticModels(namespace, pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public NameIdentifier[] listMetrics(Namespace namespace) {
     return semanticModelOperations.listMetrics(namespace);
   }
 
+  @Override
+  public Page<NameIdentifier> listMetrics(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listMetrics(namespace, pageRequest);
+  }
+
   /** {@inheritDoc} */
   @Override
   public SemanticModelMetric[] listMetricInfos(Namespace namespace) {
     return semanticModelOperations.listMetricInfos(namespace);
+  }
+
+  @Override
+  public Page<SemanticModelMetric> listMetricInfos(Namespace namespace, PageRequest pageRequest) {
+    return semanticModelOperations.listMetricInfos(namespace, pageRequest);
   }
 
   /** {@inheritDoc} */
@@ -208,6 +229,41 @@ class RelationalCatalog extends BaseSchemaCatalog
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /**
+   * List one page of the tables under the given Schema namespace, in ascending order of table name.
+   *
+   * @param namespace The namespace to list the tables under it. This namespace should have 1 level,
+   *     which is the schema name;
+   * @param pageRequest The page to read.
+   * @return The page of {@link NameIdentifier} of the tables under the given namespace.
+   * @throws NoSuchSchemaException if the schema with specified namespace does not exist.
+   */
+  @Override
+  public Page<NameIdentifier> listTables(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkTableNamespace(namespace);
+    Preconditions.checkArgument(pageRequest != null, "pageRequest must not be null");
+
+    Namespace fullNamespace = getEntityFullNamespace(namespace);
+    Map<String, String> queryParams = Maps.newHashMap();
+    queryParams.put(PAGE_SIZE, String.valueOf(pageRequest.pageSize()));
+    pageRequest.pageToken().ifPresent(token -> queryParams.put(PAGE_TOKEN, token));
+    EntityListResponse resp =
+        restClient.get(
+            formatTableRequestPath(fullNamespace),
+            queryParams,
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tableErrorHandler());
+    resp.validate();
+
+    List<NameIdentifier> idents =
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .collect(Collectors.toList());
+    return Page.of(idents, resp.nextPageToken());
   }
 
   /**
@@ -427,6 +483,28 @@ class RelationalCatalog extends BaseSchemaCatalog
     return Arrays.stream(resp.identifiers())
         .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
         .toArray(NameIdentifier[]::new);
+  }
+
+  @Override
+  public Page<NameIdentifier> listViews(Namespace namespace, PageRequest pageRequest)
+      throws NoSuchSchemaException {
+    checkViewNamespace(namespace);
+
+    Namespace fullNamespace = getEntityFullNamespace(namespace);
+    EntityListResponse resp =
+        restClient.get(
+            formatViewRequestPath(fullNamespace),
+            PageParams.of(pageRequest),
+            EntityListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.viewErrorHandler());
+    resp.validate();
+
+    return PageParams.page(
+        Arrays.stream(resp.identifiers())
+            .map(ident -> NameIdentifier.of(ident.namespace().level(2), ident.name()))
+            .toArray(NameIdentifier[]::new),
+        resp);
   }
 
   /**

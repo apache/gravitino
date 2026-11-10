@@ -30,6 +30,8 @@ import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.model.Model;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -135,6 +137,11 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -142,6 +149,11 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override
@@ -171,6 +183,11 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   }
 
   @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicies(pageRequest);
+  }
+
+  @Override
   public PolicyList<String> listPoliciesWithVisibility() {
     return objectPolicyOperations.listPoliciesWithVisibility();
   }
@@ -178,6 +195,11 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicyInfos(pageRequest);
   }
 
   @Override

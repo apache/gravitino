@@ -24,6 +24,8 @@ import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Interface for job management operations. This interface will be mixed with GravitinoClient to
@@ -168,4 +170,41 @@ public interface SupportsJobs {
    * @throws NoSuchJobException if the job with the specified ID does not exist
    */
   JobHandle cancelJob(String jobId) throws NoSuchJobException;
+
+  /**
+   * List one page of the job templates, in ascending order of name.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<JobTemplate> listJobTemplates(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the jobs, newest queued first.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<JobHandle> listJobs(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
+
+  /**
+   * List one page of the jobs of a job template, newest queued first.
+   *
+   * @param jobTemplateName The job template name.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<JobHandle> listJobs(String jobTemplateName, PageRequest pageRequest)
+      throws NoSuchJobTemplateException {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

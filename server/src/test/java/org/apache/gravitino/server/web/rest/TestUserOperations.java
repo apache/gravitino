@@ -22,14 +22,18 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -503,5 +507,47 @@ public class TestUserOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testListUserNamesPaged() throws IOException {
+    doReturn(new String[] {"c", "a", "b"}).when(manager).listUserNames(any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+            target("/metalakes/metalake1/users"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target("/metalakes/metalake1/users"));
+  }
+
+  @Test
+  public void testListUsersPaged() throws IOException {
+    doReturn(new User[] {buildUser("c"), buildUser("a"), buildUser("b")})
+        .when(manager)
+        .listUsers(any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+                target("/metalakes/metalake1/users").queryParam("details", "true"),
+                2,
+                UserListResponse.class,
+                UserListResponse::getUsers)
+            .stream()
+            .map(UserDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

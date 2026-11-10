@@ -31,7 +31,7 @@ import org.apache.gravitino.dto.CatalogDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class CatalogListResponse extends BaseResponse {
+public class CatalogListResponse extends BaseListResponse {
 
   @JsonProperty("catalogs")
   private final CatalogDTO[] catalogs;

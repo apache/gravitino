@@ -31,7 +31,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class MetadataObjectListResponse extends BaseResponse {
+public class MetadataObjectListResponse extends BaseListResponse {
 
   @JsonProperty("metadataObjects")
   private final MetadataObjectDTO[] metadataObjects;

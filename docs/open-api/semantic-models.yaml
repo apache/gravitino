@@ -95,6 +95,8 @@ paths:
           schema:
             type: boolean
             default: false
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "#/components/responses/SemanticModelMetricListResponse"
@@ -123,6 +125,9 @@ paths:
         Lists the Semantic Models in a schema. Semantic Models are supported only for relational
         catalogs. Each returned identifier uses the full metalake.catalog.schema.name namespace.
       operationId: listSemanticModels
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "#/components/responses/SemanticModelListResponse"
@@ -413,6 +418,8 @@ components:
         - code
         - identifiers
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -431,6 +438,8 @@ components:
         - code
         - metrics
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -1325,6 +1334,8 @@ components:
               - code
               - identifiers
             properties:
+              nextPageToken:
+                $ref: "./openapi.yaml#/components/schemas/NextPageToken"
               code:
                 type: integer
                 format: int32

@@ -24,6 +24,8 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Arrays;
+import java.util.List;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -59,6 +61,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -89,21 +93,27 @@ public class TableOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list tables request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             Namespace tableNS = NamespaceUtil.ofTable(metalake, catalog, schema);
-            NameIdentifier[] idents = dispatcher.listTables(tableNS);
-            idents =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.TABLE,
-                    idents);
-            Response response = Utils.ok(new EntityListResponse(idents));
+            ListPager.ArrayPage<NameIdentifier> page =
+                ListPager.pageArray(
+                    dispatcher.listTables(tableNS),
+                    NameIdentifier::name,
+                    all -> filterTables(metalake, Arrays.asList(all)),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listTables", metalake, catalog, schema));
+            NameIdentifier[] idents = page.items();
+            Response response =
+                Utils.ok(new EntityListResponse(idents).withNextPageToken(page.nextPageToken()));
             LOG.info(
                 "List {} tables under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
             return response;
@@ -112,6 +122,14 @@ public class TableOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.LIST, "", schema, e);
     }
+  }
+
+  private static NameIdentifier[] filterTables(String metalake, List<NameIdentifier> idents) {
+    return MetadataAuthzHelper.filterByExpression(
+        metalake,
+        AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+        Entity.EntityType.TABLE,
+        idents.toArray(new NameIdentifier[0]));
   }
 
   @POST

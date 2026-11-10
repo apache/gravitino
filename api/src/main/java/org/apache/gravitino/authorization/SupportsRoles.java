@@ -19,6 +19,8 @@
 package org.apache.gravitino.authorization;
 
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Interface for supporting list role names for objects. This interface will be mixed with metadata
@@ -33,4 +35,16 @@ public interface SupportsRoles {
    * @return The role name list associated with this metadata object.
    */
   String[] listBindingRoleNames();
+
+  /**
+   * List one page of the names of the roles bound to the object, in ascending order.
+   *
+   * <p>The default implementation throws {@link UnsupportedOperationException}.
+   *
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

@@ -23,6 +23,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -34,7 +35,9 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
@@ -829,5 +832,24 @@ public class TestRoleOperations extends BaseOperationsTest {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
+  }
+
+  @Test
+  public void testListRoleNamesPaged() throws IOException {
+    doReturn(new String[] {"c", "a", "b"}).when(manager).listRoleNames(any());
+    BaseMetalake inUse = mock(BaseMetalake.class);
+    PropertiesMetadata inUseProperties = mock(PropertiesMetadata.class);
+    when(inUseProperties.getOrDefault(any(), any())).thenReturn(true);
+    when(inUse.propertiesMetadata()).thenReturn(inUseProperties);
+    doReturn(inUse).when(entityStore).get(any(), any(), any());
+
+    List<String> walked =
+        PagedListWalker.walk(
+            target("/metalakes/metalake1/roles"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target("/metalakes/metalake1/roles"));
   }
 }

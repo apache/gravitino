@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.EntityStore;
@@ -43,6 +44,7 @@ import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.pagination.Page;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
@@ -138,6 +140,33 @@ class TestOperationDispatcherSnapshots {
    * silently escaping with connector classes attached. This test is that stop.
    */
   @Test
+  void testPageIsCopiedIntoParentClassLoaderPage() {
+    List<NameIdentifier> items = new ArrayList<>();
+    items.add(NameIdentifier.of("m", "c", "s", "t1"));
+    Page<NameIdentifier> connectorPage =
+        new Page<NameIdentifier>() {
+          @Override
+          public List<NameIdentifier> items() {
+            return items;
+          }
+
+          @Override
+          public Optional<String> nextPageToken() {
+            return Optional.of("token");
+          }
+        };
+
+    Page<NameIdentifier> detached = ConnectorObjectSnapshot.detach(connectorPage);
+
+    Assertions.assertNotSame(connectorPage, detached);
+    Assertions.assertEquals(Page.class.getClassLoader(), detached.getClass().getClassLoader());
+    Assertions.assertEquals(items, detached.items());
+    Assertions.assertEquals(Optional.of("token"), detached.nextPageToken());
+    items.add(NameIdentifier.of("m", "c", "s", "t2"));
+    Assertions.assertEquals(1, detached.items().size(), "detached page must not share the list");
+  }
+
+  @Test
   void testEveryDispatcherReturnTypeIsDetachedOrCarriesNoConnectorState() {
     List<Class<?>> dispatchers =
         List.of(
@@ -181,7 +210,8 @@ class TestOperationDispatcherSnapshots {
           Partition.class,
           ModelVersion[].class,
           Partition[].class,
-          FileInfo[].class);
+          FileInfo[].class,
+          Page.class);
 
   /**
    * Returns whether values of this type are built by Gravitino itself rather than by a connector,

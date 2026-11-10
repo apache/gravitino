@@ -67,6 +67,7 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +190,38 @@ class BaseSchemaCatalog(
         entity_list_response.validate()
 
         return [ident.name() for ident in entity_list_response.identifiers()]
+
+    def list_schemas_page(
+        self,
+        parent_schema: Optional[str] = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[str]:
+        """Paged variant of ``list_schemas``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        params = None
+        if parent_schema is not None:
+            if not parent_schema.strip():
+                raise IllegalArgumentException("parentSchema must not be null or blank")
+            params = {"parentSchema": parent_schema}
+
+        resp = self.rest_client.get(
+            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace()),
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=SCHEMA_ERROR_HANDLER,
+        )
+        entity_list_response = EntityListResponse.from_json(
+            resp.body, infer_missing=True
+        )
+        entity_list_response.validate()
+
+        return Page(
+            items=[ident.name() for ident in entity_list_response.identifiers()],
+            next_page_token=entity_list_response.next_page_token(),
+        )
 
     def create_schema(
         self,
@@ -336,8 +369,30 @@ class BaseSchemaCatalog(
     def list_functions(self, namespace: Namespace) -> List[NameIdentifier]:
         return self._function_operations.list_functions(namespace)
 
+    def list_functions_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_functions``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._function_operations.list_functions_page(
+            namespace, page_size=page_size, page_token=page_token
+        )
+
     def list_function_infos(self, namespace: Namespace) -> List[Function]:
         return self._function_operations.list_function_infos(namespace)
+
+    def list_function_infos_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Function]:
+        """Paged variant of ``list_function_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._function_operations.list_function_infos_page(
+            namespace, page_size=page_size, page_token=page_token
+        )
 
     def get_function(self, ident: NameIdentifier) -> Function:
         return self._function_operations.get_function(ident)
@@ -420,11 +475,33 @@ class BaseSchemaCatalog(
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._object_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> List[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._object_tag_operations.list_tags_info_with_visibility()
@@ -450,11 +527,33 @@ class BaseSchemaCatalog(
     def list_policies(self) -> List[str]:
         return self._object_policy_operations.list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policies_with_visibility(self) -> PolicyList[str]:
         return self._object_policy_operations.list_policies_with_visibility()
 
     def list_policy_infos(self) -> List[Policy]:
         return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_policy_operations.list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         return self._object_policy_operations.list_policy_infos_with_visibility()
@@ -467,3 +566,14 @@ class BaseSchemaCatalog(
 
     def list_binding_role_names(self) -> List[str]:
         return self._object_role_operations.list_binding_role_names()
+
+    def list_binding_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_binding_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._object_role_operations.list_binding_role_names_page(
+            page_size=page_size, page_token=page_token
+        )

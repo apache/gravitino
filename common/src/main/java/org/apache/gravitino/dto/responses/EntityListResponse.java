@@ -31,7 +31,7 @@ import org.apache.gravitino.json.JsonUtils.NameIdentifierSerializer;
 /** Represents a response containing a list of catalogs. */
 @EqualsAndHashCode(callSuper = true)
 @ToString
-public class EntityListResponse extends BaseResponse {
+public class EntityListResponse extends BaseListResponse {
 
   @JsonSerialize(contentUsing = NameIdentifierSerializer.class)
   @JsonDeserialize(contentUsing = NameIdentifierDeserializer.class)
@@ -46,6 +46,17 @@ public class EntityListResponse extends BaseResponse {
   public EntityListResponse(NameIdentifier[] idents) {
     super(0);
     this.idents = idents;
+  }
+
+  /**
+   * Constructor for EntityListResponse holding one page of identifiers.
+   *
+   * @param idents The array of entity identifiers in the page.
+   * @param nextPageToken The token for the next page, or null when no further entry remains.
+   */
+  public EntityListResponse(NameIdentifier[] idents, String nextPageToken) {
+    this(idents);
+    withNextPageToken(nextPageToken);
   }
 
   /** Default constructor for EntityListResponse. (Used for Jackson deserialization.) */

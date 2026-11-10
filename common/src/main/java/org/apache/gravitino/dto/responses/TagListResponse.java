@@ -32,7 +32,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class TagListResponse extends BaseResponse {
+public class TagListResponse extends BaseListResponse {
 
   @JsonProperty("tags")
   private final TagDTO[] tags;

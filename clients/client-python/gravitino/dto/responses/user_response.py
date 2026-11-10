@@ -23,6 +23,7 @@ from typing import Optional
 from dataclasses_json import config, dataclass_json
 
 from gravitino.dto.authorization.user_dto import UserDTO
+from gravitino.dto.responses.base_list_response import BaseListResponse
 from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.utils.precondition import Precondition
 
@@ -45,7 +46,7 @@ class UserResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class UserListResponse(BaseResponse):
+class UserListResponse(BaseListResponse):
     """Represents a response for a list of users with details."""
 
     _users: list[UserDTO] = field(
@@ -63,7 +64,7 @@ class UserListResponse(BaseResponse):
 
 @dataclass_json
 @dataclass
-class UserNamesListResponse(BaseResponse):
+class UserNamesListResponse(BaseListResponse):
     """Represents a response for a list of user names."""
 
     _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))

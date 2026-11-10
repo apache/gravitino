@@ -32,6 +32,8 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.stats.StatisticValue;
@@ -69,6 +71,21 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
     resp.validate();
 
     return Arrays.asList(resp.getStatistics());
+  }
+
+  @Override
+  public Page<Statistic> listStatistics(PageRequest pageRequest) {
+    StatisticListResponse resp =
+        restClient.get(
+            statisticsRequestPath,
+            PageParams.of(pageRequest),
+            StatisticListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.statisticsErrorHandler());
+
+    resp.validate();
+
+    return PageParams.page(Arrays.asList(resp.getStatistics()), resp);
   }
 
   @Override

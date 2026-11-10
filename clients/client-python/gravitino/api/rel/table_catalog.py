@@ -26,6 +26,7 @@ from gravitino.api.rel.expressions.distributions.distribution import Distributio
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.expressions.transforms.transform import Transform
 from gravitino.api.rel.indexes.index import Index
+from gravitino.api.pagination import Page
 from gravitino.api.rel.table import Table
 from gravitino.exceptions.base import (
     NoSuchSchemaException,
@@ -55,6 +56,31 @@ class TableCatalog(ABC):
         Raises:
             NoSuchSchemaException: If the schema does not exist.
         """
+
+    def list_tables_page(
+        self,
+        namespace: Namespace,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[NameIdentifier]:
+        """List one page of the tables in a namespace, in ascending order of table name.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            namespace (Namespace): A namespace.
+            page_size (int): The maximum number of tables in the page; must be at least 1.
+            page_token (Optional[str]): The ``next_page_token`` of the previous page, or None
+                for the first page.
+
+        Returns:
+            Page[NameIdentifier]: The page of table identifiers.
+
+        Raises:
+            NoSuchSchemaException: If the schema does not exist.
+        """
+        raise UnsupportedOperationException("Paged table listing is not supported")
 
     @overload
     @abstractmethod

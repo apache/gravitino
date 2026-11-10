@@ -26,6 +26,7 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -80,6 +81,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -109,7 +112,9 @@ public class JobOperations {
   public Response listJobTemplates(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean details) {
+      @QueryParam("details") @DefaultValue("false") boolean details,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received request to list job templates in metalake: {}, details: {}", metalake, details);
 
@@ -117,22 +122,34 @@ public class JobOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            List<JobTemplateEntity> jobTemplateEntities =
-                Lists.newArrayList(
-                    MetadataAuthzHelper.filterByExpression(
-                        metalake,
-                        AuthorizationExpressionConstants.LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
-                        Entity.EntityType.JOB_TEMPLATE,
-                        jobOperationDispatcher
-                            .listJobTemplates(metalake)
-                            .toArray(new JobTemplateEntity[0]),
-                        jobTemplateEntity ->
-                            NameIdentifierUtil.ofJobTemplate(metalake, jobTemplateEntity.name())));
+            ListPager.ArrayPage<JobTemplateEntity> page =
+                ListPager.pageArray(
+                    jobOperationDispatcher
+                        .listJobTemplates(metalake)
+                        .toArray(new JobTemplateEntity[0]),
+                    JobTemplateEntity::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants
+                                .LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.JOB_TEMPLATE,
+                            all,
+                            jobTemplateEntity ->
+                                NameIdentifierUtil.ofJobTemplate(
+                                    metalake, jobTemplateEntity.name())),
+                    JobTemplateEntity[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listJobTemplates", metalake, details ? "details" : "names"));
+            List<JobTemplateEntity> jobTemplateEntities = Lists.newArrayList(page.items());
             List<JobTemplateDTO> jobTemplates = toJobTemplateDTOs(jobTemplateEntities);
 
             if (details) {
               LOG.info("List {} job templates in metalake: {}", jobTemplates.size(), metalake);
-              return Utils.ok(new JobTemplateListResponse(jobTemplates));
+              return Utils.ok(
+                  new JobTemplateListResponse(jobTemplates)
+                      .withNextPageToken(page.nextPageToken()));
 
             } else {
               String[] jobTemplateNames =
@@ -140,7 +157,8 @@ public class JobOperations {
 
               LOG.info(
                   "List {} job template names in metalake: {}", jobTemplateNames.length, metalake);
-              return Utils.ok(new NameListResponse(jobTemplateNames));
+              return Utils.ok(
+                  new NameListResponse(jobTemplateNames).withNextPageToken(page.nextPageToken()));
             }
           });
 
@@ -326,7 +344,9 @@ public class JobOperations {
       @QueryParam("startedAfter") String startedAfter,
       @QueryParam("finishedAfter") String finishedAfter,
       @QueryParam("sortBy") @DefaultValue("queuedAt") String sortBy,
-      @QueryParam("sortOrder") @DefaultValue("desc") String sortOrder) {
+      @QueryParam("sortOrder") @DefaultValue("desc") String sortOrder,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received request to list jobs in metalake {}{}, queuedAfter: {}, startedAfter: {},"
             + " finishedAfter: {}, sortBy: {}, sortOrder: {}",
@@ -346,10 +366,9 @@ public class JobOperations {
       Instant queuedAfterInstant = parseInstant("queuedAfter", queuedAfter);
       Instant startedAfterInstant = parseInstant("startedAfter", startedAfter);
       Instant finishedAfterInstant = parseInstant("finishedAfter", finishedAfter);
-      Comparator<JobEntity> comparator =
-          buildJobComparator(
-              Strings.isNullOrEmpty(sortBy) ? "queuedAt" : sortBy,
-              Strings.isNullOrEmpty(sortOrder) ? "desc" : sortOrder);
+      String effectiveSortBy = Strings.isNullOrEmpty(sortBy) ? "queuedAt" : sortBy;
+      String effectiveSortOrder = Strings.isNullOrEmpty(sortOrder) ? "desc" : sortOrder;
+      Comparator<JobEntity> comparator = buildJobComparator(effectiveSortBy, effectiveSortOrder);
 
       return Utils.doAs(
           httpRequest,
@@ -371,11 +390,31 @@ public class JobOperations {
                     startedAfterInstant,
                     finishedAfterInstant,
                     comparator);
-            List<JobDTO> jobDTOs = toJobDTOs(filteredAndSortedJobs);
+            // The status counts describe every job that matches the filters, so they are counted
+            // before the page is cut.
             Map<String, Long> statusCounts = countJobsByStatus(filteredAndSortedJobs);
+            ListPager.ArrayPage<JobEntity> page =
+                ListPager.pageArray(
+                    filteredAndSortedJobs.toArray(new JobEntity[0]),
+                    jobSortKey(effectiveSortBy, effectiveSortOrder),
+                    all -> all,
+                    JobEntity[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listJobs",
+                        metalake,
+                        jobTemplateName,
+                        queuedAfter,
+                        startedAfter,
+                        finishedAfter,
+                        effectiveSortBy,
+                        effectiveSortOrder));
+            List<JobDTO> jobDTOs = toJobDTOs(Arrays.asList(page.items()));
 
             LOG.info("Listed {} jobs in metalake {}", jobDTOs.size(), metalake);
-            return Utils.ok(new JobListResponse(jobDTOs, statusCounts));
+            return Utils.ok(
+                new JobListResponse(jobDTOs, statusCounts).withNextPageToken(page.nextPageToken()));
           });
 
     } catch (Exception e) {
@@ -669,6 +708,40 @@ public class JobOperations {
   // startedAt, finishedAt, asc, desc) rather than case-insensitively, so accepted input always
   // matches what the spec advertises.
   @VisibleForTesting
+  /**
+   * Returns a string sort key that orders jobs as {@link #buildJobComparator(String, String)} does:
+   * jobs without the sort time last, then by the sort time in the requested direction, with the job
+   * name breaking ties so that the order is stable for paging.
+   */
+  static Function<JobEntity, String> jobSortKey(String sortBy, String sortOrder) {
+    Function<JobEntity, Instant> keyExtractor;
+    switch (sortBy) {
+      case "queuedAt":
+        keyExtractor = jobEntity -> jobEntity.auditInfo().createTime();
+        break;
+      case "startedAt":
+        keyExtractor = JobEntity::startedAtAsInstant;
+        break;
+      case "finishedAt":
+        keyExtractor = JobEntity::finishedAtAsInstant;
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid sortBy value: " + sortBy + ", must be one of queuedAt, startedAt, finishedAt");
+    }
+    boolean ascending = "asc".equals(sortOrder);
+    return jobEntity -> {
+      Instant time = keyExtractor.apply(jobEntity);
+      if (time == null) {
+        return "1:" + jobEntity.name();
+      }
+      long nanos =
+          Math.addExact(Math.multiplyExact(time.getEpochSecond(), 1_000_000_000L), time.getNano());
+      long ordered = ascending ? nanos : Long.MAX_VALUE - nanos;
+      return "0:" + ListPager.numericKey(ordered) + ":" + jobEntity.name();
+    };
+  }
+
   static Comparator<JobEntity> buildJobComparator(String sortBy, String sortOrder) {
     Function<JobEntity, Instant> keyExtractor;
     switch (sortBy) {

@@ -17,7 +17,7 @@
 
 import logging
 from types import MappingProxyType
-from typing import Dict, List, Mapping
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 
@@ -43,6 +43,7 @@ from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +112,34 @@ class FilesetCatalog(
             NameIdentifier.of(ident.namespace().level(2), ident.name())
             for ident in entity_list_resp.identifiers()
         ]
+
+    def list_filesets_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_filesets``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+
+        self.check_fileset_namespace(namespace)
+
+        full_namespace = self._get_fileset_full_namespace(namespace)
+
+        resp = self.rest_client.get(
+            self.format_fileset_request_path(full_namespace),
+            params=page_params(page_size, page_token),
+            error_handler=FILESET_ERROR_HANDLER,
+        )
+        entity_list_resp = EntityListResponse.from_json(resp.body, infer_missing=True)
+        entity_list_resp.validate()
+
+        return Page(
+            items=[
+                NameIdentifier.of(ident.namespace().level(2), ident.name())
+                for ident in entity_list_resp.identifiers()
+            ],
+            next_page_token=entity_list_resp.next_page_token(),
+        )
 
     def load_fileset(self, ident: NameIdentifier) -> Fileset:
         """Load fileset metadata by {@link NameIdentifier} from the catalog.

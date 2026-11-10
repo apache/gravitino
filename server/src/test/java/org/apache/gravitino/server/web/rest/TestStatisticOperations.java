@@ -31,9 +31,11 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -55,6 +57,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.PartitionStatisticsListResponse;
 import org.apache.gravitino.dto.responses.StatisticListResponse;
+import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsDropDTO;
 import org.apache.gravitino.dto.stats.PartitionStatisticsUpdateDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
@@ -1228,5 +1231,68 @@ public class TestStatisticOperations extends BaseOperationsTest {
         PartitionRange.BoundType.CLOSED, StatisticOperations.getFromBoundType(true));
     Assertions.assertEquals(
         PartitionRange.BoundType.OPEN, StatisticOperations.getFromBoundType(false));
+  }
+
+  @Test
+  public void testListStatisticsPaged() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreateTime(Instant.now()).withCreator("test").build();
+    when(manager.listStatistics(any(), any()))
+        .thenReturn(
+            Lists.newArrayList(
+                new StatisticManager.CustomStatistic("c", StatisticValues.longValue(1L), auditInfo),
+                new StatisticManager.CustomStatistic("a", StatisticValues.longValue(1L), auditInfo),
+                new StatisticManager.CustomStatistic(
+                    "b", StatisticValues.longValue(1L), auditInfo)));
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    String path =
+        "/metalakes/"
+            + metalake
+            + "/objects/TABLE/"
+            + catalog
+            + "."
+            + schema
+            + "."
+            + table
+            + "/statistics";
+    List<String> walked =
+        PagedListWalker.walk(
+                target(path), 2, StatisticListResponse.class, StatisticListResponse::getStatistics)
+            .stream()
+            .map(Statistic::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(path));
+  }
+
+  @Test
+  public void testListPartitionStatisticsPaged() {
+    when(manager.listPartitionStatistics(any(), any(), any()))
+        .thenReturn(
+            Lists.newArrayList(
+                new StatisticManager.CustomPartitionStatistic("p3", new Statistic[0]),
+                new StatisticManager.CustomPartitionStatistic("p1", new Statistic[0]),
+                new StatisticManager.CustomPartitionStatistic("p2", new Statistic[0])));
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    String path =
+        "/metalakes/"
+            + metalake
+            + "/objects/TABLE/"
+            + catalog
+            + "."
+            + schema
+            + "."
+            + table
+            + "/statistics/partitions";
+    List<String> walked =
+        PagedListWalker.walk(
+                target(path),
+                2,
+                PartitionStatisticsListResponse.class,
+                PartitionStatisticsListResponse::getPartitionStatistics)
+            .stream()
+            .map(PartitionStatisticsDTO::partitionName)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("p1", "p2", "p3"), walked);
   }
 }

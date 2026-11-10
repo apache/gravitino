@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
@@ -37,8 +38,10 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -99,6 +102,7 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(1000L).when(config).get(TREE_LOCK_MIN_NODE_IN_MEMORY);
     Mockito.doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
@@ -612,5 +616,35 @@ public class TestMetalakeOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp2.getCode());
     Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp2.getType());
     Assertions.assertTrue(errorResp2.getMessage().contains("Malformed json request"));
+  }
+
+  @Test
+  public void testListMetalakesPaged() {
+    AuditInfo info =
+        AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build();
+    BaseMetalake[] metalakes =
+        Arrays.stream(new String[] {"c", "a", "b"})
+            .map(
+                name ->
+                    BaseMetalake.builder()
+                        .withName(name)
+                        .withId(1L)
+                        .withAuditInfo(info)
+                        .withVersion(SchemaVersion.V_0_1)
+                        .build())
+            .toArray(BaseMetalake[]::new);
+    when(metalakeManager.listMetalakes()).thenReturn(metalakes);
+
+    List<String> walked =
+        PagedListWalker.walk(
+                target("/metalakes"),
+                2,
+                MetalakeListResponse.class,
+                MetalakeListResponse::getMetalakes)
+            .stream()
+            .map(MetalakeDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target("/metalakes"));
   }
 }

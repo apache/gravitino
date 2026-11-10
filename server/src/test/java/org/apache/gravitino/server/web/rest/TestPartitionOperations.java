@@ -28,6 +28,9 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -385,5 +388,38 @@ public class TestPartitionOperations extends JerseyTest {
     Assertions.assertEquals(
         IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
     Assertions.assertTrue(errorResponse.getMessage().contains("partitions must not be null"));
+  }
+
+  @Test
+  public void testListPartitionNamesPaged() {
+    when(dispatcher.listPartitionNames(any())).thenReturn(new String[] {"p3", "p1", "p2"});
+    List<String> walked =
+        PagedListWalker.walk(
+            target(partitionPath(metalake, catalog, schema, table)),
+            2,
+            PartitionNameListResponse.class,
+            PartitionNameListResponse::partitionNames);
+    Assertions.assertEquals(Arrays.asList("p1", "p2", "p3"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(
+        target(partitionPath(metalake, catalog, schema, table)));
+  }
+
+  @Test
+  public void testListPartitionsPaged() {
+    when(dispatcher.listPartitions(any()))
+        .thenReturn(new Partition[] {partitions[1], partitions[0]});
+    List<String> walked =
+        PagedListWalker.walk(
+                target(partitionPath(metalake, catalog, schema, table))
+                    .queryParam("details", "true"),
+                1,
+                PartitionListResponse.class,
+                PartitionListResponse::getPartitions)
+            .stream()
+            .map(Partition::name)
+            .collect(Collectors.toList());
+    List<String> expected =
+        Arrays.stream(partitions).map(Partition::name).sorted().collect(Collectors.toList());
+    Assertions.assertEquals(expected, walked);
   }
 }

@@ -68,6 +68,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -98,7 +100,9 @@ public class FilesetOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
 
     try {
       LOG.info("Received list filesets request for schema: {}.{}.{}", metalake, catalog, schema);
@@ -106,14 +110,25 @@ public class FilesetOperations {
           httpRequest,
           () -> {
             Namespace filesetNS = NamespaceUtil.ofFileset(metalake, catalog, schema);
-            NameIdentifier[] idents = dispatcher.listFilesets(filesetNS);
-            idents =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_FILESET_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.FILESET,
-                    idents);
-            Response response = Utils.ok(new EntityListResponse(idents));
+            ListPager.ArrayPage<NameIdentifier> identsPage =
+                ListPager.pageArray(
+                    dispatcher.listFilesets(filesetNS),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants
+                                .FILTER_FILESET_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.FILESET,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listFilesets", metalake, catalog, schema));
+            NameIdentifier[] idents = identsPage.items();
+            Response response =
+                Utils.ok(
+                    new EntityListResponse(idents).withNextPageToken(identsPage.nextPageToken()));
             LOG.info(
                 "List {} filesets under schema: {}.{}.{}",
                 idents.length,
@@ -240,7 +255,9 @@ public class FilesetOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       @QueryParam("sub_path") @DefaultValue("/") String subPath,
-      @QueryParam("location_name") String locationName) {
+      @QueryParam("location_name") String locationName,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list files request: {}.{}.{}.{}, subPath: {}, locationName:{}",
         metalake,
@@ -260,8 +277,27 @@ public class FilesetOperations {
 
             NameIdentifier filesetIdent =
                 NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
-            FileInfo[] files = dispatcher.listFiles(filesetIdent, locationName, decodedSubPath);
-            Response response = Utils.ok(new FileInfoListResponse(DTOConverters.toDTO(files)));
+            ListPager.ArrayPage<FileInfo> filesPage =
+                ListPager.pageArray(
+                    dispatcher.listFiles(filesetIdent, locationName, decodedSubPath),
+                    FileInfo::name,
+                    all -> all,
+                    FileInfo[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listFiles",
+                        metalake,
+                        catalog,
+                        schema,
+                        fileset,
+                        decodedSubPath,
+                        locationName));
+            FileInfo[] files = filesPage.items();
+            Response response =
+                Utils.ok(
+                    new FileInfoListResponse(DTOConverters.toDTO(files))
+                        .withNextPageToken(filesPage.nextPageToken()));
             LOG.info(
                 "Files listed for fileset: {}.{}.{}.{}, subPath: {}, locationName:{}",
                 metalake,

@@ -25,6 +25,8 @@ import java.util.Locale;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyNameListResponse;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -70,6 +72,20 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
   }
 
   @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    PolicyNameListResponse resp =
+        restClient.get(
+            policyRequestPath,
+            PageParams.of(pageRequest),
+            PolicyNameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+
+    resp.validate();
+    return PageParams.page(resp.getNames(), resp);
+  }
+
+  @Override
   public Policy[] listPolicyInfos() {
     return listPolicyInfosWithVisibility().policies();
   }
@@ -88,5 +104,21 @@ class MetadataObjectPolicyOperations implements SupportsPolicies {
     Policy[] policies =
         Arrays.stream(resp.getPolicies()).map(GenericPolicy::new).toArray(Policy[]::new);
     return new PolicyList<>(policies, resp.hasInaccessiblePolicies());
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    MetadataObjectPolicyListResponse resp =
+        restClient.get(
+            policyRequestPath,
+            PageParams.with(ImmutableMap.of("details", "true"), pageRequest),
+            MetadataObjectPolicyListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+
+    resp.validate();
+    Policy[] policies =
+        Arrays.stream(resp.getPolicies()).map(GenericPolicy::new).toArray(Policy[]::new);
+    return PageParams.page(policies, resp);
   }
 }

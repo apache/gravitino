@@ -63,6 +63,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -115,7 +117,9 @@ public class SemanticModelOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list Semantic Models request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
@@ -123,21 +127,31 @@ public class SemanticModelOperations {
           httpRequest,
           () -> {
             Namespace namespace = NamespaceUtil.ofSemanticModel(metalake, catalog, schema);
-            NameIdentifier[] identifiers = dispatcher.listSemanticModels(namespace);
-            identifiers = identifiers == null ? new NameIdentifier[0] : identifiers;
-            identifiers =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.SEMANTIC_MODEL,
-                    identifiers);
+            ListPager.ArrayPage<NameIdentifier> identifiersPage =
+                ListPager.pageArray(
+                    dispatcher.listSemanticModels(namespace),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants
+                                .FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.SEMANTIC_MODEL,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listSemanticModels", metalake, catalog, schema));
+            NameIdentifier[] identifiers = identifiersPage.items();
             LOG.info(
                 "List {} Semantic Models under schema: {}.{}.{}",
                 identifiers.length,
                 metalake,
                 catalog,
                 schema);
-            return Utils.ok(new EntityListResponse(identifiers));
+            return Utils.ok(
+                new EntityListResponse(identifiers)
+                    .withNextPageToken(identifiersPage.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSemanticModelException(OperationType.LIST, "", schema, e);

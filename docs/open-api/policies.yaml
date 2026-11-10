@@ -29,6 +29,8 @@ paths:
       operationId: listPolicies
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of policy objects if {details} is true, otherwise returns the list of policy names
@@ -239,6 +241,8 @@ paths:
       operationId: listPoliciesForMetadataObject
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns policies derived from the effective tags of the specified metadata object; details=true returns policy objects, otherwise policy names
@@ -281,6 +285,8 @@ paths:
       operationId: listTagsForPolicy
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns tag names or detailed policy-tag associations
@@ -347,6 +353,8 @@ components:
         - code
         - associations
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -827,6 +835,8 @@ components:
     PolicyListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

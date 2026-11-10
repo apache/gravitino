@@ -17,11 +17,14 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from abc import ABC, abstractmethod
 
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.exceptions.base import UnsupportedOperationException
+from gravitino.api.pagination import Page
 
 
 class SupportsTags(ABC):
@@ -39,6 +42,22 @@ class SupportsTags(ABC):
         """
         pass
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_tags``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
+
     def list_tags_with_visibility(self) -> TagList[str]:
         """List visible tag names and report whether inaccessible tags were omitted.
 
@@ -55,6 +74,22 @@ class SupportsTags(ABC):
             list[Tag]: The list of tags.
         """
         pass
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """One page of ``list_tags_info``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Tag]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         """List visible tag details and report whether inaccessible tags were omitted.

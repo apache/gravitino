@@ -26,6 +26,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -39,6 +40,8 @@ import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -67,7 +70,9 @@ public class MetadataObjectRoleOperations {
   public Response listRoles(
       @PathParam("metalake") String metalake,
       @PathParam("type") String type,
-      @PathParam("fullName") String fullName) {
+      @PathParam("fullName") String fullName,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     try {
       MetadataObject object =
           MetadataObjects.parse(
@@ -79,15 +84,24 @@ public class MetadataObjectRoleOperations {
             MetalakeManager.checkMetalakeInUse(metalake);
             TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
-            String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
-            names =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    LIST_ROLE_PRIVILEGE,
-                    Entity.EntityType.ROLE,
-                    names,
-                    (roleName) -> NameIdentifierUtil.ofRole(metalake, roleName));
-            return Utils.ok(new NameListResponse(names));
+            ListPager.ArrayPage<String> namesPage =
+                ListPager.pageArray(
+                    accessControlDispatcher.listRoleNamesByObject(metalake, object),
+                    name -> name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            LIST_ROLE_PRIVILEGE,
+                            Entity.EntityType.ROLE,
+                            all,
+                            (roleName) -> NameIdentifierUtil.ofRole(metalake, roleName)),
+                    String[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listRolesForObject", metalake, type, fullName));
+            String[] names = namesPage.items();
+            return Utils.ok(
+                new NameListResponse(names).withNextPageToken(namesPage.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleRoleException(OperationType.LIST, "", metalake, e);

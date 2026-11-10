@@ -21,6 +21,8 @@ package org.apache.gravitino.stats;
 import java.util.List;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /** SupportsPartitionStatistics provides methods to list and update statistics for partitions. */
 @Unstable
@@ -58,4 +60,17 @@ public interface SupportsPartitionStatistics {
    */
   boolean dropPartitionStatistics(List<PartitionStatisticsDrop> statisticsToDrop)
       throws UnmodifiableStatisticException;
+
+  /**
+   * List one page of the partition statistics in a range, in ascending order of partition name.
+   *
+   * @param range The partition range.
+   *     <p>The default implementation throws {@link UnsupportedOperationException}.
+   * @param pageRequest The page to read.
+   * @return The page.
+   */
+  default Page<PartitionStatistics> listPartitionStatistics(
+      PartitionRange range, PageRequest pageRequest) {
+    throw new UnsupportedOperationException("Paged listing is not supported");
+  }
 }

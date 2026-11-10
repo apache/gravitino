@@ -28,7 +28,7 @@ import org.apache.gravitino.dto.job.JobTemplateDTO;
 /** Represents a response containing a list of job templates. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
-public class JobTemplateListResponse extends BaseResponse {
+public class JobTemplateListResponse extends BaseListResponse {
 
   @JsonProperty("jobTemplates")
   private final List<JobTemplateDTO> jobTemplates;

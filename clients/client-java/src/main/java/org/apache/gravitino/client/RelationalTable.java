@@ -46,6 +46,8 @@ import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -241,6 +243,18 @@ class RelationalTable
     return resp.partitionNames();
   }
 
+  @Override
+  public Page<String> listPartitionNames(PageRequest pageRequest) {
+    PartitionNameListResponse resp =
+        restClient.get(
+            getPartitionRequestPath(),
+            PageParams.of(pageRequest),
+            PartitionNameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    return PageParams.page(resp.partitionNames(), resp);
+  }
+
   /**
    * @return The partition request path.
    */
@@ -272,6 +286,20 @@ class RelationalTable
             Collections.emptyMap(),
             ErrorHandlers.partitionErrorHandler());
     return resp.getPartitions();
+  }
+
+  @Override
+  public Page<Partition> listPartitions(PageRequest pageRequest) {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    PartitionListResponse resp =
+        restClient.get(
+            getPartitionRequestPath(),
+            PageParams.with(params, pageRequest),
+            PartitionListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.partitionErrorHandler());
+    return PageParams.page(resp.getPartitions(), resp);
   }
 
   /**
@@ -403,6 +431,11 @@ class RelationalTable
   }
 
   @Override
+  public Page<String> listTags(PageRequest pageRequest) {
+    return objectTagOperations.listTags(pageRequest);
+  }
+
+  @Override
   public TagList<String> listTagsWithVisibility() {
     return objectTagOperations.listTagsWithVisibility();
   }
@@ -410,6 +443,11 @@ class RelationalTable
   @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public Page<Tag> listTagsInfo(PageRequest pageRequest) {
+    return objectTagOperations.listTagsInfo(pageRequest);
   }
 
   @Override
@@ -438,6 +476,11 @@ class RelationalTable
   }
 
   @Override
+  public Page<String> listPolicies(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicies(pageRequest);
+  }
+
+  @Override
   public PolicyList<String> listPoliciesWithVisibility() {
     return objectPolicyOperations.listPoliciesWithVisibility();
   }
@@ -445,6 +488,11 @@ class RelationalTable
   @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public Page<Policy> listPolicyInfos(PageRequest pageRequest) {
+    return objectPolicyOperations.listPolicyInfos(pageRequest);
   }
 
   @Override
@@ -458,8 +506,18 @@ class RelationalTable
   }
 
   @Override
+  public Page<String> listBindingRoleNames(PageRequest pageRequest) {
+    return objectRoleOperations.listBindingRoleNames(pageRequest);
+  }
+
+  @Override
   public List<Statistic> listStatistics() {
     return objectStatisticsOperations.listStatistics();
+  }
+
+  @Override
+  public Page<Statistic> listStatistics(PageRequest pageRequest) {
+    return objectStatisticsOperations.listStatistics(pageRequest);
   }
 
   @Override
@@ -476,6 +534,12 @@ class RelationalTable
   @Override
   public List<PartitionStatistics> listPartitionStatistics(PartitionRange range) {
     return objectPartitionStatisticsOperations.listPartitionStatistics(range);
+  }
+
+  @Override
+  public Page<PartitionStatistics> listPartitionStatistics(
+      PartitionRange range, PageRequest pageRequest) {
+    return objectPartitionStatisticsOperations.listPartitionStatistics(range, pageRequest);
   }
 
   @Override

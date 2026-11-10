@@ -28,6 +28,9 @@ paths:
         - access control
       summary: List role names
       operationId: listRoles
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of role  name
@@ -156,6 +159,9 @@ paths:
         - access control
       summary: List role names for metadata object
       operationId: listRolesForObject
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of role  name for the metadata object

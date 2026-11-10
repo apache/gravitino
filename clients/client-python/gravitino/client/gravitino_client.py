@@ -42,6 +42,7 @@ from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino.api.pagination import Page
 
 from ..api.tag.tag import Tag
 
@@ -101,8 +102,30 @@ class GravitinoClient(
     def list_catalogs(self) -> List[str]:
         return self.get_metalake().list_catalogs()
 
+    def list_catalogs_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_catalogs``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_catalogs_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_catalogs_info(self) -> List[Catalog]:
         return self.get_metalake().list_catalogs_info()
+
+    def list_catalogs_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Catalog]:
+        """Paged variant of ``list_catalogs_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_catalogs_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def load_catalog(self, name: str) -> Catalog:
         return self.get_metalake().load_catalog(name)
@@ -150,6 +173,17 @@ class GravitinoClient(
             A list of JobTemplate objects representing the job templates in the metalake.
         """
         return self.get_metalake().list_job_templates()
+
+    def list_job_templates_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[JobTemplate]:
+        """Paged variant of ``list_job_templates``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_job_templates_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def register_job_template(self, job_template) -> None:
         """Register a job template with the specified job template to Gravitino. The registered
@@ -228,6 +262,21 @@ class GravitinoClient(
         """
         return self.get_metalake().list_jobs(job_template_name)
 
+    def list_jobs_page(
+        self,
+        job_template_name: str = None,
+        *,
+        page_size: int,
+        page_token: Optional[str] = None,
+    ) -> Page[JobHandle]:
+        """Paged variant of ``list_jobs``: one page, newest queued first.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_jobs_page(
+            job_template_name, page_size=page_size, page_token=page_token
+        )
+
     def get_job(self, job_id: str, include_output: bool = False) -> JobHandle:
         """Retrieves a job by its ID, optionally including its captured stdout/stderr output.
 
@@ -284,6 +333,17 @@ class GravitinoClient(
         """
         return self.get_metalake().list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_info(self) -> list[Tag]:
         """
         List tags information under a metalake.
@@ -295,6 +355,17 @@ class GravitinoClient(
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def get_tag(self, tag_name) -> Tag:
         """
@@ -379,6 +450,13 @@ class GravitinoClient(
         """
         return self.get_metalake().list_policy_associations_for_tag(tag_name)
 
+    def list_policy_names_for_tag_page(
+        self, tag_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        return self.get_metalake().list_policy_names_for_tag_page(
+            tag_name, page_size=page_size, page_token=page_token
+        )
+
     def add_policy_for_tag(
         self, tag_name, policy_name, selector: PolicyAssociationSelector = None
     ) -> PolicyTagAssociation:
@@ -419,6 +497,17 @@ class GravitinoClient(
         """
         return self.get_metalake().list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policy_infos(self) -> list[Policy]:
         """
         List policies information under a metalake.
@@ -430,6 +519,17 @@ class GravitinoClient(
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def get_policy(self, policy_name) -> Policy:
         """
@@ -547,6 +647,13 @@ class GravitinoClient(
         """
         return self.get_metalake().list_tag_associations_for_policy(policy_name)
 
+    def list_tag_names_for_policy_page(
+        self, policy_name: str, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        return self.get_metalake().list_tag_names_for_policy_page(
+            policy_name, page_size=page_size, page_token=page_token
+        )
+
     # Owner operations
     def get_owner(self, metadata_object: MetadataObject) -> Optional[Owner]:
         """Get the owner of a metadata object.
@@ -639,6 +746,17 @@ class GravitinoClient(
         """
         return self.get_metalake().list_users()
 
+    def list_users_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[User]:
+        """Paged variant of ``list_users``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_users_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_user_names(self) -> list[str]:
         """List all user names under the metalake.
 
@@ -649,6 +767,17 @@ class GravitinoClient(
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_user_names()
+
+    def list_user_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_user_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_user_names_page(
+            page_size=page_size, page_token=page_token
+        )
 
     # Group operations
 
@@ -707,6 +836,17 @@ class GravitinoClient(
         """
         return self.get_metalake().list_groups()
 
+    def list_groups_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Group]:
+        """Paged variant of ``list_groups``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_groups_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_group_names(self) -> list[str]:
         """List all group names under the metalake.
 
@@ -717,6 +857,17 @@ class GravitinoClient(
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_group_names()
+
+    def list_group_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_group_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_group_names_page(
+            page_size=page_size, page_token=page_token
+        )
 
     # Role operations
 
@@ -781,6 +932,17 @@ class GravitinoClient(
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().list_role_names()
+
+    def list_role_names_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_role_names``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self.get_metalake().list_role_names_page(
+            page_size=page_size, page_token=page_token
+        )
 
     # Grant/Revoke operations
 

@@ -58,6 +58,7 @@ from gravitino.exceptions.handlers.function_error_handler import (
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
 from gravitino.rest import rest_utils
+from gravitino.api.pagination import Page, page_params
 
 
 class FunctionCatalogOperations(FunctionCatalog):
@@ -107,6 +108,33 @@ class FunctionCatalogOperations(FunctionCatalog):
             for ident in entity_list_response.identifiers()
         ]
 
+    def list_functions_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[NameIdentifier]:
+        """Paged variant of ``list_functions``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_function_namespace(namespace)
+
+        full_namespace = self._get_function_full_namespace(namespace)
+        resp = self._rest_client.get(
+            self._format_function_request_path(full_namespace),
+            params=page_params(page_size, page_token),
+            error_handler=FUNCTION_ERROR_HANDLER,
+        )
+
+        entity_list_response = EntityListResponse.from_json(resp.body)
+        entity_list_response.validate()
+
+        return Page(
+            items=[
+                NameIdentifier.of(ident.namespace().level(2), ident.name())
+                for ident in entity_list_response.identifiers()
+            ],
+            next_page_token=entity_list_response.next_page_token(),
+        )
+
     def list_function_infos(self, namespace: Namespace) -> List[Function]:
         """List the functions with details in a schema namespace from the catalog.
 
@@ -136,6 +164,34 @@ class FunctionCatalogOperations(FunctionCatalog):
             GenericFunction(func, self._rest_client, full_namespace)
             for func in function_list_response.functions()
         ]
+
+    def list_function_infos_page(
+        self, namespace: Namespace, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Function]:
+        """Paged variant of ``list_function_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        self._check_function_namespace(namespace)
+
+        full_namespace = self._get_function_full_namespace(namespace)
+        params = {"details": "true"}
+        resp = self._rest_client.get(
+            self._format_function_request_path(full_namespace),
+            params={**(params or {}), **page_params(page_size, page_token)},
+            error_handler=FUNCTION_ERROR_HANDLER,
+        )
+
+        function_list_response = FunctionListResponse.from_json(resp.body)
+        function_list_response.validate()
+
+        return Page(
+            items=[
+                GenericFunction(func, self._rest_client, full_namespace)
+                for func in function_list_response.functions()
+            ],
+            next_page_token=function_list_response.next_page_token(),
+        )
 
     def get_function(self, ident: NameIdentifier) -> Function:
         """Get a function by NameIdentifier from the catalog.

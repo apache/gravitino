@@ -21,12 +21,12 @@ from typing import List
 from dataclasses_json import config
 from gravitino.exceptions.base import IllegalArgumentException
 
-from .base_response import BaseResponse
+from .base_list_response import BaseListResponse
 from ..job.job_dto import JobDTO
 
 
 @dataclass
-class JobListResponse(BaseResponse):
+class JobListResponse(BaseListResponse):
     """Represents a response containing a list of jobs."""
 
     _jobs: List[JobDTO] = field(metadata=config(field_name="jobs"))

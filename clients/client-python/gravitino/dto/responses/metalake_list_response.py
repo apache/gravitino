@@ -21,11 +21,11 @@ from typing import List
 from dataclasses_json import config
 
 from gravitino.dto.metalake_dto import MetalakeDTO
-from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.dto.responses.base_list_response import BaseListResponse
 
 
 @dataclass
-class MetalakeListResponse(BaseResponse):
+class MetalakeListResponse(BaseListResponse):
     """Represents a response containing a list of metalakes."""
 
     _metalakes: List[MetalakeDTO] = field(metadata=config(field_name="metalakes"))

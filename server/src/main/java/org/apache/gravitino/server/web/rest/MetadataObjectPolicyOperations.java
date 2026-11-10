@@ -51,6 +51,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -78,7 +80,9 @@ public class MetadataObjectPolicyOperations {
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list policy {} request for object type: {}, full name: {} under metalake: {}",
         verbose ? "infos" : "names",
@@ -106,6 +110,24 @@ public class MetadataObjectPolicyOperations {
                     policies,
                     policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
             boolean hasInaccessiblePolicies = policies.length < policyCount;
+            // The policies are authorized above as a whole, because hasInaccessiblePolicies
+            // describes the object's full policy list; paging then cuts a page out of the visible
+            // policies.
+            ListPager.ArrayPage<PolicyEntity> page =
+                ListPager.pageArray(
+                    policies,
+                    PolicyEntity::name,
+                    all -> all,
+                    PolicyEntity[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listPoliciesForMetadataObject",
+                        metalake,
+                        type,
+                        fullName,
+                        verbose ? "details" : "names"));
+            policies = page.items();
 
             PolicyDTO[] policyDTOs =
                 Arrays.stream(policies)
@@ -123,7 +145,8 @@ public class MetadataObjectPolicyOperations {
                   fullName,
                   metalake);
               return Utils.ok(
-                  new MetadataObjectPolicyListResponse(policyDTOs, hasInaccessiblePolicies));
+                  new MetadataObjectPolicyListResponse(policyDTOs, hasInaccessiblePolicies)
+                      .withNextPageToken(page.nextPageToken()));
 
             } else {
               String[] policyNames =
@@ -135,7 +158,9 @@ public class MetadataObjectPolicyOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new PolicyNameListResponse(policyNames, hasInaccessiblePolicies));
+              return Utils.ok(
+                  new PolicyNameListResponse(policyNames, hasInaccessiblePolicies)
+                      .withNextPageToken(page.nextPageToken()));
             }
           });
 

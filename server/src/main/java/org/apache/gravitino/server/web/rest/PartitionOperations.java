@@ -53,6 +53,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -81,7 +83,9 @@ public class PartitionOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list partition {} request for table: {}.{}.{}.{}",
         verbose ? "infos" : "names",
@@ -95,8 +99,21 @@ public class PartitionOperations {
           () -> {
             NameIdentifier tableIdent = NameIdentifier.of(metalake, catalog, schema, table);
             if (verbose) {
-              Partition[] partitions = dispatcher.listPartitions(tableIdent);
-              Response response = Utils.ok(new PartitionListResponse(toDTOs(partitions)));
+              ListPager.ArrayPage<Partition> partitionsPage =
+                  ListPager.pageArray(
+                      dispatcher.listPartitions(tableIdent),
+                      Partition::name,
+                      all -> all,
+                      Partition[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf(
+                          "listPartitionNames", metalake, catalog, schema, table, "details"));
+              Partition[] partitions = partitionsPage.items();
+              Response response =
+                  Utils.ok(
+                      new PartitionListResponse(toDTOs(partitions))
+                          .withNextPageToken(partitionsPage.nextPageToken()));
               LOG.info(
                   "List {} partitions in table {}.{}.{}.{}",
                   partitions.length,
@@ -106,8 +123,21 @@ public class PartitionOperations {
                   table);
               return response;
             } else {
-              String[] partitionNames = dispatcher.listPartitionNames(tableIdent);
-              Response response = Utils.ok(new PartitionNameListResponse((partitionNames)));
+              ListPager.ArrayPage<String> partitionNamesPage =
+                  ListPager.pageArray(
+                      dispatcher.listPartitionNames(tableIdent),
+                      name -> name,
+                      all -> all,
+                      String[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf(
+                          "listPartitionNames", metalake, catalog, schema, table, "names"));
+              String[] partitionNames = partitionNamesPage.items();
+              Response response =
+                  Utils.ok(
+                      new PartitionNameListResponse((partitionNames))
+                          .withNextPageToken(partitionNamesPage.nextPageToken()));
               LOG.info(
                   "List {} partition names in table {}.{}.{}.{}",
                   partitionNames.length,

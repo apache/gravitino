@@ -30,6 +30,9 @@ paths:
         - model
       summary: List models
       operationId: listModels
+      parameters:
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
@@ -172,6 +175,8 @@ paths:
       operationId: listModelVersions
       parameters:
         - $ref: "#/components/parameters/details"
+        - $ref: "./openapi.yaml#/components/parameters/pageSize"
+        - $ref: "./openapi.yaml#/components/parameters/pageToken"
       responses:
         "200":
           description: Returns the list of model version objects if {details} is true, otherwise returns the list of model version numbers
@@ -886,6 +891,8 @@ components:
     ModelVersionListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32
@@ -902,6 +909,8 @@ components:
     ModelVersionInfoListResponse:
       type: object
       properties:
+        nextPageToken:
+          $ref: "./openapi.yaml#/components/schemas/NextPageToken"
         code:
           type: integer
           format: int32

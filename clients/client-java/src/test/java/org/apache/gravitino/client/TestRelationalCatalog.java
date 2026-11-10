@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -79,6 +80,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -207,7 +210,8 @@ public class TestRelationalCatalog extends TestBase {
 
     // A null or blank parentSchema is rejected before any request is sent.
     SupportsSchemas schemas2 = catalog.asSchemas();
-    Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas(null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> schemas2.listSchemas((String) null));
     Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas(""));
     Assertions.assertThrows(IllegalArgumentException.class, () -> schemas2.listSchemas("  "));
 
@@ -353,6 +357,70 @@ public class TestRelationalCatalog extends TestBase {
             NonEmptySchemaException.class, () -> schemas.dropSchema(ident.name(), true));
 
     Assertions.assertTrue(ex.getMessage().contains("schema is not empty"));
+  }
+
+  @Test
+  public void testListTablesPaged() throws JsonProcessingException {
+    NameIdentifier table1 = NameIdentifier.of(metalakeName, catalogName, "schema1", "table1");
+    NameIdentifier table2 = NameIdentifier.of(metalakeName, catalogName, "schema1", "table2");
+    NameIdentifier table3 = NameIdentifier.of(metalakeName, catalogName, "schema1", "table3");
+    String tablePath = withSlash(RelationalCatalog.formatTableRequestPath(table1.namespace()));
+
+    buildMockResource(
+        Method.GET,
+        tablePath,
+        ImmutableMap.of("pageSize", "2"),
+        null,
+        new EntityListResponse(new NameIdentifier[] {table1, table2}, "token-1"),
+        SC_OK);
+    buildMockResource(
+        Method.GET,
+        tablePath,
+        ImmutableMap.of("pageSize", "2", "pageToken", "token-1"),
+        null,
+        new EntityListResponse(new NameIdentifier[] {table3}, null),
+        SC_OK);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Page<NameIdentifier> page1 =
+        tableCatalog.listTables(Namespace.of("schema1"), PageRequest.ofSize(2));
+    Assertions.assertEquals(
+        Arrays.asList(
+            NameIdentifier.of("schema1", "table1"), NameIdentifier.of("schema1", "table2")),
+        page1.items());
+    Assertions.assertEquals(Optional.of("token-1"), page1.nextPageToken());
+
+    Page<NameIdentifier> page2 =
+        tableCatalog.listTables(
+            Namespace.of("schema1"), PageRequest.ofSize(2).withToken(page1.nextPageToken().get()));
+    Assertions.assertEquals(
+        Collections.singletonList(NameIdentifier.of("schema1", "table3")), page2.items());
+    Assertions.assertFalse(page2.nextPageToken().isPresent());
+
+    // The server rejects a bad token with a 400 that names the parameter.
+    ErrorResponse badToken =
+        ErrorResponse.illegalArguments("Invalid pageToken: the token is malformed");
+    buildMockResource(
+        Method.GET,
+        tablePath,
+        ImmutableMap.of("pageSize", "2", "pageToken", "bad"),
+        null,
+        badToken,
+        SC_BAD_REQUEST);
+    PageRequest badRequest = PageRequest.ofSize(2).withToken("bad");
+    Namespace namespace = Namespace.of("schema1");
+    Throwable ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.listTables(namespace, badRequest));
+    Assertions.assertTrue(ex.getMessage().contains("pageToken"), ex.getMessage());
+  }
+
+  @Test
+  public void testPageRequestRejectsInvalidInput() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> PageRequest.ofSize(0));
+    PageRequest request = PageRequest.ofSize(1);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> request.withToken(""));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> request.withToken(null));
   }
 
   @Test
@@ -1388,5 +1456,44 @@ public class TestRelationalCatalog extends TestBase {
         .withPartitioning(partitioning)
         .withIndex(indexDTOs)
         .build();
+  }
+
+  @Test
+  public void testListSchemasPaged() throws JsonProcessingException {
+    Namespace schemaNs = Namespace.of(metalakeName, catalogName);
+    String schemaPath = withSlash(RelationalCatalog.formatSchemaRequestPath(schemaNs));
+    buildMockResource(
+        Method.GET,
+        schemaPath,
+        ImmutableMap.of("pageSize", "1"),
+        null,
+        new EntityListResponse(new NameIdentifier[] {NameIdentifier.of(schemaNs, "a")}, "t1"),
+        SC_OK);
+    Page<String> page = catalog.asSchemas().listSchemas(PageRequest.ofSize(1));
+    Assertions.assertEquals(Collections.singletonList("a"), page.items());
+    Assertions.assertEquals(Optional.of("t1"), page.nextPageToken());
+  }
+
+  @Test
+  public void testListViewsPaged() throws JsonProcessingException {
+    NameIdentifier view = NameIdentifier.of(metalakeName, catalogName, "schema1", "v1");
+    String viewPath =
+        withSlash(
+            RelationalCatalog.formatViewRequestPath(
+                Namespace.of(metalakeName, catalogName, "schema1")));
+    buildMockResource(
+        Method.GET,
+        viewPath,
+        ImmutableMap.of("pageSize", "1", "pageToken", "t1"),
+        null,
+        new EntityListResponse(new NameIdentifier[] {view}),
+        SC_OK);
+    Page<NameIdentifier> page =
+        catalog
+            .asViewCatalog()
+            .listViews(Namespace.of("schema1"), PageRequest.ofSize(1).withToken("t1"));
+    Assertions.assertEquals(
+        Collections.singletonList(NameIdentifier.of("schema1", "v1")), page.items());
+    Assertions.assertFalse(page.nextPageToken().isPresent());
   }
 }

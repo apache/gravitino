@@ -17,6 +17,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.policy.policy import Policy
 from gravitino.api.policy.policy_list import PolicyList
@@ -29,6 +31,7 @@ from gravitino.dto.responses.policy_response import (
 from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
 from gravitino.utils.http_client import HTTPClient
+from gravitino.api.pagination import Page, page_params
 
 
 class MetadataObjectPolicyOperations(SupportsPolicies):
@@ -76,6 +79,28 @@ class MetadataObjectPolicyOperations(SupportsPolicies):
             list_policies_resp.has_inaccessible_policies(),
         )
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        response = self.rest_client.get(
+            self.policy_request_path,
+            params={**{}, **page_params(page_size, page_token)},
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+        list_policies_resp = PolicyNameListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        list_policies_resp.validate()
+
+        return Page(
+            items=list(list_policies_resp.names),
+            next_page_token=list_policies_resp.next_page_token(),
+        )
+
     def list_policy_infos(self) -> list[Policy]:
         return self.list_policy_infos_with_visibility().policies()
 
@@ -94,4 +119,29 @@ class MetadataObjectPolicyOperations(SupportsPolicies):
         return PolicyList(
             [GenericPolicy(policy_dto) for policy_dto in list_info_resp.policies()],
             list_info_resp.has_inaccessible_policies(),
+        )
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        response = self.rest_client.get(
+            self.policy_request_path,
+            params={**{"details": "true"}, **page_params(page_size, page_token)},
+            error_handler=POLICY_ERROR_HANDLER,
+        )
+
+        list_info_resp = MetadataObjectPolicyListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        list_info_resp.validate()
+
+        return Page(
+            items=[
+                GenericPolicy(policy_dto) for policy_dto in list_info_resp.policies()
+            ],
+            next_page_token=list_info_resp.next_page_token(),
         )

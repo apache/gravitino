@@ -63,6 +63,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationObject
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -172,7 +174,9 @@ public class MetadataObjectTagOperations {
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list tag {} request for object type: {}, full name: {} under metalake: {}",
         verbose ? "infos" : "names",
@@ -217,6 +221,23 @@ public class MetadataObjectTagOperations {
                     tagDTOs,
                     tagDTO -> NameIdentifierUtil.ofTag(metalake, tagDTO.name()));
             boolean hasInaccessibleTags = tagDTOs.length < tagCount;
+            // The tags are authorized above as a whole, because hasInaccessibleTags describes the
+            // object's full tag list; paging then cuts a page out of the visible tags.
+            ListPager.ArrayPage<TagDTO> page =
+                ListPager.pageArray(
+                    tagDTOs,
+                    TagDTO::name,
+                    all -> all,
+                    TagDTO[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listTagsForMetadataObject",
+                        metalake,
+                        type,
+                        fullName,
+                        verbose ? "details" : "names"));
+            tagDTOs = page.items();
 
             if (verbose) {
               LOG.info(
@@ -225,7 +246,9 @@ public class MetadataObjectTagOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new MetadataObjectTagListResponse(tagDTOs, hasInaccessibleTags));
+              return Utils.ok(
+                  new MetadataObjectTagListResponse(tagDTOs, hasInaccessibleTags)
+                      .withNextPageToken(page.nextPageToken()));
 
             } else {
               String[] tagNames = Arrays.stream(tagDTOs).map(TagDTO::name).toArray(String[]::new);
@@ -235,7 +258,9 @@ public class MetadataObjectTagOperations {
                   type,
                   fullName,
                   metalake);
-              return Utils.ok(new TagNameListResponse(tagNames, hasInaccessibleTags));
+              return Utils.ok(
+                  new TagNameListResponse(tagNames, hasInaccessibleTags)
+                      .withNextPageToken(page.nextPageToken()));
             }
           });
 

@@ -32,7 +32,7 @@ import org.apache.gravitino.dto.stats.PartitionStatisticsDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class PartitionStatisticsListResponse extends BaseResponse {
+public class PartitionStatisticsListResponse extends BaseListResponse {
 
   @JsonProperty("partitionStatistics")
   private PartitionStatisticsDTO[] partitionStatistics;

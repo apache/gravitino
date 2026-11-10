@@ -28,7 +28,7 @@ import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class PartitionListResponse extends BaseResponse {
+public class PartitionListResponse extends BaseListResponse {
 
   @JsonProperty("partitions")
   private final PartitionDTO[] partitions;

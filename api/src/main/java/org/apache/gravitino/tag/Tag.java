@@ -24,6 +24,8 @@ import java.util.Optional;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * The interface of a tag. A tag is a label that can be attached to a catalog, schema, table,
@@ -108,6 +110,19 @@ public interface Tag extends Auditable {
      * @return The list of objects that are associated with this tag.
      */
     MetadataObject[] objects();
+
+    /**
+     * List one page of the metadata objects associated with the tag, in ascending order of object
+     * type and then full name.
+     *
+     * <p>The default implementation throws {@link UnsupportedOperationException}.
+     *
+     * @param pageRequest The page to read.
+     * @return The page.
+     */
+    default Page<MetadataObject> objects(PageRequest pageRequest) {
+      throw new UnsupportedOperationException("Paged listing is not supported");
+    }
 
     /**
      * List objects associated with this tag and assignment value.

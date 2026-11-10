@@ -28,7 +28,7 @@ import lombok.ToString;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class ModelVersionListResponse extends BaseResponse {
+public class ModelVersionListResponse extends BaseListResponse {
 
   @JsonProperty("versions")
   private int[] versions;

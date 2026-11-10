@@ -59,6 +59,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationMetada
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -92,7 +94,9 @@ public class SchemaOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @DefaultValue("") @QueryParam("parentSchema") String parentSchema) {
+      @DefaultValue("") @QueryParam("parentSchema") String parentSchema,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list schema request for catalog: {}.{}, parentSchema: {}",
         metalake,
@@ -109,14 +113,23 @@ public class SchemaOperations {
               validateParentSchema(parentSchema);
               schemaNS = Namespace.of(metalake, catalog, parentSchema);
             }
-            NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
-            idents =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.SCHEMA,
-                    idents);
-            Response response = Utils.ok(new EntityListResponse(idents));
+            ListPager.ArrayPage<NameIdentifier> page =
+                ListPager.pageArray(
+                    dispatcher.listSchemas(schemaNS),
+                    NameIdentifier::name,
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.SCHEMA,
+                            all),
+                    NameIdentifier[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listSchemas", metalake, catalog, parentSchema));
+            NameIdentifier[] idents = page.items();
+            Response response =
+                Utils.ok(new EntityListResponse(idents).withNextPageToken(page.nextPageToken()));
             LOG.info(
                 "List {} schemas in catalog {}.{} (parentSchema='{}')",
                 idents.length,

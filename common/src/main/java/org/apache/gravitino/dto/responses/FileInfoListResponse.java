@@ -29,7 +29,7 @@ import org.apache.gravitino.dto.file.FileInfoDTO;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class FileInfoListResponse extends BaseResponse {
+public class FileInfoListResponse extends BaseListResponse {
 
   @JsonProperty("files")
   private final FileInfoDTO[] files;

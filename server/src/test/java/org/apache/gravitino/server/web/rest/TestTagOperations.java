@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.Configs.CACHE_ENABLED;
 import static org.apache.gravitino.Configs.ENABLE_AUTHORIZATION;
+import static org.apache.gravitino.Configs.LIST_MAX_PAGE_SIZE;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -64,6 +66,7 @@ import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
+import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -116,6 +119,7 @@ public class TestTagOperations extends BaseOperationsTest {
   public static void setup() throws IllegalAccessException {
     Config config = mock(Config.class);
     Mockito.doReturn(false).when(config).get(CACHE_ENABLED);
+    Mockito.doReturn(1000).when(config).get(LIST_MAX_PAGE_SIZE);
     Mockito.doReturn(false).when(config).get(ENABLE_AUTHORIZATION);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
   }
@@ -158,8 +162,8 @@ public class TestTagOperations extends BaseOperationsTest {
           operations.getTag(metalake, name),
           operations.alterTag(metalake, name, update),
           operations.deleteTag(metalake, name),
-          operations.listMetadataObjectsForTag(metalake, name, null),
-          operations.listPoliciesForTag(metalake, name, false),
+          operations.listMetadataObjectsForTag(metalake, name, null, null, null),
+          operations.listPoliciesForTag(metalake, name, false, null, null),
           operations.addPolicyForTag(metalake, name, "policy", new PolicyTagAddRequest()),
           operations.addPolicyForTag(
               metalake,
@@ -1485,5 +1489,90 @@ public class TestTagOperations extends BaseOperationsTest {
             Entity.entity(
                 new PolicyTagAddRequest(PolicyAssociationSelectorDTO.fromSelector(selector)),
                 MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  @Test
+  public void testListTagNamesPaged() {
+    when(tagManager.listTags(metalake))
+        .thenReturn(new String[] {"c", "GRAVITINO_HIDDEN_1", "a", "b"});
+    List<String> walked =
+        PagedListWalker.walk(
+            target(tagPath(metalake)), 2, NameListResponse.class, NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+    PagedListWalker.assertRejectsInvalidPaging(target(tagPath(metalake)));
+  }
+
+  @Test
+  public void testListTagsInfoPaged() {
+    Tag[] tags =
+        Arrays.stream(new String[] {"c", "a", "b"})
+            .map(
+                name ->
+                    TagEntity.builder()
+                        .withName(name)
+                        .withId(1L)
+                        .withAuditInfo(testAuditInfo1)
+                        .build())
+            .toArray(Tag[]::new);
+    when(tagManager.listTagsInfo(metalake)).thenReturn(tags);
+    List<String> walked =
+        PagedListWalker.walk(
+                target(tagPath(metalake)).queryParam("details", "true"),
+                2,
+                TagListResponse.class,
+                TagListResponse::getTags)
+            .stream()
+            .map(TagDTO::name)
+            .collect(Collectors.toList());
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
+  }
+
+  @Test
+  public void testListMetadataObjectsForTagPaged() {
+    MetadataObject[] objects =
+        new MetadataObject[] {
+          MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA),
+          MetadataObjects.parse("object1", MetadataObject.Type.CATALOG),
+          MetadataObjects.parse("object1.object2.object3", MetadataObject.Type.TABLE)
+        };
+    when(tagManager.listMetadataObjectsForTag(metalake, "tag1", null)).thenReturn(objects);
+    List<String> walked =
+        PagedListWalker.walk(
+                target(tagPath(metalake)).path("tag1").path("objects"),
+                2,
+                MetadataObjectListResponse.class,
+                MetadataObjectListResponse::getMetadataObjects)
+            .stream()
+            .map(object -> object.type() + ":" + object.fullName())
+            .collect(Collectors.toList());
+    Assertions.assertEquals(
+        Arrays.asList("CATALOG:object1", "SCHEMA:object1.object2", "TABLE:object1.object2.object3"),
+        walked);
+  }
+
+  @Test
+  public void testListPoliciesForTagPaged() {
+    String tagName = "tag1";
+    RelationalEntity<?>[] associations =
+        Arrays.stream(new String[] {"c", "a", "b"})
+            .map(
+                name -> {
+                  PolicyEntity policy = mock(PolicyEntity.class);
+                  when(policy.name()).thenReturn(name);
+                  return new RelationalEntity<>(
+                      SupportsRelationOperations.Type.POLICY_TAG_REL,
+                      NameIdentifier.of(metalake, tagName),
+                      org.apache.gravitino.Entity.EntityType.TAG,
+                      policy);
+                })
+            .toArray(RelationalEntity<?>[]::new);
+    when(tagManager.listPolicyAssociationsForTag(metalake, tagName)).thenReturn(associations);
+    List<String> walked =
+        PagedListWalker.walk(
+            target(tagPath(metalake) + "/" + tagName + "/policies"),
+            2,
+            NameListResponse.class,
+            NameListResponse::getNames);
+    Assertions.assertEquals(Arrays.asList("a", "b", "c"), walked);
   }
 }

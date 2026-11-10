@@ -17,10 +17,14 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from abc import ABC, abstractmethod
 
 from gravitino.api.policy.policy import Policy
 from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.pagination import Page
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SupportsPolicies(ABC):
@@ -34,6 +38,22 @@ class SupportsPolicies(ABC):
             list[str]: The names of the associated policies.
         """
         raise NotImplementedError()
+
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """One page of ``list_policies``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[str]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     def list_policies_with_visibility(self) -> PolicyList[str]:
         """Lists the names of the policies associated with this object,
@@ -52,6 +72,22 @@ class SupportsPolicies(ABC):
             list[Policy]: The associated policies.
         """
         raise NotImplementedError()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """One page of ``list_policy_infos``, in ascending order.
+
+        The default implementation raises UnsupportedOperationException.
+
+        Args:
+            page_size: The maximum number of entries in the page; must be at least 1.
+            page_token: The ``next_page_token`` of the previous page, or None for the first page.
+
+        Returns:
+            Page[Policy]: The page.
+        """
+        raise UnsupportedOperationException("Paged listing is not supported")
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         """Lists the policies associated with this object with their details,

@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.SupportsMetalakes;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
@@ -40,6 +41,8 @@ import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.pagination.Page;
+import org.apache.gravitino.pagination.PageRequest;
 
 /**
  * Apache Gravitino Client for the administrator to interact with the Gravitino API, allowing the
@@ -89,6 +92,24 @@ public class GravitinoAdminClient extends GravitinoClientBase implements Support
     return Arrays.stream(resp.getMetalakes())
         .map(o -> DTOConverters.toMetaLake(o, restClient))
         .toArray(GravitinoMetalake[]::new);
+  }
+
+  @Override
+  public Page<Metalake> listMetalakes(PageRequest pageRequest) {
+    MetalakeListResponse resp =
+        restClient.get(
+            API_METALAKES_LIST_PATH,
+            PageParams.of(pageRequest),
+            MetalakeListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.metalakeErrorHandler());
+    resp.validate();
+
+    return PageParams.<Metalake>page(
+        Arrays.stream(resp.getMetalakes())
+            .map(o -> DTOConverters.toMetaLake(o, restClient))
+            .toArray(GravitinoMetalake[]::new),
+        resp);
   }
 
   /**

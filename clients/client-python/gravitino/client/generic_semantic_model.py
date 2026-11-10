@@ -35,6 +35,7 @@ from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOpe
 from gravitino.dto.semantic.semantic_model_dto import SemanticModelDTO
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
+from gravitino.api.pagination import Page
 
 
 class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
@@ -111,11 +112,33 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
     def list_policies(self) -> list[str]:
         return self._model_policy_operations.list_policies()
 
+    def list_policies_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_policies``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._model_policy_operations.list_policies_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_policies_with_visibility(self) -> PolicyList[str]:
         return self._model_policy_operations.list_policies_with_visibility()
 
     def list_policy_infos(self) -> list[Policy]:
         return self._model_policy_operations.list_policy_infos()
+
+    def list_policy_infos_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Policy]:
+        """Paged variant of ``list_policy_infos``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._model_policy_operations.list_policy_infos_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
         return self._model_policy_operations.list_policy_infos_with_visibility()
@@ -126,11 +149,33 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
     def list_tags(self) -> list[str]:
         return self._model_tag_operations.list_tags()
 
+    def list_tags_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[str]:
+        """Paged variant of ``list_tags``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._model_tag_operations.list_tags_page(
+            page_size=page_size, page_token=page_token
+        )
+
     def list_tags_with_visibility(self) -> TagList[str]:
         return self._model_tag_operations.list_tags_with_visibility()
 
     def list_tags_info(self) -> list[Tag]:
         return self._model_tag_operations.list_tags_info()
+
+    def list_tags_info_page(
+        self, *, page_size: int, page_token: Optional[str] = None
+    ) -> Page[Tag]:
+        """Paged variant of ``list_tags_info``: one page, in ascending order.
+
+        Pass the ``next_page_token`` of the previous page to read the next one.
+        """
+        return self._model_tag_operations.list_tags_info_page(
+            page_size=page_size, page_token=page_token
+        )
 
     def list_tags_info_with_visibility(self) -> TagList[Tag]:
         return self._model_tag_operations.list_tags_info_with_visibility()

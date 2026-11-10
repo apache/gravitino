@@ -68,6 +68,8 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationExpres
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,7 +96,9 @@ public class PolicyOperations {
   public Response listPolicies(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list policy {} request for metalake: {}", verbose ? "infos" : "names", metalake);
 
@@ -104,32 +108,51 @@ public class PolicyOperations {
           () -> {
             if (verbose) {
               PolicyEntity[] policies = policyDispatcher.listPolicyInfos(metalake);
-              PolicyDTO[] policyDTOs =
-                  Arrays.stream(policies)
-                      .map(p -> toDTO(p, Optional.empty()))
-                      .toArray(PolicyDTO[]::new);
-              policyDTOs =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.POLICY,
-                      policyDTOs,
-                      (policyDTO -> NameIdentifierUtil.ofPolicy(metalake, policyDTO.name())));
+              ListPager.ArrayPage<PolicyDTO> policyDTOsPage =
+                  ListPager.pageArray(
+                      Arrays.stream(policies)
+                          .map(p -> toDTO(p, Optional.empty()))
+                          .toArray(PolicyDTO[]::new),
+                      PolicyDTO::name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.POLICY,
+                              all,
+                              (policyDTO ->
+                                  NameIdentifierUtil.ofPolicy(metalake, policyDTO.name()))),
+                      PolicyDTO[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listPolicies", metalake, "details"));
+              PolicyDTO[] policyDTOs = policyDTOsPage.items();
               LOG.info("List {} policies info under metalake: {}", policyDTOs.length, metalake);
-              return Utils.ok(new PolicyListResponse(policyDTOs));
+              return Utils.ok(
+                  new PolicyListResponse(policyDTOs)
+                      .withNextPageToken(policyDTOsPage.nextPageToken()));
 
             } else {
-              String[] policyNames = policyDispatcher.listPolicies(metalake);
-              policyNames = policyNames == null ? new String[0] : policyNames;
-              policyNames =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.POLICY,
-                      policyNames,
-                      (policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName)));
+              ListPager.ArrayPage<String> policyNamesPage =
+                  ListPager.pageArray(
+                      policyDispatcher.listPolicies(metalake),
+                      name -> name,
+                      all ->
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.POLICY,
+                              all,
+                              (policyName -> NameIdentifierUtil.ofPolicy(metalake, policyName))),
+                      String[]::new,
+                      pageSize,
+                      pageToken,
+                      PageToken.scopeOf("listPolicies", metalake, "names"));
+              String[] policyNames = policyNamesPage.items();
               LOG.info("List {} policies under metalake: {}", policyNames.length, metalake);
-              return Utils.ok(new NameListResponse(policyNames));
+              return Utils.ok(
+                  new NameListResponse(policyNames)
+                      .withNextPageToken(policyNamesPage.nextPageToken()));
             }
           });
     } catch (Exception e) {
@@ -342,7 +365,9 @@ public class PolicyOperations {
           String metalake,
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
           String policyName,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info(
         "Received list tag associations for policy: {} under metalake: {}", policyName, metalake);
     try {
@@ -356,20 +381,31 @@ public class PolicyOperations {
                     .filter(
                         relation -> !HiddenPolicyTag.isReservedName(relation.targetEntity().name()))
                     .toArray(RelationalEntity<?>[]::new);
-            associations =
-                MetadataAuthzHelper.filterByExpression(
-                    metalake,
-                    AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                    Entity.EntityType.TAG,
+            ListPager.ArrayPage<RelationalEntity<?>> page =
+                ListPager.pageArray(
                     associations,
-                    association ->
-                        NameIdentifierUtil.ofTag(metalake, association.targetEntity().name()));
+                    association -> association.targetEntity().name(),
+                    all ->
+                        MetadataAuthzHelper.filterByExpression(
+                            metalake,
+                            AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                            Entity.EntityType.TAG,
+                            all,
+                            association ->
+                                NameIdentifierUtil.ofTag(
+                                    metalake, association.targetEntity().name())),
+                    RelationalEntity<?>[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf(
+                        "listTagsForPolicy", metalake, policyName, verbose ? "details" : "names"));
+            associations = page.items();
             if (!verbose) {
               String[] names =
                   Arrays.stream(associations)
                       .map(association -> association.targetEntity().name())
                       .toArray(String[]::new);
-              return Utils.ok(new NameListResponse(names));
+              return Utils.ok(new NameListResponse(names).withNextPageToken(page.nextPageToken()));
             }
 
             TagForPolicyAssociationDTO[] associationDTOs =
@@ -381,7 +417,9 @@ public class PolicyOperations {
                                     (TagEntity) association.targetEntity(), Optional.empty()),
                                 toSelectorDTO(association)))
                     .toArray(TagForPolicyAssociationDTO[]::new);
-            return Utils.ok(new TagForPolicyAssociationListResponse(associationDTOs));
+            return Utils.ok(
+                new TagForPolicyAssociationListResponse(associationDTOs)
+                    .withNextPageToken(page.nextPageToken()));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handlePolicyException(OperationType.LIST, policyName, metalake, e);

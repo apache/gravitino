@@ -32,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class NameListResponse extends BaseResponse {
+public class NameListResponse extends BaseListResponse {
 
   @JsonProperty("names")
   private final String[] names;

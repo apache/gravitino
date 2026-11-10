@@ -27,6 +27,7 @@ import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
+import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
@@ -39,6 +40,8 @@ import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.pagination.ListPager;
+import org.apache.gravitino.server.web.pagination.PageToken;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -86,7 +89,9 @@ public class SecretsProviderOperations {
       errorMessage = "Current user cannot list secrets providers")
   public Response listSecretProviders(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake) {
+          String metalake,
+      @QueryParam("pageSize") Integer pageSize,
+      @QueryParam("pageToken") String pageToken) {
     LOG.info("Received list secrets providers request for metalake: {}", metalake);
     try {
       return Utils.doAs(
@@ -103,7 +108,20 @@ public class SecretsProviderOperations {
                                 .withType(info.type())
                                 .build())
                     .toArray(SecretProviderDTO[]::new);
-            Response response = Utils.ok(new SecretProviderListResponse(providers));
+            ListPager.ArrayPage<SecretProviderDTO> page =
+                ListPager.pageArray(
+                    providers,
+                    SecretProviderDTO::getName,
+                    all -> all,
+                    SecretProviderDTO[]::new,
+                    pageSize,
+                    pageToken,
+                    PageToken.scopeOf("listSecretProviders", metalake));
+            providers = page.items();
+            Response response =
+                Utils.ok(
+                    new SecretProviderListResponse(providers)
+                        .withNextPageToken(page.nextPageToken()));
             LOG.info("Listed {} secrets providers for metalake: {}", providers.length, metalake);
             return response;
           });
