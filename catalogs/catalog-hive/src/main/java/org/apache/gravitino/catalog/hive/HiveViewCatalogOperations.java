@@ -423,24 +423,10 @@ class HiveViewCatalogOperations implements ViewCatalog {
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     switch (selected.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
-        Preconditions.checkArgument(
-            defaultCatalog == null && defaultSchema == null,
-            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-                + "defaultCatalog=%s, defaultSchema=%s for view %s",
-            selected.dialect(),
-            defaultCatalog,
-            defaultSchema,
-            ident);
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         return selected;
       case Dialects.FLINK:
-        Preconditions.checkArgument(
-            defaultCatalog == null && defaultSchema == null,
-            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-                + "defaultCatalog=%s, defaultSchema=%s for view %s",
-            selected.dialect(),
-            defaultCatalog,
-            defaultSchema,
-            ident);
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         Preconditions.checkArgument(
             properties.keySet().stream()
                 .anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
@@ -450,6 +436,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
             HiveView.FLINK_PROPERTY_PREFIX);
         return selected;
       case Dialects.SPARK:
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         Preconditions.checkArgument(
             properties.containsKey(HiveView.SPARK_VERSION_KEY),
             "Spark dialect view '%s' requires property '%s' to be set; "
@@ -466,7 +453,71 @@ class HiveViewCatalogOperations implements ViewCatalog {
     }
   }
 
+<<<<<<< HEAD
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
+=======
+  private void checkNoDefaultCatalogAndSchema(
+      SQLRepresentation representation,
+      String defaultCatalog,
+      String defaultSchema,
+      NameIdentifier ident) {
+    Preconditions.checkArgument(
+        defaultCatalog == null && defaultSchema == null,
+        "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+            + "defaultCatalog=%s, defaultSchema=%s for view %s",
+        representation.dialect(),
+        defaultCatalog,
+        defaultSchema,
+        ident);
+  }
+
+  /**
+   * Sets or clears the {@code presto_view} marker in the given HMS property map, so that a Trino
+   * dialect view is recognized as a native Trino view (see {@link TrinoNativeViewCodec}).
+   */
+  private void applyTrinoViewMarker(Map<String, String> params, String dialect) {
+    if (!Dialects.TRINO.equalsIgnoreCase(dialect)) {
+      params.remove(TrinoNativeViewCodec.PRESTO_VIEW_FLAG);
+      return;
+    }
+    params.put(TrinoNativeViewCodec.PRESTO_VIEW_FLAG, "true");
+  }
+
+  /**
+   * Derives the HMS-level representation of a view from its logical definition, shared by {@link
+   * #createView} and the {@code ReplaceView} branch of {@link #alterView}. The caller supplies the
+   * logical SQL representation, output columns, user comment, and default catalog/schema; {@code
+   * properties} is mutated in place to set or clear the {@code presto_view} marker.
+   */
+  private HmsViewEncoding encodeHmsView(
+      SQLRepresentation sqlRepresentation,
+      Column[] columns,
+      String comment,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties,
+      NameIdentifier ident) {
+    applyTrinoViewMarker(properties, sqlRepresentation.dialect());
+    String viewOriginalText =
+        toHmsViewOriginalText(
+            sqlRepresentation, columns, comment, defaultCatalog, defaultSchema, properties, ident);
+    String hmsComment =
+        Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())
+            ? TrinoNativeViewCodec.PRESTO_VIEW_COMMENT
+            : comment;
+    return new HmsViewEncoding(
+        hmsColumns(columns, sqlRepresentation.dialect()), hmsComment, viewOriginalText);
+  }
+
+  private String toHmsViewOriginalText(
+      SQLRepresentation representation,
+      Column[] columns,
+      String comment,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties,
+      NameIdentifier ident) {
+>>>>>>> 92c590b73 ([#14799] fix(catalog-hive): reject default catalog and schema on Spark views (#14800))
     switch (representation.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.FLINK:
