@@ -26,11 +26,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.google.common.hash.Hashing;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -43,7 +41,6 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.IMetaStoreClient;
 import org.apache.hadoop.security.UserGroupInformation;
-import org.apache.hadoop.security.token.Token;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.ClientPool;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -180,7 +177,8 @@ public class IcebergHiveCachedClientPool
     elements.add(conf.get(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE.varname, ""));
     try {
       // Proxy UGIs are recreated for each request. Share pools by authentication identity, not
-      // Subject identity, while keeping different real users, auth methods and tokens isolated.
+      // Subject identity, while keeping different real users and auth methods isolated. HMS
+      // delegation tokens are issued per request and must not prevent reuse by the same identity.
       elements.add(authenticationIdentity(UserGroupInformation.getCurrentUser()));
     } catch (IOException e) {
       throw new UncheckedIOException(e);
@@ -235,20 +233,10 @@ public class IcebergHiveCachedClientPool
     return Key.of(elements);
   }
 
-  private static List<Object> authenticationIdentity(UserGroupInformation user) throws IOException {
-    List<String> tokens = Lists.newArrayList();
-    for (Token<?> token : user.getTokens()) {
-      // Include token credentials without retaining their plaintext in cache keys or diagnostics.
-      tokens.add(
-          Hashing.sha256()
-              .hashString(token.encodeToUrlString(), StandardCharsets.UTF_8)
-              .toString());
-    }
-    tokens.sort(String::compareTo);
+  private static List<Object> authenticationIdentity(UserGroupInformation user) {
     return List.of(
         user.getUserName(),
         user.getAuthenticationMethod(),
-        tokens,
         user.getRealUser() == null ? List.of() : authenticationIdentity(user.getRealUser()));
   }
 

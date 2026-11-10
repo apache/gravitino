@@ -25,11 +25,11 @@ import java.security.PrivilegedAction;
 import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.Token;
-import org.apache.hadoop.security.token.TokenIdentifier;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.hive.HiveClientPool;
 import org.junit.jupiter.api.Assertions;
@@ -160,10 +160,9 @@ public class TestIcebergHiveCachedClientPool {
       try (IcebergHiveCachedClientPool pool =
           new IcebergHiveCachedClientPool(configuration, properties)) {
         HiveClientPool first =
-            UserGroupInformation.createProxyUser("alice", login)
-                .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-        for (int request = 0; request < 10; request++) {
-          UserGroupInformation proxy = UserGroupInformation.createProxyUser("alice", login);
+            proxyWithToken(login, 0).doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+        for (int request = 1; request <= 10; request++) {
+          UserGroupInformation proxy = proxyWithToken(login, request);
           Assertions.assertSame(
               first, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
         }
@@ -194,23 +193,15 @@ public class TestIcebergHiveCachedClientPool {
   }
 
   @Test
-  void testTokenCredentialsRemainIsolated() throws Exception {
-    Configuration configuration = new Configuration(false);
-    UserGroupInformation first = UserGroupInformation.createRemoteUser("alice");
-    UserGroupInformation same = UserGroupInformation.createRemoteUser("alice");
-    UserGroupInformation different = UserGroupInformation.createRemoteUser("alice");
-    Text kind = new Text("HIVE_DELEGATION_TOKEN");
-    Text service = new Text("metastore");
-    first.addToken(new Token<TokenIdentifier>(new byte[] {1}, new byte[] {2}, kind, service));
-    same.addToken(new Token<TokenIdentifier>(new byte[] {1}, new byte[] {2}, kind, service));
-    different.addToken(new Token<TokenIdentifier>(new byte[] {1}, new byte[] {3}, kind, service));
-    try (IcebergHiveCachedClientPool pool =
-        new IcebergHiveCachedClientPool(configuration, Map.of())) {
-      HiveClientPool original = first.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-      Assertions.assertSame(
-          original, same.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
-      Assertions.assertNotSame(
-          original, different.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+  void testTokenSignatureSettingsRemainIsolated() throws Exception {
+    Configuration first = new Configuration(false);
+    first.set("hive.metastore.token.signature", "first");
+    Configuration second = new Configuration(first);
+    second.set("hive.metastore.token.signature", "second");
+    try (IcebergHiveCachedClientPool firstPool = new IcebergHiveCachedClientPool(first, Map.of());
+        IcebergHiveCachedClientPool secondPool =
+            new IcebergHiveCachedClientPool(second, Map.of())) {
+      Assertions.assertNotSame(firstPool.clientPool(), secondPool.clientPool());
     }
   }
 
@@ -226,5 +217,19 @@ public class TestIcebergHiveCachedClientPool {
           pool1.close();
           pool2.close();
         });
+  }
+
+  private static UserGroupInformation proxyWithToken(UserGroupInformation login, int sequence) {
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("alice", login);
+    DelegationTokenIdentifier identifier =
+        new DelegationTokenIdentifier(new Text("alice"), new Text("service"), new Text("service"));
+    identifier.setSequenceNumber(sequence);
+    proxy.addToken(
+        new Token<>(
+            identifier.getBytes(),
+            new byte[] {(byte) sequence},
+            identifier.getKind(),
+            new Text("metastore")));
+    return proxy;
   }
 }
