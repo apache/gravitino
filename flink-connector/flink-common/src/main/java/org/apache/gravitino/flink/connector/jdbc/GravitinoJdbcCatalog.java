@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.ObjectPath;
@@ -122,6 +123,13 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
     if (connectionDatabase != null) {
       innerCatalogOptions.put(
           JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
+    }
+    // Flink JDBC 4.x takes "jdbc:dialect://host:port/" as a URL that already names a database and
+    // connects to it as is, so drop the trailing slash to have 'default-database' appended.
+    String baseUrl = innerCatalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL);
+    if (baseUrl != null && baseUrl.indexOf('?') < 0) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_URL, StringUtils.stripEnd(baseUrl.trim(), "/"));
     }
     CatalogFactory.Context contextWithCredentials =
         new CatalogFactory.Context() {

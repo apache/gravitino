@@ -144,9 +144,18 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
 
   @Test
   public void testToFlinkTablePropertiesWithBypassBaseUrl() {
-    // A base-url without the trailing slash is also accepted by FlinkJdbcCatalog.
-    for (String bypassBaseUrl :
-        new String[] {"jdbc:postgresql://127.0.0.1:15432/", "jdbc:postgresql://127.0.0.1:15432"}) {
+    // Flink JDBC accepts a base-url with or without the trailing slash, and 4.x also one with the
+    // database and query parameters.
+    Map<String, String> expectedTableUrls =
+        ImmutableMap.of(
+            "jdbc:postgresql://127.0.0.1:15432/", "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432", "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432/gravitino",
+                "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432/gravitino?sslmode=require",
+                "jdbc:postgresql://127.0.0.1:15432/gravitino?sslmode=require");
+    for (Map.Entry<String, String> entry : expectedTableUrls.entrySet()) {
+      String bypassBaseUrl = entry.getKey();
       Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
       catalogPropertiesWithBypassUrl.put(FLINK_BYPASS_DEFAULT_DATABASE, "public");
       catalogPropertiesWithBypassUrl.put(
@@ -164,8 +173,9 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
                   flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t"));
 
       Assertions.assertEquals(
-          "jdbc:postgresql://127.0.0.1:15432/gravitino",
-          tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+          entry.getValue(),
+          tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL),
+          bypassBaseUrl);
     }
   }
 

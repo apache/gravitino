@@ -37,6 +37,10 @@ public abstract class JdbcPropertiesConverter
 
   private static final Pattern jdbcUrlPattern = Pattern.compile("(jdbc:\\w+://[^:/]+(?::\\d+)?)");
 
+  // Group 1 is the URL up to the authority, group 2 the optional query parameters.
+  private static final Pattern jdbcBaseUrlPattern =
+      Pattern.compile("(jdbc:\\w+://[^/?]+)(?:/[^?]*)?(\\?.*)?");
+
   private static final Set<String> INJECTED_TABLE_OPTIONS =
       ImmutableSet.of(
           JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
@@ -119,14 +123,10 @@ public abstract class JdbcPropertiesConverter
         jdbcPassword != null, JdbcPropertiesConstants.FLINK_JDBC_PASSWORD + " should not be null.");
     Preconditions.checkArgument(
         jdbcBaseUrl != null, JdbcPropertiesConstants.FLINK_JDBC_URL + " should not be null.");
-    // Same as FlinkJdbcCatalog, accept a base-url with or without the trailing slash.
-    if (!jdbcBaseUrl.endsWith("/")) {
-      jdbcBaseUrl = jdbcBaseUrl + "/";
-    }
     Map<String, String> tableOptions = new HashMap<>();
     tableOptions.put(
         JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL,
-        jdbcBaseUrl + getConnectionDatabase(flinkCatalogProperties, tablePath));
+        buildDatabaseUrl(jdbcBaseUrl, getConnectionDatabase(flinkCatalogProperties, tablePath)));
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME, getTableName(tablePath));
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_USER, jdbcUser);
     tableOptions.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, jdbcPassword);
@@ -153,6 +153,20 @@ public abstract class JdbcPropertiesConverter
   }
 
   protected abstract String defaultDriverName();
+
+  /**
+   * Builds the JDBC URL of the given database from a base-url. The base-url may end with or without
+   * a slash, and Flink JDBC 4.x also accepts one that contains a database and query parameters, so
+   * any database in it is replaced and the query parameters are kept.
+   */
+  private static String buildDatabaseUrl(String baseUrl, String database) {
+    Matcher matcher = jdbcBaseUrlPattern.matcher(baseUrl.trim());
+    if (!matcher.matches()) {
+      return (baseUrl.endsWith("/") ? baseUrl : baseUrl + "/") + database;
+    }
+    String parameters = matcher.group(2) == null ? "" : matcher.group(2);
+    return matcher.group(1) + "/" + database + parameters;
+  }
 
   private static String getBaseUrlFromJdbcUrl(String jdbcUrl) {
     Matcher matcher = jdbcUrlPattern.matcher(jdbcUrl);
