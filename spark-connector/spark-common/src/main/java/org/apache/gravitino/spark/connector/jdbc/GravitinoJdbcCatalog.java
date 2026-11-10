@@ -119,8 +119,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
                 table, sourceError.getMessage()),
             sourceError);
       }
-      throw new RuntimeException(
-          String.format("Failed to load the real sparkTable: %s", table), e);
+      throw new RuntimeException(String.format("Failed to load the real sparkTable: %s", table), e);
     }
   }
 

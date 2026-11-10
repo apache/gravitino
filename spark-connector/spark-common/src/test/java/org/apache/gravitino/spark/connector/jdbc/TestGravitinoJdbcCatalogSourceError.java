@@ -74,8 +74,7 @@ public class TestGravitinoJdbcCatalogSourceError {
 
   @Test
   void testSourceErrorNamesTheMissingPrivilege() {
-    SQLException error =
-        GravitinoJdbcCatalog.sourceError(options(NO_RIGHTS, PASSWORD), TABLE);
+    SQLException error = GravitinoJdbcCatalog.sourceError(options(NO_RIGHTS, PASSWORD), TABLE);
     Assertions.assertNotNull(error);
     Assertions.assertTrue(error.getMessage().contains("rights"), error.getMessage());
   }
@@ -114,11 +113,13 @@ public class TestGravitinoJdbcCatalogSourceError {
       // Spark 3.x reports the failed schema read as a missing table, which the catalog replaces
       // with the source's error. Spark 4.0 already reports it as FAILED_JDBC with the source
       // error as the cause. Either way the source's reason must reach the caller.
-      Exception error = Assertions.assertThrows(Exception.class, () -> catalog.loadSparkTable(TABLE));
+      Exception error =
+          Assertions.assertThrows(Exception.class, () -> catalog.loadSparkTable(TABLE));
       Assertions.assertFalse(
           String.valueOf(error.getMessage()).contains("Failed to load the real sparkTable"),
           error.getMessage());
-      Assertions.assertNotNull(sqlCause(error), "the source's SQL error must be in the cause chain");
+      Assertions.assertNotNull(
+          sqlCause(error), "the source's SQL error must be in the cause chain");
     }
   }
 
