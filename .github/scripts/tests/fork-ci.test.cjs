@@ -19,8 +19,9 @@ const assert = require('node:assert/strict');
 const { mkdtemp, readFile, rm } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
-const { FAIL_FAST, SUITES, requiredName, evaluate, createService } = require('../fork-ci-status.cjs');
+const { requiredSuites, FAIL_FAST, SUITES, requiredName, evaluate, createService } = require('../fork-ci-status.cjs');
 const { resolve } = require('../resolve-fork-ci.cjs');
+const { statusState, TRUSTED_REQUIRED } = require('../publish-ci-status.cjs');
 const { yamlEntries, prepare } = require('../allowlist-pr.cjs');
 const A = 'a'.repeat(40), B = 'b'.repeat(40), C = 'c'.repeat(40);
 const pr = () => ({ number: 7, state: 'open', head: { sha: A, repo: { owner: { login: 'fork' }, name: 'repo', full_name: 'fork/repo' } },
@@ -62,6 +63,7 @@ const runsOf = (github, endpoint, args) => endpoint === github.rest.actions.list
   ? endpoint(args).then(response => response.data.workflow_runs) : undefined;
 function serviceMock({ changed = false, trusted = false, forkJobs = jobs(pr()), trustedJobs = jobs(pr()), trustedSha = B } = {}) {
   const github = { rest: {
+    repos: { getContent: async () => ({ data: { encoding: 'base64', content: Buffer.from(workflowFor(SUITES)).toString('base64') } }) },
     git: { getTree: async ({ owner, tree_sha }) => ({ data: { tree: tree_sha.length === 40
       ? [{ path: '.github', sha: 'github-tree' }, { path: '.asf.yaml', sha: 'policy' }]
       : ['workflows', 'actions', 'scripts'].map(name => ({ path: name, sha: changed && owner === 'fork' ? 'changed-' + name : name })) } }) },
@@ -71,6 +73,80 @@ function serviceMock({ changed = false, trusted = false, forkJobs = jobs(pr()), 
   github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? (args.run_id === 2 ? trustedJobs : forkJobs);
   return github;
 }
+const workflowFor = suites => `jobs:
+  required_ci:
+    needs:
+      - eligibility
+${suites.map(suite => `      - ${suite}\n`).join('')}    runs-on: ubuntu-latest
+`;
+const historicalSuites = SUITES.filter(suite => suite !== 'tms');
+function workflowSource(github, suites, expectedRef) {
+  github.rest.repos.getContent = async args => {
+    assert.deepEqual(args, { owner: 'apache', repo: 'gravitino', path: '.github/workflows/fork-ci.yml', ref: expectedRef });
+    return { data: { encoding: 'base64', content: Buffer.from(workflowFor(suites)).toString('base64') } };
+  };
+}
+test('adding TMS upstream does not retroactively fail an older successful fork run', async () => {
+  const github = serviceMock({ forkJobs: jobs(pr()).filter(job => !job.name.startsWith('tms / ')) });
+  workflowSource(github, historicalSuites, B);
+  assert.equal((await createService(github).mirror(pr())).result.conclusion, 'success');
+});
+test('historical required callers cannot disappear when upstream removes or renames a suite', async () => {
+  const github = serviceMock();
+  workflowSource(github, [...SUITES, 'historical_caller'], B);
+  assert.equal((await createService(github).mirror(pr())).result.conclusion, 'action_required');
+});
+test('a fork run must include the callers of the newer base commit it tested', async () => {
+  // The head's workflow predates TMS, but the run merged a base commit that requires it.
+  const forkJobs = jobs(pr()).filter(job => !job.name.startsWith('tms / '));
+  forkJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ forkJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, SUITES, C);
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.conclusion, 'action_required');
+  assert.match(result.note, /no tms jobs.*merge the latest base branch and push/);
+});
+test('a fork run that tested a newer base commit without a later suite passes', async () => {
+  const forkJobs = jobs(pr()).filter(job => !job.name.startsWith('tms / '));
+  forkJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ forkJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, historicalSuites, C);
+  assert.equal((await createService(github).mirror(pr())).result.conclusion, 'success');
+});
+test('trusted runs use their dispatched workflow SHA rather than the frozen PR base', async () => {
+  const trustedJobs = jobs(pr()); trustedJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ trusted: true, trustedSha: C, trustedJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, [...SUITES, 'new_caller'], C);
+  assert.equal((await createService(github).mirror(pr())).result.conclusion, 'action_required');
+});
+test('workflow contents GitHub does not return inline cannot publish success', async () => {
+  // GitHub omits the content of files larger than 1 MB.
+  const github = serviceMock();
+  github.rest.repos.getContent = async () => ({ data: { encoding: 'none', content: '' } });
+  await assert.rejects(createService(github).mirror(pr()), /Cannot read trusted Fork CI workflow contents at b{40}/);
+});
+test('a workflow source API failure cannot publish success', async () => {
+  const github = serviceMock();
+  github.rest.repos.getContent = async () => { throw new Error('API unavailable'); };
+  await assert.rejects(createService(github).mirror(pr()), /API unavailable/);
+});
+test('changed definitions cannot self-attest through a watcher-only failure', async () => {
+  const github = serviceMock({ changed: true, forkJobs: [...jobs(pr()), { name: FAIL_FAST, conclusion: 'failure' }] });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => {
+    const response = await list(args);
+    for (const run of response.data.workflow_runs) run.conclusion = 'failure';
+    return response;
+  };
+  const { result } = await createService(github).mirror(pr());
+  // Not success, and shown as pending trusted verification rather than as an error.
+  assert.equal(result.conclusion, 'action_required');
+  assert.equal(result.title, TRUSTED_REQUIRED);
+  assert.equal(statusState(result), 'pending');
+});
 test('changed workflow definitions cannot self-attest a successful fork run', async () => {
   const service = createService(serviceMock({ changed: true }));
   assert.equal((await service.mirror(pr())).result.conclusion, 'action_required');
@@ -149,7 +225,7 @@ test('trusted runs on an advanced base are found by branch and verified against 
   for (const comparison of ['ahead', 'identical', 'diverged']) {
     const tested = pr();tested.base.sha = C;
     const github = serviceMock({ changed: true, trusted: true, trustedSha: C, trustedJobs: jobs(tested) });
-    github.rest.repos = { compareCommitsWithBasehead: async args => {
+    github.rest.repos = { ...github.rest.repos, compareCommitsWithBasehead: async args => {
       assert.equal(args.basehead, `${C}...main`);return { data: { status: comparison } };
     } };
     const list = github.rest.actions.listWorkflowRuns;
@@ -279,7 +355,7 @@ function publisherMock({ current = pr(), latest, rerun = run(), failTrees = fals
   const listPulls = () => {};
   let reads = 0;
   github.rest.pulls = { list: listPulls, get: async () => ({ data: ++reads === 1 ? pr() : current }) };
-  github.rest.repos = { getContent: async () => ({ data: {} }),
+  github.rest.repos = { ...github.rest.repos,
     getCombinedStatusForRef: async ({ ref }) => ({ data: { statuses: stored.get(ref) || [] } }),
     createCommitStatus: async args => { statuses.push(args);
       stored.set(args.sha, [{ ...args }, ...(stored.get(args.sha) || []).filter(s => s.context !== args.context)]); } };
@@ -371,6 +447,32 @@ test('scheduled publication ignores poisoned cache state and recomputes definiti
   assert.ok(!workflow.includes('actions/cache/'));
 }));
 
+test('a full rerun on a newer base is judged by its newest Required CI job', async () => {
+  // Attempt 1 failed against base B; the rerun repeated eligibility against base C and passed.
+  const p = pr();
+  const github = serviceMock();
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: {
+    workflow_runs: event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 2 }] : []
+  } });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? [
+    { name: requiredName(p), id: 1, run_attempt: 1, conclusion: 'failure' },
+    { name: requiredName(p, C), id: 2, run_attempt: 2, conclusion: 'success' },
+    ...SUITES.map((suite, i) => ({ name: `${suite} / changes`, id: 10 + i, run_attempt: 2, conclusion: 'success' }))];
+  workflowSource(github, SUITES, C);
+  const mirror = await createService(github).mirror(p);
+  assert.equal(mirror.base, C);
+  assert.equal(mirror.result.conclusion, 'success');
+});
+test('a trusted run without a required suite asks for another trusted dispatch', async () => {
+  const trustedJobs = jobs(pr()).filter(job => !job.name.startsWith('tms / ')); trustedJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ trusted: true, trustedSha: C, trustedJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, SUITES, C);
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.conclusion, 'action_required');
+  assert.match(result.note, /trusted run has no tms jobs\. Dispatch trusted Fork CI again/);
+});
 test('partial reruns retain successful callers but use each job newest result', async () => {
   const p = pr();
   const github = serviceMock();
@@ -419,7 +521,7 @@ test('a run against a newer commit of the PR base branch is accepted', async () 
     const tested = pr(); tested.base.sha = C;
     const github = serviceMock({ forkJobs: jobs(tested) });
     let basehead;
-    github.rest.repos = { compareCommitsWithBasehead: async args => { basehead = args.basehead; return { data: { status } }; } };
+    github.rest.repos = { ...github.rest.repos, compareCommitsWithBasehead: async args => { basehead = args.basehead; return { data: { status } }; } };
     const mirror = await createService(github).mirror(pr());
     assert.equal(mirror.result.conclusion, conclusion);
     assert.equal(basehead, `${C}...main`);
@@ -1179,4 +1281,126 @@ test('history cleanup failure leaves the current result published and remains ob
   await update({ github, context: ctx, core, sleep: async () => {} });
   assert.equal(statuses[0].sha, A);assert.equal(statuses[0].state, 'success');
   assert.match(failures[0], /#7/);
+}));
+
+
+test('current required callers match every reusable Fork CI workflow job', async () => {
+  const source = await readFile(path.join(__dirname, '../../workflows/fork-ci.yml'), 'utf8');
+  const callers = [...source.matchAll(/^  ([\w-]+):\n(?:(?!  [\w-]+:)[^\n]*\n)*?    uses: \.\/\.github\/workflows\//gm)].map(match => match[1]);
+  assert.ok(callers.length > 10);
+  assert.deepEqual([...requiredSuites(source)].sort(), callers.sort());
+});
+test('unsupported or empty required caller lists fail closed', () => {
+  const valid = workflowFor(['build']);
+  assert.deepEqual(requiredSuites(valid), ['build']);
+  assert.deepEqual(requiredSuites(valid.replaceAll('\n', '\r\n')), ['build']);
+  for (const source of ['', valid.replace('required_ci:', 'other:'),
+    valid.replace('needs:', 'needs: [eligibility, build]'),
+    valid.replace('      - build', '      - ${{ inputs.suites }}'),
+    valid.replace('      - build', '     - build'),
+    valid.replace('      - eligibility\n', ''),
+    workflowFor(['build', 'mcp']).replace('      - eligibility\n', ''),
+    valid.replace('      - build\n', ''),
+    valid.replace('      - build', '      - build\n      - build'),
+    valid + valid]) {
+    assert.throws(() => requiredSuites(source));
+  }
+});
+test('trusted workflow suite metadata is cached by immutable definition SHA', async () => {
+  const github = serviceMock(); let reads = 0;
+  const getContent = github.rest.repos.getContent;
+  github.rest.repos.getContent = async args => { reads++; return getContent(args); };
+  const service = createService(github);
+  await service.mirror(pr()); await service.mirror(pr());
+  assert.equal(reads, 1);
+});
+test('running, failed and untrusted runs do not depend on workflow contents API', async () => {
+  for (const kind of ['running', 'failed', 'untrusted']) {
+    const github = serviceMock({ changed: kind === 'untrusted' });
+    github.rest.repos.getContent = async () => { throw new Error('must not fetch workflow'); };
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      const response = await list(args);
+      for (const run of response.data.workflow_runs) {
+        if (kind === 'running') run.status = 'in_progress';
+        if (kind === 'failed') run.conclusion = 'failure';
+      }
+      return response;
+    };
+    const { result } = await createService(github).mirror(pr());
+    assert.equal(kind === 'running' ? result.status : result.conclusion,
+      kind === 'running' ? 'in_progress' : kind === 'failed' ? 'failure' : 'action_required');
+  }
+});
+
+test('workflow lookup and parse failures leave the published status untouched and observable', async () => withPublisher(async ({ ctx, core, failures }) => {
+  for (const data of [undefined, { encoding: 'base64', content: Buffer.from('jobs: {}').toString('base64') },
+    { encoding: 'none' }]) {
+    const { github, statuses } = publisherMock();
+    const getContent = github.rest.repos.getContent;
+    github.rest.repos.getContent = async args => {
+      if (args.ref !== B) return getContent(args);
+      if (!data) throw Object.assign(new Error('API unavailable'), { status: 503 });
+      return { data };
+    };
+    const before = failures.length;
+    await update({ github, context: ctx, core, sleep: async () => {} });
+    assert.deepEqual(statuses, []);
+    assert.ok(failures.length > before);
+  }
+}));
+
+test('publisher shares the immutable workflow read between migration detection and suite validation', async () => withPublisher(async ({ ctx, core }) => {
+  const { github, statuses } = publisherMock();
+  const getContent = github.rest.repos.getContent; const reads = [];
+  github.rest.repos.getContent = async args => { reads.push(args.ref); return getContent(args); };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses[0].state, 'success');
+  assert.deepEqual(reads, [B]);
+}));
+
+test('a transient base workflow lookup failure recovers on the next polling pass', async () => withPublisher(async ({ ctx, core, failures }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const { github, statuses } = publisherMock();
+  github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+  // The PR base read serves both migration detection and suite validation.
+  let baseReads = 0;
+  const getContent = github.rest.repos.getContent;
+  github.rest.repos.getContent = async args => {
+    if (args.ref === B && ++baseReads === 1) throw Object.assign(new Error('Temporary API failure'), { status: 503 });
+    return getContent(args);
+  };
+  let time = Date.parse('2026-01-03T00:00:00Z');
+  await update({ github, context: ctx, core, clock: () => time, sleep: async ms => { time += ms; } });
+  assert.equal(baseReads, 2);
+  assert.equal(statuses.length, 1); assert.equal(statuses[0].state, 'success');
+  assert.deepEqual(failures, []);
+}));
+test('a transient trusted workflow lookup failure recovers on the next polling pass', async () => withPublisher(async ({ ctx, core, failures }) => {
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const { github, statuses } = publisherMock();
+  github.rest.rateLimit.get = async () => ({ data: { resources: { core: { remaining: 15000, limit: 15000 } } } });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => args.event === 'workflow_dispatch'
+    ? { data: { workflow_runs: [{ ...run(), id: 2, head_sha: C, head_branch: 'main',
+      display_title: 'Trusted Fork CI #7', created_at: '2026-01-02T00:00:00Z' }] } } : list(args);
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (args.run_id === 2) {
+      const result = jobs(pr()); result[0].name = requiredName(pr(), C); return result;
+    }
+    return paginate(endpoint, args);
+  };
+  let trustedReads = 0;
+  const getContent = github.rest.repos.getContent;
+  github.rest.repos.getContent = async args => {
+    if (args.ref === C && ++trustedReads === 1) throw Object.assign(new Error('Temporary API failure'), { status: 503 });
+    return getContent(args);
+  };
+  let time = Date.parse('2026-01-03T00:00:00Z');
+  await update({ github, context: ctx, core, clock: () => time, sleep: async ms => { time += ms; } });
+  assert.equal(trustedReads, 2);
+  assert.equal(statuses.length, 1); assert.equal(statuses[0].state, 'success');
+  assert.deepEqual(failures, []);
 }));

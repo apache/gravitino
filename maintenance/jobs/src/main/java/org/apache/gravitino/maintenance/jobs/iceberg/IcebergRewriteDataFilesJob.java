@@ -18,16 +18,22 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for rewriting Iceberg table data files.
@@ -35,11 +41,13 @@ import org.apache.spark.sql.SparkSession;
  * <p>This job leverages Iceberg's RewriteDataFilesProcedure to optimize data file layout through
  * binpack or sort strategies. Z-order is a type of sort order, not a strategy.
  */
-public class IcebergRewriteDataFilesJob implements BuiltInJob {
+public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanceAction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRewriteDataFilesJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-rewrite-data-files";
-  private static final String VERSION = "v3";
+  private static final String VERSION = "v1";
 
   // Valid strategy values for Iceberg rewrite_data_files procedure
   private static final String STRATEGY_BINPACK = "binpack";
@@ -148,7 +156,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
-        System.out.println("Applied custom Spark configurations: " + customConfigs);
       } catch (IllegalArgumentException e) {
         System.err.println("Error: " + e.getMessage());
         printUsage();
@@ -160,19 +167,11 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
-      // Build the procedure call SQL
-      String sql =
-          buildProcedureCall(
-              catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
-
-      System.out.println("Executing Iceberg rewrite_data_files procedure: " + sql);
-
-      // Execute the procedure
-      Row[] results = (Row[]) spark.sql(sql).collect();
-
-      // Print results
-      if (results.length > 0) {
-        Row result = results[0];
+      List<Row> results =
+          execute(
+              spark, catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
         // Iceberg 1.6.1 returns 4 columns, newer versions may return 5
         if (result.size() >= 5) {
           System.out.printf(
@@ -197,7 +196,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
               result.getInt(0), result.getInt(1), result.getLong(2), result.getInt(3));
         }
       }
-
       System.out.println("Rewrite data files job completed successfully");
     } catch (Exception e) {
       System.err.println("Error executing rewrite data files job: " + e.getMessage());
@@ -272,21 +270,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
     return sql.toString();
   }
 
-  /** Delegates to {@link IcebergJobUtils#escapeSqlString(String)}. */
-  static String escapeSqlString(String value) {
-    return IcebergJobUtils.escapeSqlString(value);
-  }
-
-  /** Delegates to {@link IcebergJobUtils#escapeSqlIdentifier(String)}. */
-  static String escapeSqlIdentifier(String identifier) {
-    return IcebergJobUtils.escapeSqlIdentifier(identifier);
-  }
-
-  /** Delegates to {@link IcebergJobUtils#parseArguments(String[])}. */
-  static Map<String, String> parseArguments(String[] args) {
-    return IcebergJobUtils.parseArguments(args);
-  }
-
   /**
    * Validate the strategy parameter value.
    *
@@ -308,11 +291,6 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
               + STRATEGY_SORT
               + "'");
     }
-  }
-
-  /** Delegates to {@link IcebergJobUtils#parseCustomSparkConfigs(String)}. */
-  static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return IcebergJobUtils.parseCustomSparkConfigs(sparkConfJson);
   }
 
   /** Print usage information. */
@@ -398,5 +376,145 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob {
    */
   private static Map<String, String> buildSparkConfigs() {
     return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  }
+
+  /**
+   * Runs {@code rewrite_data_files} on an existing Spark session. Shared by CLI {@link #main} and
+   * TMS {@link #executeAndCollectAfter}.
+   *
+   * @return procedure result rows
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String strategy,
+      @Nullable String sortOrder,
+      @Nullable String whereClause,
+      @Nullable String optionsJson) {
+    validateStrategy(strategy);
+    String sql =
+        buildProcedureCall(
+            catalogName, tableIdentifier, strategy, sortOrder, whereClause, optionsJson);
+    LOG.info("Executing Iceberg rewrite_data_files: {}", sql);
+    return spark.sql(sql).collectAsList();
+  }
+
+  @Override
+  public boolean hasBeforeMetrics() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
+    Map<String, Object> payload = collectCompactionMetrics(spark, catalogName, tableIdentifier);
+    return TableSnapshotMetrics.of(snapshotId, payload);
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before) {
+    execute(
+        spark,
+        catalogName,
+        tableIdentifier,
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("strategy")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("sort-order")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("where")),
+        IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("options")));
+    return TableSnapshotMetrics.of(
+        IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier),
+        collectCompactionMetrics(spark, catalogName, tableIdentifier));
+  }
+
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main})
+  // -------------------------------------------------------------------------
+
+  /**
+   * Collects compaction inventory metrics for TMS before/after reporting. Uses the same {@code
+   * files} metadata SQL as {@link IcebergUpdateStatsAndMetricsJob}. CLI entry points never call
+   * this.
+   */
+  @VisibleForTesting
+  static Map<String, Object> collectCompactionMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    boolean partitioned =
+        IcebergUpdateStatsAndMetricsJob.isPartitionedTable(spark, catalogName, tableIdentifier);
+    if (partitioned) {
+      String sql =
+          IcebergUpdateStatsAndMetricsJob.buildPartitionStatsSql(catalogName, tableIdentifier);
+      Row[] rows = (Row[]) spark.sql(sql).collect();
+      return aggregatePartitionCompactionMetrics(rows);
+    }
+
+    String sql = IcebergUpdateStatsAndMetricsJob.buildTableStatsSql(catalogName, tableIdentifier);
+    Row[] rows = (Row[]) spark.sql(sql).collect();
+    if (rows.length == 0) {
+      return compactionMetrics(0D, 0L, 0D, 0L, 0L);
+    }
+    Row row = rows[0];
+    return compactionMetrics(
+        numberAsDouble(row, "data-file-mse"),
+        numberAsLong(row, "delete-file-number"),
+        numberAsDouble(row, "avg-file-size"),
+        numberAsLong(row, "total-file-size"),
+        numberAsLong(row, "file-number"));
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> aggregatePartitionCompactionMetrics(Row[] rows) {
+    double maxMse = 0D;
+    long deleteFiles = 0L;
+    long fileNumber = 0L;
+    long totalFileSize = 0L;
+    double weightedAvgNumerator = 0D;
+    for (Row row : rows) {
+      maxMse = Math.max(maxMse, numberAsDouble(row, "data-file-mse"));
+      deleteFiles += numberAsLong(row, "delete-file-number");
+      long partitionFiles = numberAsLong(row, "file-number");
+      fileNumber += partitionFiles;
+      totalFileSize += numberAsLong(row, "total-file-size");
+      weightedAvgNumerator += numberAsDouble(row, "avg-file-size") * partitionFiles;
+    }
+    double avgFileSize = fileNumber == 0L ? 0D : weightedAvgNumerator / fileNumber;
+    return compactionMetrics(maxMse, deleteFiles, avgFileSize, totalFileSize, fileNumber);
+  }
+
+  @VisibleForTesting
+  static Map<String, Object> compactionMetrics(
+      double dataFileMse,
+      long deleteFileNumber,
+      double avgFileSize,
+      long totalFileSize,
+      long fileNumber) {
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC, dataFileMse);
+    metrics.put(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC, deleteFileNumber);
+    metrics.put(IcebergDataCompactionContent.AVG_FILE_SIZE_METRIC, avgFileSize);
+    metrics.put(IcebergDataCompactionContent.TOTAL_FILE_SIZE_METRIC, totalFileSize);
+    metrics.put(IcebergDataCompactionContent.FILE_NUMBER_METRIC, fileNumber);
+    return metrics;
+  }
+
+  private static double numberAsDouble(Row row, String field) {
+    Number number = row.getAs(field);
+    return number == null ? 0D : number.doubleValue();
+  }
+
+  private static long numberAsLong(Row row, String field) {
+    Number number = row.getAs(field);
+    return number == null ? 0L : number.longValue();
   }
 }

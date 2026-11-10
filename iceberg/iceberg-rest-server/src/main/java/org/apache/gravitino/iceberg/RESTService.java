@@ -35,6 +35,7 @@ import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.IcebergRequestBodyReaderInterceptor;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
@@ -53,6 +54,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecu
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -93,6 +95,8 @@ public class RESTService implements GravitinoAuxiliaryService {
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
+    boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    IcebergReadRestrictionLoader readRestrictionLoader = loadReadRestrictionLoader(enableAuth);
     JettyServerConfig serverConfig =
         JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
@@ -116,8 +120,13 @@ public class RESTService implements GravitinoAuxiliaryService {
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
 
-    config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    config
+        .register(IcebergObjectMapperProvider.class)
+        // Without the bundled mappers, Jackson failures reach IcebergExceptionMapper and are
+        // answered with an Iceberg ErrorModel instead of a text/plain Jackson message.
+        .register(JacksonFeature.withoutExceptionMappers());
     config.register(IcebergExceptionMapper.class);
+    config.register(IcebergRequestBodyReaderInterceptor.class);
     config.register(new OutOfMemoryErrorListener());
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
@@ -130,7 +139,6 @@ public class RESTService implements GravitinoAuxiliaryService {
     boolean skipAuthorizationForRestBackend =
         icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
-    Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
@@ -208,6 +216,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(readRestrictionLoader).to(IcebergReadRestrictionLoader.class).ranked(1);
             bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
             bind(icebergNamespaceDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
@@ -246,6 +255,15 @@ public class RESTService implements GravitinoAuxiliaryService {
     } else {
       server.addCustomFilters(ICEBERG_SPEC);
     }
+  }
+
+  static IcebergReadRestrictionLoader loadReadRestrictionLoader(boolean enableAuthorization) {
+    IcebergReadRestrictionLoader loader = IcebergReadRestrictionLoader.load();
+    if (loader.enabled() && !enableAuthorization) {
+      throw new IllegalStateException(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true");
+    }
+    return loader;
   }
 
   static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {

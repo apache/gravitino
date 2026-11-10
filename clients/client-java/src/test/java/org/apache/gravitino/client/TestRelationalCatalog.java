@@ -84,6 +84,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.types.Type;
@@ -770,8 +771,47 @@ public class TestRelationalCatalog extends TestBase {
                   expected.columns()[i].autoIncrement(), actual.columns()[i].autoIncrement());
               Assertions.assertEquals(
                   expected.columns()[i].defaultValue(), actual.columns()[i].defaultValue());
+              Assertions.assertEquals(
+                  expected.columns()[i].initialDefaultValue(),
+                  actual.columns()[i].initialDefaultValue());
             });
     Assertions.assertArrayEquals(expected.partitioning(), actual.partitioning());
+  }
+
+  @Test
+  public void testLoadTableExposesInitialDefaultValue() throws JsonProcessingException {
+    NameIdentifier tableId = NameIdentifier.of("schema1", "table_with_defaults");
+    Namespace fullNamespace = Namespace.of(metalakeName, catalogName, tableId.namespace().level(0));
+    String tablePath =
+        withSlash(RelationalCatalog.formatTableRequestPath(fullNamespace) + "/" + tableId.name());
+    LiteralDTO seed =
+        LiteralDTO.builder().withDataType(Types.StringType.get()).withValue("seed").build();
+    ColumnDTO[] columns =
+        new ColumnDTO[] {
+          new ColumnDTO.Builder<>()
+              .withName("col1")
+              .withDataType(Types.StringType.get())
+              .withComment("comment1")
+              .withNullable(true)
+              .withDefaultValue(seed)
+              .withInitialDefaultValue(seed)
+              .build()
+        };
+    TableDTO expectedTable =
+        createMockTable(
+            tableId.name(),
+            columns,
+            "comment",
+            Collections.emptyMap(),
+            new Partitioning[0],
+            DistributionDTO.NONE,
+            SortOrderDTO.EMPTY_SORT);
+    buildMockResource(Method.GET, tablePath, null, new TableResponse(expectedTable), SC_OK);
+
+    Table table = catalog.asTableCatalog().loadTable(tableId);
+    assertTableEquals(fromDTO(expectedTable), table);
+    Assertions.assertEquals(
+        Literals.stringLiteral("seed"), table.columns()[0].initialDefaultValue());
   }
 
   @Test
@@ -814,6 +854,17 @@ public class TestRelationalCatalog extends TestBase {
     Throwable ex =
         Assertions.assertThrows(NoSuchTableException.class, () -> tableCatalog.loadTable(tableId));
     Assertions.assertTrue(ex.getMessage().contains("table not found"));
+    buildMockResource(Method.GET, tablePath, null, errorResp, SC_NOT_FOUND);
+    Assertions.assertFalse(tableCatalog.tableExists(tableId));
+
+    ErrorResponse missingSchema =
+        ErrorResponse.notFound(NoSuchSchemaException.class.getSimpleName(), "schema not found");
+    buildMockResource(Method.GET, tablePath, null, missingSchema, SC_NOT_FOUND);
+    NoSuchSchemaException schemaError =
+        Assertions.assertThrows(NoSuchSchemaException.class, () -> tableCatalog.loadTable(tableId));
+    Assertions.assertTrue(schemaError.getMessage().contains("schema not found"));
+    buildMockResource(Method.GET, tablePath, null, missingSchema, SC_NOT_FOUND);
+    Assertions.assertFalse(tableCatalog.tableExists(tableId));
   }
 
   @Test

@@ -39,6 +39,8 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
 /** Normalizes Semantic Model parents while retaining Gravitino-owned model naming rules. */
 public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher {
@@ -64,6 +66,16 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    return dispatcher.listMetrics(normalizeParentForLookup(namespace));
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    return dispatcher.listMetricInfos(normalizeParentForLookup(namespace));
+  }
+
+  @Override
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
     return dispatcher.loadSemanticModel(normalizeForLookup(ident));
   }
@@ -78,11 +90,12 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     return dispatcher.createSemanticModel(
-        normalizeForCreate(ident), comment, definition, properties);
+        normalizeForCreate(ident), comment, definition, properties, sourceUpdate);
   }
 
   @Override
@@ -90,9 +103,10 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
     return dispatcher.importSemanticModel(
-        normalizeForCreate(ident), comment, definition, properties);
+        normalizeForCreate(ident), comment, definition, properties, sourceUpdate);
   }
 
   @Override
@@ -101,14 +115,16 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(
         changes != null && changes.length > 0, "At least one change is required");
     SemanticModelChange[] normalizedChanges =
         Arrays.stream(changes).map(this::normalizeChange).toArray(SemanticModelChange[]::new);
-    return dispatcher.alterSemanticModel(normalizeForLookup(ident), normalizedChanges);
+    return dispatcher.alterSemanticModel(
+        normalizeForLookup(ident), sourceUpdate, normalizedChanges);
   }
 
   @Override

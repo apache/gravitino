@@ -1,0 +1,254 @@
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements. See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License. You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+=== eq ===
+source: (x STRING) RETURNS BOOLEAN -> x = 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== neq ===
+source: (x STRING) RETURNS BOOLEAN -> x <> 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[NEQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== neq_alias ===
+source: (x STRING) RETURNS BOOLEAN -> x != 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[NEQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== lt ===
+source: (x STRING) RETURNS BOOLEAN -> x < 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[LT], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== lte ===
+source: (x STRING) RETURNS BOOLEAN -> x <= 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[LTE], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== gt ===
+source: (x STRING) RETURNS BOOLEAN -> x > 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[GT], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== gte ===
+source: (x STRING) RETURNS BOOLEAN -> x >= 'US'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[GTE], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== in ===
+source: (x STRING) RETURNS BOOLEAN -> x IN ('US', 'CA', NULL)
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=In{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}, Literal{attributes=[STRING, CA, STRING], children=[]}, Literal{attributes=[NULL, , null], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== not_in ===
+source: (x STRING) RETURNS BOOLEAN -> x NOT IN ('US', NULL)
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Not{attributes=[], children=[In{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}, Literal{attributes=[NULL, , null], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== between ===
+source: (x STRING) RETURNS BOOLEAN -> x BETWEEN 'A' AND 'Z'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Between{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, A, STRING], children=[]}, Literal{attributes=[STRING, Z, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== not_between ===
+source: (x STRING) RETURNS BOOLEAN -> x NOT BETWEEN 'A' AND 'Z'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Not{attributes=[], children=[Between{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, A, STRING], children=[]}, Literal{attributes=[STRING, Z, STRING], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== is_null ===
+source: (x STRING) RETURNS BOOLEAN -> x IS NULL
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=IsNull{attributes=[false], children=[InputReference{attributes=[X, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== is_not_null ===
+source: (x STRING) RETURNS BOOLEAN -> x IS NOT NULL
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=IsNull{attributes=[true], children=[InputReference{attributes=[X, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== like ===
+source: (x STRING) RETURNS BOOLEAN -> x LIKE 'Acme%'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Like{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, Acme%, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== not_like ===
+source: (x STRING) RETURNS BOOLEAN -> x NOT LIKE 'Acme%'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Not{attributes=[], children=[Like{attributes=[], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, Acme%, STRING], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== precedence ===
+source: (x STRING) RETURNS BOOLEAN -> NOT x = 'US' OR x IS NULL AND FALSE
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=LogicalExpression{attributes=[OR], children=[Not{attributes=[], children=[Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}]}, LogicalExpression{attributes=[AND], children=[IsNull{attributes=[false], children=[InputReference{attributes=[X, STRING], children=[]}]}, Literal{attributes=[BOOLEAN, FALSE, BOOLEAN], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== searched_case ===
+source: (x STRING) RETURNS BOOLEAN -> CASE WHEN is_group_member('auditors') THEN x = 'US' ELSE x = CURRENT_USER() END
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=CaseExpression{attributes=[false, true], children=[FunctionCall{attributes=[IS_GROUP_MEMBER], children=[Literal{attributes=[STRING, auditors, STRING], children=[]}]}, Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, FunctionCall{attributes=[CURRENT_USER], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== simple_case ===
+source: (x STRING) RETURNS BOOLEAN -> CASE x WHEN 'US' THEN TRUE WHEN NULL THEN FALSE END
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=CaseExpression{attributes=[true, false], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}, Literal{attributes=[BOOLEAN, TRUE, BOOLEAN], children=[]}, Literal{attributes=[NULL, , null], children=[]}, Literal{attributes=[BOOLEAN, FALSE, BOOLEAN], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== quoted_string ===
+source: (x STRING) RETURNS BOOLEAN -> x = 'O''Brien\\n😀'
+result: SqlDefinition{parameters={X=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, STRING], children=[]}, Literal{attributes=[STRING, O'Brien\\n😀, STRING], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== unsupported_user_attribute ===
+source: (x STRING) RETURNS BOOLEAN -> x = user_attribute('region')
+error: Invalid restricted-sql-v1 definition at line 1, column 35: Unknown restricted-sql-v1 function: user_attribute
+
+=== quoted_identifier ===
+source: ("Customer Region" STRING) RETURNS BOOLEAN -> "Customer Region" = 'US'
+result: SqlDefinition{parameters={Customer Region=STRING}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[Customer Region, STRING], children=[]}, Literal{attributes=[STRING, US, STRING], children=[]}]}, quotedParameters=[Customer Region], columnMask=false}
+
+=== nan ===
+source: (x DOUBLE) RETURNS BOOLEAN -> is_nan(x)
+result: SqlDefinition{parameters={X=DOUBLE}, resultType=BOOLEAN, body=FunctionCall{attributes=[IS_NAN], children=[InputReference{attributes=[X, DOUBLE], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== date_part ===
+source: (x DATE) RETURNS BOOLEAN -> year(x) = 2026 AND month(x) = 3 OR day(x) = 15
+result: SqlDefinition{parameters={X=DATE}, resultType=BOOLEAN, body=LogicalExpression{attributes=[OR], children=[LogicalExpression{attributes=[AND], children=[Comparison{attributes=[EQ], children=[FunctionCall{attributes=[YEAR], children=[InputReference{attributes=[X, DATE], children=[]}]}, Literal{attributes=[NUMBER, 2026, null], children=[]}]}, Comparison{attributes=[EQ], children=[FunctionCall{attributes=[MONTH], children=[InputReference{attributes=[X, DATE], children=[]}]}, Literal{attributes=[NUMBER, 3, null], children=[]}]}]}, Comparison{attributes=[EQ], children=[FunctionCall{attributes=[DAY], children=[InputReference{attributes=[X, DATE], children=[]}]}, Literal{attributes=[NUMBER, 15, null], children=[]}]}]}, quotedParameters=[], columnMask=false}
+
+=== date ===
+source: (x DATE) RETURNS BOOLEAN -> x = DATE '2024-02-29'
+result: SqlDefinition{parameters={X=DATE}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, DATE], children=[]}, Literal{attributes=[TEMPORAL, 2024-02-29, DATE], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== time ===
+source: (x TIME) RETURNS BOOLEAN -> x = TIME '12:30:00.123456'
+result: SqlDefinition{parameters={X=TIME}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, TIME], children=[]}, Literal{attributes=[TEMPORAL, 12:30:00.123456, TIME], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== timestamp ===
+source: (x TIMESTAMP) RETURNS BOOLEAN -> x = TIMESTAMP '2026-01-01 12:30:00'
+result: SqlDefinition{parameters={X=TIMESTAMP}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, TIMESTAMP], children=[]}, Literal{attributes=[TEMPORAL, 2026-01-01 12:30:00, TIMESTAMP], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== timestamp_zone ===
+source: (x TIMESTAMP WITH TIME ZONE) RETURNS BOOLEAN -> x = TIMESTAMP WITH TIME ZONE '2026-01-01 12:30:00+00:00'
+result: SqlDefinition{parameters={X=TIMESTAMP WITH TIME ZONE}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, TIMESTAMP WITH TIME ZONE], children=[]}, Literal{attributes=[TEMPORAL, 2026-01-01 12:30:00+00:00, TIMESTAMP WITH TIME ZONE], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== integer_min ===
+source: (x INTEGER) RETURNS BOOLEAN -> x = -2147483648
+result: SqlDefinition{parameters={X=INTEGER}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, INTEGER], children=[]}, Literal{attributes=[NUMBER, -2147483648, null], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== long_max ===
+source: (x LONG) RETURNS BOOLEAN -> x = 9223372036854775807
+result: SqlDefinition{parameters={X=LONG}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, LONG], children=[]}, Literal{attributes=[NUMBER, 9223372036854775807, null], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== decimal ===
+source: (x DECIMAL(4,2)) RETURNS BOOLEAN -> x = 99.99
+result: SqlDefinition{parameters={X=DECIMAL(4,2)}, resultType=BOOLEAN, body=Comparison{attributes=[EQ], children=[InputReference{attributes=[X, DECIMAL(4,2)], children=[]}, Literal{attributes=[NUMBER, 99.99, null], children=[]}]}, quotedParameters=[], columnMask=false}
+
+=== mask_alphanum ===
+source: (value STRING) RETURNS STRING -> mask_alphanum(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[MASK_ALPHANUM], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== show_first_4 ===
+source: (value STRING) RETURNS STRING -> show_first_4(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[SHOW_FIRST_4], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== show_last_4 ===
+source: (value STRING) RETURNS STRING -> show_last_4(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[SHOW_LAST_4], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== mask_to_fixed_value ===
+source: (value STRING) RETURNS STRING -> mask_to_fixed_value(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[MASK_TO_FIXED_VALUE], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== replace_with_null ===
+source: (value STRING) RETURNS STRING -> replace_with_null(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[REPLACE_WITH_NULL], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== sha256_global ===
+source: (value STRING) RETURNS STRING -> sha256_global(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[SHA256_GLOBAL], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== sha256_query_local ===
+source: (value STRING) RETURNS STRING -> sha256_query_local(value)
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[SHA256_QUERY_LOCAL], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== mask_nested ===
+source: (value STRING) RETURNS STRING -> show_last_4(mask_alphanum(value))
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=FunctionCall{attributes=[SHOW_LAST_4], children=[FunctionCall{attributes=[MASK_ALPHANUM], children=[InputReference{attributes=[VALUE, STRING], children=[]}]}]}, quotedParameters=[], columnMask=true}
+
+=== mask_case ===
+source: (value STRING) RETURNS STRING -> CASE WHEN CURRENT_USER() = 'alice' THEN value ELSE NULL END
+result: SqlDefinition{parameters={VALUE=STRING}, resultType=STRING, body=CaseExpression{attributes=[false, true], children=[Comparison{attributes=[EQ], children=[FunctionCall{attributes=[CURRENT_USER], children=[]}, Literal{attributes=[STRING, alice, STRING], children=[]}]}, InputReference{attributes=[VALUE, STRING], children=[]}, Literal{attributes=[NULL, , null], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== truncate_to_year ===
+source: (value TIMESTAMP WITH TIME ZONE) RETURNS TIMESTAMP WITH TIME ZONE -> truncate_to_year(value)
+result: SqlDefinition{parameters={VALUE=TIMESTAMP WITH TIME ZONE}, resultType=TIMESTAMP WITH TIME ZONE, body=FunctionCall{attributes=[TRUNCATE_TO_YEAR], children=[InputReference{attributes=[VALUE, TIMESTAMP WITH TIME ZONE], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== truncate_to_month ===
+source: (value TIMESTAMP WITH TIME ZONE) RETURNS TIMESTAMP WITH TIME ZONE -> truncate_to_month(value)
+result: SqlDefinition{parameters={VALUE=TIMESTAMP WITH TIME ZONE}, resultType=TIMESTAMP WITH TIME ZONE, body=FunctionCall{attributes=[TRUNCATE_TO_MONTH], children=[InputReference{attributes=[VALUE, TIMESTAMP WITH TIME ZONE], children=[]}]}, quotedParameters=[], columnMask=true}
+
+=== invalid_rego ===
+source: filter := true
+error: Invalid restricted-sql-v1 definition at line 1, column 8: token recognition error at: ':'
+
+=== missing_declarations ===
+source: TRUE
+error: Invalid restricted-sql-v1 definition at line 1, column 1: mismatched input 'TRUE' expecting '('
+
+=== duplicate_parameters ===
+source: (x STRING, X STRING) RETURNS BOOLEAN -> TRUE
+error: Invalid restricted-sql-v1 definition at line 1, column 12: duplicate parameter X
+
+=== undeclared ===
+source: () RETURNS BOOLEAN -> x = 1
+error: Invalid restricted-sql-v1 definition at line 1, column 23: undeclared parameter X
+
+=== non_boolean ===
+source: () RETURNS BOOLEAN -> 1
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
+
+=== invalid_branch ===
+source: () RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE 1 END
+error: Invalid restricted-sql-v1 definition at line 1, column 53: Invalid restricted-sql-v1 expression: expected BOOLEAN, found NUMBER
+
+=== invalid_mask ===
+source: (value STRING) RETURNS STRING -> show_last_4(value, 4)
+error: Invalid restricted-sql-v1 definition at line 1, column 34: Invalid restricted-sql-v1 expression: SHOW_LAST_4 requires exactly one argument
+
+=== unknown_function ===
+source: () RETURNS BOOLEAN -> unknown()
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Unknown restricted-sql-v1 function: unknown
+
+=== integer_overflow ===
+source: (x INTEGER) RETURNS BOOLEAN -> x = 2147483648
+error: Invalid restricted-sql-v1 definition at line 1, column 36: Numeric literal does not fit INTEGER
+
+=== fractional_integer ===
+source: (x INTEGER) RETURNS BOOLEAN -> x = 1.1
+error: Invalid restricted-sql-v1 definition at line 1, column 36: Numeric literal does not fit INTEGER
+
+=== invalid_date ===
+source: () RETURNS BOOLEAN -> DATE '2025-02-29' IS NULL
+error: Invalid restricted-sql-v1 definition at line 1, column 23: Invalid temporal literal for DATE
+
+=== invalid_precision ===
+source: (x TIME(3)) RETURNS BOOLEAN -> TRUE
+error: Invalid restricted-sql-v1 definition at line 1, column 4: temporal precision must be 6
+
+=== invalid_pattern ===
+source: () RETURNS BOOLEAN -> 'x' LIKE '%x'
+error: Invalid restricted-sql-v1 definition at line 1, column 23: LIKE requires a non-empty fixed prefix followed by one %
+
+=== chained_comparison ===
+source: () RETURNS BOOLEAN -> 1 < 2 < 3
+error: Invalid restricted-sql-v1 definition at line 1, column 29: mismatched input '<' expecting {<EOF>, 'OR', 'AND'}
+
+=== numeric_boundary ===
+source: () RETURNS BOOLEAN -> 1and TRUE
+error: Invalid restricted-sql-v1 definition at line 1, column 23: numeric literal must end at a token boundary
+
+=== sql_comment ===
+source: () RETURNS BOOLEAN -> TRUE -- comment
+error: Invalid restricted-sql-v1 definition at line 1, column 28: token recognition error at: '--'
+
+=== invalid_quote ===
+source: () RETURNS BOOLEAN -> 'unterminated
+error: Invalid restricted-sql-v1 definition at line 1, column 23: token recognition error at: ''unterminated'
+
+=== unsupported_user_attribute_mask ===
+source: (value STRING) RETURNS STRING -> user_attribute('region')
+error: Invalid restricted-sql-v1 definition at line 1, column 34: Unknown restricted-sql-v1 function: user_attribute
+
+=== unsupported_user_attribute_unselected ===
+source: () RETURNS BOOLEAN -> CASE WHEN TRUE THEN TRUE ELSE user_attribute('active') END
+error: Invalid restricted-sql-v1 definition at line 1, column 53: Unknown restricted-sql-v1 function: user_attribute
