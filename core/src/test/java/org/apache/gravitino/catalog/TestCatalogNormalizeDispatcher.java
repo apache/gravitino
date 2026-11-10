@@ -27,13 +27,17 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
@@ -51,6 +55,7 @@ public class TestCatalogNormalizeDispatcher {
   private static CatalogNormalizeDispatcher catalogNormalizeDispatcher;
   private static CatalogManager catalogManager;
   private static EntityStore entityStore;
+  @Nullable private static LockManager previousLockManager;
   private static final String metalake = "metalake";
   private static final BaseMetalake metalakeEntity =
       BaseMetalake.builder()
@@ -62,7 +67,7 @@ public class TestCatalogNormalizeDispatcher {
           .build();
 
   @BeforeAll
-  public static void setUp() throws IOException {
+  public static void setUp() throws IOException, IllegalAccessException {
     Config config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
@@ -71,6 +76,8 @@ public class TestCatalogNormalizeDispatcher {
 
     entityStore.put(metalakeEntity, true);
 
+    previousLockManager = GravitinoEnv.getInstance().lockManager();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
     catalogManager = Mockito.spy(catalogManager);
     catalogNormalizeDispatcher = new CatalogNormalizeDispatcher(catalogManager);
@@ -94,6 +101,8 @@ public class TestCatalogNormalizeDispatcher {
       catalogManager.close();
       catalogManager = null;
     }
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", previousLockManager, true);
+    previousLockManager = null;
   }
 
   @Test
@@ -169,6 +178,21 @@ public class TestCatalogNormalizeDispatcher {
       Assertions.assertEquals(
           "The catalog name '" + illegalName + "' is illegal.", exception.getMessage());
     }
+  }
+
+  @Test
+  void testRenameCatalogRejectsDottedName() {
+    NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
+    Mockito.clearInvocations(catalogManager);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogNormalizeDispatcher.alterCatalog(
+                    ident, CatalogChange.rename("catalog.xxx")));
+    Assertions.assertEquals("The catalog name 'catalog.xxx' is illegal.", exception.getMessage());
+    Mockito.verify(catalogManager, Mockito.never())
+        .alterCatalog(Mockito.eq(ident), Mockito.any(CatalogChange[].class));
   }
 
   @Test
