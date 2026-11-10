@@ -423,24 +423,10 @@ class HiveViewCatalogOperations implements ViewCatalog {
     SQLRepresentation selected = (SQLRepresentation) firstRepresentation;
     switch (selected.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
-        Preconditions.checkArgument(
-            defaultCatalog == null && defaultSchema == null,
-            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-                + "defaultCatalog=%s, defaultSchema=%s for view %s",
-            selected.dialect(),
-            defaultCatalog,
-            defaultSchema,
-            ident);
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         return selected;
       case Dialects.FLINK:
-        Preconditions.checkArgument(
-            defaultCatalog == null && defaultSchema == null,
-            "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
-                + "defaultCatalog=%s, defaultSchema=%s for view %s",
-            selected.dialect(),
-            defaultCatalog,
-            defaultSchema,
-            ident);
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         Preconditions.checkArgument(
             properties.keySet().stream()
                 .anyMatch(k -> k.startsWith(HiveView.FLINK_PROPERTY_PREFIX)),
@@ -450,6 +436,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
             HiveView.FLINK_PROPERTY_PREFIX);
         return selected;
       case Dialects.SPARK:
+        checkNoDefaultCatalogAndSchema(selected, defaultCatalog, defaultSchema, ident);
         Preconditions.checkArgument(
             properties.containsKey(HiveView.SPARK_VERSION_KEY),
             "Spark dialect view '%s' requires property '%s' to be set; "
@@ -464,6 +451,21 @@ class HiveViewCatalogOperations implements ViewCatalog {
                 "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
                 Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, selected.dialect(), ident));
     }
+  }
+
+  private void checkNoDefaultCatalogAndSchema(
+      SQLRepresentation representation,
+      String defaultCatalog,
+      String defaultSchema,
+      NameIdentifier ident) {
+    Preconditions.checkArgument(
+        defaultCatalog == null && defaultSchema == null,
+        "Dialect '%s' does not support non-null defaultCatalog/defaultSchema, but got "
+            + "defaultCatalog=%s, defaultSchema=%s for view %s",
+        representation.dialect(),
+        defaultCatalog,
+        defaultSchema,
+        ident);
   }
 
   private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {

@@ -245,7 +245,7 @@ Support for altering partitions is under development.
 - Each view must contain exactly one SQL representation.
 - Supports creating views with the `hive`, `flink`, or `spark` dialect.
 - When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, `spark`, or `trino` dialect.
-- For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
+- For the `hive`, `flink`, and `spark` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
 - The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
 - The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
 
