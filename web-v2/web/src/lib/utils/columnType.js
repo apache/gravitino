@@ -40,6 +40,6 @@ export const formatColumnType = type => {
     case 'unparsed':
       return `unparsed(${type.unparsedType})`
     default:
-      return `${type.type}`
+      return type.type ?? ''
   }
 }

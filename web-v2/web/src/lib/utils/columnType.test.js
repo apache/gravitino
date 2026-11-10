@@ -53,7 +53,8 @@ describe('formatColumnType', () => {
     ['a union', { type: 'union', types: ['integer', 'string'] }, 'union<integer,string>'],
     ['an external type', { type: 'external', catalogString: 'FixedSizeList(4)' }, 'external(FixedSizeList(4))'],
     ['an unparsed type', { type: 'unparsed', unparsedType: 'geo' }, 'unparsed(geo)'],
-    ['a missing type', undefined, '']
+    ['a missing type', undefined, ''],
+    ['an object without a type field', {}, '']
   ])('formats %s', (_, type, expected) => {
     expect(formatColumnType(type)).toBe(expected)
   })

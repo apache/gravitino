@@ -390,11 +390,15 @@ export default function TableDetailsPage({ ...props }) {
         filters: columnTypeFitlers,
         onFilter: (value, record) =>
           typeof record.type === 'string' ? record.type.indexOf(value) === 0 : record.type.type.indexOf(value) === 0,
-        render: type => (
-          <Tag color={columnTypeColor(type)} title={formatColumnType(type)}>
-            {formatColumnType(type)}
-          </Tag>
-        )
+        render: type => {
+          const formattedType = formatColumnType(type)
+
+          return (
+            <Tag color={columnTypeColor(type)} title={formattedType}>
+              {formattedType}
+            </Tag>
+          )
+        }
       },
       {
         title: 'Tags',

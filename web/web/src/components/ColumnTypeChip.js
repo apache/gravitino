@@ -27,7 +27,7 @@ import { formatColumnType } from '@/lib/utils/columnType'
 const ColumnTypeChip = props => {
   const { type = '' } = props
 
-  const formatType = type && isString(type) ? type.replace(/\(.*\)/, '') : type
+  const formatType = isString(type) ? type.replace(/\(.*\)/, '') : type?.type
 
   const label = formatColumnType(type)
 
