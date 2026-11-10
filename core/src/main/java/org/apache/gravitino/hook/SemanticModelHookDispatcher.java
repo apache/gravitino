@@ -66,6 +66,12 @@ public class SemanticModelHookDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
+  public NameIdentifier[] listSemanticModelDatasets(
+      NameIdentifier source, Entity.EntityType sourceType) {
+    return dispatcher.listSemanticModelDatasets(source, sourceType);
+  }
+
+  @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
     return dispatcher.listSemanticModels(namespace);
   }

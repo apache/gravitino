@@ -388,3 +388,7 @@ WHERE r.deleted_at = 0 AND EXISTS (
       AND NOT EXISTS (SELECT 1 FROM view_meta live
                       WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
 );
+
+-- Align the location and uri name widths with the MySQL and PostgreSQL schemas.
+ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default';
+ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL;

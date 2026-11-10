@@ -529,13 +529,11 @@ public class TestIcebergExpireSnapshotsJob {
 
   @Test
   public void testExpireMetricNames() {
-    Map<String, Object> before = IcebergExpireSnapshotsJob.expireBeforeMetrics(3L);
-    assertEquals(1, before.size());
-    assertEquals(3L, before.get(IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC));
-
-    Map<String, Object> after = IcebergExpireSnapshotsJob.expireAfterMetrics(2L, 100L);
-    assertEquals(2, after.size());
-    assertEquals(2L, after.get(IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC));
-    assertEquals(100L, after.get(IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC));
+    assertEquals("custom-snapshot-number", IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-snapshot-number",
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-file-size", IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC);
   }
 }

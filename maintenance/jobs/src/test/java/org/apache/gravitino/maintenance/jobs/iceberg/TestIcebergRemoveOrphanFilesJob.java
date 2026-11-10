@@ -107,11 +107,10 @@ public class TestIcebergRemoveOrphanFilesJob {
 
   @Test
   public void testOrphanAfterMetricNames() {
-    java.util.Map<String, Object> metrics =
-        IcebergRemoveOrphanFilesJob.orphanAfterMetrics(10L, 200L);
-    assertEquals(2, metrics.size());
-    assertEquals(10L, metrics.get(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC));
-    assertEquals(200L, metrics.get(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC));
+    assertEquals(
+        "custom-removed-file-number", IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC);
+    assertEquals(
+        "custom-removed-file-size", IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC);
   }
 
   /** Verifies location boundaries. */

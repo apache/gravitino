@@ -23,6 +23,7 @@ import static org.apache.spark.sql.functions.lit;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
@@ -97,7 +98,7 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         .withExecutable(resolveExecutable(IcebergRemoveOrphanFilesJob.class))
         .withClassName(IcebergRemoveOrphanFilesJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -268,17 +269,11 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
             IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("location")),
             parseDryRun(IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("dry-run"))));
-    return TableSnapshotMetrics.of(
-        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier),
-        orphanAfterMetrics(orphan.filesRemoved(), orphan.bytesReclaimed()));
-  }
-
-  @VisibleForTesting
-  static Map<String, Object> orphanAfterMetrics(long removedFileNumber, long removedFileSize) {
     Map<String, Object> metrics = new HashMap<>();
-    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, removedFileNumber);
-    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, removedFileSize);
-    return metrics;
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_NUMBER_METRIC, orphan.filesRemoved());
+    metrics.put(IcebergOrphanFileRemovalContent.REMOVED_FILE_SIZE_METRIC, orphan.bytesReclaimed());
+    return TableSnapshotMetrics.of(
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), metrics);
   }
 
   static String buildProcedureCall(
@@ -399,14 +394,19 @@ public class IcebergRemoveOrphanFilesJob implements BuiltInJob, IcebergMaintenan
         "{{spark_conf:-}}");
   }
 
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
-  }
-
   private static void printUsage() {
-    LOG.error(
-        "Usage: IcebergRemoveOrphanFilesJob --catalog <name> --table <db.table> "
-            + "[--older-than 'yyyy-MM-dd HH:mm:ss'] [--location <path>] "
-            + "[--dry-run true|false] [--spark-conf <json>]");
+    IcebergJobUtils.printCliUsage(
+        IcebergRemoveOrphanFilesJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --older-than <timestamp>  Remove orphans older than this timestamp",
+            "                              Example: '2024-01-01 00:00:00'",
+            "  --location <path>         Orphan scan root location",
+            "  --dry-run <bool>          List orphans without deleting (true or false)"),
+        ImmutableList.of(
+            "  --catalog iceberg_prod --table db.sample --dry-run true",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'"));
   }
 }
