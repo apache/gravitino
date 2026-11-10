@@ -21,7 +21,7 @@ import React, { useRef, useState } from 'react'
 import { Button, Dropdown, Form, FormListOperation, Input, InputNumber, Popconfirm, Select, Tooltip } from 'antd'
 import { useClickAway } from 'react-use'
 import SpecialColumnTypeComponent from '@/components/SpecialColumnTypeComponent'
-import { ColumnSpesicalType, ColumnWithParamType } from '@/config'
+import { ColumnSpesicalType, ColumnWithParamType, ColumnWithPrecisionType } from '@/config'
 import { capitalizeFirstLetter, extractNumbersInParentheses } from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 
@@ -35,6 +35,7 @@ export default function ColumnTypeComponent({ ...props }) {
   const [paramL, setParamL] = useState('')
   const [paramP, setParamP] = useState('')
   const [paramS, setParamS] = useState('')
+  const [paramPrecision, setParamPrecision] = useState('')
   const [open, setOpen] = useState(false)
   const [isEditSpecialColumnType, setIsEditSpecialColumnType] = useState(false)
   const currentType = Form.useWatch([...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'], form)
@@ -51,8 +52,16 @@ export default function ColumnTypeComponent({ ...props }) {
     setParamS(value)
   }
 
+  const onChangeParamPrecision = value => {
+    setParamPrecision(value)
+  }
+
   const onFocus = e => {
     setErrorMsg('')
+    const value = currentType?.replace(/\([^)]*\)/g, '').toLowerCase()
+    if (ColumnWithPrecisionType.includes(value)) {
+      setParamPrecision(extractNumbersInParentheses(currentType))
+    }
     setIsShowParamsInput(!isShowParamsInput)
   }
 
@@ -60,6 +69,7 @@ export default function ColumnTypeComponent({ ...props }) {
     setParamL('')
     setParamP('')
     setParamS('')
+    setParamPrecision('')
     setErrorMsg('')
     if (value && ColumnSpesicalType.includes(value)) {
       setOpen(true)
@@ -84,6 +94,7 @@ export default function ColumnTypeComponent({ ...props }) {
       setErrorMsg('')
       const currentTypeParam = extractNumbersInParentheses(currentType)
       const value = currentType?.replace(/\([^)]*\)/g, '')?.toLowerCase()
+      const [currentPrecision] = currentTypeParam.split(',')
       if (currentTypeParam && !paramL && ColumnWithParamType.includes(value)) {
         setParamL(currentTypeParam)
       }
@@ -91,6 +102,9 @@ export default function ColumnTypeComponent({ ...props }) {
       if (currentTypeParam && value === 'decimal' && !paramP && !paramS) {
         setParamP(currentTypeParam1)
         setParamS(currentTypeParam2)
+      }
+      if (currentTypeParam && ColumnWithPrecisionType.includes(value) && !paramPrecision) {
+        setParamPrecision(currentPrecision)
       }
       if (ColumnWithParamType.includes(value)) {
         form.setFieldValue(
@@ -122,6 +136,13 @@ export default function ColumnTypeComponent({ ...props }) {
         if (errors.length) {
           setErrorMsg(errors.join(', '))
         }
+      }
+      if (ColumnWithPrecisionType.includes(value)) {
+        form.setFieldValue(
+          [...parentField, subField.name, 'typeObj', ...columnNamespace, 'type'],
+          capitalizeFirstLetter(value) +
+            (paramPrecision || currentPrecision ? `(${paramPrecision || currentPrecision})` : '')
+        )
       }
     }
   })
@@ -202,7 +223,7 @@ export default function ColumnTypeComponent({ ...props }) {
         )}
 
         {typeof currentType === 'string' &&
-          ColumnWithParamType.includes(currentType?.replace(/\([^)]*\)/g, '')) &&
+          ColumnWithParamType.includes(currentType?.replace(/\([^)]*\)/g, '').toLowerCase()) &&
           isShowParamsInput && (
             <div className='ml-1 border-b focus-within:border-[color:theme(colors.defaultPrimary)]'>
               <InputNumber
@@ -212,6 +233,22 @@ export default function ColumnTypeComponent({ ...props }) {
                 value={paramL}
                 onChange={onChangeParamL}
                 className='w-20 border-none focus-within:shadow-none'
+              />
+            </div>
+          )}
+        {typeof currentType === 'string' &&
+          ColumnWithPrecisionType.includes(currentType.replace(/\([^)]*\)/g, '').toLowerCase()) &&
+          isShowParamsInput && (
+            <div className='ml-1 border-b focus-within:border-[color:theme(colors.defaultPrimary)]'>
+              <InputNumber
+                size='small'
+                controls={false}
+                min={0}
+                max={12}
+                placeholder='P'
+                value={paramPrecision}
+                onChange={onChangeParamPrecision}
+                className='w-10 border-none focus-within:shadow-none'
               />
             </div>
           )}
