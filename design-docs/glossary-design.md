@@ -426,13 +426,13 @@ Term operations use the existing lock tools of the store, always in this order:
 
 Each row is locked only once, in its final mode.
 
-| Operation                     | Locks                                                                   | Conflict it prevents                     |
-| ----------------------------- | ----------------------------------------------------------------------- | ---------------------------------------- |
-| Create                        | metalake (shared) → domains (shared)                                    | metalake or domain drop                  |
-| Edit content, status, domains | term (exclusive) → added domains (shared)                               | edits at the same time; domain drop      |
-| Add or remove a relation      | metalake (shared) → hierarchy lock → both terms (exclusive, ID order)   | a cycle or overlap; the other term drop  |
-| Bind / unbind                 | object chain (`lockLiveEndpoint`, shared) → terms (exclusive, ID order) | object drop; term edits at the same time |
-| Delete                        | metalake (shared) → hierarchy lock → term (exclusive)                   | a new link to the term being deleted     |
+| Operation                     | Locks                                                                    | Conflict it prevents                     |
+| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
+| Create                        | metalake (shared) -> domains (shared)                                    | metalake or domain drop                  |
+| Edit content, status, domains | term (exclusive) -> added domains (shared)                               | edits at the same time; domain drop      |
+| Add or remove a relation      | metalake (shared) -> hierarchy lock -> both terms (exclusive, ID order)  | a cycle or overlap; the other term drop  |
+| Bind / unbind                 | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order) | object drop; term edits at the same time |
+| Delete                        | metalake (shared) -> hierarchy lock -> term (exclusive)                  | a new link to the term being deleted     |
 
 - The **hierarchy lock** is a `SELECT … FOR UPDATE` on one row per metalake in
   `glossary_hierarchy_lock`. The row is inserted on first use. Locking only the two terms is not
@@ -457,21 +457,21 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 - `DropResponse` on delete;
 - bindings are written on the object.
 
-| Operation              | Endpoint                                                                 | Request → response                                                      |
-| ---------------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
-| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=&bindings=`     | → `NameListResponse` / `TermListResponse`                               |
-| Create                 | `POST /terms`                                                            | `TermCreateRequest` → `TermResponse`                                    |
-| Get                    | `GET /terms/{term}`                                                      | → `TermResponse`                                                        |
-| Alter                  | `PUT /terms/{term}`                                                      | `TermUpdatesRequest` → `TermResponse`                                   |
-| Drop                   | `DELETE /terms/{term}`                                                   | → `DropResponse`                                                        |
-| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER`                | → `TermTreeResponse`                                                    |
-| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=`                                 | → `TermBindingListResponse`                                             |
-| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=`                | → `NameListResponse` / `ObjectTermsResponse`                            |
-| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                  | `TermsAssociateRequest{termsToAdd, termsToRemove}` → `NameListResponse` |
-| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=` | → `NameListResponse` / `TermListResponse`                               |
-| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`         | `TermsAssociateRequest` → `NameListResponse`                            |
-| Owner                  | existing `/owners/glossary_term/{term}`                                  |                                                                         |
-| Tags                   | existing `/objects/glossary_term/{term}/tags`                            |                                                                         |
+| Operation              | Endpoint                                                                 | Request -> response                                                      |
+| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
+| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=&bindings=`     | -> `NameListResponse` / `TermListResponse`                               |
+| Create                 | `POST /terms`                                                            | `TermCreateRequest` -> `TermResponse`                                    |
+| Get                    | `GET /terms/{term}`                                                      | -> `TermResponse`                                                        |
+| Alter                  | `PUT /terms/{term}`                                                      | `TermUpdatesRequest` -> `TermResponse`                                   |
+| Drop                   | `DELETE /terms/{term}`                                                   | -> `DropResponse`                                                        |
+| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER`                | -> `TermTreeResponse`                                                    |
+| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=`                                 | -> `TermBindingListResponse`                                             |
+| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
+| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                  | `TermsAssociateRequest{termsToAdd, termsToRemove}` -> `NameListResponse` |
+| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=` | -> `NameListResponse` / `TermListResponse`                               |
+| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`         | `TermsAssociateRequest` -> `NameListResponse`                            |
+| Owner                  | existing `/owners/glossary_term/{term}`                                  |                                                                          |
+| Tags                   | existing `/objects/glossary_term/{term}/tags`                            |                                                                          |
 
 ```
 TermCreateRequest     { name, definition, synonyms, status?, domains, broader, related, links,
@@ -579,38 +579,38 @@ Example question: "net revenue from VIP active users last month".
 User question
    │
    ▼
-① Agent (LLM) picks the business words ──▶ ["net revenue", "VIP", "active user"]
+1 Agent (LLM) picks the business words ──▶ ["net revenue", "VIP", "active user"]
    │
    ▼
-② resolve_business_term(words)                                  (MCP tool)
+2 resolve_business_term(words)                                  (MCP tool)
    │
    ▼
-③ GET /terms?match=net%20revenue&match=VIP&match=active%20user
+3 GET /terms?match=net%20revenue&match=VIP&match=active%20user
             &status=APPROVED&details=true&bindings=true          (Gravitino server)
    │
    ▼
-④ Result per word ──▶ "net revenue": term Net revenue,    metric dw.sales.sales_model/net_revenue
+4 Result per word ──▶ "net revenue": term Net revenue,    metric dw.sales.sales_model/net_revenue
    │                  "active user": term Active Customer, column dw.sales.customers.is_active,
    │                                 metric dw.sales.sales_model/active_customers
    │                  unmatched:     ["VIP"]
    ▼
-⑤ Agent decides per word
+5 Agent decides per word
    ├── column or table ──▶ get_table_metadata_details ──▶ write SQL
    ├── metric ───────────▶ load_semantic_model ─────────▶ metric query
    ├── other object ─────▶ the tool for that object type (for example a fileset or a model)
    └── unmatched ────────▶ ask the user: "What do you mean by VIP?"
 
-⑥ Agent runs the query with the user's own privileges and answers
+6 Agent runs the query with the user's own privileges and answers
 ```
 
-| Step                   | Who                    | What happens                                                                                                                                                                                                                                                                                            |
-| ---------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ① Pick business words  | Agent (LLM)            | Gravitino does not parse the question; the agent does. The tool description tells it how: keep a phrase whole ("active user", not "active" and "user"); use the singular form; leave out time ranges, numbers and query words ("last month", "total", "top 10"). A question usually gives 1 to 5 words. |
-| ② Call the tool        | Agent → MCP server     | One call with all the words. Add `domain` when the user or the context names one.                                                                                                                                                                                                                       |
-| ③ Look up              | MCP server → Gravitino | One REST call, with one `match` per word. The server compares `key(word)` with term names and synonyms, and keeps only `APPROVED` terms the caller can see (and in `domain`, if given). It adds the bindings of each term.                                                                              |
-| ④ Group                | MCP server             | Groups the terms by the word they matched (`matchedBy`), and lists the words with no match in `unmatched`.                                                                                                                                                                                              |
-| ⑤ Decide               | Agent                  | One term for a word: use it. Several terms: pick one by domain, or ask the user. No term: ask the user, and do not guess a column. Then follow the bindings with the existing tools.                                                                                                                    |
-| ⑥ Read data and answer | Agent → existing tools | The query runs with the user's own privileges. The answer names the terms and definitions it used.                                                                                                                                                                                                      |
+| Step                    | Who                     | What happens                                                                                                                                                                                                                                                                                            |
+| ----------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Pick business words  | Agent (LLM)             | Gravitino does not parse the question; the agent does. The tool description tells it how: keep a phrase whole ("active user", not "active" and "user"); use the singular form; leave out time ranges, numbers and query words ("last month", "total", "top 10"). A question usually gives 1 to 5 words. |
+| 2. Call the tool        | Agent -> MCP server     | One call with all the words. Add `domain` when the user or the context names one.                                                                                                                                                                                                                       |
+| 3. Look up              | MCP server -> Gravitino | One REST call, with one `match` per word. The server compares `key(word)` with term names and synonyms, and keeps only `APPROVED` terms the caller can see (and in `domain`, if given). It adds the bindings of each term.                                                                              |
+| 4. Group                | MCP server              | Groups the terms by the word they matched (`matchedBy`), and lists the words with no match in `unmatched`.                                                                                                                                                                                              |
+| 5. Decide               | Agent                   | One term for a word: use it. Several terms: pick one by domain, or ask the user. No term: ask the user, and do not guess a column. Then follow the bindings with the existing tools.                                                                                                                    |
+| 6. Read data and answer | Agent -> existing tools | The query runs with the user's own privileges. The answer names the terms and definitions it used.                                                                                                                                                                                                      |
 
 **How `match` works**
 
@@ -626,12 +626,12 @@ User question
   into calls of 20 and merges the results, so the agent never sees the limit. A direct REST caller
   gets 400 and must split the words itself.
 - **Exact match only** (ignoring case and extra spaces). "customers" does not find `Customer`.
-  That is why step ① uses the singular form, and why admins write names and synonyms in the
+  That is why step 1 uses the singular form, and why admins write names and synonyms in the
   singular form.
 
 **`resolve_business_term`**
 
-- Input: `words` (the business phrases from step ①), and an optional `domain`.
+- Input: `words` (the business phrases from step 1), and an optional `domain`.
 - Output for the example above:
 
 ```json
