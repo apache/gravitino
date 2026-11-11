@@ -29,6 +29,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.file.Fileset;
@@ -45,12 +47,15 @@ import org.apache.gravitino.tag.TagValue;
 class GenericFileset
     implements Fileset,
         SupportsTags,
+        SupportsDomains,
         SupportsRoles,
         SupportsCredentials,
         SupportsSecrets,
         SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
@@ -65,6 +70,8 @@ class GenericFileset
     MetadataObject filesetObject = MetadataObjects.of(filesetFullName, MetadataObject.Type.FILESET);
     this.objectTagOperations =
         new MetadataObjectTagOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
@@ -104,6 +111,24 @@ class GenericFileset
   @Override
   public Map<String, String> properties() {
     return filesetDTO.properties();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
   }
 
   @Override
