@@ -32,6 +32,11 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
+>>>>>>> 2043e62ea ([#14848] improvement(spark-connector): Let JDBC catalog subclasses opt in to preferTimestampNTZ (#14849))
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
@@ -98,6 +103,189 @@ public class TestGravitinoJdbcCatalog {
     }
   }
 
+<<<<<<< HEAD
+=======
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc-postgresql",
+        "jdbc-mysql",
+        "jdbc-doris",
+        "jdbc-starrocks",
+        "jdbc-oceanbase",
+        "jdbc-oracle"
+      })
+  void testTimestampMappingIsUnchangedByDefault(String provider) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials())
+          .thenReturn(new Credential[] {new JdbcCredential("user", "password")});
+      GravitinoJdbcCatalog catalog = catalog(provider, credentials);
+      JDBCOptions options = initialize(catalog, Map.of(), Map.of());
+      Assertions.assertFalse(options.preferTimestampNTZ());
+      Assertions.assertEquals(
+          DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+      Assertions.assertEquals(
+          DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withTimeZone()));
+      Assertions.assertEquals("password", options.asConnectionProperties().getProperty("password"));
+      verify(credentials).getCredentials();
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("nonPostgreSqlNtzOptions")
+  void testNonPostgreSqlNtzOptionsAreIgnored(
+      String provider, Map<String, String> catalogOptions, Map<String, String> properties)
+      throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      GravitinoJdbcCatalog catalog = catalog(provider, credentials);
+      JDBCOptions options = initialize(catalog, catalogOptions, properties);
+      Assertions.assertFalse(options.preferTimestampNTZ());
+      Assertions.assertEquals(
+          DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+      Assertions.assertEquals(
+          1L,
+          options.asProperties().stringPropertyNames().stream()
+              .filter("preferTimestampNTZ"::equalsIgnoreCase)
+              .count());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc-postgresql",
+        "jdbc-mysql",
+        "jdbc-doris",
+        "jdbc-starrocks",
+        "jdbc-oceanbase",
+        "jdbc-oracle"
+      })
+  void testSessionTimestampTypeDoesNotEnableNtz(String provider) throws Exception {
+    SQLConf conf = SQLConf.get();
+    String previous = conf.getConfString("spark.sql.timestampType", null);
+    try {
+      conf.setConfString("spark.sql.timestampType", "TIMESTAMP_NTZ");
+      try (MockedStatic<GravitinoCatalogManager> global =
+          mockStatic(GravitinoCatalogManager.class)) {
+        global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+        SupportsCredentials credentials = mock(SupportsCredentials.class);
+        when(credentials.getCredentials()).thenReturn(new Credential[0]);
+        GravitinoJdbcCatalog catalog = catalog(provider, credentials);
+        Assertions.assertFalse(initialize(catalog, Map.of(), Map.of()).preferTimestampNTZ());
+        Assertions.assertEquals(
+            DataTypes.TimestampType,
+            catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+      }
+    } finally {
+      if (previous == null) {
+        conf.unsetConf("spark.sql.timestampType");
+      } else {
+        conf.setConfString("spark.sql.timestampType", previous);
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "preferTimestampNTZ, true, '', true",
+    "prefertimestampntz, true, '', true",
+    "PREFERTIMESTAMPNTZ, false, '', false",
+    "preferTimestampNTZ, '', true, true",
+    "prefertimestampntz, '', true, true",
+    "PreferTimestampNtz, '', false, false",
+    "preferTimestampNTZ, false, true, false",
+    "prefertimestampntz, true, false, true",
+    "PreferTimestampNtz, true, false, true",
+    "PREFERTIMESTAMPNTZ, false, true, false",
+    "prefertimestampntz, '', true, true"
+  })
+  void testPostgreSqlNtzOptionDrivesReaderAndConverter(
+      String key, String option, String property, boolean expected) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      GravitinoJdbcCatalog catalog = catalog("jdbc-postgresql", credentials);
+      // A Spark catalog option wins over a Gravitino catalog property with the "spark.bypass."
+      // prefix.
+      JDBCOptions options =
+          initialize(
+              catalog,
+              option.isEmpty() ? Map.of() : Map.of(key, option),
+              property.isEmpty() ? Map.of() : Map.of("spark.bypass." + key, property));
+      Assertions.assertEquals(expected, options.preferTimestampNTZ());
+      Assertions.assertEquals(
+          expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  /** A catalog for another provider that opts in to preferTimestampNTZ. */
+  private static class OptInCatalog extends GravitinoJdbcCatalog {
+    @Override
+    protected boolean supportsPreferTimestampNtz() {
+      return true;
+    }
+
+    @Override
+    protected SparkTypeConverter getSparkTypeConverter() {
+      return new SparkJdbcTypeConverter(useTimestampNtz());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true, true", "false, false", "'', false"})
+  void testSubclassCanOptInToNtzOption(String option, boolean expected) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(credentials);
+      OptInCatalog catalog = new OptInCatalog();
+      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+
+      JDBCOptions options =
+          initialize(
+              catalog,
+              option.isEmpty() ? Map.of() : Map.of("preferTimestampNTZ", option),
+              Map.of());
+      Assertions.assertEquals(expected, options.preferTimestampNTZ());
+      Assertions.assertEquals(expected, catalog.useTimestampNtz());
+      Assertions.assertEquals(
+          expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  @Test
+  void testOptedInCatalogStillRejectsInvalidNtzValue() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(credentials);
+      OptInCatalog catalog = new OptInCatalog();
+      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> initialize(catalog, Map.of("preferTimestampNTZ", "yes"), Map.of()));
+    }
+  }
+
+>>>>>>> 2043e62ea ([#14848] improvement(spark-connector): Let JDBC catalog subclasses opt in to preferTimestampNTZ (#14849))
   @Test
   void testSpark33RejectsUnsupportedTimestampNtzBeforeOpeningReader() throws Exception {
     try (MockedStatic<GravitinoCatalogManager> managers =
