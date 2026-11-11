@@ -107,13 +107,13 @@ package org.apache.gravitino.catalog.lakehouse.generic;
  *       before failing, which this interface cannot express. Every check this catalog can make on
  *       its own is made before the provider is consulted, so the cases that remain are the ones
  *       only the table format can detect.
- *   <li>A location that is provisioned but then not used is not handed back either. A creation mode
- *       such as Lance's {@code EXIST_OK} returns the table that already exists, at the location it
- *       already has, and the location provisioned for that call goes nowhere. Detecting that from
- *       here would mean comparing two location strings and concluding from the comparison what an
- *       implementation did internally, which is exactly the inference this interface leaves to the
- *       provider; and a retried creation is the ordinary way to reach it, so an implementation that
- *       allocates has to reconcile these along with the failures above.
+ *   <li>A location that is provisioned but then not used is not handed back either. A table format
+ *       whose create returns a table that already exists, at the location it already has, leaves
+ *       the location provisioned for that call unused. Detecting that from here would mean
+ *       comparing two location strings and concluding from the comparison what an implementation
+ *       did internally, which is exactly the inference this interface leaves to the provider; and a
+ *       retried creation is the ordinary way to reach it, so an implementation that allocates has
+ *       to reconcile these along with the failures above.
  *   <li>A table format that drops a table through its own internals, rather than through the
  *       catalog, does not trigger {@link #unprovisionTableLocation(TableLocationContext)}. Lance's
  *       {@code OVERWRITE} creation mode does this: it drops the existing table and creates a new

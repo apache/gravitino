@@ -224,8 +224,9 @@ public class LanceTableOperations extends ManagedTableOperations {
     // owner. The Lance REST exist_ok mode loads the table first and sends CREATE only.
     Preconditions.checkArgument(
         mode != CreationMode.EXIST_OK,
-        "%s=%s is not supported by createTable: load the table first, or use the Lance REST"
-            + " exist_ok mode",
+        "Cannot create table %s: %s=%s is not supported by createTable. Load the table first, or"
+            + " use the Lance REST exist_ok mode",
+        ident,
         LANCE_CREATION_MODE,
         CreationMode.EXIST_OK);
 

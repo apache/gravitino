@@ -99,6 +99,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String LONE_SCHEMA_TABLE = "i_lone_schema_table";
   private static final String NON_LANCE_TABLE = "j_non_lance_table";
   private static final String EXIST_OK_TABLE = "k_exist_ok_table";
+  private static final String EXIST_OK_NEW_TABLE = "l_exist_ok_new_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -318,6 +319,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     // The prober may create tables in the write schema but cannot read or remove this one.
     assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "describe"));
 
+    // The response still carries the existing table's metadata; authorizing that is #12955.
     assertStatus(200, createTable(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "exist_ok"));
 
     // exist_ok returned the existing table without creating it, so its owner is unchanged and the
@@ -333,6 +335,21 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "describe"));
     assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "drop"));
     Assertions.assertTrue(new File(location(EXIST_OK_TABLE)).exists());
+  }
+
+  @Test
+  public void testExistOkCreateOfMissingTableMakesTheCallerTheOwner() throws Exception {
+    assertStatus(200, createTable(PROBER, WRITE_SCHEMA, EXIST_OK_NEW_TABLE, "exist_ok"));
+
+    Owner owner =
+        client
+            .loadMetalake(getLanceRESTServerMetalakeName())
+            .getOwner(
+                MetadataObjects.of(
+                    List.of(CATALOG, WRITE_SCHEMA, EXIST_OK_NEW_TABLE), MetadataObject.Type.TABLE))
+            .orElseThrow();
+    Assertions.assertEquals(PROBER, owner.name());
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, EXIST_OK_NEW_TABLE, "describe"));
   }
 
   @Test

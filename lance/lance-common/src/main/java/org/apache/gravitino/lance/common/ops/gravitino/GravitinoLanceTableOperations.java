@@ -422,6 +422,8 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     try {
       return tableCatalog.createTable(tableIdentifier, columns, null, createTableProperties);
     } catch (TableAlreadyExistsException e) {
+      // If the concurrent table is already gone again, report the conflict instead of retrying;
+      // the client can retry the request.
       return loadExistingLanceTable(tableCatalog, tableIdentifier, tableId).orElseThrow(() -> e);
     }
   }
