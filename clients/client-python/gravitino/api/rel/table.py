@@ -30,6 +30,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.stats.supports_statistics import SupportsStatistics
+from gravitino.api.domain.supports_domains import SupportsDomains
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -139,3 +140,7 @@ class Table(Auditable):
         raise UnsupportedOperationException(
             "Table does not support secret property operations."
         )
+
+    def supports_domains(self) -> SupportsDomains:
+        """Return domain lookup operations for this table."""
+        raise UnsupportedOperationException("Table does not support domain operations.")
