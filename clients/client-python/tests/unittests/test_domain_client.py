@@ -200,6 +200,15 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual(self.NAME, self.metalake.get_domain(self.NAME).name())
         self._request("GET", self.path + "/" + encode_string(self.NAME))
 
+    def test_list_domains_rejects_malformed_names(self):
+        for names in ("Tax", [None], ["Tax", 123], {"Tax": True}):
+            with self.subTest(names=names):
+                self._respond({"code": 0, "names": names})
+                with self.assertRaisesRegex(
+                    IllegalArgumentException, "names must be an array of strings"
+                ):
+                    self.metalake.list_domains()
+
     def test_list_responses_require_explicit_arrays(self):
         for field, operation in (
             ("names", self.metalake.list_domains),

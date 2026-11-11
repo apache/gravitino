@@ -22,7 +22,16 @@ from dataclasses_json import config, dataclass_json
 
 from gravitino.dto.domain_dto import DomainDTO, DomainMemberDTO
 from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.utils.precondition import Precondition
+
+
+def _decode_domain_names(value: object) -> Optional[list[str]]:
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(name, str) for name in value):
+        raise IllegalArgumentException("names must be an array of strings")
+    return value
 
 
 @dataclass_json
@@ -31,7 +40,7 @@ class DomainNamesListResponse(BaseResponse):
     """Visible domain names."""
 
     _names: Optional[list[str]] = field(
-        default=None, metadata=config(field_name="names")
+        default=None, metadata=config(field_name="names", decoder=_decode_domain_names)
     )
 
     def names(self) -> list[str]:
