@@ -39,6 +39,7 @@ import org.apache.gravitino.dto.responses.DomainListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.tag.TagValue;
@@ -133,5 +134,29 @@ public class TestSupportsDomains extends TestBase {
       buildMockResource(Method.GET, path, null, ErrorResponse.forbidden("denied", null), 403);
       Assertions.assertThrows(ForbiddenException.class, operations[i]::listDomains);
     }
+  }
+
+  /**
+   * Verifies both domain lookups preserve the server exception for a deleted table.
+   *
+   * @throws Exception if HTTP mock setup fails
+   */
+  @Test
+  public void testDeletedTableDomainLookups() throws Exception {
+    TableDTO table = Mockito.mock(TableDTO.class);
+    Mockito.when(table.name()).thenReturn("deleted");
+    SupportsDomains operations =
+        RelationalTable.from(NAMESPACE, table, client.restClient()).supportsDomains();
+    String path = "/api/metalakes/metalake/objects/table/cat.db.deleted/domains";
+    ErrorResponse missing =
+        ErrorResponse.notFound("NoSuchMetadataObjectException", "Table was deleted");
+    buildMockResource(Method.GET, path, null, missing, 404);
+    buildMockResource(
+        Method.GET, path, Collections.singletonMap("details", "true"), null, missing, 404);
+    Assertions.assertAll(
+        () -> Assertions.assertThrows(NoSuchMetadataObjectException.class, operations::listDomains),
+        () ->
+            Assertions.assertThrows(
+                NoSuchMetadataObjectException.class, operations::listDomainsInfo));
   }
 }

@@ -1114,9 +1114,13 @@ public class ErrorHandlers {
     @Override
     public void accept(ErrorResponse response) {
       String message = formatErrorMessage(response);
-      if (response.getCode() == ErrorConstants.NOT_FOUND_CODE
-          && response.getType().equals(NoSuchDomainException.class.getSimpleName())) {
-        throw new NoSuchDomainException("%s", message);
+      if (response.getCode() == ErrorConstants.NOT_FOUND_CODE) {
+        if (response.getType().equals(NoSuchDomainException.class.getSimpleName())) {
+          throw new NoSuchDomainException("%s", message);
+        }
+        if (response.getType().equals(NoSuchMetadataObjectException.class.getSimpleName())) {
+          throw new NoSuchMetadataObjectException("%s", message);
+        }
       }
       if (response.getCode() == ErrorConstants.ALREADY_EXISTS_CODE) {
         if (response.getType().equals(DomainAlreadyExistsException.class.getSimpleName())) {
