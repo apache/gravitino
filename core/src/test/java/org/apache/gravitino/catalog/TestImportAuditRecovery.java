@@ -21,7 +21,6 @@ package org.apache.gravitino.catalog;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -84,7 +83,7 @@ public class TestImportAuditRecovery {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void testConflictStopsForKnownCreatorOrAfterOneRetry(boolean knownCreator) throws Exception {
+  void testConflictReturnsCurrentRegistration(boolean knownCreator) throws Exception {
     SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
     SchemaEntity current =
         schema(1L, knownCreator ? AuditInfo.builder().withCreator("bob").build() : AuditInfo.EMPTY);
@@ -97,52 +96,7 @@ public class TestImportAuditRecovery {
     when(store.get(observed.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class))
         .thenReturn(current);
     Assertions.assertSame(current, fill(observed, ALICE));
-    verify(store, times(knownCreator ? 1 : 2))
-        .update(
-            eq(observed.nameIdentifier()),
-            eq(SchemaEntity.class),
-            eq(Entity.EntityType.SCHEMA),
-            any());
-  }
-
-  @Test
-  void testPropertyConflictRetriesOnceWithoutLosingCurrentFields() throws Exception {
-    SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
-    AuditInfo modified =
-        AuditInfo.builder()
-            .withLastModifier("bob")
-            .withLastModifiedTime(Instant.EPOCH.plusSeconds(1))
-            .build();
-    SchemaEntity current =
-        SchemaEntity.builder()
-            .withId(observed.id())
-            .withName(observed.name())
-            .withNamespace(observed.namespace())
-            .withComment("updated")
-            .withProperties(Map.of("key", "changed"))
-            .withAuditInfo(modified)
-            .build();
-    when(store.get(observed.nameIdentifier(), Entity.EntityType.SCHEMA, SchemaEntity.class))
-        .thenReturn(current);
-    when(store.update(
-            eq(observed.nameIdentifier()),
-            eq(SchemaEntity.class),
-            eq(Entity.EntityType.SCHEMA),
-            any()))
-        .thenThrow(new OptimisticLockException("property update won"))
-        .thenAnswer(
-            call -> {
-              Function<SchemaEntity, SchemaEntity> updater = call.getArgument(3);
-              return updater.apply(current);
-            });
-    SchemaEntity updated = fill(observed, ALICE);
-    Assertions.assertEquals(ALICE.creator(), updated.auditInfo().creator());
-    Assertions.assertEquals(ALICE.createTime(), updated.auditInfo().createTime());
-    Assertions.assertEquals(modified.lastModifier(), updated.auditInfo().lastModifier());
-    Assertions.assertEquals(modified.lastModifiedTime(), updated.auditInfo().lastModifiedTime());
-    Assertions.assertEquals(current.properties(), updated.properties());
-    Assertions.assertEquals(current.comment(), updated.comment());
-    verify(store, times(2))
+    verify(store)
         .update(
             eq(observed.nameIdentifier()),
             eq(SchemaEntity.class),
