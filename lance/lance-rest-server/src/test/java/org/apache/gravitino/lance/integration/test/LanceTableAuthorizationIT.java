@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.integration.test;
 
+import java.io.File;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -97,6 +98,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String OWNED_SCHEMA_TABLE = "h_owned_schema_table";
   private static final String LONE_SCHEMA_TABLE = "i_lone_schema_table";
   private static final String NON_LANCE_TABLE = "j_non_lance_table";
+  private static final String EXIST_OK_TABLE = "k_exist_ok_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -129,6 +131,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
+    createTable(WRITE_SCHEMA, EXIST_OK_TABLE);
     Catalog catalog = metalake.loadCatalog(CATALOG);
     catalog
         .asTableCatalog()
@@ -308,6 +311,28 @@ public class LanceTableAuthorizationIT extends BaseIT {
 
     // A denied overwrite must not have reached the metadata store.
     Assertions.assertEquals(location(HIDDEN_TABLE), describedLocation(ADMIN, HIDDEN_TABLE));
+  }
+
+  @Test
+  public void testExistOkCreateKeepsTheExistingOwner() throws Exception {
+    // The prober may create tables in the write schema but cannot read or remove this one.
+    assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "describe"));
+
+    assertStatus(200, createTable(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "exist_ok"));
+
+    // exist_ok returned the existing table without creating it, so its owner is unchanged and the
+    // prober still cannot read or remove it.
+    Owner owner =
+        client
+            .loadMetalake(getLanceRESTServerMetalakeName())
+            .getOwner(
+                MetadataObjects.of(
+                    List.of(CATALOG, WRITE_SCHEMA, EXIST_OK_TABLE), MetadataObject.Type.TABLE))
+            .orElseThrow();
+    Assertions.assertEquals(ADMIN, owner.name());
+    assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "describe"));
+    assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "drop"));
+    Assertions.assertTrue(new File(location(EXIST_OK_TABLE)).exists());
   }
 
   @Test
@@ -507,18 +532,26 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
+    assertStatus(200, createTable(ADMIN, schemaName, tableName, null));
+  }
+
+  private HttpResponse<String> createTable(
+      String user, String schemaName, String tableName, String mode) throws Exception {
     Schema schema =
         new Schema(
             List.of(
                 Field.nullable("id", new ArrowType.Int(32, true)),
                 Field.nullable("value", new ArrowType.Utf8())));
     HttpRequest request =
-        request(ADMIN, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+        request(
+                user,
+                "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create",
+                mode == null ? "" : "&mode=" + mode)
             .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
             .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
             .build();
-    assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> registerExistingTable(String user, String schema, String tableName)

@@ -375,19 +375,23 @@ public class TestLanceTableOperations {
                 new Index[0]));
   }
 
-  /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */
-  @Test
-  public void testExistOkRejectsNonLanceTable() throws IOException {
+  /**
+   * Verifies EXIST_OK is rejected before any read or write. Returning an existing table from
+   * createTable would make the caller its owner; the Lance REST exist_ok mode loads first instead.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testExistOkIsRejectedBeforeAnyAccess(boolean register) throws IOException {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
-    String location = tempDir.resolve("delta-exist-ok").toString();
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenReturn(nonLanceTableEntity(ident, location));
+    String location = tempDir.resolve("exist-ok").toString();
     Map<String, String> properties =
         Map.of(
             Table.PROPERTY_LOCATION,
             location,
             LANCE_CREATION_MODE,
             "EXIST_OK",
+            LANCE_TABLE_REGISTER,
+            String.valueOf(register),
             Table.PROPERTY_TABLE_FORMAT,
             "lance");
 
@@ -405,9 +409,12 @@ public class TestLanceTableOperations {
                     new SortOrder[0],
                     new Index[0]));
 
-    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
-    verify(lanceTableOps, never()).openDataset(anyString(), any());
+    Assertions.assertTrue(exception.getMessage().contains("EXIST_OK is not supported"));
+    Assertions.assertTrue(exception.getMessage().contains("Lance REST exist_ok"));
+    verify(store, never()).get(any(), any(), any());
+    verify(store, never()).put(any(), anyBoolean());
     verify(store, never()).delete(any(), any());
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
   }
 
   /** Verifies both overwrite paths reject a non-Lance entity before mutation. */

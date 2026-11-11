@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.lance.common.ops.gravitino;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
 import java.util.HashMap;
@@ -26,8 +27,11 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
@@ -41,8 +45,11 @@ import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.AlterTableDropColumnsResponse;
+import org.lance.namespace.model.CreateTableResponse;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
+@SuppressWarnings("unchecked")
 class TestGravitinoLanceTableOperations {
 
   @Test
@@ -219,6 +226,118 @@ class TestGravitinoLanceTableOperations {
         InvalidInputException.class, () -> ops.alterTable("catalog.schema.table", ".", request));
 
     Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  void testExistOkReturnsExistingTableWithoutCreating() {
+    // Creating a table makes the caller its owner, so an existing table must never reach
+    // createTable.
+    TableCatalog tableCatalog = tableCatalogWithTable("lance");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+
+    CreateTableResponse response =
+        ops.createTable("catalog.schema.table", "exist_ok", ".", null, Map.of(), null);
+
+    Assertions.assertEquals("lance", response.getProperties().get(Table.PROPERTY_TABLE_FORMAT));
+    Mockito.verify(tableCatalog).loadTable(NameIdentifier.of("schema", "table"));
+    Mockito.verify(tableCatalog, Mockito.never())
+        .createTable(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyMap());
+  }
+
+  @Test
+  void testExistOkCreatesMissingTableInCreateMode() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
+    Table created = lanceTable();
+    Mockito.when(
+            tableCatalog.createTable(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(Column[].class),
+                Mockito.isNull(),
+                Mockito.anyMap()))
+        .thenReturn(created);
+
+    operations(tableCatalog)
+        .createTable("catalog.schema.table", "exist_ok", ".", null, Map.of(), null);
+
+    ArgumentCaptor<Map<String, String>> properties = ArgumentCaptor.forClass(Map.class);
+    Mockito.verify(tableCatalog)
+        .createTable(
+            Mockito.eq(NameIdentifier.of("schema", "table")),
+            Mockito.any(Column[].class),
+            Mockito.isNull(),
+            properties.capture());
+    Assertions.assertEquals("CREATE", properties.getValue().get(LANCE_CREATION_MODE));
+  }
+
+  @Test
+  void testExistOkReturnsTableCreatedByConcurrentRequest() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Table concurrent = lanceTable();
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenThrow(new NoSuchTableException("Table does not exist"))
+        .thenReturn(concurrent);
+    Mockito.when(
+            tableCatalog.createTable(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(Column[].class),
+                Mockito.isNull(),
+                Mockito.anyMap()))
+        .thenThrow(new TableAlreadyExistsException("Table already exists"));
+
+    CreateTableResponse response =
+        operations(tableCatalog)
+            .createTable("catalog.schema.table", "exist_ok", ".", null, Map.of(), null);
+
+    Assertions.assertEquals("lance", response.getProperties().get(Table.PROPERTY_TABLE_FORMAT));
+    Mockito.verify(tableCatalog, Mockito.times(2)).loadTable(NameIdentifier.of("schema", "table"));
+  }
+
+  @Test
+  void testExistOkReportsConflictWhenConcurrentTableIsGoneAgain() {
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
+    TableAlreadyExistsException conflict = new TableAlreadyExistsException("Table already exists");
+    Mockito.when(
+            tableCatalog.createTable(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(Column[].class),
+                Mockito.isNull(),
+                Mockito.anyMap()))
+        .thenThrow(conflict);
+
+    TableAlreadyExistsException thrown =
+        Assertions.assertThrows(
+            TableAlreadyExistsException.class,
+            () ->
+                operations(tableCatalog)
+                    .createTable("catalog.schema.table", "exist_ok", ".", null, Map.of(), null));
+    Assertions.assertSame(conflict, thrown);
+  }
+
+  @Test
+  void testExistOkRejectsExistingNonLanceTableWithoutCreating() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+
+    InvalidInputException exception =
+        Assertions.assertThrows(
+            InvalidInputException.class,
+            () ->
+                operations(tableCatalog)
+                    .createTable("catalog.schema.table", "exist_ok", ".", null, Map.of(), null));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+    Mockito.verify(tableCatalog, Mockito.never())
+        .createTable(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.anyMap());
+  }
+
+  private static Table lanceTable() {
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties())
+        .thenReturn(Map.of(Table.PROPERTY_TABLE_FORMAT, "lance", Table.PROPERTY_EXTERNAL, "true"));
+    return table;
   }
 
   private static TableCatalog tableCatalogWithTable(String format) {

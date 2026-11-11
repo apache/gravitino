@@ -60,7 +60,7 @@ public class LanceTableDelegator implements LakehouseTableDelegator {
             false),
         PropertyEntry.enumPropertyEntry(
             LANCE_CREATION_MODE,
-            "Creation mode for Lance table: CREATE, EXIST_OK, or OVERWRITE",
+            "Creation mode for Lance table: CREATE or OVERWRITE. EXIST_OK is rejected.",
             false /* required */,
             true /* immutable */,
             LanceTableOperations.CreationMode.class,

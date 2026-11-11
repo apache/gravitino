@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
@@ -117,6 +118,8 @@ class TestGravitinoLanceModeParsing {
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Table table = Mockito.mock(Table.class);
     when(table.properties()).thenReturn(Map.of());
+    when(tableCatalog.loadTable(any(NameIdentifier.class)))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
     when(tableCatalog.createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), anyMap()))
         .thenReturn(table);
@@ -124,15 +127,20 @@ class TestGravitinoLanceModeParsing {
 
     operations.createTable("catalog.schema.table", " exist_ok ", ".", null, Map.of(), null);
     operations.createTable("catalog.schema.table", "ExistOk", ".", null, Map.of(), null);
+    operations.createTable("catalog.schema.table", " OverWrite ", ".", null, Map.of(), null);
 
+    // exist_ok is handled before the catalog: a missing table is created with CREATE.
     ArgumentCaptor<Map<String, String>> propertiesCaptor = propertiesCaptor();
-    Mockito.verify(tableCatalog, Mockito.times(2))
+    Mockito.verify(tableCatalog, Mockito.times(2)).loadTable(any(NameIdentifier.class));
+    Mockito.verify(tableCatalog, Mockito.times(3))
         .createTable(
             any(NameIdentifier.class), any(Column[].class), isNull(), propertiesCaptor.capture());
     Assertions.assertEquals(
-        "EXIST_OK", propertiesCaptor.getAllValues().get(0).get(LANCE_CREATION_MODE));
+        "CREATE", propertiesCaptor.getAllValues().get(0).get(LANCE_CREATION_MODE));
     Assertions.assertEquals(
-        "EXIST_OK", propertiesCaptor.getAllValues().get(1).get(LANCE_CREATION_MODE));
+        "CREATE", propertiesCaptor.getAllValues().get(1).get(LANCE_CREATION_MODE));
+    Assertions.assertEquals(
+        "OVERWRITE", propertiesCaptor.getAllValues().get(2).get(LANCE_CREATION_MODE));
   }
 
   @Test

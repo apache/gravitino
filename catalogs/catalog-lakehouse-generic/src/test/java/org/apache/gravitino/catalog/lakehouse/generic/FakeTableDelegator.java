@@ -48,8 +48,8 @@ public class FakeTableDelegator implements LakehouseTableDelegator {
   public static final String TABLE_FORMAT = "testing";
 
   // Set by a test to make createTable behave like a format that declines the location it was
-  // given: Lance's EXIST_OK mode returns the table that already exists, at the location that table
-  // already had. Static because the catalog builds its own table operations through ServiceLoader.
+  // given, for example by returning a table that already exists at the location that table already
+  // had. Static because the catalog builds its own table operations through ServiceLoader.
   private static volatile String locationToUseInstead;
 
   // Set by a test to reproduce the shape of LanceTableOperations#dropTable: the entity is removed

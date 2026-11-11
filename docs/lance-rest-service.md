@@ -415,7 +415,8 @@ Schema owners additionally need `USE_CATALOG`, and table owners need `USE_CATALO
 `DescribeTable`. `CREATE_TABLE` alone does not authorize overwrite requests. The `DropTable`
 and `DeregisterTable` endpoints require ownership rather than `MODIFY_TABLE`. Similarly, namespace creation privileges do not authorize
 overwriting or dropping another owner's namespace. Successful creation assigns ownership to
-the effective caller.
+the effective caller. An `exist_ok` request for a table that already exists returns that table
+and does not change its owner.
 
 ### Listings and concealed objects
 

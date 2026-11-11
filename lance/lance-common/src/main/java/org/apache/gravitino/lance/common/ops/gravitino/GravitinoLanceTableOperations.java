@@ -42,6 +42,7 @@ import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.LanceTableOperations;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.AlterColumnsGravitinoLance;
 import org.apache.gravitino.lance.common.ops.gravitino.GravitinoLanceTableAlterHandler.DropColumns;
@@ -49,6 +50,7 @@ import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.TableNotFoundException;
@@ -191,15 +193,19 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     createTableProperties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
     createTableProperties.put(Table.PROPERTY_EXTERNAL, "true");
 
-    // Pass creation mode as property to delegate handling to LanceTableOperations
-    createTableProperties.put(LANCE_CREATION_MODE, normalizeCreateMode(mode, tableId));
-
-    // Single call - mode is handled server-side
-    Table t =
-        namespaceWrapper
-            .asTableCatalog(catalog)
-            .createTable(
-                tableIdentifier, columns.toArray(new Column[0]), null, createTableProperties);
+    String createMode = normalizeCreateMode(mode, tableId);
+    TableCatalog tableCatalog = namespaceWrapper.asTableCatalog(catalog);
+    Column[] createColumns = columns.toArray(new Column[0]);
+    Table t;
+    if (CreateMode.EXIST_OK.name().equals(createMode)) {
+      t =
+          loadOrCreateTable(
+              tableCatalog, tableIdentifier, tableId, createColumns, createTableProperties);
+    } else {
+      // CREATE and OVERWRITE are handled by the catalog's LanceTableOperations.
+      createTableProperties.put(LANCE_CREATION_MODE, createMode);
+      t = tableCatalog.createTable(tableIdentifier, createColumns, null, createTableProperties);
+    }
     Map<String, String> properties = t.properties();
     Map<String, String> effectiveStorageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(
@@ -395,6 +401,45 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
   private static <REQUEST, RESPONSE> GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> getHandler(
       Class<?> requestClass) {
     return (GravitinoLanceTableAlterHandler<REQUEST, RESPONSE>) ALTER_HANDLERS.get(requestClass);
+  }
+
+  /**
+   * Handles the exist_ok mode here instead of in the catalog. Creating a table makes the caller its
+   * owner, so an existing table must be returned without going through createTable at all. A table
+   * created by a concurrent request after the check is loaded and returned the same way.
+   */
+  private Table loadOrCreateTable(
+      TableCatalog tableCatalog,
+      NameIdentifier tableIdentifier,
+      String tableId,
+      Column[] columns,
+      Map<String, String> createTableProperties) {
+    Optional<Table> existing = loadExistingLanceTable(tableCatalog, tableIdentifier, tableId);
+    if (existing.isPresent()) {
+      return existing.get();
+    }
+    createTableProperties.put(LANCE_CREATION_MODE, CreateMode.CREATE.name());
+    try {
+      return tableCatalog.createTable(tableIdentifier, columns, null, createTableProperties);
+    } catch (TableAlreadyExistsException e) {
+      return loadExistingLanceTable(tableCatalog, tableIdentifier, tableId).orElseThrow(() -> e);
+    }
+  }
+
+  private static Optional<Table> loadExistingLanceTable(
+      TableCatalog tableCatalog, NameIdentifier tableIdentifier, String tableId) {
+    Table table;
+    try {
+      table = tableCatalog.loadTable(tableIdentifier);
+    } catch (NoSuchTableException e) {
+      return Optional.empty();
+    }
+    if (!LancePropertiesUtils.isLanceTableFormat(
+        table.properties().get(Table.PROPERTY_TABLE_FORMAT))) {
+      throw new InvalidInputException(
+          "Table is not a Lance table: " + tableId, CommonUtil.formatCurrentStackTrace(), tableId);
+    }
+    return Optional.of(table);
   }
 
   private Table loadAndValidateLanceTable(

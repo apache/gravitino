@@ -220,19 +220,14 @@ public class LanceTableOperations extends ManagedTableOperations {
             .map(Boolean::parseBoolean)
             .orElse(false);
 
-    // Handle EXIST_OK mode - check if table exists first
-    if (mode == CreationMode.EXIST_OK) {
-      Preconditions.checkArgument(
-          !register, "EXIST_OK mode is not supported for register operation");
-
-      try {
-        Table table = super.loadTable(ident);
-        validateLanceTable(ident, table);
-        return table;
-      } catch (NoSuchTableException e) {
-        // Table doesn't exist, proceed with creation
-      }
-    }
+    // Returning an existing table from createTable would let the owner hook make the caller its
+    // owner. The Lance REST exist_ok mode loads the table first and sends CREATE only.
+    Preconditions.checkArgument(
+        mode != CreationMode.EXIST_OK,
+        "%s=%s is not supported by createTable: load the table first, or use the Lance REST"
+            + " exist_ok mode",
+        LANCE_CREATION_MODE,
+        CreationMode.EXIST_OK);
 
     if (register) {
       if (mode == CreationMode.CREATE) {
