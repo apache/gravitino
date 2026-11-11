@@ -37,6 +37,13 @@ public class TestPartitionUtils {
     return ColumnDTO.builder().withName(name).withDataType(type).build();
   }
 
+  private static Column eventStructColumn() {
+    return column(
+        "event",
+        Types.StructType.of(
+            Types.StructType.Field.notNullField("ts", Types.TimestampType.withoutTimeZone())));
+  }
+
   @Test
   void testIdentityStringPartition() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("colA", "O'Hara"));
@@ -46,6 +53,28 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     Assertions.assertEquals("colA = \"O'Hara\"", where);
+  }
+
+  @Test
+  void testIdentityIntegerPartition() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("part", "7"));
+    Column[] columns = new Column[] {column("part", Types.IntegerType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("part")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("part = 7", where);
+  }
+
+  @Test
+  void testIdentityBooleanPartition() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("flag", "true"));
+    Column[] columns = new Column[] {column("flag", Types.BooleanType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("flag")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("flag = true", where);
   }
 
   @Test
@@ -81,6 +110,28 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     Assertions.assertEquals("t = TIME \"12:34:56\"", where);
+  }
+
+  @Test
+  void testBucketPartitionUsesIcebergArgumentOrder() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("bucket", "14"));
+    Column[] columns = new Column[] {column("user_id", Types.LongType.get())};
+    Transform[] transforms = new Transform[] {Transforms.bucket(16, new String[] {"user_id"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("bucket(16, user_id) = 14", where);
+  }
+
+  @Test
+  void testTruncatePartitionUsesIcebergArgumentOrder() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("trunc", "usa"));
+    Column[] columns = new Column[] {column("country", Types.StringType.get())};
+    Transform[] transforms = new Transform[] {Transforms.truncate(3, "country")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("truncate(3, country) = \"usa\"", where);
   }
 
   @Test
@@ -130,6 +181,115 @@ public class TestPartitionUtils {
   }
 
   @Test
+  void testDayPartitionOnNestedStructFieldResolvesTopLevelColumn() {
+    // Real schemas expose struct column "event", while the transform path is event.ts.
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.ts_day", "2026-03-18"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms = new Transform[] {Transforms.day(new String[] {"event", "ts"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("days(event.ts) = DATE \"2026-03-18\"", where);
+  }
+
+  @Test
+  void testYearPartitionOnNestedStructField() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.ts_year", "56"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms = new Transform[] {Transforms.year(new String[] {"event", "ts"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("years(event.ts) = 56", where);
+  }
+
+  @Test
+  void testMonthPartitionOnNestedStructField() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.ts_month", "674"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms = new Transform[] {Transforms.month(new String[] {"event", "ts"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("months(event.ts) = 674", where);
+  }
+
+  @Test
+  void testHourPartitionOnNestedStructField() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.ts_hour", "492724"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms = new Transform[] {Transforms.hour(new String[] {"event", "ts"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("hours(event.ts) = 492724", where);
+  }
+
+  @Test
+  void testBucketPartitionOnNestedStructField() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.id_bucket", "3"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(Types.StructType.Field.notNullField("id", Types.LongType.get())))
+        };
+    Transform[] transforms =
+        new Transform[] {Transforms.bucket(8, new String[][] {new String[] {"event", "id"}})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("bucket(8, event.id) = 3", where);
+  }
+
+  @Test
+  void testTruncatePartitionOnNestedStructField() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.loc_trunc", "ab"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField("loc", Types.StringType.get())))
+        };
+    Transform[] transforms =
+        new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("truncate(2, event.loc) = \"ab\"", where);
+  }
+
+  @Test
+  void testDayPartitionAcceptsIsoDateFromUpdateStatsPath() {
+    // Production path: IcebergUpdateStatsAndMetricsJob stores Spark date via String.valueOf.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "2026-01-01"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.day("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("days(event_time) = DATE \"2026-01-01\"", where);
+  }
+
+  @Test
+  void testDayPartitionRejectsNonIntegerNonIsoValue() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "not-a-day"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.day("event_time")};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("not-a-day"));
+  }
+
+  @Test
   void testMonthPartitionUsesIcebergMonthsFunction() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("month", "660"));
     Column[] columns = new Column[] {column("event_time", Types.TimestampType.withTimeZone())};
@@ -138,6 +298,28 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     Assertions.assertEquals("months(event_time) = 660", where);
+  }
+
+  @Test
+  void testYearPartitionUsesIcebergYearsFunctionWithIntLiteral() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("year", "56"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.year("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("years(event_time) = 56", where);
+  }
+
+  @Test
+  void testHourPartitionUsesIcebergHoursFunctionWithIntLiteral() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("hour", "492724"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.hour("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("hours(event_time) = 492724", where);
   }
 
   @Test

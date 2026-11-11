@@ -22,9 +22,14 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -54,6 +59,36 @@ public class TestGravitinoCompactionJobAdapter {
             "strategy", "sort",
             "options", "{\"target_file_size_bytes\":\"1073741824\"}"),
         jobAdapter.jobConfig(mockCompactionJobContext("sort", "zorder(c1,c2)")));
+  }
+
+  @Test
+  public void testWhereClauseForDayPartitionUsesIsoDateFromStatsPath() {
+    // Mirrors CLI submit-strategy-jobs: update-stats stores day as ISO date, adapter builds where.
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("ts")
+              .withDataType(Types.TimestampType.withoutTimeZone())
+              .build()
+        };
+    Transform[] partitioning = new Transform[] {Transforms.day("ts")};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-01-01"))));
+
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "db", "table"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    columns,
+                    partitioning,
+                    partitions));
+
+    Assertions.assertEquals("(days(ts) = DATE \"2026-01-01\")", conf.get("where_clause"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {

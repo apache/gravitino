@@ -66,7 +66,7 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
     if (jobContext.getPartitions().isEmpty()) {
       return "";
     }
-    // Generate Iceberg Spark system-function predicates (e.g. days(ts) = N, bucket(16, id) = V).
+    // See PartitionUtils: Iceberg Spark system-function forms + CALL-safe literals.
     return PartitionUtils.getWhereClauseForPartitions(
         jobContext.getPartitions(), jobContext.getColumns(), jobContext.getPartitioning());
   }
