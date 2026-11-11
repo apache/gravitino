@@ -1060,6 +1060,20 @@ public class TestTagManager {
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
   }
 
+  /** Tag/policy objects cannot reach metadata tag-association writes through the manager. */
+  @Test
+  public void testTagAndPolicyAssociationTargetsAreRejected() {
+    for (MetadataObject.Type type :
+        new MetadataObject.Type[] {MetadataObject.Type.TAG, MetadataObject.Type.POLICY}) {
+      MetadataObject object = MetadataObjects.of(null, "legacy.with.dot", type);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, object, new String[] {"tag"}, new String[0]));
+    }
+  }
+
   @Test
   public void testAssociateTagsForMetadataObject() {
     Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);

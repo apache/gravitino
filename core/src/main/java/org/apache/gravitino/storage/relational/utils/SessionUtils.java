@@ -91,8 +91,8 @@ public class SessionUtils {
    * @return the read result
    */
   public static <T, R> R getWithoutCommitFresh(Class<T> mapperClazz, Function<T, R> func) {
+    SqlSession session = SqlSessions.getSqlSession();
     try {
-      SqlSession session = SqlSessions.getSqlSession();
       session.clearCache();
       return getWithoutCommit(mapperClazz, func);
     } finally {

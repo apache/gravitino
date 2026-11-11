@@ -100,6 +100,37 @@ public class TestTagMetaService extends TestJDBCBackend {
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
+  /** Legacy dotted object names remain readable by single and batch relation queries. */
+  @TestTemplate
+  public void testReadTagsForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    TagMetaService service = TagMetaService.getInstance();
+    Map<NameIdentifier, Entity.EntityType> objects =
+        Map.of(
+            tag.nameIdentifier(), Entity.EntityType.TAG,
+            policy.nameIdentifier(), Entity.EntityType.POLICY);
+    for (Map.Entry<NameIdentifier, Entity.EntityType> object : objects.entrySet()) {
+      assertTrue(service.listTagsForMetadataObject(object.getKey(), object.getValue()).isEmpty());
+      assertTrue(
+          service
+              .listTagsForMetadataObjects(List.of(object.getKey()), object.getValue())
+              .isEmpty());
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              service.getTagForMetadataObject(
+                  object.getKey(), object.getValue(), tag.nameIdentifier()));
+    }
+  }
+
   /** Verifies a deleted ID is rejected permanently instead of producing a retryable conflict. */
   @TestTemplate
   public void testOverwriteRejectsDeletedTagId() throws IOException {
