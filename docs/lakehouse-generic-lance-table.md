@@ -321,7 +321,14 @@ select another dataset, and Unicode URI paths are compared in their ASCII-encode
 must be hierarchical and correctly percent-encoded; file URIs must not contain user information or
 a port. Malformed URI locations are rejected before dataset access. If an existing table has a malformed
 location, new table creation fails until a catalog administrator corrects that metadata. Each new
-creation scans stored table locations across the catalog; it does not open the other datasets.
+creation, registration or declaration processes O(number of schemas + tables) stored metadata
+entries across the catalog; it does not open the other datasets. Large catalogs therefore add
+latency to these operations. The scan is not capped, because a partial scan could miss an overlap;
+a location index and atomic conflict detection remain follow-up work in #14788.
+
+Only URI schemes supported by Lance are recognized. Hadoop aliases such as `s3a`, `s3n` and `gcs`
+are not enabled by this check. Remote object-key escapes are not blindly decoded, because an
+escaped key and its decoded spelling can identify different objects.
 
 Azure `az` and `abfss` locations are compared by container, account and path, including the `dfs` and
 `blob` host spellings. If a URI omits its account, the comparison conservatively treats matching

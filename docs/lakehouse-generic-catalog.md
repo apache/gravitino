@@ -52,6 +52,12 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
 | `lance.allow-external-dataset-modification` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Also allow column and index changes to the datasets of registered or declared tables. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. Renamed from `lance.allow-external-table-purge`. | `false` | No |
 
+The previous name, `lance.allow-external-table-purge`, was introduced in #14870 and has not
+been released. It is no longer read. If you configured it on an unreleased build, remove it and
+explicitly set `lance.allow-external-dataset-modification=true` only if you intend to allow both
+external dataset deletion and schema/index changes to registered or declared datasets. The new
+setting defaults to `false`; the broader permission is not inferred from the old purge-only flag.
+
 #### Pluggable table location provider
 
 By default the catalog derives a new table's location from the `location` properties, following the

@@ -512,7 +512,16 @@ public class LanceTableOperations extends ManagedTableOperations {
                 + " external location {}. The dataset is kept and must be removed manually.",
             ident,
             location);
-        throw e;
+        String message =
+            String.format(
+                "%s The dataset created for Lance table %s at external location %s has been"
+                    + " retained. Inspect it and clean up only data created by this request before"
+                    + " retrying; do not delete shared parent directories.",
+                e.getMessage(), ident, location);
+        if (e instanceof TableAlreadyExistsException) {
+          throw new TableAlreadyExistsException(e, "%s", message);
+        }
+        throw new OptimisticLockException(e, "%s", message);
       }
       // Attempt to remove the managed dataset so a retry can create it again; if cleanup fails,
       // retain the registration error and cleanup failure.

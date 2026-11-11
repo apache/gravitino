@@ -2365,8 +2365,9 @@ public class TestLanceTableOperations {
     }
   }
 
-  @Test
-  void testExternalCreateConflictKeepsLocation() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testExternalCreateConflictKeepsLocation(boolean optimisticConflict) throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     Path parent = tempDir.resolve("conflict-parent");
     String victim = parent.resolve("victim").toString();
@@ -2377,13 +2378,31 @@ public class TestLanceTableOperations {
     when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
     when(idGenerator.nextId()).thenReturn(2L);
     // A concurrent creation of the same name wins after the existence check.
-    doThrow(new EntityAlreadyExistsException("concurrent creation"))
-        .when(store)
-        .put(any(), eq(false));
+    RuntimeException metadataFailure =
+        optimisticConflict
+            ? new OptimisticLockException("concurrent creation")
+            : new EntityAlreadyExistsException("concurrent creation");
+    doThrow(metadataFailure).when(store).put(any(), eq(false));
 
-    Assertions.assertThrows(
-        TableAlreadyExistsException.class,
-        () -> create(ident, columns, parent.toString(), Map.of(Table.PROPERTY_EXTERNAL, "true")));
+    Class<? extends RuntimeException> expectedException =
+        optimisticConflict ? OptimisticLockException.class : TableAlreadyExistsException.class;
+    RuntimeException failure =
+        Assertions.assertThrows(
+            expectedException,
+            () ->
+                create(ident, columns, parent.toString(), Map.of(Table.PROPERTY_EXTERNAL, "true")));
+    Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
+    Assertions.assertTrue(failure.getMessage().contains(parent.toString()));
+    Assertions.assertTrue(failure.getMessage().contains("retained"));
+    Assertions.assertTrue(
+        failure.getMessage().contains("clean up only data created by this request"));
+    Assertions.assertTrue(failure.getMessage().contains("do not delete shared parent directories"));
+    Throwable original = failure.getCause();
+    if (!optimisticConflict) {
+      Assertions.assertInstanceOf(TableAlreadyExistsException.class, original);
+      original = original.getCause();
+    }
+    Assertions.assertSame(metadataFailure, original);
 
     try (Dataset dataset = Dataset.open().uri(victim).build()) {
       Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());

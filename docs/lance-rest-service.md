@@ -161,7 +161,11 @@ this check (#14788).
 
 When `CreateTable` fails because the table name already exists, the request is rejected before any
 data is written. If a concurrent request creates the same name after that check, the dataset written
-at the external location is kept, and an administrator must remove it.
+at the external location is kept. The table-already-exists error reports that data was retained and
+requires manual inspection before retrying. Lock conflicts and other internal failures keep the
+generic HTTP `500` response; an administrator must inspect server logs for retained-dataset details
+before retrying. Remove only data created by the failed request; do not recursively delete a shared
+parent directory.
 
 
 ## Deployment
