@@ -18,10 +18,11 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DATASET_ADOPTED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
@@ -266,21 +267,21 @@ public class TestLanceTableOperations {
             location,
             Table.PROPERTY_EXTERNAL,
             Boolean.toString(external),
-            LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+            LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION,
             "true");
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity(ident, List.of(), properties));
     when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
     if (catalogPermission != null) {
       lanceTableOps.setCatalogProperties(
-          Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, catalogPermission));
+          Map.of(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, catalogPermission));
     }
 
     if (external && !Boolean.parseBoolean(catalogPermission)) {
       UnsupportedOperationException error =
           Assertions.assertThrowsExactly(
               UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
-      Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+      Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
       verify(store, never()).delete(any(), any());
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
@@ -327,7 +328,7 @@ public class TestLanceTableOperations {
                     replacement,
                     LANCE_CREATION_MODE,
                     "OVERWRITE",
-                    LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                    LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION,
                     "true"),
                 new Transform[0],
                 null,
@@ -1105,6 +1106,8 @@ public class TestLanceTableOperations {
         new AtomicReference<>(tableEntity(ident, List.of(), properties));
     stubMutableTable(ident, storedTable);
     when(idGenerator.nextId()).thenReturn(10L);
+    // Changing a registered dataset requires the catalog opt-in.
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, "true"));
 
     Dataset schemaDataset = mock(Dataset.class);
     when(schemaDataset.version()).thenReturn(3L);
@@ -2333,6 +2336,164 @@ public class TestLanceTableOperations {
     Assertions.assertTrue(failure.getMessage().contains(ident.toString()));
     verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
     verify(store, never()).put(any(), anyBoolean());
+  }
+
+  @Test
+  void testCreateChecksExistingNameBeforeWritingDataset() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Path parent = tempDir.resolve("existing-name-parent");
+    String victim = parent.resolve("victim").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(victim, columns, Map.of())) {
+      // Another table's dataset inside the requested location.
+    }
+    Mockito.clearInvocations(lanceTableOps);
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(true);
+
+    Assertions.assertThrows(
+        TableAlreadyExistsException.class,
+        () -> create(ident, columns, parent.toString(), Map.of(Table.PROPERTY_EXTERNAL, "true")));
+
+    verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
+    Assertions.assertFalse(Files.exists(parent.resolve("_versions")));
+    try (Dataset dataset = Dataset.open().uri(victim).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  @Test
+  void testExternalCreateConflictKeepsLocation() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Path parent = tempDir.resolve("conflict-parent");
+    String victim = parent.resolve("victim").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(victim, columns, Map.of())) {
+      // Another table's dataset inside the requested location.
+    }
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
+    when(idGenerator.nextId()).thenReturn(2L);
+    // A concurrent creation of the same name wins after the existence check.
+    doThrow(new EntityAlreadyExistsException("concurrent creation"))
+        .when(store)
+        .put(any(), eq(false));
+
+    Assertions.assertThrows(
+        TableAlreadyExistsException.class,
+        () -> create(ident, columns, parent.toString(), Map.of(Table.PROPERTY_EXTERNAL, "true")));
+
+    try (Dataset dataset = Dataset.open().uri(victim).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+    // The new dataset at the external location is kept rather than dropped with its directory.
+    Assertions.assertTrue(Files.exists(parent.resolve("_versions")));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"register", "declare", "create"})
+  void testCreateMarksAdoptedDatasets(String operation) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("adopted-" + operation).toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    Map<String, String> extra = Maps.newHashMap();
+    if ("register".equals(operation)) {
+      try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+        // Registration requires an existing dataset.
+      }
+      extra.put(LANCE_TABLE_REGISTER, "true");
+    } else if ("declare".equals(operation)) {
+      extra.put(LANCE_TABLE_DECLARED, "true");
+    }
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
+    when(idGenerator.nextId()).thenReturn(2L);
+
+    Table table = create(ident, columns, location, extra);
+
+    Assertions.assertEquals(
+        "create".equals(operation) ? null : "true",
+        table.properties().get(LANCE_TABLE_DATASET_ADOPTED));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {LANCE_TABLE_DATASET_ADOPTED, LANCE_TABLE_REGISTER})
+  void testAlterRejectsAdoptedDatasetWithoutCatalogPermission(String marker) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("adopted-alter-" + marker).toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()), Column.of("value", Types.StringType.get())
+            },
+            Map.of())) {
+      // A dataset that the table adopted rather than created.
+    }
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_EXTERNAL,
+            "true",
+            LANCE_TABLE_VERSION,
+            "1",
+            marker,
+            "true");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(
+                    ColumnEntity.builder()
+                        .withId(1L)
+                        .withName("id")
+                        .withDataType(Types.IntegerType.get())
+                        .withPosition(0)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build(),
+                    ColumnEntity.builder()
+                        .withId(2L)
+                        .withName("value")
+                        .withDataType(Types.StringType.get())
+                        .withPosition(1)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build()),
+                properties));
+
+    UnsupportedOperationException error =
+        Assertions.assertThrowsExactly(
+            UnsupportedOperationException.class,
+            () ->
+                lanceTableOps.alterTable(
+                    ident, TableChange.deleteColumn(new String[] {"value"}, false)));
+
+    Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
+    verify(store, never()).update(any(), any(), any(), any());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals(1L, dataset.version());
+      Assertions.assertEquals(2, dataset.getSchema().getFields().size());
+    }
+  }
+
+  private Table create(
+      NameIdentifier ident, Column[] columns, String location, Map<String, String> extra)
+      throws Exception {
+    Map<String, String> properties = Maps.newHashMap(extra);
+    properties.put(Table.PROPERTY_LOCATION, location);
+    properties.put(Table.PROPERTY_TABLE_FORMAT, "lance");
+    properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(1L).toString());
+    return PrincipalUtils.doAs(
+        new UserPrincipal("tester"),
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                properties,
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
   }
 
   private Table register(NameIdentifier ident, String mode) throws Exception {

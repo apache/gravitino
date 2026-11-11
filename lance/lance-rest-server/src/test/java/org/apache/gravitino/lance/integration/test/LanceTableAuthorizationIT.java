@@ -349,14 +349,16 @@ public class LanceTableAuthorizationIT extends BaseIT {
     GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
     metalake.alterCatalog(
         CATALOG,
-        CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
+        CatalogChange.setProperty(
+            LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, "true"));
     try {
       assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
       Assertions.assertFalse(Files.exists(Path.of(location(DROP_TABLE))));
     } finally {
       metalake.alterCatalog(
           CATALOG,
-          CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "false"));
+          CatalogChange.setProperty(
+              LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, "false"));
     }
     assertStatus(404, table(ADMIN, WRITE_SCHEMA, DEREGISTER_TABLE, "describe"));
     assertStatus(404, table(ADMIN, WRITE_SCHEMA, DROP_TABLE, "describe"));
@@ -419,7 +421,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
       HttpResponse<String> rejected = table(PROBER, WRITE_SCHEMA, alias, "drop");
       assertStatus(406, rejected);
       Assertions.assertTrue(
-          rejected.body().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+          rejected.body().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
       assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
       assertStatus(200, table(ADMIN, SCHEMA, victim, "describe"));
       try (Dataset dataset = Dataset.open().uri(victimLocation.toString()).build()) {
@@ -431,6 +433,79 @@ public class LanceTableAuthorizationIT extends BaseIT {
       table(ADMIN, WRITE_SCHEMA, alias, "deregister");
       table(ADMIN, SCHEMA, victim, "deregister");
     }
+  }
+
+  /** A failed create at a parent directory must not delete the datasets under it. */
+  @Test
+  void testConflictingCreateCannotDeleteAnotherSchemasData() throws Exception {
+    String victim = "conflict_victim";
+    String own = "conflict_own";
+    Path parent = tempDir.resolve("conflict_parent");
+    Path victimLocation = parent.resolve("victim");
+    LanceDatasetTestUtils.createDataset(victimLocation.toString());
+    assertStatus(200, register(ADMIN, SCHEMA, victim, null, victimLocation.toString()));
+    try {
+      assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
+      assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, own));
+
+      assertStatus(409, createAt(PROBER, WRITE_SCHEMA, own, parent.toString()));
+
+      try (Dataset dataset = Dataset.open().uri(victimLocation.toString()).build()) {
+        Assertions.assertFalse(dataset.getSchema().getFields().isEmpty());
+      }
+    } finally {
+      table(ADMIN, WRITE_SCHEMA, own, "deregister");
+      table(ADMIN, SCHEMA, victim, "deregister");
+    }
+  }
+
+  /** A table registered or declared at another table's dataset must not change that dataset. */
+  @ParameterizedTest
+  @ValueSource(strings = {"register", "declare"})
+  void testTableOwnerCannotChangeAnotherTablesDataset(String operation) throws Exception {
+    String victim = "change_victim_" + operation;
+    String alias = "change_alias_" + operation;
+    createTable(SCHEMA, victim);
+    try {
+      assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
+      if ("register".equals(operation)) {
+        assertStatus(200, register(PROBER, WRITE_SCHEMA, alias, null, location(victim)));
+      } else {
+        DeclareTableRequest body = new DeclareTableRequest();
+        body.setId(List.of(CATALOG, WRITE_SCHEMA, alias));
+        body.setLocation(location(victim));
+        assertStatus(
+            200, send(PROBER, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, alias) + "/declare", body));
+        // Loading the declared table reads its schema from the dataset and clears lance.declared.
+        assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
+      }
+
+      HttpResponse<String> rejected = dropColumns(PROBER, WRITE_SCHEMA, alias, "value");
+      assertStatus(406, rejected);
+      Assertions.assertTrue(
+          rejected.body().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
+
+      try (Dataset dataset = Dataset.open().uri(location(victim)).build()) {
+        Assertions.assertEquals(
+            List.of("id", "value"),
+            dataset.getSchema().getFields().stream().map(Field::getName).toList());
+      }
+    } finally {
+      table(ADMIN, WRITE_SCHEMA, alias, "deregister");
+      table(ADMIN, SCHEMA, victim, "deregister");
+    }
+  }
+
+  private HttpResponse<String> createAt(
+      String user, String schemaName, String tableName, String tableLocation) throws Exception {
+    Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    HttpRequest request =
+        request(user, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+            .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
+            .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, tableLocation)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
+            .build();
+    return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
   private HttpResponse<String> dropColumns(String user, String tableName, String column)

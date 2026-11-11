@@ -19,7 +19,7 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
@@ -58,14 +58,15 @@ public class TestPropertiesMetadata {
   @Test
   void testExternalPurgePolicyDefaultsToDisabledAndCanBeChangedAtCatalogLevel() {
     PropertiesMetadata metadata = genericCatalog.catalogPropertiesMetadata();
-    Assertions.assertTrue(metadata.containsProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertTrue(metadata.containsProperty(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
     Assertions.assertEquals(
-        false, metadata.getOrDefault(Map.of(), LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+        false, metadata.getOrDefault(Map.of(), LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
     Assertions.assertEquals(
         true,
         metadata.getOrDefault(
-            Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"), LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
-    Assertions.assertFalse(metadata.isImmutableProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+            Map.of(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, "true"),
+            LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
+    Assertions.assertFalse(metadata.isImmutableProperty(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
   }
 
   @Test

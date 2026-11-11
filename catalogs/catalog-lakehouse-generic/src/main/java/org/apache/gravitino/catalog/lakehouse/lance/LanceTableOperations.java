@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -234,20 +234,30 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
-    if (register) {
-      if (mode == CreationMode.CREATE) {
-        // Check metadata before accessing storage so an existing name consistently reports a
-        // conflict. The final strict insert still detects a concurrent registration.
-        try {
-          if (store().exists(ident, Entity.EntityType.TABLE)) {
-            throw new TableAlreadyExistsException("Table %s already exists", ident);
-          }
-        } catch (IOException e) {
-          throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
+    if (mode == CreationMode.CREATE) {
+      // Check metadata before accessing storage so an existing name reports a conflict without
+      // writing a dataset. The final strict insert still detects a concurrent creation.
+      try {
+        if (store().exists(ident, Entity.EntityType.TABLE)) {
+          throw new TableAlreadyExistsException("Table %s already exists", ident);
         }
+      } catch (IOException e) {
+        throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
       }
+    }
+
+    if (register) {
       // Validate before OVERWRITE can remove existing metadata or managed data.
       validateExistingDatasetLocation(ident, location, properties);
+    }
+
+    if (register || isDeclaredOnly(properties)) {
+      // Gravitino does not create the dataset of a registered or declared table. Record that, so
+      // later dataset changes require the catalog opt-in. The declared flag is removed once the
+      // schema is loaded from the dataset, so it cannot serve as this record.
+      Map<String, String> adoptedProperties = new HashMap<>(properties);
+      adoptedProperties.put(LanceConstants.LANCE_TABLE_DATASET_ADOPTED, "true");
+      properties = adoptedProperties;
     }
 
     // Handle OVERWRITE mode - drop existing table if present
@@ -292,6 +302,14 @@ public class LanceTableOperations extends ManagedTableOperations {
               + ident
               + " because its dataset schema is not initialized or could not be loaded");
     }
+    if (isAdoptedDataset(loadedTable.properties()) && !externalDatasetModificationAllowed()) {
+      // The location of a registered or declared table may hold another table's dataset.
+      throw new UnsupportedOperationException(
+          "Changing the dataset of a registered or declared Lance table is disabled. A catalog"
+              + " administrator may enable "
+              + LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION
+              + " to allow changes to datasets that Gravitino did not create.");
+    }
     long version = handleLanceTableChange(loadedTable, changes);
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
@@ -310,12 +328,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
       boolean external = LancePropertiesUtils.isExternalTable(table.properties());
-      if (external
-          && !Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_TABLE_PURGE))) {
+      if (external && !externalDatasetModificationAllowed()) {
         throw new UnsupportedOperationException(
             "Purging external Lance tables is disabled. Use dropTable or Lance REST deregister"
                 + " to remove metadata only. A catalog administrator may enable "
-                + LANCE_ALLOW_EXTERNAL_TABLE_PURGE
+                + LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION
                 + " to allow physical deletion of external data.");
       }
 
@@ -472,8 +489,19 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchSchemaException e) {
       throw e;
     } catch (TableAlreadyExistsException | OptimisticLockException e) {
-      // Metadata registration failed after creating the dataset. Attempt to remove it so a retry
-      // can create it again; if cleanup fails, retain the registration error and cleanup failure.
+      // Metadata registration failed after creating the dataset. Dataset.drop removes the whole
+      // location, and an external location may be a directory that holds other datasets, so
+      // only a managed location is cleaned up. An external one keeps the new dataset.
+      if (LancePropertiesUtils.isExternalTable(properties)) {
+        LOG.warn(
+            "Metadata registration for Lance table {} failed after its dataset was created at"
+                + " external location {}. The dataset is kept and must be removed manually.",
+            ident,
+            location);
+        throw e;
+      }
+      // Attempt to remove the managed dataset so a retry can create it again; if cleanup fails,
+      // retain the registration error and cleanup failure.
       try {
         Dataset.drop(location, storageProps);
       } catch (Exception dropFailure) {
@@ -597,6 +625,16 @@ public class LanceTableOperations extends ManagedTableOperations {
         .map(mode -> mode.trim().replace('-', '_').toUpperCase())
         .map(SchemaRefreshMode::valueOf)
         .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
+  }
+
+  private boolean externalDatasetModificationAllowed() {
+    return Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
+  }
+
+  private static boolean isAdoptedDataset(Map<String, String> properties) {
+    // Registrations made before the adopted flag existed carry only lance.register.
+    return Boolean.parseBoolean(properties.get(LanceConstants.LANCE_TABLE_DATASET_ADOPTED))
+        || Boolean.parseBoolean(properties.get(LANCE_TABLE_REGISTER));
   }
 
   private boolean isDeclaredOnly(Table table) {

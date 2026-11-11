@@ -135,10 +135,18 @@ table metadata or deleting files. Lance REST reports this as HTTP `406` (`Unsupp
 created, declared or registered through Lance REST are external, so this default also applies to them.
 Use `DeregisterTable` to remove their metadata while retaining their data.
 
-A catalog administrator can set `lance.allow-external-table-purge=true` on the `lakehouse-generic`
+A catalog administrator can set `lance.allow-external-dataset-modification=true` on the `lakehouse-generic`
 catalog to permit physical deletion. This catalog-only setting also applies to create `OVERWRITE`
 when it replaces an existing external table. A table property or request header cannot enable it.
 Existing catalogs must explicitly opt in to retain their previous destructive drop/overwrite behavior.
+The same setting is required for `AlterTableAlterColumns`, `AlterTableDropColumns` and index changes
+on a table that was registered or declared, because Gravitino did not create its dataset. Tables
+created through `CreateTable` can be altered without it. This setting was named
+`lance.allow-external-table-purge` before.
+
+When `CreateTable` fails because the table name already exists, the request is rejected before any
+data is written. If a concurrent request creates the same name after that check, the dataset written
+at the external location is kept, and an administrator must remove it.
 Enabling it permits deletion at caller-supplied locations; it does not verify storage ownership or
 provide isolation between tables. Enable it only when table owners are trusted to delete data at
 locations they can register. Underlying storage permissions still apply.

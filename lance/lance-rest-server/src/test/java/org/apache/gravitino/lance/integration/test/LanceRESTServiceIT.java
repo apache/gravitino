@@ -580,7 +580,7 @@ public class LanceRESTServiceIT extends BaseIT {
             LanceNamespaceException.class,
             () -> createTable(ids, newLocation, overwriteTableProperties, body, "overwrite"));
     Assertions.assertTrue(
-        denied.getMessage().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+        denied.getMessage().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
     Assertions.assertEquals(
         location,
         catalog
@@ -593,7 +593,8 @@ public class LanceRESTServiceIT extends BaseIT {
     catalog =
         metalake.alterCatalog(
             CATALOG_NAME,
-            CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
+            CatalogChange.setProperty(
+                LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION, "true"));
 
     response =
         Assertions.assertDoesNotThrow(
@@ -1321,7 +1322,7 @@ public class LanceRESTServiceIT extends BaseIT {
     Map<String, String> catalogProperties =
         ImmutableMap.<String, String>builder()
             .putAll(properties)
-            .put("lance.allow-external-table-purge", Boolean.toString(allowExternalPurge))
+            .put("lance.allow-external-dataset-modification", Boolean.toString(allowExternalPurge))
             .put("lance.storage.endpoint", MINIO_ENDPOINT)
             .put("lance.storage.allow_http", "true")
             .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)
