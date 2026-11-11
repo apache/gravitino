@@ -41,7 +41,7 @@ from gravitino.dto.responses.domain_response import (
     DomainResponse,
 )
 from gravitino.exceptions.handlers.domain_error_handler import DOMAIN_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import domain_path, encode_string
 from gravitino.utils.http_client import HTTPClient, Response
 from gravitino.utils.precondition import Precondition
 
@@ -55,7 +55,31 @@ class GenericDomain(Domain):
         self._metalake = metalake
         self._domain = deepcopy(domain_dto)
         self._client = client
-        self._path = f"api/metalakes/{encode_string(metalake)}/domains/{encode_string(self.name())}"
+
+    @property
+    def _path(self) -> str:
+        return domain_path(self._metalake, self.name())
+
+    def _snapshot_fields(self) -> tuple:
+        return (
+            self._metalake,
+            self.name(),
+            self.comment(),
+            frozenset(self.properties().items()),
+            self.status(),
+            self.parent(),
+            self.backing_tag(),
+            self._domain.audit_info(),
+            tuple(self._domain.relations()),
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, GenericDomain):
+            return NotImplemented
+        return self._snapshot_fields() == other._snapshot_fields()
+
+    def __hash__(self) -> int:
+        return hash(self._snapshot_fields())
 
     def name(self) -> str:
         return self._domain.name()
@@ -199,7 +223,7 @@ class GenericDomain(Domain):
         )
         result = DomainMemberListResponse.from_json(response.body, infer_missing=True)
         result.validate()
-        return [dto.member() for dto in result.members()]
+        return [dto.member(self._metalake) for dto in result.members()]
 
     def _snapshot(self, response: Response) -> Domain:
         result = DomainResponse.from_json(response.body, infer_missing=True)

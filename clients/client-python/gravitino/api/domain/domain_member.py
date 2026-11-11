@@ -39,6 +39,8 @@ class DomainMember:
     _object: MetadataObject
     _relations: tuple[DomainRelation, ...]
 
+    _metalake: str = ""
+
     def object(self) -> MetadataObject:
         """Return the member object."""
         return self._object

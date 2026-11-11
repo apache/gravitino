@@ -36,6 +36,17 @@ class DomainMemberFilter:
     name_contains: Optional[str] = None
     domains: tuple[str, ...] = ()
 
+    def _criteria(self) -> tuple:
+        return frozenset(self.types), self.name_contains, frozenset(self.domains)
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, DomainMemberFilter):
+            return NotImplemented
+        return self._criteria() == other._criteria()
+
+    def __hash__(self) -> int:
+        return hash(self._criteria())
+
     def __post_init__(self) -> None:
         Precondition.check_argument(self.types is not None, "types must not be None")
         Precondition.check_argument(

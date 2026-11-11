@@ -23,6 +23,8 @@ from dataclasses_json import config, dataclass_json
 from gravitino.api.domain.domain import Domain
 from gravitino.api.domain.domain_member import DomainMember
 from gravitino.api.domain.domain_relation import DomainRelation
+from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.tag.tag_value import TagValue
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metadata_object_dto import MetadataObjectDTO
@@ -52,7 +54,23 @@ class DomainRelationDTO:
     )
 
     def relation(self) -> DomainRelation:
-        return DomainRelation(self._relation, self._source)
+        if self._relation == DomainRelation.Type.DIRECT:
+            return DomainRelation(self._relation)
+        Precondition.check_argument(self._source is not None, "Missing relation source")
+        if self._relation == DomainRelation.Type.VIA_SUBDOMAIN:
+            source = MetadataObjects.parse(
+                self._source.name(), MetadataObject.Type.DOMAIN
+            )
+        else:
+            Precondition.check_argument(
+                self._source.type()
+                in (MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA),
+                "An inherited relation must come from a catalog or schema",
+            )
+            source = MetadataObjects.parse(
+                self._source.full_name(), self._source.type()
+            )
+        return DomainRelation(self._relation, source)
 
 
 @dataclass_json
@@ -63,8 +81,12 @@ class DomainMemberDTO:
     _object: MetadataObjectDTO = field(metadata=config(field_name="object"))
     _relations: list[DomainRelationDTO] = field(metadata=config(field_name="relations"))
 
-    def member(self) -> DomainMember:
-        return DomainMember(self._object, tuple(r.relation() for r in self._relations))
+    def member(self, metalake: str) -> DomainMember:
+        return DomainMember(
+            MetadataObjects.parse(self._object.full_name(), self._object.type()),
+            tuple(r.relation() for r in self._relations),
+            metalake,
+        )
 
 
 @dataclass_json

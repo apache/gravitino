@@ -126,7 +126,7 @@ from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
 from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import domain_path, encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -700,11 +700,8 @@ class GravitinoMetalake(
 
     def get_domain(self, name: str) -> Domain:
         """Load a domain by name; hidden drafts raise NoSuchDomainException."""
-        Precondition.check_argument(
-            StringUtils.is_not_blank(name), "name must not be blank"
-        )
         response = self.rest_client.get(
-            f"api/metalakes/{encode_string(self.name())}/domains/{encode_string(name)}",
+            domain_path(self.name(), name),
             error_handler=DOMAIN_ERROR_HANDLER,
         )
         result = DomainResponse.from_json(response.body, infer_missing=True)
@@ -744,14 +741,10 @@ class GravitinoMetalake(
 
     def alter_domain(self, name: str, *changes: DomainChange) -> Domain:
         """Alter name, comment or properties; the backing tag is unchanged."""
-        Precondition.check_argument(
-            StringUtils.is_not_blank(name), "name must not be blank"
-        )
-        Precondition.check_argument(bool(changes), "at least one change is required")
         request = DomainUpdatesRequest.from_changes(changes)
         request.validate()
         response = self.rest_client.put(
-            f"api/metalakes/{encode_string(self.name())}/domains/{encode_string(name)}",
+            domain_path(self.name(), name),
             json=request,
             error_handler=DOMAIN_ERROR_HANDLER,
         )
@@ -761,11 +754,8 @@ class GravitinoMetalake(
 
     def delete_domain(self, name: str) -> bool:
         """Delete a domain, preserving tags; parents with children are rejected."""
-        Precondition.check_argument(
-            StringUtils.is_not_blank(name), "name must not be blank"
-        )
         response = self.rest_client.delete(
-            f"api/metalakes/{encode_string(self.name())}/domains/{encode_string(name)}",
+            domain_path(self.name(), name),
             error_handler=DOMAIN_ERROR_HANDLER,
         )
         result = DropResponse.from_json(response.body, infer_missing=True)

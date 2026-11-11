@@ -222,6 +222,47 @@ class TestDomainClient(unittest.TestCase):
             },
         )
 
+    def test_empty_alter_domain(self):
+        self._respond({"code": 0, "domain": self._dto()})
+        self.assertEqual(self._domain(), self.metalake.alter_domain(self.NAME))
+        self._request(
+            "PUT", self.path + "/" + encode_string(self.NAME), {"updates": []}
+        )
+
+    def test_snapshot_equality(self):
+        dto = DomainDTO.from_dict(self._dto())
+        other_client = GenericDomain(self.METALAKE, dto, MagicMock())
+        self.assertEqual({self._domain(), other_client}, {other_client})
+        self.assertNotEqual(other_client, GenericDomain("other", dto, self.client))
+        for changes in (
+            {"name": "new"},
+            {"comment": None},
+            {"properties": {}},
+            {"status": "published"},
+            {"parent": "parent"},
+            {"backingTag": None},
+            {"audit": {"creator": "other"}},
+            {"relations": [{"relation": "direct"}]},
+        ):
+            with self.subTest(changes=changes):
+                self.assertNotEqual(other_client, self._domain(**changes))
+
+    def test_invalid_inherited_source(self):
+        for source in (None, {"fullName": "cat.schema.table", "type": "table"}):
+            domain = self._domain(
+                relations=[{"relation": "inherited", "source": source}]
+            )
+            with self.assertRaises(IllegalArgumentException):
+                domain.relations()
+
+    def test_dot_segment_snapshot(self):
+        for name in (".", ".."):
+            domain = self._domain(name=name)
+            self.assertEqual(name, domain.name())
+            with self.assertRaises(IllegalArgumentException):
+                domain.publish()
+        self.opener.open.assert_not_called()
+
     def test_delete_domain(self):
         for dropped in (True, False):
             self._respond({"code": 0, "dropped": dropped})
@@ -331,6 +372,12 @@ class TestDomainClient(unittest.TestCase):
             name_contains="a b/&?+=%,",
             domains=scopes,
         )
+        reversed_filter = DomainMemberFilter(
+            types=tuple(reversed(member_filter.types)),
+            name_contains=member_filter.name_contains,
+            domains=tuple(reversed(scopes)),
+        )
+        self.assertEqual({member_filter}, {reversed_filter})
         member = self._domain().list_members(member_filter)[0]
         self._request(
             "GET",
@@ -355,6 +402,13 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual("cat.schema", member.relations()[1].source().full_name())
         self.assertEqual("Trading.US/a b", member.relations()[2].source().name())
         self.assertIsNone(member.relations()[2].source().parent())
+        self.assertEqual(
+            MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE),
+            member.object(),
+        )
+        self.assertEqual({member}, {self._domain().list_members(member_filter)[0]})
+        other = GenericDomain("other", DomainDTO.from_dict(self._dto()), self.client)
+        self.assertNotEqual(member, other.list_members(member_filter)[0])
         member.relations().clear()
         self.assertEqual(3, len(member.relations()))
         self._respond({"code": 0, "members": []})
@@ -471,10 +525,17 @@ class TestDomainClient(unittest.TestCase):
                     self.metalake.get_domain(self.NAME)
 
     def test_validation_before_http(self):
-        for name in (None, "", " "):
+        for name in (None, "", " ", ".", ".."):
             for operation in (
                 self.metalake.get_domain,
                 self.metalake.delete_domain,
+                lambda n: self.metalake.create_domain(
+                    n, None, None, TagValue("tag"), False
+                ),
+                lambda n: self._domain().create_subdomain(
+                    n, None, None, TagValue("tag"), False
+                ),
+                lambda n: self.metalake.alter_domain(self.NAME, DomainChange.rename(n)),
                 lambda n: self.metalake.alter_domain(n, DomainChange.rename("new")),
             ):
                 with self.subTest(name=name, operation=operation):
@@ -491,7 +552,6 @@ class TestDomainClient(unittest.TestCase):
             lambda: self.metalake.create_domain(
                 "name", None, {"key": None}, TagValue("tag"), False
             ),
-            lambda: self.metalake.alter_domain("name"),
             lambda: self.metalake.alter_domain("name", None),
             lambda: self.metalake.alter_domain("name", DomainChange.rename(" ")),
             lambda: self.metalake.alter_domain(
