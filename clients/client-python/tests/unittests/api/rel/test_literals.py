@@ -67,6 +67,14 @@ class TestLiterals(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Decimal precision must be in range"):
             Literals.decimal_literal(Decimal("1E+38"))
 
+    def test_decimal_literal_non_finite(self) -> None:
+        for text in ("NaN", "Infinity", "-Infinity"):
+            with self.subTest(value=text):
+                with self.assertRaisesRegex(
+                    ValueError, "Decimal literal must be a finite number"
+                ):
+                    Literals.decimal_literal(Decimal(text))
+
     def test_decimal_literal_retains_fractional_scale(self) -> None:
         for text, precision, scale in (("1E-3", 3, 3), ("123.40", 5, 2)):
             with self.subTest(value=text):
