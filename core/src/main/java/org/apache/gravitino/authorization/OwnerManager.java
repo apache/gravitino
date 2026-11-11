@@ -133,6 +133,57 @@ public class OwnerManager implements OwnerDispatcher {
   }
 
   @Override
+  public boolean supportsOwnerInitialization() {
+    return store.relationOperations().supportsOwnerInitialization();
+  }
+
+  @Override
+  public boolean initializeOwner(
+      String metalake,
+      MetadataObject metadataObject,
+      long expectedId,
+      String ownerName,
+      Owner.Type ownerType) {
+    Entity.EntityType principalType;
+    NameIdentifier principal;
+    if (ownerType == Owner.Type.USER) {
+      principalType = Entity.EntityType.USER;
+      principal = AuthorizationUtils.ofUser(metalake, ownerName);
+    } else if (ownerType == Owner.Type.GROUP) {
+      principalType = Entity.EntityType.GROUP;
+      principal = AuthorizationUtils.ofGroup(metalake, ownerName);
+    } else {
+      throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+    }
+    try {
+      boolean inserted =
+          store
+              .relationOperations()
+              .initializeOwner(
+                  MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+                  MetadataObjectUtil.toEntityType(metadataObject),
+                  expectedId,
+                  principal,
+                  principalType);
+      if (inserted) {
+        OwnerImpl newOwner = new OwnerImpl();
+        newOwner.name = ownerName;
+        newOwner.type = ownerType;
+        AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+            metalake, metadataObject, plugin -> plugin.onOwnerSet(metadataObject, null, newOwner));
+        notifyOwnerChange(null, metalake, metadataObject);
+      }
+      return inserted;
+    } catch (NoSuchEntityException e) {
+      throw new NotFoundException(
+          e, "Owner %s is not found while initializing %s", ownerName, metadataObject.fullName());
+    } catch (IOException e) {
+      throw new RuntimeException(
+          "Failed to initialize the owner of " + metadataObject.fullName(), e);
+    }
+  }
+
+  @Override
   public void setOwners(
       String metalake,
       List<MetadataObject> metadataObjects,

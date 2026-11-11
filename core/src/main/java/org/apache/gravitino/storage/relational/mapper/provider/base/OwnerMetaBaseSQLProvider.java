@@ -391,6 +391,19 @@ public class OwnerMetaBaseSQLProvider {
         + " ORDER BY updated_at DESC, id DESC LIMIT 1";
   }
 
+  /**
+   * Returns the current-read owner lookup used after locking the owned object.
+   *
+   * @param metadataObjectId the object ID
+   * @param metadataObjectType the object type
+   * @return the locking SQL query
+   */
+  public String selectOwnerByMetadataObjectIdAndTypeForUpdate(
+      long metadataObjectId, String metadataObjectType) {
+    return selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType)
+        + " FOR UPDATE";
+  }
+
   public String selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
       @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {

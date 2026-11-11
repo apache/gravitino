@@ -226,6 +226,14 @@ public class OwnerMetaSQLProviderFactory {
     return getProvider().selectOwnerByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 
+  /** Returns the current-read owner lookup used during insert-only initialization. */
+  public static String selectOwnerByMetadataObjectIdAndTypeForUpdate(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .selectOwnerByMetadataObjectIdAndTypeForUpdate(metadataObjectId, metadataObjectType);
+  }
+
   public static String selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
       @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId) {

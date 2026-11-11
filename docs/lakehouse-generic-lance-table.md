@@ -140,6 +140,18 @@ blob columns stored as `External(arrow_field_json_str)` keep that form instead o
 `External("lance.blob.legacy")`.
 :::
 
+### Ownership with `EXIST_OK`
+
+`lance.creation-mode=EXIST_OK` is supported by the Gravitino table creation API as well as Lance
+REST. If the table already exists, its owner is unchanged, including when it has no owner. If this
+request creates a new table, its effective caller becomes the owner when authorization is enabled.
+A concurrent request that returns the existing table does not initialize ownership. Ownership
+initialization is bound to the created table's ID and does not overwrite an owner assigned in the
+meantime or follow the name to a replacement table.
+
+Creation and owner initialization remain separate operations. If the server stops between them,
+the table can remain unowned; a later `EXIST_OK` request does not claim it.
+
 ### Table Properties
 
 Required and optional properties for tables in a Generic Lakehouse Catalog:
@@ -149,12 +161,12 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 | `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                  | (none)   | Yes          |
 | `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                          | (none)   | Conditional* |
 | `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge is rejected unless the catalog enables `lance.allow-external-table-purge`. For a non-external table, dropping will drop both.                                                                                 | false    | No           |
-| `lance.creation-mode` | Create mode: `CREATE` or `OVERWRITE`. `EXIST_OK` is not supported through the Gravitino API; use the Lance REST `exist_ok` mode, or load the table before creating it.                                                                                                                                                                   | `CREATE` | No           |
+| `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                            | `CREATE` | No           |
 | `lance.register`      | Whether it is a register table operation. If `true`, register an existing, readable Lance dataset without creating data. A missing dataset or plain directory is rejected. Registered tables are external. If `false`, create a dataset.                                                                                                 | false    | No           |
 | `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           |
 
 - `CREATE`: Create a new table, fail if the table already exists.
-- `EXIST_OK`: Rejected with `IllegalArgumentException`. Returning an existing table from `createTable` would make the caller its owner. The Lance REST `exist_ok` mode is still supported: it loads the table first and returns it unchanged if it exists.
+- `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
 - `OVERWRITE`: For creation (`lance.register=false`), purge the existing table and its dataset before creating a replacement. An existing external table requires the catalog to enable `lance.allow-external-table-purge`; otherwise the original metadata and data are retained. For registration (`lance.register=true`), validate the replacement dataset first and replace only external-table metadata, retaining the old dataset. Registration overwrite of a managed table is rejected; explicitly dropping or purging a managed table deletes its data.
 
 Registration validation checks dataset existence and readability, not an operator-defined storage scope or authorization to purge external data.
@@ -168,10 +180,9 @@ HTTP `400 INVALID_INPUT`; `tableExists` presents it as absent. These checks pres
 metadata and location.
 
 For create requests dispatched to the Lance table delegator, an existing non-Lance entity remains
-a normal name conflict for `CREATE` (`409`). Create `OVERWRITE` and register `OVERWRITE` are
-rejected with `IllegalArgumentException` by the direct Gravitino API, which is returned as HTTP
-`400` by the Lance REST service. The Lance REST `exist_ok` mode also returns HTTP `400` for an
-existing non-Lance entity. In particular, overwrite validation happens
+a normal name conflict for `CREATE` (`409`). `EXIST_OK`, create `OVERWRITE`, and register
+`OVERWRITE` are rejected with `IllegalArgumentException` by the direct Gravitino API, which is
+returned as HTTP `400` by the Lance REST service. In particular, overwrite validation happens
 before metadata removal or a Lance dataset delete. Generic Catalog `ListTables` behavior is
 unchanged; it continues to list all formats. Format-specific listing is a separate follow-up
 concern.

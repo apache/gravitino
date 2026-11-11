@@ -153,6 +153,22 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectId") long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  /**
+   * Reads the current owner while the caller holds the metadata object's write lock, including
+   * under repeatable-read isolation.
+   *
+   * @param metadataObjectId the object ID
+   * @param metadataObjectType the object type
+   * @return the active owner, or null if unowned
+   */
+  @Nullable
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectOwnerByMetadataObjectIdAndTypeForUpdate")
+  OwnerInfo selectOwnerByMetadataObjectIdAndTypeForUpdate(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
   @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
   List<ChangedOwnerInfo> selectChangedOwners(
       @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,

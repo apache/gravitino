@@ -414,9 +414,10 @@ Schema owners additionally need `USE_CATALOG`, and table owners need `USE_CATALO
 `CREATE_TABLE` and `PROBE_TABLE_LIKE` authorize `TableExists` without authorizing
 `DescribeTable`. `CREATE_TABLE` alone does not authorize overwrite requests. The `DropTable`
 and `DeregisterTable` endpoints require ownership rather than `MODIFY_TABLE`. Similarly, namespace creation privileges do not authorize
-overwriting or dropping another owner's namespace. Successful creation assigns ownership to
-the effective caller. An `exist_ok` request for a table that already exists returns that table
-and does not change its owner.
+overwriting or dropping another owner's namespace. Creating a new table assigns ownership to
+the effective caller. `exist_ok` returning an existing table preserves its owner, even if no owner
+has been assigned. This also applies to direct Gravitino table creation with
+`lance.creation-mode=EXIST_OK`.
 
 ### Listings and concealed objects
 

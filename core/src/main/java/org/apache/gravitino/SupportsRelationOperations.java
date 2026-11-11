@@ -188,6 +188,40 @@ public interface SupportsRelationOperations {
       throws IOException;
 
   /**
+   * Whether this store supports atomic, identity-bound owner initialization. Check before creating
+   * the owned object: an unconditional relation insert is not a safe compatibility fallback.
+   *
+   * @return true if {@link #initializeOwner} is implemented
+   */
+  default boolean supportsOwnerInitialization() {
+    return false;
+  }
+
+  /**
+   * Inserts the first owner only while the expected source object is active and still unowned. The
+   * identity check and insert must be serialized with owner assignments and object deletion.
+   *
+   * @param srcIdentifier the source object's name
+   * @param srcType the source object's type
+   * @param expectedId the source ID returned by creation, never an ID resolved solely by name here
+   * @param dstIdentifier the owner principal's name
+   * @param dstType USER or GROUP
+   * @return true if inserted; false for an existing owner or a deleted/replaced source
+   * @throws NoSuchEntityException if the owner principal does not exist
+   * @throws IOException if persistence fails
+   * @throws UnsupportedOperationException if initialization is unsupported
+   */
+  default boolean initializeOwner(
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      long expectedId,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType)
+      throws IOException {
+    throw new UnsupportedOperationException("Identity-bound owner initialization is unsupported");
+  }
+
+  /**
    * Batch inserts the same relation from many source entities to one destination. Parameter order
    * matches {@link #insertRelation}. All sources share one {@code srcType}. Semantics match
    * repeated {@link #insertRelation} with the same {@code relType}; a relational backend may use

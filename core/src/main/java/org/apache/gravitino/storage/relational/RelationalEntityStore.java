@@ -479,6 +479,34 @@ public class RelationalEntityStore
   }
 
   @Override
+  public boolean supportsOwnerInitialization() {
+    return backend.supportsOwnerInitialization();
+  }
+
+  @Override
+  public boolean initializeOwner(
+      NameIdentifier srcIdentifier,
+      Entity.EntityType srcType,
+      long expectedId,
+      NameIdentifier dstIdentifier,
+      Entity.EntityType dstType)
+      throws IOException {
+    boolean inserted;
+    try {
+      inserted =
+          backend.initializeOwner(srcIdentifier, srcType, expectedId, dstIdentifier, dstType);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, String.format("The initial owner of %s %s", srcType, srcIdentifier));
+    }
+    if (inserted) {
+      invalidateCache(srcIdentifier, srcType);
+      invalidateCache(dstIdentifier, dstType);
+    }
+    return inserted;
+  }
+
+  @Override
   public void batchInsertRelations(
       Type relType,
       List<NameIdentifier> srcIdentifiers,

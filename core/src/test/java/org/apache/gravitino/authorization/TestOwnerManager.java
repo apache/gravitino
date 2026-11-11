@@ -432,6 +432,39 @@ public class TestOwnerManager {
     Assertions.assertFalse(thrown instanceof NoSuchMetadataObjectException);
   }
 
+  @Test
+  @Order(10)
+  public void testInitializeOwnerPreservesOwnersAndNotifiesOnlyOnInsert() throws Exception {
+    MetadataObject object = createCatalog("catalog_owner_initialization");
+    NameIdentifier ident = NameIdentifier.of(METALAKE, object.name());
+    long id = entityStore.get(ident, Entity.EntityType.CATALOG, CatalogEntity.class).id();
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    GravitinoAuthorizer original = GravitinoEnv.getInstance().gravitinoAuthorizer();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", authorizer, true);
+    Mockito.clearInvocations(authorizationPlugin);
+    try {
+      Assertions.assertTrue(ownerManager.supportsOwnerInitialization());
+      Assertions.assertTrue(
+          ownerManager.initializeOwner(METALAKE, object, id, USER, Owner.Type.USER));
+      Assertions.assertFalse(
+          ownerManager.initializeOwner(METALAKE, object, id, USER, Owner.Type.USER));
+      Assertions.assertFalse(
+          ownerManager.initializeOwner(METALAKE, object, id, GROUP, Owner.Type.GROUP));
+      Assertions.assertEquals(USER, ownerManager.getOwner(METALAKE, object).orElseThrow().name());
+      Mockito.verify(authorizationPlugin)
+          .onOwnerSet(Mockito.eq(object), Mockito.isNull(), Mockito.any());
+      Mockito.verify(authorizer)
+          .handleMetadataOwnerChange(
+              Mockito.eq(METALAKE),
+              Mockito.isNull(),
+              Mockito.eq(ident),
+              Mockito.eq(Entity.EntityType.CATALOG));
+      Mockito.verifyNoMoreInteractions(authorizationPlugin, authorizer);
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", original, true);
+    }
+  }
+
   private static EntityStore storeFailingOwnerInsert() throws IOException {
     EntityStore store =
         Mockito.mock(

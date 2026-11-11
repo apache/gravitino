@@ -790,7 +790,19 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      // ManagedTableOperations persists the server-issued ID on insertion and preserves the old
+      // ID when returning an existing table. Inspect the unmasked snapshot: the public properties
+      // omit this reserved identifier. Do not infer creation from the presence of an owner.
+      StringIdentifier persistedId = StringIdentifier.fromProperties(table.properties());
+      Preconditions.checkState(
+          persistedId != null,
+          "Managed table %s did not return its persisted identifier after create",
+          ident);
+      EntityCombinedTable result =
+          EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      return persistedId.id() == catalogResult.id
+          ? result.withCreatedTableId(catalogResult.id)
+          : result;
     }
 
     AuditInfo audit =
@@ -831,6 +843,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
+        .withCreatedTableId(tableEntity.id())
         .withHiddenProperties(catalogResult.hiddenProperties);
   }
 

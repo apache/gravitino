@@ -45,6 +45,7 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
@@ -350,6 +351,52 @@ public class LanceTableAuthorizationIT extends BaseIT {
             .orElseThrow();
     Assertions.assertEquals(PROBER, owner.name());
     assertStatus(200, table(PROBER, WRITE_SCHEMA, EXIST_OK_NEW_TABLE, "describe"));
+  }
+
+  @Test
+  public void testNativeExistOkKeepsExistingOwnerAndInitializesNewTable() throws Exception {
+    try (GravitinoAdminClient prober =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth(PROBER).build()) {
+      GravitinoMetalake metalake = prober.loadMetalake(getLanceRESTServerMetalakeName());
+      Catalog catalog = metalake.loadCatalog(CATALOG);
+      Map<String, String> properties =
+          Map.of(
+              Table.PROPERTY_TABLE_FORMAT, "lance",
+              Table.PROPERTY_LOCATION, location("native_exist_ok"),
+              LanceConstants.LANCE_CREATION_MODE, "EXIST_OK",
+              LanceConstants.LANCE_TABLE_DECLARED, "true");
+      Table existing =
+          catalog
+              .asTableCatalog()
+              .createTable(
+                  NameIdentifier.of(WRITE_SCHEMA, EXIST_OK_TABLE), new Column[0], null, properties);
+      Assertions.assertEquals(
+          location(EXIST_OK_TABLE), existing.properties().get(Table.PROPERTY_LOCATION));
+      MetadataObject existingObject =
+          MetadataObjects.of(
+              List.of(CATALOG, WRITE_SCHEMA, EXIST_OK_TABLE), MetadataObject.Type.TABLE);
+      Assertions.assertEquals(
+          ADMIN,
+          client
+              .loadMetalake(getLanceRESTServerMetalakeName())
+              .getOwner(existingObject)
+              .orElseThrow()
+              .name());
+      assertStatus(403, table(PROBER, WRITE_SCHEMA, EXIST_OK_TABLE, "drop"));
+
+      String newTable = "native_exist_ok_new";
+      catalog
+          .asTableCatalog()
+          .createTable(NameIdentifier.of(WRITE_SCHEMA, newTable), new Column[0], null, properties);
+      MetadataObject newObject =
+          MetadataObjects.of(List.of(CATALOG, WRITE_SCHEMA, newTable), MetadataObject.Type.TABLE);
+      Assertions.assertEquals(PROBER, metalake.getOwner(newObject).orElseThrow().name());
+      // The same owner can repeat the request too; EXIST_OK does not become an ownership check.
+      catalog
+          .asTableCatalog()
+          .createTable(NameIdentifier.of(WRITE_SCHEMA, newTable), new Column[0], null, properties);
+      Assertions.assertEquals(PROBER, metalake.getOwner(newObject).orElseThrow().name());
+    }
   }
 
   @Test

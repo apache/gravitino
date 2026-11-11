@@ -31,6 +31,21 @@ import org.junit.jupiter.api.Test;
 public class TestSupportsRelationOperations {
 
   @Test
+  public void testOwnerInitializationHasNoUnsafeDefaultFallback() {
+    SupportsRelationOperations operations = new RecordingRelationOperations();
+    Assertions.assertFalse(operations.supportsOwnerInitialization());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            operations.initializeOwner(
+                NameIdentifier.of("metalake", "catalog", "schema", "table"),
+                Entity.EntityType.TABLE,
+                1L,
+                NameIdentifier.of("metalake", "user"),
+                Entity.EntityType.USER));
+  }
+
+  @Test
   public void testRelationOperationsDoesNotExposeTagSpecificMethods() {
     Set<String> methodNames =
         Arrays.stream(SupportsRelationOperations.class.getDeclaredMethods())

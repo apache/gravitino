@@ -250,10 +250,10 @@ complete record of the locations it handed out.
   the metadata write then fails. Everything the catalog can check on its own -- the table format is
   given, the format is supported -- is checked before the provider is consulted, so the cases that
   remain are the ones only the table format can detect.
-- A location that is provisioned but then not used is not handed back either. A table format
-  whose create returns a table that already exists, at the location it already has, leaves the
-  location provisioned for that call unused; a client retrying a create is the ordinary way to
-  reach it. Detecting that from the catalog would mean comparing two location strings and
+- A location that is provisioned but then not used is not handed back either. A creation mode such
+  as Lance's `EXIST_OK` returns the table that already exists, at the location it already has, and
+  the location provisioned for that call goes nowhere; a client retrying a create is the ordinary
+  way to reach it. Detecting that from the catalog would mean comparing two location strings and
   concluding from the comparison what a provider did internally, which is exactly the inference this
   interface leaves to the provider, so an allocating provider reconciles these along with the
   failures above.

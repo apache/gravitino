@@ -69,6 +69,37 @@ public interface OwnerDispatcher {
   }
 
   /**
+   * Whether identity-bound, insert-only owner initialization is supported. Create hooks must check
+   * this before creating an object; there is no safe fallback to {@link #setOwner}.
+   *
+   * @return true if {@link #initializeOwner} is implemented
+   */
+  default boolean supportsOwnerInitialization() {
+    return false;
+  }
+
+  /**
+   * Initializes ownership of a newly created metadata object without replacing an existing owner.
+   * Callers must only pass objects actually created by their request.
+   *
+   * @param metalake the metalake name
+   * @param metadataObject the object name and type
+   * @param expectedId the persistent identity returned by creation
+   * @param ownerName the initial owner name
+   * @param ownerType the initial owner type
+   * @return true if inserted; false if already owned, deleted or replaced by a different identity
+   * @throws UnsupportedOperationException if initialization is unsupported
+   */
+  default boolean initializeOwner(
+      String metalake,
+      MetadataObject metadataObject,
+      long expectedId,
+      String ownerName,
+      Owner.Type ownerType) {
+    throw new UnsupportedOperationException("Identity-bound owner initialization is unsupported");
+  }
+
+  /**
    * Retrieves the owner of a metadata object.
    *
    * @param metalake the name of the metalake

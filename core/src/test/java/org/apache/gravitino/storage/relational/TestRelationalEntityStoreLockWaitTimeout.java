@@ -308,6 +308,15 @@ public class TestRelationalEntityStoreLockWaitTimeout {
                     Entity.EntityType.USER,
                     true)),
         Pair.of(
+            "initializeOwner",
+            () ->
+                store.initializeOwner(
+                    TABLE_IDENT,
+                    Entity.EntityType.TABLE,
+                    1L,
+                    NameIdentifier.of(METALAKE, "user1"),
+                    Entity.EntityType.USER)),
+        Pair.of(
             "batchInsertRelations",
             () ->
                 store.batchInsertRelations(

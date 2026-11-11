@@ -846,7 +846,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
-  public void testCreateTableRejectsExistOkMode() {
+  public void testCreateTableWithExistOkMode() {
     // Create initial table
     Column[] columns =
         new Column[] {
@@ -883,27 +883,23 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     existOkProperties.put(LANCE_CREATION_MODE, "EXIST_OK");
     existOkProperties.put(Table.PROPERTY_EXTERNAL, "true");
 
-    // EXIST_OK is rejected through the Gravitino API: returning an existing table from
-    // createTable would make the caller its owner. Only Lance REST supports exist_ok.
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        tableIdentifier,
-                        columns,
-                        TABLE_COMMENT,
-                        existOkProperties,
-                        Transforms.EMPTY_TRANSFORM,
-                        Distributions.NONE,
-                        new SortOrder[0]));
-    Assertions.assertTrue(exception.getMessage().contains("EXIST_OK is not supported"));
+    Table existingTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                columns,
+                TABLE_COMMENT,
+                existOkProperties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
 
-    // The existing table and its dataset are unchanged
-    Table loadedTable = catalog.asTableCatalog().loadTable(tableIdentifier);
-    Assertions.assertEquals(createdTable.name(), loadedTable.name());
+    // Should return the existing table without error
+    Assertions.assertNotNull(existingTable);
+    Assertions.assertEquals(createdTable.name(), existingTable.name());
+
+    // Verify the table exists on disk
     File tableDir = new File(location);
     Assertions.assertTrue(tableDir.exists());
   }
@@ -1087,7 +1083,8 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     existOkProperties.put(Table.PROPERTY_EXTERNAL, "true");
     existOkProperties.put(LANCE_CREATION_MODE, "EXIST_OK");
 
-    // EXIST_OK is rejected for registration too.
+    // Throw an exception for registering the table with EXIST_OK mode, since register operation
+    // doesn't support EXIST_OK mode currently.
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
