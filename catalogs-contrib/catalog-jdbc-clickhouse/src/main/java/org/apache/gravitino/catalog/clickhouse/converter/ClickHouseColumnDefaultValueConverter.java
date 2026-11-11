@@ -24,7 +24,6 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP
 import com.google.common.base.Preconditions;
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
@@ -56,8 +55,19 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
 
   /**
    * Checks that a literal default value fits the column type. ClickHouse does not validate DEFAULT
-   * literals when a table is created or altered, so an invalid value would otherwise be accepted
-   * and only fail on insert. Non-literal and NULL defaults are not checked.
+   * literals when a table is created or altered, and silently wraps or clamps out-of-range values
+   * on insert. Only the following column types are checked:
+   *
+   * <ul>
+   *   <li>Integer types (signed and unsigned): the value, truncated toward zero as ClickHouse does,
+   *       must be within the type range.
+   *   <li>Decimal: the value, with excess fractional digits discarded as ClickHouse does, must fit
+   *       the precision.
+   *   <li>Date: the value must be a {@code yyyy-MM-dd} date between 1970-01-01 and 2149-06-06.
+   *   <li>UUID: the value must be a valid UUID string.
+   * </ul>
+   *
+   * <p>Other column types, and non-literal or NULL defaults, are not checked.
    *
    * @param columnType the Gravitino type of the column
    * @param defaultValue the default value of the column
@@ -223,10 +233,12 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       } else if (columnType instanceof Types.LongType longType) {
         checkIntegralRange(value, 64, longType.signed(), columnType);
       } else if (columnType instanceof Types.DecimalType decimalType) {
-        BigDecimal rounded =
-            new BigDecimal(value).setScale(decimalType.scale(), RoundingMode.HALF_UP);
+        // ClickHouse discards excess fractional digits, so the value fits as long as its integer
+        // part has at most (precision - scale) digits.
+        BigDecimal limit =
+            BigDecimal.ONE.scaleByPowerOfTen(decimalType.precision() - decimalType.scale());
         Preconditions.checkArgument(
-            rounded.precision() <= decimalType.precision(),
+            new BigDecimal(value).abs().compareTo(limit) < 0,
             "Default value %s is out of range for column type %s",
             value,
             columnType.simpleString());
@@ -253,14 +265,17 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
   }
 
   private static void checkIntegralRange(String value, int bits, boolean signed, Type columnType) {
-    BigInteger number = new BigInteger(value);
     BigInteger min = signed ? BigInteger.ONE.shiftLeft(bits - 1).negate() : BigInteger.ZERO;
     BigInteger max =
         signed
             ? BigInteger.ONE.shiftLeft(bits - 1).subtract(BigInteger.ONE)
             : BigInteger.ONE.shiftLeft(bits).subtract(BigInteger.ONE);
+    // ClickHouse converts a fractional or exponent literal to an integer by truncating toward
+    // zero (1.9 becomes 1, 1e3 becomes 1000), so the value fits when min - 1 < value < max + 1.
+    BigDecimal number = new BigDecimal(value);
     Preconditions.checkArgument(
-        number.compareTo(min) >= 0 && number.compareTo(max) <= 0,
+        number.compareTo(new BigDecimal(min.subtract(BigInteger.ONE))) > 0
+            && number.compareTo(new BigDecimal(max.add(BigInteger.ONE))) < 0,
         "Default value %s is out of range for column type %s, valid range is [%s, %s]",
         value,
         columnType.simpleString(),

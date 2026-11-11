@@ -25,6 +25,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -265,6 +266,67 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                     new String[] {"c_invalid"},
                     Types.ByteType.get(),
                     Literals.of("128", Types.ByteType.get()))));
+  }
+
+  @Test
+  public void testNumericDefaultValueTruncationOnClickHouse() throws Exception {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_num_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("dec_col")
+          .withType(Types.DecimalType.of(3, 2))
+          .withNullable(false)
+          .withDefaultValue(Literals.decimalLiteral(Decimal.of("9.995")))
+          .build(),
+      JdbcColumn.builder()
+          .withName("int_col")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.doubleLiteral(1.9))
+          .build(),
+      JdbcColumn.builder()
+          .withName("byte_col")
+          .withType(Types.ByteType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.of("-128.9", Types.ByteType.get()))
+          .build()
+    };
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection conn =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO `%s`.`%s` (id) VALUES (1)".formatted(TEST_DB_NAME.toString(), tableName));
+      try (ResultSet rs =
+          stmt.executeQuery(
+              "SELECT toString(dec_col), int_col, byte_col FROM `%s`.`%s`"
+                  .formatted(TEST_DB_NAME.toString(), tableName))) {
+        Assertions.assertTrue(rs.next());
+        Assertions.assertEquals("9.99", rs.getString(1));
+        Assertions.assertEquals(1, rs.getInt(2));
+        Assertions.assertEquals(-128, rs.getInt(3));
+      }
+    }
   }
 
   @Test

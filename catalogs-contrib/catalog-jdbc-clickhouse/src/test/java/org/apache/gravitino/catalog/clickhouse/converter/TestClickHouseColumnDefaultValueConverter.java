@@ -23,6 +23,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -84,12 +85,36 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertAccepted(Types.DateType.get(), "1970-01-01");
     assertAccepted(Types.DateType.get(), "2149-06-06");
     assertAccepted(Types.UUIDType.get(), "61f0c404-5cb3-11e7-907b-a6006ad3dba0");
-    assertAccepted(Types.DecimalType.of(3, 2), "9.994");
     assertAccepted(Types.DecimalType.of(3, 2), "-9.99");
+    // ClickHouse discards excess fractional digits and truncates integers toward zero.
+    assertAccepted(Types.DecimalType.of(3, 2), "9.995");
+    assertAccepted(Types.DecimalType.of(3, 2), "-9.999");
+    assertAccepted(Types.DecimalType.of(3, 2), "1e0");
+    assertAccepted(Types.IntegerType.get(), "1.0");
+    assertAccepted(Types.IntegerType.get(), "-1.9");
+    assertAccepted(Types.IntegerType.get(), "1e3");
+    assertAccepted(Types.IntegerType.get(), "2147483647.5");
+    assertAccepted(Types.IntegerType.get(), "-2147483648.9");
+    assertAccepted(Types.ByteType.get(), "127.9");
+    assertAccepted(Types.ByteType.unsigned(), "-0.5");
+    assertAccepted(Types.UUIDType.get(), "61F0C404-5CB3-11E7-907B-A6006AD3DBA0");
     // Callers may wrap the value in single quotes.
     assertAccepted(Types.DateType.get(), "'2024-01-01'");
     assertAccepted(Types.UUIDType.get(), "'61f0c404-5cb3-11e7-907b-a6006ad3dba0'");
     assertAccepted(Types.IntegerType.get(), "'5'");
+  }
+
+  @Test
+  void testTypedLiteralDefaultValues() {
+    Assertions.assertDoesNotThrow(
+        () ->
+            CONVERTER.checkDefaultValue(
+                Types.DecimalType.of(3, 2), Literals.decimalLiteral(Decimal.of("9.995"))));
+    Assertions.assertDoesNotThrow(
+        () -> CONVERTER.checkDefaultValue(Types.IntegerType.get(), Literals.doubleLiteral(1.0)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CONVERTER.checkDefaultValue(Types.ByteType.get(), Literals.integerLiteral(128)));
   }
 
   @Test
@@ -120,7 +145,13 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertRejected(Types.LongType.get(), "9223372036854775808");
     assertRejected(Types.IntegerType.get(), "abc");
     assertRejected(Types.DecimalType.of(3, 2), "99.999");
-    assertRejected(Types.DecimalType.of(3, 2), "9.995");
+    assertRejected(Types.DecimalType.of(3, 2), "10");
+    assertRejected(Types.DecimalType.of(3, 2), "-10.001");
+    assertRejected(Types.DecimalType.of(3, 2), "1e999999999");
+    assertRejected(Types.IntegerType.get(), "2147483648.0");
+    assertRejected(Types.IntegerType.get(), "-2147483649");
+    assertRejected(Types.IntegerType.get(), "1e999999999");
+    assertRejected(Types.ByteType.unsigned(), "-1.0");
     assertRejected(Types.DateType.get(), "'2150-01-01'");
     assertRejected(Types.DateType.get(), "1969-12-31");
     assertRejected(Types.DateType.get(), "2150-01-01");
