@@ -20,6 +20,7 @@ package org.apache.gravitino.hook;
 
 import java.util.Map;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
@@ -62,11 +63,21 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   public Metalake createMetalake(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws MetalakeAlreadyExistsException {
+    AccessControlDispatcher accessControlDispatcher =
+        GravitinoEnv.getInstance().internalAccessControlDispatcher();
+    if (accessControlDispatcher != null) {
+      // The creator is added as a user only after the metalake is committed, so check the name
+      // fits the user name column first.
+      EntityFieldLimits.checkMaxLength(
+          PrincipalUtils.getCurrentUserName(),
+          EntityFieldLimits.MAX_NAME_LENGTH,
+          "name",
+          Entity.EntityType.USER);
+    }
+
     Metalake metalake = dispatcher.createMetalake(ident, comment, properties);
 
     // Add the creator to the metalake.
-    AccessControlDispatcher accessControlDispatcher =
-        GravitinoEnv.getInstance().internalAccessControlDispatcher();
     if (accessControlDispatcher != null) {
       accessControlDispatcher.addUser(ident.name(), PrincipalUtils.getCurrentUserName());
     }

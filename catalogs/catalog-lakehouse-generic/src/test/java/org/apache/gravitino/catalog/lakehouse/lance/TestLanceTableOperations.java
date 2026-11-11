@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
@@ -44,10 +45,12 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
@@ -165,7 +168,7 @@ public class TestLanceTableOperations {
     }
   }
 
-  /** Legacy registration flags also protect drop and overwrite, while purge remains destructive. */
+  /** Legacy registrations retain their data unless the catalog explicitly permits purging it. */
   @ParameterizedTest
   @CsvSource(
       value = {
@@ -230,17 +233,111 @@ public class TestLanceTableOperations {
                       new Index[0]));
       Assertions.assertEquals("true", replaced.properties().get(Table.PROPERTY_EXTERNAL));
     } else if ("purge".equals(operation)) {
-      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
     } else {
       Assertions.assertTrue(lanceTableOps.dropTable(ident));
     }
-    verify(store).delete(ident, Entity.EntityType.TABLE);
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
-    } else {
+    verify(store, Mockito.times("purge".equals(operation) ? 0 : 1))
+        .delete(ident, Entity.EntityType.TABLE);
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      value = {"true,NULL", "true,false", "true,true", "false,NULL", "false,false", "false,true"},
+      nullValues = "NULL")
+  void testPurgeRequiresCatalogPermissionForExternalData(boolean external, String catalogPermission)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "purge_policy");
+    String location = tempDir.resolve("purge_policy").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // Purge must preserve both a real dataset and its metadata when the policy rejects it.
+    }
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_EXTERNAL,
+            Boolean.toString(external),
+            LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+            "true");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity(ident, List.of(), properties));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    if (catalogPermission != null) {
+      lanceTableOps.setCatalogProperties(
+          Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, catalogPermission));
+    }
+
+    if (external && !Boolean.parseBoolean(catalogPermission)) {
+      UnsupportedOperationException error =
+          Assertions.assertThrowsExactly(
+              UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+      Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+      verify(store, never()).delete(any(), any());
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
       }
+    } else {
+      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      verify(store).delete(ident, Entity.EntityType.TABLE);
+      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
+    }
+  }
+
+  @Test
+  void testOverwriteCannotPurgeExternalDataWithoutCatalogPermission() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "protected_table");
+    String location = tempDir.resolve("protected_table").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // The existing external dataset is not owned by this overwrite request.
+    }
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    Table.PROPERTY_EXTERNAL,
+                    "true")));
+    String replacement = tempDir.resolve("replacement").toString();
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    replacement,
+                    LANCE_CREATION_MODE,
+                    "OVERWRITE",
+                    LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                    "true"),
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+    verify(store, never()).delete(any(), any());
+    verify(store, never()).put(any(), anyBoolean());
+    Assertions.assertFalse(Files.exists(Paths.get(replacement)));
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 
@@ -969,6 +1066,8 @@ public class TestLanceTableOperations {
             });
 
     Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))));
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(9L);
@@ -1148,12 +1247,189 @@ public class TestLanceTableOperations {
     verify(dataset, never()).alterColumns(anyList());
   }
 
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "rename",
+        "addThenRename",
+        "renameThenRename",
+        "addThenDeleteMissing",
+        "deleteTwice",
+        "deleteMissingDefault"
+      })
+  void testInvalidColumnNamesRejectWholeRequest(String path) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "conflict");
+    String location = tempDir.resolve("conflict").toString();
+    Column[] columns = {
+      Column.of("id", Types.LongType.get()), Column.of("name", Types.StringType.get())
+    };
+    long version;
+    try (Dataset dataset = lanceTableOps.createDataset(location, columns, Map.of())) {
+      version = dataset.getVersion().getId();
+    }
+    List<ColumnEntity> storedColumns = new ArrayList<>();
+    for (int i = 0; i < columns.length; i++) {
+      storedColumns.add(
+          ColumnEntity.builder()
+              .withId(10L + i)
+              .withName(columns[i].name())
+              .withDataType(columns[i].dataType())
+              .withPosition(i)
+              .withNullable(true)
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build());
+    }
+    TableEntity entity =
+        tableEntity(
+            ident,
+            storedColumns,
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                String.valueOf(version)));
+    when(store.get(ident, Entity.EntityType.TABLE, TableEntity.class)).thenReturn(entity);
+    TableChange rename = TableChange.renameColumn(new String[] {"id"}, "name");
+    TableChange[] changes =
+        switch (path) {
+          case "addThenRename" -> new TableChange[] {
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get()), rename
+          };
+          case "renameThenRename" -> new TableChange[] {
+            TableChange.renameColumn(new String[] {"id"}, "extra"),
+            TableChange.renameColumn(new String[] {"extra"}, "name")
+          };
+          case "addThenDeleteMissing" -> new TableChange[] {
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get()),
+            TableChange.deleteColumn(new String[] {"missing"}, false)
+          };
+          case "deleteTwice" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"id"}, false),
+            TableChange.deleteColumn(new String[] {"id"}, false)
+          };
+          case "deleteMissingDefault" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"missing"}, null)
+          };
+          default -> new TableChange[] {rename};
+        };
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> lanceTableOps.alterTable(ident, changes));
+    String invalidName =
+        switch (path) {
+          case "addThenDeleteMissing", "deleteMissingDefault" -> "missing";
+          case "deleteTwice" -> "id";
+          default -> "name";
+        };
+    Assertions.assertTrue(error.getMessage().contains(invalidName));
+    verify(store, never())
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+    try (Dataset dataset = lanceTableOps.openDataset(location)) {
+      Assertions.assertEquals(version, dataset.getVersion().getId());
+      Assertions.assertEquals(
+          List.of("id", "name"),
+          dataset.getSchema().getFields().stream()
+              .map(Field::getName)
+              .collect(Collectors.toList()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testColumnNamesCanBeReusedAfterEarlierChanges(boolean drop) {
+    String location = tempDir.resolve("reuse").toString();
+    Column[] columns = {
+      Column.of("id", Types.LongType.get()), Column.of("name", Types.StringType.get())
+    };
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // Use real Lance mutations to verify that preflight follows the request order.
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+    TableChange[] changes =
+        drop
+            ? new TableChange[] {
+              TableChange.deleteColumn(new String[] {"name"}, false),
+              TableChange.renameColumn(new String[] {"id"}, "name")
+            }
+            : new TableChange[] {
+              TableChange.renameColumn(new String[] {"id"}, "new"),
+              TableChange.renameColumn(new String[] {"name"}, "id")
+            };
+    lanceTableOps.handleLanceTableChange(table, changes);
+    try (Dataset dataset = lanceTableOps.openDataset(location)) {
+      Assertions.assertEquals(
+          drop ? List.of("name") : List.of("new", "id"),
+          dataset.getSchema().getFields().stream()
+              .map(Field::getName)
+              .collect(Collectors.toList()));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"alone", "twice", "thenAdd", "addThenDrop"})
+  void testOptionalDeletesRespectRequestOrder(String path) {
+    String location = tempDir.resolve("optional-delete").toString();
+    Column[] columns = {
+      Column.of("id", Types.LongType.get()), Column.of("name", Types.StringType.get())
+    };
+    long version;
+    try (Dataset dataset = lanceTableOps.createDataset(location, columns, Map.of())) {
+      version = dataset.getVersion().getId();
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+    TableChange[] changes =
+        switch (path) {
+          case "twice" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"name"}, false),
+            TableChange.deleteColumn(new String[] {"name"}, true)
+          };
+          case "thenAdd" -> new TableChange[] {
+            TableChange.deleteColumn(new String[] {"extra"}, true),
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get())
+          };
+          case "addThenDrop" -> new TableChange[] {
+            TableChange.addColumn(new String[] {"extra"}, Types.StringType.get()),
+            TableChange.deleteColumn(new String[] {"extra"}, true)
+          };
+          default -> new TableChange[] {TableChange.deleteColumn(new String[] {"missing"}, true)};
+        };
+    long result = lanceTableOps.handleLanceTableChange(table, changes);
+    if (path.equals("alone")) {
+      Assertions.assertEquals(version, result);
+    } else {
+      Assertions.assertTrue(result > version);
+    }
+    try (Dataset dataset = lanceTableOps.openDataset(location)) {
+      List<String> expected =
+          switch (path) {
+            case "twice" -> List.of("id");
+            case "thenAdd" -> List.of("id", "name", "extra");
+            default -> List.of("id", "name");
+          };
+      Assertions.assertEquals(
+          expected,
+          dataset.getSchema().getFields().stream()
+              .map(Field::getName)
+              .collect(Collectors.toList()));
+    }
+  }
+
   @Test
   public void testHandleLanceTableChangeRespectsOrder() {
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
 
     Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("old", new ArrowType.Utf8()),
+                    Field.nullable("col1", new ArrowType.Utf8()))));
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(7L);
@@ -1195,6 +1471,12 @@ public class TestLanceTableOperations {
                 "table-key"));
 
     Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("old", new ArrowType.Utf8()),
+                    Field.nullable("col1", new ArrowType.Utf8()))));
     Version version = mock(Version.class);
     when(dataset.getVersion()).thenReturn(version);
     when(version.getId()).thenReturn(9L);

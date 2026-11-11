@@ -74,10 +74,12 @@ import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
+import org.apache.iceberg.exceptions.ValidationException;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
@@ -472,6 +474,8 @@ public class IcebergCatalogOperations
       LoadTableResponse loadTableResponse = backend.wrapper().updateTable(icebergTableChange);
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
+    } catch (ValidationException e) {
+      throw new IllegalArgumentException(e.getMessage(), e);
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
@@ -488,8 +492,8 @@ public class IcebergCatalogOperations
    */
   private Table renameTable(NameIdentifier tableIdent, TableChange.RenameTable renameTable)
       throws NoSuchTableException, IllegalArgumentException {
+    Namespace destNamespace = tableIdent.namespace();
     try {
-      Namespace destNamespace = tableIdent.namespace();
       if (renameTable.getNewSchemaName().isPresent()) {
         String[] namespaceLevels = tableIdent.namespace().levels();
         String[] destLevels = Arrays.copyOf(namespaceLevels, namespaceLevels.length);
@@ -511,6 +515,11 @@ public class IcebergCatalogOperations
       backend.wrapper().renameTable(renameTableRequest);
       return loadTable(
           NameIdentifier.of(ArrayUtils.add(destNamespace.levels(), renameTable.getNewName())));
+    } catch (AlreadyExistsException e) {
+      throw new TableAlreadyExistsException(
+          e,
+          "Table already exists: %s",
+          NameIdentifier.of(destNamespace, renameTable.getNewName()));
     } catch (org.apache.iceberg.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(e, ICEBERG_TABLE_DOES_NOT_EXIST_MSG, tableIdent.name());
     }
@@ -561,6 +570,12 @@ public class IcebergCatalogOperations
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     Preconditions.checkArgument(indexes.length == 0, "Iceberg-catalog does not support indexes");
+    for (Column column : columns) {
+      Preconditions.checkArgument(
+          !column.autoIncrement(),
+          "Iceberg does not support auto-increment column: %s",
+          column.name());
+    }
     try {
       NameIdentifier schemaIdent = NameIdentifier.of(tableIdent.namespace().levels());
       if (!schemaExists(schemaIdent)) {
@@ -614,6 +629,8 @@ public class IcebergCatalogOperations
       return createdTable;
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
+    } catch (ValidationException | BadRequestException e) {
+      throw new IllegalArgumentException(e.getMessage(), e);
     }
   }
 

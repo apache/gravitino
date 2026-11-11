@@ -75,7 +75,25 @@ spark.hadoop.fs.defaultFS=file:///
 `spark.jars` in `spark_conf` replaces a `spark.jars` default of the k8s job executor, so if that
 default provides the Iceberg runtime, list it in `spark_conf` as well.
 
-**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino endpoint needs `auth_type` / `username` / `password` (or OAuth client-credentials fields) in `updater_options` for `builtin-iceberg-update-stats`. A secured Iceberg REST catalog needs `rest.auth.*` in `spark-conf` for any built-in job that reads the table. See [Configuration](./optimizer-configuration.md).
+**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino
+endpoint needs the optimizer Gravitino client auth (`none` / `simple` / `basic` / `oauth`) in CLI
+conf and/or short names in `updater_options`. A secured Iceberg REST catalog needs `rest.auth.*` in
+`spark-conf` for any built-in job that reads the table. Object-store writes also need
+`spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials`. See
+[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats) and
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
+
+**`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)
+URI. For REST catalogs use the Gravitino **catalog name** instead.
+
+**Direct rewrite `runJob` returns HTTP 400 listing missing keys** — `where_clause` has no template
+default; pass `""` to rewrite the whole table. Shared catalog keys
+(`catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location`) are also
+required. `strategy` / `sort_order` / `options` have defaults when omitted.
+
+**Rewrite succeeds with `Rewritten data files: 0`** — Iceberg's default `min-input-files` is 5.
+One small file per partition is not enough for a non-empty rewrite. Add more small files or pass
+rewrite options that lower the threshold, then re-run.
 
 **Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
 Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
@@ -97,25 +115,21 @@ With the local job executor, `spark.jars` in `spark_conf` doesn't add it: the dr
 Use the Spark, Scala, and Iceberg versions that match your cluster. See
 [Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
-**Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
+**Multi-level / non-identity partition rewrite** — the rewrite **job** does not reject these
+layouts. A **direct** `builtin-iceberg-rewrite-data-files` submit with an empty `where_clause`
+rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and similar). You may
+still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
-```text
-Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
-```
-
-Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_id}` and reading `error.log` under `builtin-iceberg-rewrite-data-files`. The only workaround is to compact identity-partitioned tables and leave the rest alone.
-
-Observed in `1.2.0`:
-
-| Partitioning                                                                  | Rewrite |
-|-------------------------------------------------------------------------------|---------|
-| `p`, `p, c2`                                                                    | Works   |
-| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`                  | Fails   |
-| `p, truncate(1, c2)`, `p, bucket(8, id)`                                        | Fails   |
+The failure mode
+`Cannot translate Spark expression ... day(...) ... to data source filter` still happens when
+the submit uses a **partition `where_clause` that applies time/bucket transforms** — the form
+the compaction adapter builds via `PartitionUtils` (for example `p = "a" AND day(ts) = 19723`).
+That is a strategy-generated filter path, not a limitation of empty-`where_clause` direct
+submits. Confirm in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 
 ## Related
 
 - [Table Maintenance Service](./optimizer.md)
 - [Configuration](./optimizer-configuration.md)
-- [Quick Start](./optimizer.md#walkthrough)
-- [CLI Reference](./optimizer-configuration.md)
+- [Walkthrough](./optimizer.md#walkthrough)
+- [CLI Reference](./optimizer-cli-reference.md)

@@ -55,12 +55,14 @@ val blackRequirement = "black==26.5.1"
 val isortRequirement = "isort==9.0.0"
 
 // Dev tooling used by the pylint and testPython tasks: pylint (and its transitive
-// astroid) for linting, pytest and parameterized for the unit tests. These live in
+// astroid) for linting, pytest and parameterized for the unit tests, and
+// cryptography to generate certificates for the TLS end-to-end tests. These live in
 // pyproject's [dependency-groups] dev, not the runtime dependencies, so
 // `uv pip install -e .` (installDependenciesWithUv) does not pull them in and they
 // never reach the shipped image. Pinned so a new release cannot change the lint/test
 // outcome in CI.
 val devToolRequirements = listOf(
+  "cryptography==50.0.2",
   "pylint==3.3.8",
   "pytest==8.4.1",
   "parameterized==0.9.0"
@@ -192,7 +194,7 @@ tasks {
 
   register<Exec>("installDevTools") {
     group = "python"
-    description = "Install dev-group tooling (pylint, pytest, parameterized) into the venv"
+    description = "Install dev-group tooling (pylint, pytest, parameterized, cryptography) into the venv"
     dependsOn("installDependenciesWithUv")
     workingDir(pythonProjectDir)
 

@@ -28,7 +28,7 @@ import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.iceberg.IcebergMaintenanceJob.MaintenanceType;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link IcebergMaintenanceJob}. */
+/** Unit tests for {@link IcebergMaintenanceJob} orchestration. */
 public class TestIcebergMaintenanceJob {
 
   @Test
@@ -79,5 +79,27 @@ public class TestIcebergMaintenanceJob {
             new String[] {
               "--maintenance-types", "expire_snapshots", "--policy-ids", "10", "--tables", "[]"
             }));
+  }
+
+  @Test
+  public void testSnapshotDriftGateOnlyForCompactionAndManifest() {
+    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_DATA_FILES));
+    assertTrue(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REWRITE_MANIFESTS));
+    assertFalse(IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.EXPIRE_SNAPSHOTS));
+    assertFalse(
+        IcebergMaintenanceJob.shouldCheckSnapshotDrift(MaintenanceType.REMOVE_ORPHAN_FILES));
+  }
+
+  @Test
+  public void testMaintenanceActionsWireToJobClasses() {
+    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action() instanceof IcebergRewriteDataFilesJob);
+    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action() instanceof IcebergRewriteManifestsJob);
+    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action() instanceof IcebergExpireSnapshotsJob);
+    assertTrue(MaintenanceType.REMOVE_ORPHAN_FILES.action() instanceof IcebergRemoveOrphanFilesJob);
+
+    assertTrue(MaintenanceType.REWRITE_DATA_FILES.action().hasBeforeMetrics());
+    assertTrue(MaintenanceType.REWRITE_MANIFESTS.action().hasBeforeMetrics());
+    assertTrue(MaintenanceType.EXPIRE_SNAPSHOTS.action().hasBeforeMetrics());
+    assertFalse(MaintenanceType.REMOVE_ORPHAN_FILES.action().hasBeforeMetrics());
   }
 }
