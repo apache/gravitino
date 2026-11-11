@@ -38,9 +38,11 @@ class TagValue:
             or (
                 isinstance(self._value, str)
                 and bool(self._value.strip())
-                and len(self._value) <= 256
+                # Java String.length() counts UTF-16 code units.
+                and len(self._value.encode("utf-16-le", errors="surrogatepass")) // 2
+                <= 256
             ),
-            "Tag value must not be blank or exceed 256 characters",
+            "Tag value must not be blank or exceed 256 UTF-16 code units",
         )
 
     def name(self) -> str:

@@ -593,6 +593,13 @@ class TestDomainClient(unittest.TestCase):
                     operation()
         self.opener.open.assert_not_called()
 
+    def test_tag_value_utf16_length(self):
+        for value in ("x" * 256, "😀" * 128):
+            self.assertEqual(value, TagValue("tag", value).value())
+        for value in ("😀" * 129, "😀" * 128 + "x"):
+            with self.assertRaises(IllegalArgumentException):
+                TagValue("tag", value)
+
     def test_value_and_filter_validation(self):
         for name, value in (
             (None, None),
