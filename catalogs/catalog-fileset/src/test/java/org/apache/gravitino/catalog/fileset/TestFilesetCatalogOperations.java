@@ -2600,6 +2600,39 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testInitializeReportsNamedLocationAccessDenied(boolean failOnExists) throws IOException {
+    Path path = new Path("s3a://test-bucket/private-prefix");
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    AccessDeniedException denied =
+        new AccessDeniedException(path.toString(), null, "backend request ID");
+    if (failOnExists) {
+      when(fileSystem.exists(path)).thenThrow(denied);
+    } else {
+      when(fileSystem.exists(path)).thenReturn(true);
+      when(fileSystem.getFileStatus(path)).thenThrow(denied);
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(fileSystem).when(ops).getFileSystem(Mockito.eq(path), Mockito.anyMap());
+      ConnectionFailedException failure =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s3", path.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+
+      Assertions.assertEquals(
+          "Failed to check Fileset catalog storage at location-s3 (access denied)",
+          failure.getMessage());
+      Assertions.assertNull(failure.getCause());
+    }
+  }
+
   @Test
   public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
