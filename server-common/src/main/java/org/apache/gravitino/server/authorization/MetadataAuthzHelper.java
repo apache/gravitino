@@ -358,7 +358,15 @@ public class MetadataAuthzHelper {
     if (!enableAuthorization() || nameIdentifiers.length == 0) {
       return entities;
     }
+<<<<<<< HEAD
     if (isMetadataObject) {
+=======
+    // Preserve legacy tag/policy names for normal authorization and cleanup. These are
+    // single-level metadata objects; their full names are never split into parent scopes.
+    if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)
+        && entityType != Entity.EntityType.TAG
+        && entityType != Entity.EntityType.POLICY) {
+>>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
       Arrays.stream(nameIdentifiers)
           .forEach(
               identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));

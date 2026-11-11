@@ -119,14 +119,28 @@ public class RoleMetaService {
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
+        NameIdentifierUtil.toMetadataObjectForRead(metadataObjectIdent, metadataObjectType);
     long metadataObjectId = EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
+<<<<<<< HEAD
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
             mapper ->
                 mapper.listRolesByMetadataObjectIdAndType(
                     metadataObjectId, metadataObject.type().name()));
+=======
+        allFields
+            ? SessionUtils.getWithoutCommitFresh(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesWithPrivilegesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()))
+            : SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()));
+>>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
     return rolePOs.stream()
         .map(
             po -> {
@@ -448,9 +462,19 @@ public class RoleMetaService {
 
   private static RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
     RolePO rolePO =
+<<<<<<< HEAD
         SessionUtils.getWithoutCommit(
             RoleMetaMapper.class,
             mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+=======
+        withPrivileges
+            ? SessionUtils.getWithoutCommitFresh(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName))
+            : SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+>>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
 
     if (rolePO == null) {
       throw new NoSuchEntityException(

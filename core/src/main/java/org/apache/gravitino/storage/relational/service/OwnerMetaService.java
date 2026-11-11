@@ -183,7 +183,20 @@ public class OwnerMetaService {
     OwnerRelPO ownerRelPO =
         POConverters.initializeOwnerRelPOsWithVersion(
             metalakeId, ownerType.name(), ownerId, entityType.name(), entityId);
+<<<<<<< HEAD
     SessionUtils.doMultipleWithCommit(
+=======
+    String metadataObjectType =
+        NameIdentifierUtil.toMetadataObjectForRead(entity, entityType).type().name();
+    assignOwner(
+        metalake,
+        metalakeId,
+        owner,
+        ownerType,
+        ownerId,
+        List.of(entityId),
+        entityType,
+>>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
@@ -221,11 +234,26 @@ public class OwnerMetaService {
     List<OwnerRelForDeletion> deletions = new ArrayList<>(ownedObjects.size());
     List<OwnerRelPO> ownerRelPOs = new ArrayList<>(ownedObjects.size());
     for (NameIdentifier entity : ownedObjects) {
+<<<<<<< HEAD
       Long entityId = EntityIdService.getEntityId(entity, ownedObjectType);
       deletions.add(
           new OwnerRelForDeletion(
               entityId,
               NameIdentifierUtil.toMetadataObject(entity, ownedObjectType).type().name()));
+=======
+      entityIds.add(EntityIdService.getEntityId(entity, ownedObjectType));
+    }
+    entityIds.sort(Comparator.naturalOrder());
+    String metadataObjectType =
+        NameIdentifierUtil.toMetadataObjectForRead(ownedObjects.get(0), ownedObjectType)
+            .type()
+            .name();
+
+    List<OwnerRelForDeletion> deletions = new ArrayList<>(entityIds.size());
+    List<OwnerRelPO> ownerRelPOs = new ArrayList<>(entityIds.size());
+    for (Long entityId : entityIds) {
+      deletions.add(new OwnerRelForDeletion(entityId, metadataObjectType));
+>>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
       ownerRelPOs.add(
           POConverters.initializeOwnerRelPOsWithVersion(
               metalakeId, ownerType.name(), ownerId, ownedObjectType.name(), entityId));
