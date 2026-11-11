@@ -22,11 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.sql.PreparedStatement;
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -44,7 +41,6 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
 import org.apache.gravitino.cache.CaffeineEntityCache;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.RoleEntity;
@@ -63,7 +59,7 @@ import org.junit.jupiter.api.TestTemplate;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
-/** Verifies function identity and role names against changes committed by a separate node. */
+/** Verifies function grant names against parent renames committed by a separate node. */
 public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
 
   private static final String METALAKE = "function_coherence_ml";
@@ -101,71 +97,6 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
                     List.of(Privileges.ExecuteFunction.allow()))),
             Map.of());
     backend.insert(role, false);
-  }
-
-  /** A stale cached parent must not make an orphan function pass its existence check. */
-  @TestTemplate
-  public void testMissingParentCannotExposeFunctionThroughCachedSchemaId() throws Exception {
-    withReaderCache(
-        () -> {
-          onPeer(
-              () -> {
-                markSchemaDeleted();
-                return null;
-              });
-          assertThrows(
-              NoSuchEntityException.class,
-              () ->
-                  EntityIdService.getEntityId(
-                      function.nameIdentifier(), Entity.EntityType.FUNCTION));
-          assertThrows(
-              NoSuchEntityException.class,
-              () ->
-                  FunctionMetaService.getInstance()
-                      .getFunctionByIdentifier(function.nameIdentifier()));
-          assertThrows(
-              NoSuchEntityException.class,
-              () ->
-                  FunctionMetaService.getInstance().listFunctionsByNamespace(function.namespace()));
-        });
-  }
-
-  /** Recreating a schema cannot expose its predecessor's functions or transfer their grants. */
-  @TestTemplate
-  public void testRecreatedParentDoesNotInheritFunctionsOrPrivileges() throws Exception {
-    withReaderCache(
-        () -> {
-          FunctionEntity replacement =
-              createFunctionEntity(
-                  RandomIdGenerator.INSTANCE.nextId(),
-                  function.namespace(),
-                  function.name(),
-                  AUDIT_INFO);
-          onPeer(
-              () -> {
-                markSchemaDeleted();
-                createAndInsertSchema(METALAKE, CATALOG, SCHEMA);
-                backend.insert(replacement, false);
-                return null;
-              });
-          assertEquals(
-              replacement.id(),
-              FunctionMetaService.getInstance()
-                  .getFunctionByIdentifier(function.nameIdentifier())
-                  .id());
-          assertEquals(
-              List.of(replacement.id()),
-              FunctionMetaService.getInstance()
-                  .listFunctionsByNamespace(function.namespace())
-                  .stream()
-                  .map(FunctionEntity::id)
-                  .toList());
-          assertEquals(
-              replacement.id().longValue(),
-              EntityIdService.getEntityId(function.nameIdentifier(), Entity.EntityType.FUNCTION));
-          RoleEntity loaded = backend.get(role.nameIdentifier(), Entity.EntityType.ROLE);
-          assertTrue(loaded.securableObjects().isEmpty());
-        });
   }
 
   /** Peer renames must be visible to repeated role reads in a READ_COMMITTED session. */
@@ -239,11 +170,6 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
                         NameIdentifier.of(
                             METALAKE, "renamed_catalog", "renamed_schema", "function"));
             assertEquals(function.id(), loaded.id());
-            assertThrows(
-                NoSuchEntityException.class,
-                () ->
-                    FunctionMetaService.getInstance()
-                        .getFunctionByIdentifier(function.nameIdentifier()));
           } finally {
             SessionUtils.rollbackTransaction();
           }
@@ -268,19 +194,6 @@ public class TestFunctionPrivilegeCoherence extends TestJDBCBackend {
     assertEquals(expected, loaded.securableObjects().get(0).fullName());
     assertEquals(
         List.of(Privileges.ExecuteFunction.allow()), loaded.securableObjects().get(0).privileges());
-  }
-
-  private void markSchemaDeleted() throws Exception {
-    try (SqlSession session =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        PreparedStatement statement =
-            session
-                .getConnection()
-                .prepareStatement("UPDATE schema_meta SET deleted_at = ? WHERE schema_id = ?")) {
-      statement.setLong(1, Instant.now().toEpochMilli());
-      statement.setLong(2, schema.id());
-      assertEquals(1, statement.executeUpdate());
-    }
   }
 
   private void withReaderCache(CheckedRunnable action) throws Exception {

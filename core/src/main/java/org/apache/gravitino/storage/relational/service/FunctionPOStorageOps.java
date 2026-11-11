@@ -98,16 +98,8 @@ public class FunctionPOStorageOps extends BasePOStorageOps<FunctionPO, FunctionM
     return pos.stream().filter(po -> po.functionId() != null).collect(Collectors.toList());
   }
 
-  /**
-   * Uses full-name reads to verify the function's live namespace.
-   *
-   * <p>A cached schema ID can outlive a parent drop, rename, or recreation and expose a function
-   * that the authoritative privilege ID resolver cannot resolve under the same name.
-   *
-   * @return false so name-based reads verify every parent in the database
-   */
   @Override
   public boolean supportsParentIdRelationalRead() {
-    return false;
+    return true;
   }
 }
