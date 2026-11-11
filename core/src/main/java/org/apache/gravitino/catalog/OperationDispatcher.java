@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.collect.Maps;
-import java.io.IOException;
 import java.util.Map;
 import java.util.function.BiFunction;
 import javax.annotation.Nullable;
@@ -160,9 +159,9 @@ public abstract class OperationDispatcher {
           return latest;
         }
         // The updater rechecks the original ID before applying the audit on the retry.
-      } catch (IOException e) {
-        throw new RuntimeException(
-            "Failed to import creation audit for " + entity.nameIdentifier(), e);
+      } catch (Exception e) {
+        LOG.warn("Failed to import creation audit for {}", entity.nameIdentifier(), e);
+        return latest;
       }
     }
     return latest;

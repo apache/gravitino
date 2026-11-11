@@ -205,19 +205,21 @@ public class TestImportAuditRecovery {
     Assertions.assertEquals(reported.createTime(), updated.auditInfo().createTime());
   }
 
-  @Test
-  void testStoreFailureIsPropagated() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testStoreFailureReturnsObservedEntity(boolean checkedException) throws Exception {
     SchemaEntity observed = schema(1L, AuditInfo.EMPTY);
-    IOException failure = new IOException("unavailable");
+    Exception failure =
+        checkedException
+            ? new IOException("unavailable")
+            : new IllegalStateException("unavailable");
     when(store.update(
             eq(observed.nameIdentifier()),
             eq(SchemaEntity.class),
             eq(Entity.EntityType.SCHEMA),
             any()))
         .thenThrow(failure);
-    Assertions.assertSame(
-        failure,
-        Assertions.assertThrows(RuntimeException.class, () -> fill(observed, ALICE)).getCause());
+    Assertions.assertSame(observed, fill(observed, ALICE));
   }
 
   private void currentAtUpdate(SchemaEntity observed, SchemaEntity current) throws Exception {

@@ -43,6 +43,7 @@ import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
@@ -300,10 +301,12 @@ public class TestIcebergImportAuditPersistence extends TestJDBCBackend {
               })
           .when(f.store)
           .update(eq(table), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
-      Assertions.assertNull(f.tables.importTable(table, ALICE).auditInfo().creator());
+      EntityCombinedTable imported = (EntityCombinedTable) f.tables.importTable(table, ALICE);
+      Assertions.assertNull(imported.auditInfo().creator());
       TableEntity stored = f.store.get(table, Entity.EntityType.TABLE, TableEntity.class);
       Assertions.assertTrue(replaced.get());
       Assertions.assertNotEquals(observed.id(), stored.id());
+      Assertions.assertEquals(stored.id(), imported.tableFromGravitino().id());
       Assertions.assertNull(stored.auditInfo().creator());
       Assertions.assertNull(stored.auditInfo().createTime());
       Assertions.assertNull(stored.columns().get(0).auditInfo().creator());
