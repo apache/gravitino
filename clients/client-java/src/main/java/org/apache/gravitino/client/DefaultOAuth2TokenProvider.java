@@ -29,11 +29,9 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
   private String scope;
   private String path;
   private String token;
-  private OAuth2ClientAuthenticationMethod authenticationMethod =
-      OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST;
+  private OAuth2ClientAuthenticationMethod authenticationMethod;
 
   private DefaultOAuth2TokenProvider() {}
-
   @Override
   protected String getAccessToken() {
     synchronized (this) {
