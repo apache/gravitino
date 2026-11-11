@@ -17,17 +17,17 @@
 import re
 from typing import Dict
 
-from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.auth.basic_auth_provider import BasicAuthProvider
 from gravitino.auth.default_oauth2_token_provider import DefaultOAuth2TokenProvider
-from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
-from gravitino.auth.simple_auth_provider import SimpleAuthProvider
-from gravitino.filesystem.gvfs_config import GVFSConfig
-from gravitino.name_identifier import NameIdentifier
-from gravitino.exceptions.base import GravitinoRuntimeException
 from gravitino.auth.oauth2_client_authentication_method import (
     OAuth2ClientAuthenticationMethod,
 )
+from gravitino.auth.oauth2_token_provider import OAuth2TokenProvider
+from gravitino.auth.simple_auth_provider import SimpleAuthProvider
+from gravitino.client.gravitino_client import GravitinoClient
+from gravitino.exceptions.base import GravitinoRuntimeException
+from gravitino.filesystem.gvfs_config import GVFSConfig
+from gravitino.name_identifier import NameIdentifier
 
 _identifier_pattern = re.compile(
     "^(?:gvfs://)?fileset/([^/]+)/([^/]+)/([^/]+)(?:/[^/]+)*/?$"
@@ -45,6 +45,46 @@ def _check_auth_config(auth_type: str, config_key: str, config_value: str):
             f"{config_key} should not be null"
             f" if {GVFSConfig.AUTH_TYPE} is set to {auth_type}."
         )
+
+
+def _create_oauth2_token_provider(options: Dict[str, str]) -> OAuth2TokenProvider:
+    """Build an OAuth2 token provider from GVFS options."""
+    auth_type = GVFSConfig.OAUTH2_AUTH_TYPE
+
+    oauth2_server_uri = options.get(GVFSConfig.OAUTH2_SERVER_URI)
+    _check_auth_config(auth_type, GVFSConfig.OAUTH2_SERVER_URI, oauth2_server_uri)
+
+    oauth2_credential = options.get(GVFSConfig.OAUTH2_CREDENTIAL)
+    _check_auth_config(auth_type, GVFSConfig.OAUTH2_CREDENTIAL, oauth2_credential)
+
+    oauth2_path = options.get(GVFSConfig.OAUTH2_PATH)
+    _check_auth_config(auth_type, GVFSConfig.OAUTH2_PATH, oauth2_path)
+
+    oauth2_scope = options.get(GVFSConfig.OAUTH2_SCOPE)
+    _check_auth_config(auth_type, GVFSConfig.OAUTH2_SCOPE, oauth2_scope)
+
+    authentication_method_value = options.get(
+        GVFSConfig.OAUTH2_CLIENT_AUTHENTICATION_METHOD,
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST.value,
+    )
+
+    try:
+        authentication_method = OAuth2ClientAuthenticationMethod.from_value(
+            authentication_method_value
+        )
+    except ValueError as exc:
+        raise GravitinoRuntimeException(
+            f"Unsupported OAuth2 client authentication method: "
+            f"{authentication_method_value}"
+        ) from exc
+
+    return DefaultOAuth2TokenProvider(
+        uri=oauth2_server_uri,
+        credential=oauth2_credential,
+        scope=oauth2_scope,
+        path=oauth2_path,
+        authentication_method=authentication_method,
+    )
 
 
 def create_client(
@@ -93,45 +133,10 @@ def create_client(
         )
 
     if auth_type == GVFSConfig.OAUTH2_AUTH_TYPE:
-        oauth2_server_uri = options.get(GVFSConfig.OAUTH2_SERVER_URI)
-        _check_auth_config(auth_type, GVFSConfig.OAUTH2_SERVER_URI, oauth2_server_uri)
-
-        oauth2_credential = options.get(GVFSConfig.OAUTH2_CREDENTIAL)
-        _check_auth_config(auth_type, GVFSConfig.OAUTH2_CREDENTIAL, oauth2_credential)
-
-        oauth2_path = options.get(GVFSConfig.OAUTH2_PATH)
-        _check_auth_config(auth_type, GVFSConfig.OAUTH2_PATH, oauth2_path)
-
-        oauth2_scope = options.get(GVFSConfig.OAUTH2_SCOPE)
-        _check_auth_config(auth_type, GVFSConfig.OAUTH2_SCOPE, oauth2_scope)
-
-        authentication_method_value = options.get(
-            GVFSConfig.OAUTH2_CLIENT_AUTHENTICATION_METHOD,
-            OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST.value,
-        )
-
-        try:
-            authentication_method = OAuth2ClientAuthenticationMethod.from_value(
-                authentication_method_value
-            )
-        except ValueError as exc:
-            raise GravitinoRuntimeException(
-                f"Unsupported OAuth2 client authentication method: "
-                f"{authentication_method_value}"
-            ) from exc
-
-        oauth2_token_provider: OAuth2TokenProvider = DefaultOAuth2TokenProvider(
-            uri=oauth2_server_uri,
-            credential=oauth2_credential,
-            scope=oauth2_scope,
-            path=oauth2_path,
-            authentication_method=authentication_method,
-        )
-
         return GravitinoClient(
             uri=server_uri,
             metalake_name=metalake_name,
-            auth_data_provider=oauth2_token_provider,
+            auth_data_provider=_create_oauth2_token_provider(options),
             request_headers=request_headers,
             client_config=client_config,
         )

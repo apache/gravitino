@@ -32,6 +32,9 @@ from fsspec.implementations.local import LocalFileSystem
 
 from gravitino import gvfs, NameIdentifier
 from gravitino.auth.auth_constants import AuthConstants
+from gravitino.auth.oauth2_client_authentication_method import (
+    OAuth2ClientAuthenticationMethod,
+)
 from gravitino.constants.timeout import TIMEOUT
 from gravitino.exceptions.base import (
     GravitinoRuntimeException,
@@ -47,9 +50,6 @@ from tests.unittests.auth.mock_base import (
     GENERATED_TIME,
     mock_authentication_with_error_authentication_type,
     mock_authentication_invalid_grant_error,
-)
-from gravitino.auth.oauth2_client_authentication_method import (
-    OAuth2ClientAuthenticationMethod,
 )
 
 # pylint: disable=protected-access,too-many-lines,too-many-locals
