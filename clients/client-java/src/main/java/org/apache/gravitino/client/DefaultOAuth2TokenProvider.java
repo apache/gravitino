@@ -32,6 +32,7 @@ public class DefaultOAuth2TokenProvider extends OAuth2TokenProvider {
   private OAuth2ClientAuthenticationMethod authenticationMethod;
 
   private DefaultOAuth2TokenProvider() {}
+
   @Override
   protected String getAccessToken() {
     synchronized (this) {
