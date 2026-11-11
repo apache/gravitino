@@ -121,10 +121,13 @@ rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and sim
 still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
 Strategy-generated partition filters use Iceberg Spark system functions (for example
-`days(ts) = 19723`, `bucket(16, id) = 3`), not Spark builtins such as `day()`. With Iceberg Spark
-runtime 1.4+ these forms are translated by `SparkV2Filters`. If
-`Cannot translate Spark expression ...` still appears, confirm the job classpath uses a matching
-Iceberg Spark runtime and that the predicate resolved as an Iceberg function (not Spark
+`days(ts) = DATE "2024-01-01"`, `years(ts) = 54`, `bucket(16, id) = 3`), not Spark builtins such
+as `day()`. The `days()` UDF returns `DATE`, so the strategy emits a date literal (not the raw
+epoch-day int). Identity `DATE`/`TIMESTAMP`/`TIME` partitions use the same double-quoted typed
+literals (`dt = DATE "2024-01-01"`): single quotes are unsafe inside `CALL ... where => '...'`.
+With Iceberg Spark runtime 1.4+ these forms are translated by `SparkV2Filters`.
+If `Cannot translate Spark expression ...` still appears, confirm the job classpath uses a
+matching Iceberg Spark runtime and that the predicate resolved as an Iceberg function (not Spark
 `day()`/`year()`). Empty-`where_clause` direct submits remain the whole-table fallback. Confirm
 in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 

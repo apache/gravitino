@@ -68,7 +68,19 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("ts = TIMESTAMP '2024-01-01 00:00:00'", where);
+    // Double-quoted typed literal survives CALL where => '...' embedding.
+    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\"", where);
+  }
+
+  @Test
+  void testIdentityTimePartitionUsesDoubleQuotedLiteral() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("t", "12:34:56"));
+    Column[] columns = new Column[] {column("t", Types.TimeType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("t")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("t = TIME \"12:34:56\"", where);
   }
 
   @Test
@@ -106,14 +118,15 @@ public class TestPartitionUtils {
   }
 
   @Test
-  void testDayPartitionUsesIcebergDaysFunction() {
+  void testDayPartitionUsesIcebergDaysFunctionWithDateLiteral() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "19723"));
     Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
     Transform[] transforms = new Transform[] {Transforms.day("event_time")};
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("days(event_time) = 19723", where);
+    // epoch day 19723 == 2024-01-01; Iceberg Spark days() returns DateType
+    Assertions.assertEquals("days(event_time) = DATE \"2024-01-01\"", where);
   }
 
   @Test
@@ -175,7 +188,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning);
 
-    Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
+    Assertions.assertEquals("(dt = DATE \"2024-01-01\")", where);
   }
 
   @Test

@@ -21,6 +21,8 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -59,8 +61,10 @@ public class PartitionUtils {
   // Identity: "columnName = value"
   // Bucket: "bucket(numBuckets, columnName) = value"
   // Truncate: "truncate(width, columnName) = value"
-  // Temporal: "years|months|days|hours(columnName) = value"
-  // Literals: strings quoted, numbers bare, date/timestamp as DATE/TIMESTAMP '...'
+  // Temporal: "years|months|hours(columnName) = <int>"; days uses DATE literal because the Iceberg
+  // Spark days() UDF returns DateType (int epoch-day compares fail with DATATYPE_MISMATCH).
+  // Literals: strings / DATE / TIMESTAMP / TIME use double quotes (safe inside CALL where =>
+  // '...'; single-quoted typed literals are eaten by the CALL string), numbers bare.
   public static String getWhereClauseForPartition(
       List<PartitionEntry> partition, Column[] columns, Transform[] partitioning) {
     Preconditions.checkArgument(
@@ -147,10 +151,19 @@ public class PartitionUtils {
   private static String formatLiteral(Transform transform, Column column, String rawValue) {
     if (transform instanceof Transforms.YearTransform
         || transform instanceof Transforms.MonthTransform
-        || transform instanceof Transforms.DayTransform
         || transform instanceof Transforms.HourTransform
         || transform instanceof Transforms.BucketTransform) {
       return rawValue;
+    }
+
+    // Iceberg Spark days() returns DATE; CALL where => '...' also eats single-quoted DATE
+    // literals (escapeSqlString doubling still parses as unquoted). Use double-quoted DATE.
+    // Epoch-day -> ISO date mirrors Iceberg DateTimeUtil.daysToIsoDate without depending on
+    // iceberg-api (ofEpochDay + ISO_LOCAL_DATE == dateFromDays(...).format(ISO_LOCAL_DATE)).
+    if (transform instanceof Transforms.DayTransform) {
+      String isoDate =
+          LocalDate.ofEpochDay(Integer.parseInt(rawValue)).format(DateTimeFormatter.ISO_LOCAL_DATE);
+      return "DATE \"" + isoDate + "\"";
     }
 
     Type type = column.dataType();
@@ -166,11 +179,12 @@ public class PartitionUtils {
       case DECIMAL:
         return rawValue;
       case DATE:
-        return "DATE '" + rawValue + "'";
+        // Double quotes: CALL where => '...' eats single-quoted typed literals.
+        return "DATE \"" + rawValue + "\"";
       case TIMESTAMP:
-        return "TIMESTAMP '" + rawValue + "'";
+        return "TIMESTAMP \"" + rawValue + "\"";
       case TIME:
-        return "TIME '" + rawValue + "'";
+        return "TIME \"" + rawValue + "\"";
       default:
         return "\"" + escapeStringLiteral(rawValue) + "\"";
     }

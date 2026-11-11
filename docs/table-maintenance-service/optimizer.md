@@ -26,9 +26,10 @@ Confirm your environment matches this list before starting an evaluation against
   Scheduling and `minIntervalMs` stay outside strategy evaluation. Sort and cluster maintenance
   still need custom strategies.
 - Compaction's **policy/strategy** path generates Iceberg Spark system-function predicates (for
-  example `days(ts) = N`, `bucket(16, id) = V`) for non-identity partitions. Direct
-  `builtin-iceberg-rewrite-data-files` with an empty `where_clause` still covers whole-table
-  rewrite on broader layouts; see
+  example `days(ts) = DATE "yyyy-MM-dd"`, `years|months|hours(ts) = N`, `bucket(16, id) = V`) for
+  non-identity partitions, and double-quoted typed literals for identity `DATE`/`TIMESTAMP`
+  columns (`dt = DATE "yyyy-MM-dd"`). Direct `builtin-iceberg-rewrite-data-files` with an empty
+  `where_clause` still covers whole-table rewrite on broader layouts; see
   [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
