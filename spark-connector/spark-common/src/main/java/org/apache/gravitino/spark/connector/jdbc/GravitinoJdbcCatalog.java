@@ -227,7 +227,6 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   /**
-<<<<<<< HEAD
    * Returns whether this version's JDBC reader preserves timestamp-without-time-zone values.
    *
    * @return true for readers preserving wall-clock values with preferTimestampNTZ
@@ -237,13 +236,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   /**
-   * Returns the timestamp mode selected when initializing this catalog.
-   *
-   * @return whether zone-free timestamps use TIMESTAMP_NTZ
-=======
    * Returns whether this catalog honors the {@code preferTimestampNTZ} option. PostgreSQL catalogs
    * do. A subclass whose source and Spark JDBC dialect keep zone-free timestamps as wall-clock
    * values can opt in; every other catalog reads with the option off.
+   *
+   * <p>Opting in does not bypass the reader version check: enabling NTZ still requires {@link
+   * #supportsTimestampNtz()} to return true, which the built-in catalogs support on Spark 3.5 or
+   * later.
    *
    * @return true if the catalog reads {@code preferTimestampNTZ} from its options
    */
@@ -256,7 +255,6 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * {@link #getSparkTypeConverter()} must use it so its converter agrees with the JDBC reader.
    *
    * @return whether zone-free timestamps use Spark TimestampNTZType
->>>>>>> 2043e62ea ([#14848] improvement(spark-connector): Let JDBC catalog subclasses opt in to preferTimestampNTZ (#14849))
    */
   protected boolean useTimestampNtz() {
     return useTimestampNtz;
