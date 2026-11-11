@@ -25,8 +25,8 @@ import org.apache.commons.lang3.StringUtils;
 /**
  * Authentication method used by the OAuth2 client-credentials flow.
  *
- * <p>Config values use the RFC 6749 style names {@code client_secret_post} and {@code
- * client_secret_basic}. Matching is case-insensitive.
+ * <p>Protocol names follow RFC 6749: {@code client_secret_post} and {@code client_secret_basic}.
+ * Matching via {@link #fromValue(String)} is case-insensitive.
  */
 public enum OAuth2ClientAuthenticationMethod {
 
@@ -36,37 +36,37 @@ public enum OAuth2ClientAuthenticationMethod {
   /** Client credentials are sent using HTTP Basic authentication. */
   CLIENT_SECRET_BASIC("client_secret_basic");
 
-  private final String configValue;
+  private final String value;
 
-  OAuth2ClientAuthenticationMethod(String configValue) {
-    this.configValue = configValue;
+  OAuth2ClientAuthenticationMethod(String value) {
+    this.value = value;
   }
 
   /**
-   * Returns the canonical RFC-style config value for this method.
+   * Returns the RFC-style protocol name for this method.
    *
    * @return {@code client_secret_post} or {@code client_secret_basic}
    */
-  public String configValue() {
-    return configValue;
+  public String value() {
+    return value;
   }
 
   /**
-   * Parses an RFC-style OAuth2 client authentication method config value.
+   * Parses an RFC-style OAuth2 client authentication method name.
    *
    * <p>Accepted values are {@code client_secret_post} and {@code client_secret_basic}
    * (case-insensitive).
    *
-   * @param value the config value
+   * @param value the protocol name
    * @return the matching authentication method
    * @throws IllegalArgumentException if {@code value} is blank or unsupported
    */
-  public static OAuth2ClientAuthenticationMethod fromConfigValue(String value) {
+  public static OAuth2ClientAuthenticationMethod fromValue(String value) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(value), "OAuth2 client authentication method must not be blank");
     String normalized = value.trim();
     for (OAuth2ClientAuthenticationMethod method : values()) {
-      if (method.configValue.equalsIgnoreCase(normalized)) {
+      if (method.value.equalsIgnoreCase(normalized)) {
         return method;
       }
     }

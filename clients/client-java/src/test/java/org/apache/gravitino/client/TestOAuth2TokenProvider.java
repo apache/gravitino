@@ -268,21 +268,20 @@ public class TestOAuth2TokenProvider {
   }
 
   @Test
-  public void testFromConfigValueAcceptsRfcStyleNames() {
+  public void testFromValueAcceptsRfcStyleNames() {
     Assertions.assertEquals(
         OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
-        OAuth2ClientAuthenticationMethod.fromConfigValue("client_secret_basic"));
+        OAuth2ClientAuthenticationMethod.fromValue("client_secret_basic"));
     Assertions.assertEquals(
         OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
-        OAuth2ClientAuthenticationMethod.fromConfigValue("CLIENT_SECRET_BASIC"));
+        OAuth2ClientAuthenticationMethod.fromValue("CLIENT_SECRET_BASIC"));
     Assertions.assertEquals(
         OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
-        OAuth2ClientAuthenticationMethod.fromConfigValue("client_secret_post"));
+        OAuth2ClientAuthenticationMethod.fromValue("client_secret_post"));
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> OAuth2ClientAuthenticationMethod.fromConfigValue("basic"));
+        IllegalArgumentException.class, () -> OAuth2ClientAuthenticationMethod.fromValue("basic"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> OAuth2ClientAuthenticationMethod.fromConfigValue(""));
+        IllegalArgumentException.class, () -> OAuth2ClientAuthenticationMethod.fromValue(""));
   }
 
   @Test

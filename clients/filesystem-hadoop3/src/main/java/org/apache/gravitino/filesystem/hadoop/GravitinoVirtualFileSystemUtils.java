@@ -204,7 +204,7 @@ public class GravitinoVirtualFileSystemUtils {
               "client_secret_post");
 
       OAuth2ClientAuthenticationMethod authenticationMethod =
-          OAuth2ClientAuthenticationMethod.fromConfigValue(authenticationMethodValue);
+          OAuth2ClientAuthenticationMethod.fromValue(authenticationMethodValue);
 
       DefaultOAuth2TokenProvider authDataProvider =
           DefaultOAuth2TokenProvider.builder()

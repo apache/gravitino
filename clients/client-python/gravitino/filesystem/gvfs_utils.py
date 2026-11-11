@@ -111,7 +111,7 @@ def create_client(
         )
 
         try:
-            authentication_method = OAuth2ClientAuthenticationMethod.from_config_value(
+            authentication_method = OAuth2ClientAuthenticationMethod.from_value(
                 authentication_method_value
             )
         except ValueError as exc:

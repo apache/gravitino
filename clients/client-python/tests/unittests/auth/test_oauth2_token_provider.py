@@ -178,23 +178,23 @@ class TestOAuth2TokenProvider(unittest.TestCase):
                 ),
             )
 
-    def test_from_config_value_accepts_rfc_style_names(self):
+    def test_from_value_accepts_rfc_style_names(self):
         self.assertEqual(
             OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
-            OAuth2ClientAuthenticationMethod.from_config_value("client_secret_basic"),
+            OAuth2ClientAuthenticationMethod.from_value("client_secret_basic"),
         )
         self.assertEqual(
             OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC,
-            OAuth2ClientAuthenticationMethod.from_config_value("CLIENT_SECRET_BASIC"),
+            OAuth2ClientAuthenticationMethod.from_value("CLIENT_SECRET_BASIC"),
         )
         self.assertEqual(
             OAuth2ClientAuthenticationMethod.CLIENT_SECRET_POST,
-            OAuth2ClientAuthenticationMethod.from_config_value("client_secret_post"),
+            OAuth2ClientAuthenticationMethod.from_value("client_secret_post"),
         )
         with self.assertRaises(ValueError):
-            OAuth2ClientAuthenticationMethod.from_config_value("basic")
+            OAuth2ClientAuthenticationMethod.from_value("basic")
         with self.assertRaises(ValueError):
-            OAuth2ClientAuthenticationMethod.from_config_value("")
+            OAuth2ClientAuthenticationMethod.from_value("")
 
     @patch(
         "gravitino.utils.http_client.HTTPClient.post_form",

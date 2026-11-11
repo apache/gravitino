@@ -116,37 +116,7 @@ class OAuth2ClientUtil {
 
     switch (authenticationMethod) {
       case CLIENT_SECRET_BASIC:
-        Preconditions.checkArgument(
-            StringUtils.isNotBlank(credentialPair.getLeft()),
-            "Client ID is required for client_secret_basic authentication");
-
-        String encodedClientId;
-        String encodedClientSecret;
-
-        try {
-          encodedClientId =
-              URLEncoder.encode(credentialPair.getLeft(), StandardCharsets.UTF_8.name());
-          encodedClientSecret =
-              URLEncoder.encode(credentialPair.getRight(), StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-          throw new IllegalStateException("UTF-8 encoding is unavailable", e);
-        }
-
-        String encoded =
-            Base64.getEncoder()
-                .encodeToString(
-                    (encodedClientId + ":" + encodedClientSecret).getBytes(StandardCharsets.UTF_8));
-
-        Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("Authorization", "Basic " + encoded);
-
-        Map<String, String> formData =
-            ImmutableMap.<String, String>builder()
-                .put(GRANT_TYPE, CLIENT_CREDENTIALS)
-                .put(SCOPE, toScope(scopes))
-                .build();
-
-        return Pair.of(formData, requestHeaders);
+        return buildClientSecretBasicRequest(credentialPair, scopes);
       case CLIENT_SECRET_POST:
         return Pair.of(
             clientCredentialsRequest(credentialPair.getLeft(), credentialPair.getRight(), scopes),
@@ -155,6 +125,39 @@ class OAuth2ClientUtil {
         throw new IllegalArgumentException(
             "Unsupported OAuth2 client authentication method: " + authenticationMethod);
     }
+  }
+
+  private static Pair<Map<String, String>, Map<String, String>> buildClientSecretBasicRequest(
+      Pair<String, String> credentialPair, List<String> scopes) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(credentialPair.getLeft()),
+        "Client ID is required for client_secret_basic authentication");
+
+    String encodedClientId;
+    String encodedClientSecret;
+    try {
+      encodedClientId = URLEncoder.encode(credentialPair.getLeft(), StandardCharsets.UTF_8.name());
+      encodedClientSecret =
+          URLEncoder.encode(credentialPair.getRight(), StandardCharsets.UTF_8.name());
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("UTF-8 encoding is unavailable", e);
+    }
+
+    String encoded =
+        Base64.getEncoder()
+            .encodeToString(
+                (encodedClientId + ":" + encodedClientSecret).getBytes(StandardCharsets.UTF_8));
+
+    Map<String, String> requestHeaders = new HashMap<>();
+    requestHeaders.put("Authorization", "Basic " + encoded);
+
+    Map<String, String> formData =
+        ImmutableMap.<String, String>builder()
+            .put(GRANT_TYPE, CLIENT_CREDENTIALS)
+            .put(SCOPE, toScope(scopes))
+            .build();
+
+    return Pair.of(formData, requestHeaders);
   }
 
   private static Map<String, String> clientCredentialsRequest(

@@ -23,18 +23,18 @@ from typing import Union
 class OAuth2ClientAuthenticationMethod(Enum):
     """OAuth2 client authentication method for the client-credentials flow.
 
-    Config values use the RFC 6749 style names ``client_secret_post`` and
-    ``client_secret_basic``. Matching via ``from_config_value`` is case-insensitive.
+    Protocol names follow RFC 6749: ``client_secret_post`` and
+    ``client_secret_basic``. Matching via ``from_value`` is case-insensitive.
     """
 
     CLIENT_SECRET_POST = "client_secret_post"
     CLIENT_SECRET_BASIC = "client_secret_basic"
 
     @classmethod
-    def from_config_value(
+    def from_value(
         cls, value: Union[str, "OAuth2ClientAuthenticationMethod"]
     ) -> "OAuth2ClientAuthenticationMethod":
-        """Parse an RFC-style OAuth2 client authentication method config value.
+        """Parse an RFC-style OAuth2 client authentication method name.
 
         Accepted values are ``client_secret_post`` and ``client_secret_basic``
         (case-insensitive).
