@@ -207,7 +207,29 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 ```
 
+<<<<<<< HEAD
 ## Statistics tool parameters
+=======
+The server reads the certificate and key at startup, so restart it after rotating them.
+
+### Connecting to Gravitino over HTTPS
+
+When `--gravitino-uri` uses `https://`, the server verifies Gravitino's certificate against the public root certificates it ships with. If a private CA signed that certificate, set `SSL_CERT_FILE` to a PEM bundle that contains both the public roots and the CA:
+
+```shell
+cat "$(uv run python -c 'import certifi; print(certifi.where())')" /path/to/ca.crt > /path/to/ca-bundle.crt
+SSL_CERT_FILE=/path/to/ca-bundle.crt uv run mcp_server --metalake test \
+  --gravitino-uri https://gravitino.example.com:8433 \
+  --transport streamable-http --mcp-url https://localhost:8000/mcp \
+  --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+```
+
+- `SSL_CERT_FILE` replaces the default roots instead of adding to them. A file with only the private CA breaks connections to servers with public certificates, such as an identity provider's token endpoint.
+- The bundle applies to every outbound HTTPS connection, including the `--oauth-token-endpoint` request.
+- If the certificate is not trusted, tool calls fail with `CERTIFICATE_VERIFY_FAILED`. Restart the server after replacing the bundle.
+
+## Selecting a metalake
+>>>>>>> 8dc5c43bf ([#14871] improvement(mcp-server): Document private CA trust for HTTPS Gravitino and test both TLS hops (#14872))
 
 The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) require `metalake_name` to identify the metalake.
 
