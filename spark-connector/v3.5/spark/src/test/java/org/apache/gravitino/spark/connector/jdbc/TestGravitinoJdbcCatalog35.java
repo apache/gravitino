@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35;
 
 /** Runs catalog option and converter regressions through the Spark 3.5 production catalog. */
@@ -36,5 +37,20 @@ public class TestGravitinoJdbcCatalog35 extends TestGravitinoJdbcCatalog34 {
   @Override
   protected GravitinoJdbcCatalog newCatalog() {
     return new GravitinoJdbcCatalogSpark35();
+  }
+
+  @Override
+  protected GravitinoJdbcCatalog newOptInCatalog() {
+    return new GravitinoJdbcCatalogSpark35() {
+      @Override
+      protected boolean supportsPreferTimestampNtz() {
+        return true;
+      }
+
+      @Override
+      protected SparkTypeConverter getSparkTypeConverter() {
+        return new SparkJdbcTypeConverter34(useTimestampNtz());
+      }
+    };
   }
 }

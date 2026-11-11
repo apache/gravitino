@@ -38,6 +38,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark34;
 import org.apache.spark.sql.connector.catalog.Identifier;
@@ -254,6 +255,53 @@ public class TestGravitinoJdbcCatalog34 {
     }
   }
 
+  @ParameterizedTest
+  @CsvSource({"true, true", "false, false", "'', false"})
+  void testSubclassCanOptInToNtzOption(String option, boolean expected) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(new CredentialCatalogStub());
+      GravitinoJdbcCatalog catalog = newOptInCatalog();
+      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      Map<String, String> options =
+          option.isEmpty() ? Map.of() : Map.of("preferTimestampNTZ", option);
+      if (expected && !expectedTimestampNtzSupport()) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> initialize(catalog, options, Map.of()));
+        Assertions.assertTrue(error.getMessage().contains("Spark 3.5"));
+        Assertions.assertTrue(error.getMessage().contains("use false"));
+        return;
+      }
+      JDBCOptions reader = initialize(catalog, options, Map.of());
+      Assertions.assertEquals(expected, reader.preferTimestampNTZ());
+      Assertions.assertEquals(expected, catalog.useTimestampNtz());
+      Assertions.assertEquals(
+          expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  @Test
+  void testOptedInCatalogStillRejectsInvalidNtzValue() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(new CredentialCatalogStub());
+      GravitinoJdbcCatalog catalog = newOptInCatalog();
+      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> initialize(catalog, Map.of("preferTimestampNTZ", "yes"), Map.of()));
+      Assertions.assertTrue(error.getMessage().contains("'yes'"));
+      Assertions.assertTrue(error.getMessage().contains("preferTimestampNTZ"));
+    }
+  }
+
   @Test
   void testNtzPropertyNeedsTheBypassPrefix() throws Exception {
     try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
@@ -421,6 +469,25 @@ public class TestGravitinoJdbcCatalog34 {
    */
   protected GravitinoJdbcCatalog newCatalog() {
     return new GravitinoJdbcCatalogSpark34();
+  }
+
+  /**
+   * Creates a subclass that opts in and supplies its own converter using the selected mode.
+   *
+   * @return the opting-in catalog for this Spark version
+   */
+  protected GravitinoJdbcCatalog newOptInCatalog() {
+    return new GravitinoJdbcCatalogSpark34() {
+      @Override
+      protected boolean supportsPreferTimestampNtz() {
+        return true;
+      }
+
+      @Override
+      protected SparkTypeConverter getSparkTypeConverter() {
+        return new SparkJdbcTypeConverter34(useTimestampNtz());
+      }
+    };
   }
 
   private GravitinoJdbcCatalog catalog(String provider, SupportsCredentials credentials)

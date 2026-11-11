@@ -77,7 +77,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     applyJdbcCredential(gravitinoCatalogClient, all);
     useTimestampNtz = false;
-    if ("jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider())) {
+    if (supportsPreferTimestampNtz()) {
       String value = preferTimestampNtz(options, properties);
       Preconditions.checkArgument(
           "true".equalsIgnoreCase(value) || "false".equalsIgnoreCase(value),
@@ -94,7 +94,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
           name);
     }
     // One value drives both the reader and converter for every provider. Explicitly disable NTZ
-    // outside PostgreSQL, including when Spark's session timestamp type defaults to NTZ.
+    // for catalogs that do not support the option, including when Spark's session timestamp type
+    // defaults to NTZ.
     setPreferTimestampNtz(all, useTimestampNtz);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     jdbcOptions = new HashMap<>(all);
@@ -235,9 +236,25 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   }
 
   /**
-   * Returns the timestamp mode selected when initializing this catalog.
+   * Returns whether this catalog honors the {@code preferTimestampNTZ} option. PostgreSQL catalogs
+   * do. A subclass whose source and Spark JDBC dialect keep zone-free timestamps as wall-clock
+   * values can opt in; every other catalog reads with the option off.
    *
-   * @return whether zone-free timestamps use TIMESTAMP_NTZ
+   * <p>Opting in does not bypass the reader version check: enabling NTZ still requires {@link
+   * #supportsTimestampNtz()} to return true, which the built-in catalogs support on Spark 3.5 or
+   * later.
+   *
+   * @return true if the catalog reads {@code preferTimestampNTZ} from its options
+   */
+  protected boolean supportsPreferTimestampNtz() {
+    return "jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider());
+  }
+
+  /**
+   * Returns the timestamp mode selected when the catalog was initialized. A subclass that overrides
+   * {@link #getSparkTypeConverter()} must use it so its converter agrees with the JDBC reader.
+   *
+   * @return whether zone-free timestamps use Spark TimestampNTZType
    */
   protected boolean useTimestampNtz() {
     return useTimestampNtz;

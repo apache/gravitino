@@ -36,6 +36,8 @@ import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /** Unit tests for {@link GravitinoJdbcCatalog#applyJdbcCredential}. */
@@ -98,13 +100,23 @@ public class TestGravitinoJdbcCatalog {
     }
   }
 
-  @Test
-  void testSpark33RejectsUnsupportedTimestampNtzBeforeOpeningReader() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testSpark33RejectsUnsupportedTimestampNtzBeforeOpeningReader(boolean optIn)
+      throws Exception {
     try (MockedStatic<GravitinoCatalogManager> managers =
         mockStatic(GravitinoCatalogManager.class)) {
-      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
+      GravitinoJdbcCatalog catalog =
+          optIn
+              ? new GravitinoJdbcCatalog() {
+                @Override
+                protected boolean supportsPreferTimestampNtz() {
+                  return true;
+                }
+              }
+              : new GravitinoJdbcCatalog();
       Catalog source = mock(Catalog.class);
-      when(source.provider()).thenReturn("jdbc-postgresql");
+      when(source.provider()).thenReturn(optIn ? "jdbc-mysql" : "jdbc-postgresql");
       when(source.supportsCredentials()).thenReturn(new CredentialCatalogStub());
       FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
       IllegalArgumentException error =
