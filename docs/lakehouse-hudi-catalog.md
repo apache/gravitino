@@ -58,7 +58,7 @@ Property name with this prefix passed down to the underlying backend client for 
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -73,7 +73,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 ### Schema Operations
 
 Only support read operations: listSchema, loadSchema, and schemaExists.
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 

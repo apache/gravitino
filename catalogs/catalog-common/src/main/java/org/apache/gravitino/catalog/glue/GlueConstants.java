@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import org.apache.gravitino.storage.AWSProperties;
+
 /** Constant keys for the AWS Glue Data Catalog connector configuration and table properties. */
 public final class GlueConstants {
 
@@ -34,17 +36,50 @@ public final class GlueConstants {
    */
   public static final String AWS_GLUE_CATALOG_ID = "aws-glue-catalog-id";
 
-  /** AWS access key ID for static credential authentication (optional, sensitive). */
-  public static final String AWS_ACCESS_KEY_ID = "aws-access-key-id";
+  /**
+   * AWS access key ID for static credential authentication (optional, hidden). Identifier half of
+   * the static credential pair; {@link #AWS_SECRET_ACCESS_KEY} is the secret half.
+   */
+  public static final String AWS_ACCESS_KEY_ID = AWSProperties.GRAVITINO_AWS_ACCESS_KEY_ID;
 
   /** AWS secret access key for static credential authentication (optional, sensitive). */
-  public static final String AWS_SECRET_ACCESS_KEY = "aws-secret-access-key";
+  public static final String AWS_SECRET_ACCESS_KEY = AWSProperties.GRAVITINO_AWS_SECRET_ACCESS_KEY;
 
   /**
    * Custom Glue endpoint URL (optional). Used for VPC endpoints or LocalStack testing. Example:
    * {@code http://localhost:4566}
    */
   public static final String AWS_GLUE_ENDPOINT = "aws-glue-endpoint";
+
+  /**
+   * Upper bound in milliseconds for one Glue API call made by the catalog, including all retries
+   * (optional). Defaults to {@link #DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS}.
+   */
+  public static final String AWS_GLUE_API_CALL_TIMEOUT_MS = "aws-glue-api-call-timeout-ms";
+
+  /** Default value for {@link #AWS_GLUE_API_CALL_TIMEOUT_MS}: 30 seconds. */
+  public static final long DEFAULT_AWS_GLUE_API_CALL_TIMEOUT_MS = 30_000L;
+
+  /**
+   * Upper bound in milliseconds for a single attempt of a Glue API call (optional). Also used as
+   * the HTTP connection and socket timeout of the S3 client used for Iceberg tables. Defaults to
+   * {@link #DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}.
+   */
+  public static final String AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS =
+      "aws-glue-api-call-attempt-timeout-ms";
+
+  /** Default value for {@link #AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS}: 10 seconds. */
+  public static final long DEFAULT_AWS_GLUE_API_CALL_ATTEMPT_TIMEOUT_MS = 10_000L;
+
+  /**
+   * Maximum number of attempts of a Glue API call made by the catalog, including the first one
+   * (optional). Retries apply to throttling and transient failures. Defaults to {@link
+   * #DEFAULT_AWS_GLUE_MAX_ATTEMPTS}.
+   */
+  public static final String AWS_GLUE_MAX_ATTEMPTS = "aws-glue-max-attempts";
+
+  /** Default value for {@link #AWS_GLUE_MAX_ATTEMPTS}. */
+  public static final int DEFAULT_AWS_GLUE_MAX_ATTEMPTS = 4;
 
   /**
    * Default table format used when creating tables via Gravitino's {@code createTable()} API
@@ -66,8 +101,10 @@ public final class GlueConstants {
 
   /**
    * Base storage path used as a warehouse when no explicit {@code location} is given at table
-   * creation time. The table location is derived as {@code warehouse/database/table}. Example:
-   * {@code s3://my-bucket/gravitino-warehouse}.
+   * creation time and the Glue database declares no {@code LocationUri}. The table location is
+   * derived as {@code warehouse/database/table}.
+   *
+   * <p>Example warehouse: {@code s3://my-bucket/gravitino-warehouse}.
    */
   public static final String WAREHOUSE = "warehouse";
 
@@ -76,14 +113,17 @@ public final class GlueConstants {
   // -------------------------------------------------------------------------
 
   /**
-   * Glue table format parameter key stored in {@code Table.parameters()}. Common values: {@code
-   * ICEBERG}, {@code HIVE}, {@code DELTA}, {@code PARQUET} (uppercase, as stored by Glue). Used
-   * internally to determine the table format when reading Glue tables.
+   * Table property that chooses the format of a table at create: {@code HIVE} or {@code ICEBERG}.
+   * It is not stored; a loaded table reports it from its {@link #TABLE_TYPE_PARAM} parameter, and
+   * it cannot be changed.
    */
   public static final String TABLE_FORMAT = "table-format";
 
-  /** Table-format value indicating an Iceberg table stored in Glue {@code Table.parameters()}. */
+  /** Value of {@link #TABLE_FORMAT} for an Iceberg table. */
   public static final String TABLE_FORMAT_ICEBERG = "ICEBERG";
+
+  /** Value of {@link #TABLE_FORMAT} for a Hive-format table. */
+  public static final String TABLE_FORMAT_HIVE = "HIVE";
 
   /**
    * Table file format (lowercase, e.g. "parquet", "orc", "textfile") used when creating Hive-format
@@ -93,6 +133,13 @@ public final class GlueConstants {
 
   /** Iceberg table metadata location stored in Glue {@code Table.parameters()}. */
   public static final String METADATA_LOCATION = "metadata_location";
+
+  /**
+   * Key of the {@code Table.parameters()} entry, set to {@code true}, that marks an Iceberg table
+   * registered through Gravitino from an existing metadata file. Such a table shares its files with
+   * the table it was registered from, so Gravitino changes only its Glue parameters.
+   */
+  public static final String REGISTERED_ICEBERG_TABLE_PARAM = "gravitino.iceberg.registered";
 
   /**
    * Key of the {@code table_type} entry in {@code Table.parameters()} that identifies the table
@@ -145,6 +192,13 @@ public final class GlueConstants {
 
   /** Glue {@code tableType} value for external tables. */
   public static final String EXTERNAL_TABLE_TYPE = "EXTERNAL_TABLE";
+
+  /**
+   * Glue {@code tableType} value for views. Both Hive-compatible views (whose definition lives in
+   * {@code Table.viewOriginalText()}) and Glue multi-dialect views (whose definition lives in
+   * {@code Table.viewDefinition()}) carry this type.
+   */
+  public static final String VIRTUAL_VIEW_TABLE_TYPE = "VIRTUAL_VIEW";
 
   private GlueConstants() {}
 }

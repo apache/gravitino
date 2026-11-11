@@ -17,13 +17,17 @@
 
 package org.apache.gravitino.server.authorization.expression;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +40,10 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.MockGravitinoAuthorizer;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -43,6 +51,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 
 /** Test for {@link AuthorizationExpressionEvaluator} */
@@ -90,6 +100,55 @@ public class TestAuthorizationExpressionEvaluator {
           authorizationExpressionEvaluator.evaluate(
               metadataNames, new AuthorizationRequestContext()));
     }
+  }
+
+  /**
+   * Verifies that blank names are classified as invalid metadata before the authorizer is called.
+   *
+   * @param catalogName the whitespace-only catalog name
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {" ", "\t", "\n", " \t\n"})
+  public void testBlankCatalogNameIsInvalidMetadata(String catalogName) {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator("CATALOG::USE_CATALOG", authorizer);
+    Map<Entity.EntityType, NameIdentifier> names =
+        Map.of(Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog("metalake", catalogName));
+
+    IllegalMetadataObjectException error =
+        Assertions.assertThrows(
+            IllegalMetadataObjectException.class,
+            () ->
+                evaluator.evaluate(
+                    names,
+                    new AuthorizationRequestContext(),
+                    new UserPrincipal("tester"),
+                    Optional.empty()));
+
+    Assertions.assertEquals("Metadata object full name cannot be blank", error.getMessage());
+    Assertions.assertInstanceOf(IllegalArgumentException.class, error.getCause());
+    verifyNoInteractions(authorizer);
+  }
+
+  /** Verifies that existing identifier-validation errors retain their exception type. */
+  @Test
+  public void testDottedCatalogNameRetainsIdentifierError() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    AuthorizationExpressionEvaluator evaluator =
+        new AuthorizationExpressionEvaluator("CATALOG::USE_CATALOG", authorizer);
+    Map<Entity.EntityType, NameIdentifier> names =
+        Map.of(Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog("metalake", "sales.2024"));
+
+    Assertions.assertThrows(
+        IllegalNameIdentifierException.class,
+        () ->
+            evaluator.evaluate(
+                names,
+                new AuthorizationRequestContext(),
+                new UserPrincipal("tester"),
+                Optional.empty()));
+    verifyNoInteractions(authorizer);
   }
 
   @Test
@@ -217,6 +276,62 @@ public class TestAuthorizationExpressionEvaluator {
               () -> new AuthorizationExpressionEvaluator("BAD", new MockGravitinoAuthorizer()));
       Assertions.assertInstanceOf(OgnlException.class, e.getCause());
     }
+  }
+
+  @Test
+  public void testProbeSchemaExpressionAllowsCreateAndHonorsDeny() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    Set<Privilege.Name> allowed = Set.of(Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+    Set<Privilege.Name> denied = new HashSet<>();
+    when(authorizer.authorize(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> allowed.contains(invocation.getArgument(3)));
+    when(authorizer.deny(any(), any(), any(), any(), any()))
+        .thenAnswer(invocation -> denied.contains(invocation.getArgument(3)));
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(false);
+    UserPrincipal principal = new UserPrincipal("tester");
+    Map<Entity.EntityType, NameIdentifier> metadataNames = metadataNames(false);
+
+    Assertions.assertTrue(
+        evaluate(
+            AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION,
+            authorizer,
+            principal,
+            metadataNames));
+    Assertions.assertFalse(
+        evaluate(
+            AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
+            authorizer,
+            principal,
+            metadataNames),
+        "CREATE_SCHEMA must permit only the existence probe, not loading schema metadata");
+
+    denied.add(Privilege.Name.CREATE_SCHEMA);
+    Assertions.assertFalse(
+        evaluate(
+            AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION,
+            authorizer,
+            principal,
+            metadataNames),
+        "A CREATE_SCHEMA deny must override the corresponding allow");
+
+    denied.clear();
+    denied.add(Privilege.Name.USE_CATALOG);
+    Assertions.assertFalse(
+        evaluate(
+            AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION,
+            authorizer,
+            principal,
+            metadataNames),
+        "A USE_CATALOG deny on the required parent path must reject the probe");
+  }
+
+  private static boolean evaluate(
+      String expression,
+      GravitinoAuthorizer authorizer,
+      UserPrincipal principal,
+      Map<Entity.EntityType, NameIdentifier> metadataNames) {
+    return new AuthorizationExpressionEvaluator(expression, authorizer)
+        .evaluate(metadataNames, new AuthorizationRequestContext(), principal, Optional.empty());
   }
 
   private static Map<Entity.EntityType, NameIdentifier> metadataNames(boolean authorized) {

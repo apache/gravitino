@@ -75,11 +75,29 @@ public interface ModelMetaMapper {
   @SelectProvider(type = ModelMetaSQLProviderFactory.class, method = "selectModelMetaByModelId")
   ModelPO selectModelMetaByModelId(@Param("modelId") Long modelId);
 
+  /**
+   * Selects and exclusively locks an active model metadata row.
+   *
+   * @param modelId the model ID
+   * @return the active model metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(
+      type = ModelMetaSQLProviderFactory.class,
+      method = "selectModelMetaByModelIdForUpdate")
+  ModelPO selectModelMetaByModelIdForUpdate(@Param("modelId") Long modelId);
+
+  /**
+   * Soft-deletes a model only if its stored version is unchanged.
+   *
+   * @param modelId the model ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of changed rows; zero means the model changed or disappeared
+   */
   @UpdateProvider(
       type = ModelMetaSQLProviderFactory.class,
-      method = "softDeleteModelMetaBySchemaIdAndModelName")
-  Integer softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
+      method = "softDeleteModelMetaByIdAndVersion")
+  Integer softDeleteModelMetaByIdAndVersion(
+      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = ModelMetaSQLProviderFactory.class,
@@ -102,8 +120,37 @@ public interface ModelMetaMapper {
   Integer deleteModelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
-  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelLatestVersion")
-  Integer updateModelLatestVersion(@Param("modelId") Long modelId);
+  /**
+   * Advances the concurrency version shared by a model and its child records, as long as the model
+   * still exists under the name the caller resolved.
+   *
+   * @param modelId the model ID
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the number of changed rows; zero means the model was dropped or renamed away
+   */
+  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "bumpModelVersion")
+  Integer bumpModelVersion(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName);
+
+  /**
+   * Advances the shared concurrency version and the version-number allocator in one write, as long
+   * as the model still exists under the name the caller resolved.
+   *
+   * @param modelId the model ID
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the number of changed rows; zero means the model was dropped or renamed away
+   */
+  @UpdateProvider(
+      type = ModelMetaSQLProviderFactory.class,
+      method = "bumpModelVersionAndLatestVersion")
+  Integer bumpModelVersionAndLatestVersion(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName);
 
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelMeta")
   Integer updateModelMeta(

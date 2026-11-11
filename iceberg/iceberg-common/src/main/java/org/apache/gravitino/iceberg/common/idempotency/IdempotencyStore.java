@@ -54,7 +54,7 @@ public interface IdempotencyStore extends Closeable {
   enum ReserveResult {
     /** The key was newly claimed by this caller, which now owns the mutation. */
     RESERVED,
-    /** The key is already reserved or finalized, so the request is a retry. */
+    /** A non-expired reservation or finalized record already exists for the key. */
     DUPLICATE
   }
 
@@ -66,7 +66,14 @@ public interface IdempotencyStore extends Closeable {
   void initialize(Map<String, String> properties);
 
   /**
-   * Atomically attempts to claim a key.
+   * Atomically attempts to claim a key. An expired record is treated as absent, so the key can be
+   * reserved again without waiting for a purge.
+   *
+   * <p>The store retains the operation binding but does not compare it when returning {@link
+   * ReserveResult#DUPLICATE}. The REST handler owns binding checks: when {@link #load} returns a
+   * finalized record, the handler must reject a different binding with {@code 409 Conflict} instead
+   * of replaying it. When the key is still in flight, {@code load} returns empty and the handler
+   * returns the same in-flight {@code 409 Conflict}, regardless of whether the bindings match.
    *
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
@@ -75,7 +82,7 @@ public interface IdempotencyStore extends Closeable {
    *     for every reservation and pass back to {@link #finalizeRecord} and {@link #release}
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return {@link ReserveResult#RESERVED} if newly claimed, {@link ReserveResult#DUPLICATE} if a
-   *     record for this key already exists
+   *     non-expired reservation or finalized record for this key already exists
    */
   ReserveResult reserve(
       String idempotencyKey, String operationBinding, long claim, long expiresAtMs);
@@ -84,8 +91,8 @@ public interface IdempotencyStore extends Closeable {
    * Loads a finalized record for replay.
    *
    * @param idempotencyKey the client-provided key
-   * @return the record, or {@link Optional#empty()} if the key is unknown or still reserved by an
-   *     in-flight request
+   * @return the record, or {@link Optional#empty()} if the key is unknown, expired, or still
+   *     reserved by an in-flight request
    */
   Optional<IdempotencyRecord> load(String idempotencyKey);
 

@@ -17,7 +17,7 @@ Nothing crosses that boundary:
   user in each, and provisioning them is done per metalake
 - Roles are defined and granted within one metalake, so a role held in one carries no privilege in
   another
-- A tag or policy created in one metalake cannot be attached to an object in another
+- A tag can only be assigned to objects in its metalake, and a policy can only be associated with tags in its metalake
 - Names only have to be unique within one metalake
 
 That makes a metalake the unit to reach for when separating environments, business units, or tenants
@@ -50,8 +50,8 @@ Properties are free-form key and value pairs, with one reserved key. `in-use` re
 metalake is available, defaults to `true`, and is set through the enable and disable operations
 rather than by writing the property directly.
 
-A metalake cannot carry a tag or a policy, so there is no way to classify or govern everything at
-once from the top. The widest attachment point is a catalog.
+A metalake cannot carry a tag assignment, so there is no way to classify or govern everything at
+once from the top. The widest tag assignment point is a catalog. Policies apply through tags.
 
 ### In Use and Not In Use
 

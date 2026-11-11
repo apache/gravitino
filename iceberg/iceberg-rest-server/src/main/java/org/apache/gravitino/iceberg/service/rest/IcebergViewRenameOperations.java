@@ -84,6 +84,7 @@ public class IcebergViewRenameOperations {
           RenameTableRequest renameViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
+    IcebergRESTUtils.validateRequest(renameViewRequest, "RenameTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),

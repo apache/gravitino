@@ -55,7 +55,7 @@ definitions is the same name accepting different arguments, the way `round(x)` a
 are one function in most engines.
 
 An implementation is how a definition is expressed for a given engine. Each declares a language and
-a runtime, so one definition can carry a SQL version for Trino and a Python version for Spark, and
+a runtime, so one definition can carry a SQL version for Trino and a Java version for Spark, and
 each engine uses the one it can execute.
 
 | Language | Carries                                          |
@@ -79,7 +79,7 @@ all go through the API, as does attaching a tag, which the function page does no
 
 | Privilege           | Grantable on                           | What it allows                    |
 |---------------------|----------------------------------------|-----------------------------------|
-| `REGISTER_FUNCTION` | Metalake, catalog, schema, or function | Registering functions             |
+| `REGISTER_FUNCTION` | Metalake, catalog, or schema           | Registering functions             |
 | `EXECUTE_FUNCTION`  | Metalake, catalog, schema, or function | Calling a function from an engine |
 | `MODIFY_FUNCTION`   | Metalake, catalog, schema, or function | Altering a registered function    |
 

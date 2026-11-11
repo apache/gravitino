@@ -20,6 +20,8 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config
 
+from gravitino.api.secret import SecretBinding, SecretReference
+
 
 class SchemaChange(ABC):
     """NamespaceChange class to set the property and value pairs for the namespace."""
@@ -48,6 +50,16 @@ class SchemaChange(ABC):
             The SchemaChange object.
         """
         return SchemaChange.RemoveProperty(schema_property)
+
+    @staticmethod
+    def set_secret_binding(schema_property: str, binding: SecretBinding):
+        """Creates a schema change to bind a write-through secret for a property."""
+        return SchemaChange.SetSecretBinding(schema_property, binding)
+
+    @staticmethod
+    def set_secret_reference(schema_property: str, reference: SecretReference):
+        """Creates a schema change to bind an external secret reference for a property."""
+        return SchemaChange.SetSecretReference(schema_property, reference)
 
     @dataclass
     class SetProperty:
@@ -149,3 +161,56 @@ class SchemaChange(ABC):
                  A string summary of the property removal operation.
             """
             return f"REMOVEPROPERTY {self._property}"
+
+    @dataclass
+    class SetSecretBinding:
+        """SchemaChange class to bind a write-through secret for a property."""
+
+        _property: str = field(metadata=config(field_name="property"))
+        _binding: SecretBinding = field(metadata=config(field_name="binding"))
+
+        def property(self):
+            return self._property
+
+        def binding(self):
+            return self._binding
+
+        def __eq__(self, other):
+            if not isinstance(other, SchemaChange.SetSecretBinding):
+                return False
+            return (
+                self._property == other.property() and self._binding == other.binding()
+            )
+
+        def __hash__(self):
+            return hash((self._property, self._binding))
+
+        def __str__(self):
+            return f"SETSECRETBINDING {self._property} {self._binding}"
+
+    @dataclass
+    class SetSecretReference:
+        """SchemaChange class to bind an external secret reference for a property."""
+
+        _property: str = field(metadata=config(field_name="property"))
+        _reference: SecretReference = field(metadata=config(field_name="reference"))
+
+        def property(self):
+            return self._property
+
+        def reference(self):
+            return self._reference
+
+        def __eq__(self, other):
+            if not isinstance(other, SchemaChange.SetSecretReference):
+                return False
+            return (
+                self._property == other.property()
+                and self._reference == other.reference()
+            )
+
+        def __hash__(self):
+            return hash((self._property, self._reference))
+
+        def __str__(self):
+            return f"SETSECRETREFERENCE {self._property} {self._reference}"

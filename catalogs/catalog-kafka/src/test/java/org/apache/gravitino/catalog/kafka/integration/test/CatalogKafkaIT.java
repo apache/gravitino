@@ -165,6 +165,7 @@ public class CatalogKafkaIT extends BaseIT {
     // test load catalog
     Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadedCatalog);
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 
     // test alter catalog
     Catalog alteredCatalog =

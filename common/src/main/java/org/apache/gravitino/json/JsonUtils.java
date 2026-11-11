@@ -49,7 +49,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -83,6 +82,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -313,16 +313,28 @@ public class JsonUtils {
             .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
             .registerModule(new JavaTimeModule())
             .registerModule(new Jdk8Module())
-            .registerModule(
-                new SimpleModule()
-                    .addDeserializer(Type.class, new TypeDeserializer())
-                    .addSerializer(Type.class, new TypeSerializer())
-                    .addDeserializer(Partitioning.class, new PartitioningDeserializer())
-                    .addSerializer(Partitioning.class, new PartitioningSerializer())
-                    .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
-                    .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
-                    .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
-                    .addSerializer(StatisticValue.class, new StatisticValueSerializer()));
+            .registerModule(anyFieldModule());
+  }
+
+  private static SimpleModule anyFieldModule() {
+    SimpleModule module =
+        new SimpleModule()
+            .addDeserializer(Type.class, new TypeDeserializer())
+            .addSerializer(Type.class, new TypeSerializer())
+            .addDeserializer(Partitioning.class, new PartitioningDeserializer())
+            .addSerializer(Partitioning.class, new PartitioningSerializer())
+            .addDeserializer(Expression.class, new ColumnDefaultValueDeserializer())
+            .addSerializer(Expression.class, new ColumnDefaultValueSerializer())
+            .addDeserializer(StatisticValue.class, new StatisticValueDeserializer())
+            .addSerializer(StatisticValue.class, new StatisticValueSerializer())
+            .addSerializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer())
+            .addDeserializer(
+                PolicyExecutionSpec.class,
+                new ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer());
+    ExecutablePolicyContentSerde.registerDomainSerdes(module);
+    return module;
   }
 
   /**
@@ -1310,6 +1322,22 @@ public class JsonUtils {
     }
   }
 
+  /**
+   * Custom JSON serializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer
+   */
+  public static class PolicyExecutionSpecSerializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecSerializer {}
+
+  /**
+   * Custom JSON deserializer for {@link PolicyExecutionSpec}.
+   *
+   * @see ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer
+   */
+  public static class PolicyExecutionSpecDeserializer
+      extends ExecutablePolicyContentSerde.PolicyExecutionSpecDeserializer {}
+
   /** Custom JSON serializer for DistributionDTO objects. */
   public static class DistributionSerializer extends JsonSerializer<DistributionDTO> {
     @Override
@@ -1354,7 +1382,9 @@ public class JsonUtils {
     @Override
     public void serialize(Expression value, JsonGenerator gen, SerializerProvider serializers)
         throws IOException {
-      if (value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET)) {
+      if (value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET)) {
         return;
       }
       writeFunctionArg((FunctionArg) value, gen);
@@ -1362,7 +1392,9 @@ public class JsonUtils {
 
     @Override
     public boolean isEmpty(SerializerProvider provider, Expression value) {
-      return value == null || value.equals(Column.DEFAULT_VALUE_NOT_SET);
+      return value == null
+          || value.equals(Column.DEFAULT_VALUE_NOT_SET)
+          || value.equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
     }
   }
 
@@ -1378,6 +1410,18 @@ public class JsonUtils {
     }
   }
 
+  /** Custom JSON deserializer for Column initial default value. */
+  public static class ColumnInitialDefaultValueDeserializer extends JsonDeserializer<Expression> {
+    @Override
+    public Expression deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+      JsonNode node = p.getCodec().readTree(p);
+      if (node == null || node.isNull()) {
+        return Column.INITIAL_DEFAULT_VALUE_NOT_SET;
+      }
+      return readFunctionArg(node);
+    }
+  }
+
   /** Custom JSON deserializer for StatisticValue objects. */
   public static class StatisticValueDeserializer extends JsonDeserializer<StatisticValue> {
     @Override
@@ -1388,13 +1432,27 @@ public class JsonUtils {
     }
   }
 
-  private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
+  private static StatisticValue<?> getStatisticValue(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
     if (node.isIntegralNumber()) {
+      // BigInteger nodes are integral as well, and asLong() would wrap them around silently.
+      Preconditions.checkArgument(
+          node.canConvertToLong(),
+          "Statistic value is out of the range of a 64-bit signed integer: %s",
+          node);
       return StatisticValues.longValue(node.asLong());
     } else if (node.isFloatingPointNumber()) {
-      return StatisticValues.doubleValue(node.asDouble());
+      // Jackson parses a literal past the double range into a DoubleNode that already holds
+      // infinity (USE_BIG_DECIMAL_FOR_FLOATS is off), and the serializer would write that back
+      // out as the JSON string "Infinity", so the value would come back as a string.
+      double doubleValue = node.asDouble();
+      Preconditions.checkArgument(
+          Double.isFinite(doubleValue),
+          "Statistic value is out of the range of a 64-bit floating point number, the literal"
+              + " parsed to %s",
+          doubleValue);
+      return StatisticValues.doubleValue(doubleValue);
     } else if (node.isTextual()) {
       return StatisticValues.stringValue(node.asText());
     } else if (node.isBoolean()) {
@@ -1403,10 +1461,7 @@ public class JsonUtils {
       ArrayNode arrayNode = (ArrayNode) node;
       List<StatisticValue<Object>> values = Lists.newArrayListWithCapacity(arrayNode.size());
       for (JsonNode arrayElement : arrayNode) {
-        StatisticValue<?> value = getStatisticValue(arrayElement);
-        if (value != null) {
-          values.add((StatisticValue<Object>) value);
-        }
+        values.add((StatisticValue<Object>) getStatisticValue(arrayElement));
       }
       return StatisticValues.listValue(values);
     } else if (node.isObject()) {
@@ -1414,20 +1469,10 @@ public class JsonUtils {
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
           .fields()
-          .forEachRemaining(
-              entry -> {
-                try {
-                  StatisticValue<?> value = getStatisticValue(entry.getValue());
-                  if (value != null) {
-                    map.put(entry.getKey(), value);
-                  }
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
-                }
-              });
+          .forEachRemaining(entry -> map.put(entry.getKey(), getStatisticValue(entry.getValue())));
       return StatisticValues.objectValue(map);
     } else {
-      throw new UnsupportedEncodingException(
+      throw new IllegalArgumentException(
           String.format("Don't support json node type %s", node.getNodeType()));
     }
   }

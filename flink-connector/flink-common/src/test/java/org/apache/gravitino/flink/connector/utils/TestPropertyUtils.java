@@ -16,34 +16,85 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
 package org.apache.gravitino.flink.connector.utils;
 
-import java.util.HashMap;
 import java.util.Map;
-import org.apache.hadoop.conf.Configuration;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.credential.S3TokenCredential;
+import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for {@link PropertyUtils}. */
 public class TestPropertyUtils {
 
   @Test
-  public void testExtractHadoopConfigurationRemovesHadoopOptions() {
-    Map<String, String> options = new HashMap<>();
-    options.put("warehouse", "file:/tmp/warehouse");
-    options.put("hadoop.fs.oss.endpoint", "oss-endpoint");
-    options.put("fs.s3a.access.key", "s3-key");
-    options.put("dfs.client.use.datanode.hostname", "true");
+  void testPropertiesWithSecretsOverlaysPlaintext() {
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecrets(
+            Map.of("jdbc-password", "******", "visible", "ok"),
+            () -> () -> Map.of("jdbc-password", "s3cr3t"));
+    Assertions.assertEquals("s3cr3t", merged.get("jdbc-password"));
+    Assertions.assertEquals("ok", merged.get("visible"));
+  }
 
-    Configuration configuration = PropertyUtils.extractHadoopConfiguration(options);
+  @Test
+  void testPropertiesWithSecretsSwallowsNotFoundFromOlderServer() {
+    SupportsSecrets broken =
+        () -> {
+          throw new NotFoundException("secrets endpoint not found");
+        };
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecrets(Map.of("jdbc-password", "******"), () -> broken);
+    Assertions.assertEquals("******", merged.get("jdbc-password"));
+  }
 
-    Assertions.assertEquals("file:/tmp/warehouse", options.get("warehouse"));
-    Assertions.assertFalse(options.containsKey("hadoop.fs.oss.endpoint"));
-    Assertions.assertFalse(options.containsKey("fs.s3a.access.key"));
-    Assertions.assertFalse(options.containsKey("dfs.client.use.datanode.hostname"));
-    Assertions.assertEquals("oss-endpoint", configuration.get("fs.oss.endpoint"));
-    Assertions.assertEquals("s3-key", configuration.get("fs.s3a.access.key"));
-    Assertions.assertEquals("true", configuration.get("dfs.client.use.datanode.hostname"));
+  @Test
+  void testPropertiesWithSecretsPropagatesRestException() {
+    SupportsSecrets broken =
+        () -> {
+          throw new RESTException("connection failed");
+        };
+    Assertions.assertThrows(
+        RESTException.class,
+        () -> PropertyUtils.propertiesWithSecrets(Map.of("k", "v"), () -> broken));
+  }
+
+  @Test
+  void testPropertiesWithSecretsSwallowsUnsupportedOperation() {
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecrets(
+            Map.of("k", "v"),
+            () -> {
+              throw new UnsupportedOperationException("no secrets");
+            });
+    Assertions.assertEquals("v", merged.get("k"));
+  }
+
+  @Test
+  void testPropertiesWithSecretsNullProperties() {
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecrets(null, () -> () -> Map.of("secret", "x"));
+    Assertions.assertEquals("x", merged.get("secret"));
+  }
+
+  @Test
+  void testPropertiesWithSecretsAndCredentialsSkipsExpiringCredentials() {
+    Credential staticCred = new S3SecretKeyCredential("AKIATEST", "static-secret");
+    Credential tokenCred =
+        new S3TokenCredential("SESSION", "session-secret", "tok", 1_700_000_000_000L);
+    Map<String, String> merged =
+        PropertyUtils.propertiesWithSecretsAndCredentials(
+            Map.of("s3-endpoint", "http://s3.example.com"),
+            () -> () -> Map.of(),
+            () -> () -> new Credential[] {tokenCred, staticCred});
+    Assertions.assertEquals(
+        "AKIATEST", merged.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        "static-secret", merged.get(S3SecretKeyCredential.GRAVITINO_S3_STATIC_SECRET_ACCESS_KEY));
+    Assertions.assertFalse(merged.containsKey(S3TokenCredential.GRAVITINO_S3_TOKEN));
+    Assertions.assertEquals("http://s3.example.com", merged.get("s3-endpoint"));
   }
 }

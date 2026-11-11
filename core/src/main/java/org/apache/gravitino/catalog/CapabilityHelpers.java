@@ -19,15 +19,28 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ObjectArrays;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Supplier;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -50,14 +63,114 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 
 public class CapabilityHelpers {
 
+  /**
+   * Maps a normalized table identifier to the identifier under which the table is physically stored
+   * by the catalog's backend, when the catalog implements the connector-side {@link
+   * SupportsTableNameResolution} capability; otherwise returns {@code normalizedIdent} unchanged.
+   *
+   * <p>This is the single resolution path shared by the authorization layer (so a request is
+   * authorized against the physical name) and the table dispatcher (so the operation runs on the
+   * same physical name), which keeps the authorized identifier and the operated-on identifier
+   * identical.
+   *
+   * <p>For the vast majority of catalogs — those that do not implement the capability — this is a
+   * pure identity call: no differently-cased object is consulted, no extra source access is made
+   * beyond the single {@code doWithCatalog} used to reach the catalog's operations. Resolution is
+   * best-effort and takes no lock; a concurrent rename/recreate surfaces as the normal {@code
+   * NoSuchTableException} from the subsequent locked operation.
+   *
+   * @param normalizedIdent the case-normalized table identifier
+   * @param catalogManager the catalog manager used to reach the catalog operations
+   * @return the identifier under which the table is physically stored, or {@code normalizedIdent}
+   *     unchanged when the catalog does not opt in or no unambiguous mapping applies
+   */
+  public static NameIdentifier resolvePhysicalTableName(
+      NameIdentifier normalizedIdent, CatalogManager catalogManager) {
+    NameIdentifier catalogIdent = getCatalogIdentifier(normalizedIdent);
+    try {
+      return catalogManager.doWithCatalog(
+          catalogIdent,
+          catalog -> {
+            CatalogOperations catalogOps = catalog.ops();
+            if (catalogOps instanceof SupportsTableNameResolution) {
+              return ((SupportsTableNameResolution) catalogOps).resolveTableName(normalizedIdent);
+            }
+            return normalizedIdent;
+          });
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
+      throw new RuntimeException(
+          "Failed to resolve physical table name for: " + normalizedIdent, e);
+    }
+  }
+
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
     try {
-      return c.capabilities();
-    } catch (Exception e) {
+      return catalogManager.doWithCatalog(catalogIdent, catalog -> catalog.capability());
+    } catch (NoSuchCatalogException e) {
+      throw e;
+    } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
+  }
+
+  /**
+   * Normalizes the identifier of an existing catalog object to the identifier stored by Gravitino.
+   * Tag and authorization lookups use it, so they find the same stored object.
+   *
+   * <ul>
+   *   <li>Names follow the catalog's case rules for each scope.
+   *   <li>A table, or the parent table of a column, is resolved to its physical name by {@link
+   *       #resolvePhysicalTableName}.
+   *   <li>A column keeps the requested name when its table has a stored column with exactly that
+   *       name. A custom {@link Capability#normalizeName} can fold a name that the source stored
+   *       with another case, and an exact name must still find that column.
+   *   <li>A Semantic Model name is owned by Gravitino, so only its schema is normalized.
+   * </ul>
+   *
+   * @param ident the entity identifier of the object
+   * @param scope the capability scope of the object
+   * @param catalogManager the catalog manager used to load capabilities and resolve table names
+   * @param entityStore supplies the entity store that holds the stored columns of a table. It is
+   *     called only for a column whose name the catalog rules change.
+   * @return the normalized identifier
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws RuntimeException if capabilities, the physical table name or the stored table cannot be
+   *     loaded
+   */
+  public static NameIdentifier normalizeMetadataIdentifier(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      CatalogManager catalogManager,
+      Supplier<EntityStore> entityStore) {
+    Capability capability = getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.COLUMN) {
+      NameIdentifier table =
+          resolvePhysicalTableName(
+              applyCaseSensitive(
+                  NameIdentifier.of(ident.namespace().levels()),
+                  Capability.Scope.TABLE,
+                  capability),
+              catalogManager);
+      String column = applyCaseSensitiveOnName(scope, ident.name(), capability);
+      if (!column.equals(ident.name()) && hasStoredColumn(table, ident.name(), entityStore.get())) {
+        column = ident.name();
+      }
+      return NameIdentifier.of(
+          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())), column);
+    }
+
+    if (scope == Capability.Scope.SEMANTIC_MODEL) {
+      return NameIdentifier.of(
+          applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+    }
+
+    NameIdentifier normalized = applyCaseSensitive(ident, scope, capability);
+    return scope == Capability.Scope.TABLE
+        ? resolvePhysicalTableName(normalized, catalogManager)
+        : normalized;
   }
 
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {
@@ -94,6 +207,18 @@ public class CapabilityHelpers {
         .toArray(FilesetChange[]::new);
   }
 
+  public static ModelChange[] applyCapabilities(Capability capabilities, ModelChange... changes) {
+    return Arrays.stream(changes)
+        .map(
+            change -> {
+              if (change instanceof ModelChange.RenameModel) {
+                return applyCapabilities((ModelChange.RenameModel) change, capabilities);
+              }
+              return change;
+            })
+        .toArray(ModelChange[]::new);
+  }
+
   public static ViewChange[] applyCapabilities(Capability capabilities, ViewChange... changes) {
     return Arrays.stream(changes)
         .map(
@@ -122,17 +247,6 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
-  /**
-   * Convenience overload that loads the catalog capability for {@code ident} and applies it to the
-   * identifier. Use this from call sites (e.g. HookDispatchers) that need a normalized identifier
-   * but do not already hold a {@link Capability} instance.
-   */
-  public static NameIdentifier applyCapabilities(
-      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, scope, capability);
-  }
-
   public static NameIdentifier[] applyCaseSensitive(
       NameIdentifier[] idents, Capability.Scope scope, Capability capabilities) {
     return Arrays.stream(idents)
@@ -148,16 +262,25 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
+  /**
+   * Loads the catalog capability for {@code ident} and applies its case-sensitivity rules.
+   *
+   * @param ident the identifier to normalize
+   * @param scope the identifier's capability scope
+   * @param catalogManager the catalog manager used to load the capability
+   * @return the case-normalized identifier
+   */
+  public static NameIdentifier applyCaseSensitive(
+      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
+    Capability capability = getCapability(ident, catalogManager);
+    return applyCaseSensitive(ident, scope, capability);
+  }
+
   public static Namespace applyCaseSensitive(
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.MODEL
-        || identScope == Capability.Scope.FUNCTION) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -223,16 +346,39 @@ public class CapabilityHelpers {
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.FUNCTION) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
     }
     return namespace;
+  }
+
+  private static boolean hasStoredColumn(
+      NameIdentifier table, String column, EntityStore entityStore) {
+    try {
+      return entityStore.get(table, Entity.EntityType.TABLE, TableEntity.class).columns().stream()
+          .anyMatch(storedColumn -> storedColumn.name().equals(column));
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load stored columns of table: " + table, e);
+    }
+  }
+
+  private static boolean hasSchemaParent(Capability.Scope resourceScope) {
+    switch (resourceScope) {
+      case TABLE:
+      case VIEW:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+      case SEMANTIC_MODEL:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private static Index applyCapabilities(Index index, Capability capabilities) {
@@ -349,6 +495,14 @@ public class CapabilityHelpers {
     return FilesetChange.rename(newName);
   }
 
+  private static ModelChange applyCapabilities(
+      ModelChange.RenameModel renameModel, Capability capabilities) {
+    applyNameSpecification(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    String newName =
+        applyCaseSensitiveOnName(Capability.Scope.MODEL, renameModel.newName(), capabilities);
+    return ModelChange.rename(newName);
+  }
+
   private static ViewChange applyCapabilities(
       ViewChange.RenameView renameView, Capability capabilities) {
     applyNameSpecification(Capability.Scope.VIEW, renameView.getNewName(), capabilities);
@@ -374,15 +528,23 @@ public class CapabilityHelpers {
     return TableChange.rename(newName, newSchemaName);
   }
 
+  private static void applyExistingColumnName(String name, Capability capabilities) {
+    CapabilityResult result =
+        capabilities.specificationOnExistingName(Capability.Scope.COLUMN, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-    applyNameSpecification(Capability.Scope.COLUMN, change.fieldName()[0], capabilities);
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
 
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    applyExistingColumnName(change.fieldName()[0], capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
@@ -405,16 +567,10 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       TableChange.UpdateColumnPosition updateColumnPosition =
           (TableChange.UpdateColumnPosition) change;
-      if (updateColumnPosition.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyNameSpecification(Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        String afterFieldName =
-            applyCaseSensitiveOnName(
-                Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        return TableChange.updateColumnPosition(
-            fieldName, TableChange.ColumnPosition.after(afterFieldName));
-      }
-      return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
+      return TableChange.updateColumnPosition(
+          fieldName,
+          normalizeColumnPosition(
+              updateColumnPosition.getPosition(), capabilities, fieldName.length == 1));
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return TableChange.updateColumnType(
@@ -427,28 +583,45 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.AddColumn addColumn, Capability capabilities) {
-    Column appliedColumn =
-        applyCapabilities(
-            Column.of(
-                addColumn.fieldName()[0],
-                addColumn.getDataType(),
-                addColumn.getComment(),
-                addColumn.isNullable(),
-                addColumn.isAutoIncrement(),
-                addColumn.getDefaultValue()),
-            capabilities);
+    Column column =
+        Column.of(
+            addColumn.fieldName()[0],
+            addColumn.getDataType(),
+            addColumn.getComment(),
+            addColumn.isNullable(),
+            addColumn.isAutoIncrement(),
+            addColumn.getDefaultValue());
+    applyColumnNotNull(column, capabilities);
+    applyColumnDefaultValue(column, capabilities);
 
-    String[] standardizeFieldName =
-        Arrays.copyOf(addColumn.fieldName(), addColumn.fieldName().length);
-    standardizeFieldName[0] = appliedColumn.name();
+    boolean topLevel = addColumn.fieldName().length == 1;
+    if (topLevel) {
+      applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
+    } else {
+      // For a nested addition the first component names an existing parent column.
+      applyExistingColumnName(addColumn.fieldName()[0], capabilities);
+    }
     return TableChange.addColumn(
-        standardizeFieldName,
-        appliedColumn.dataType(),
-        appliedColumn.comment(),
-        addColumn.getPosition(),
-        appliedColumn.nullable(),
-        appliedColumn.autoIncrement(),
-        appliedColumn.defaultValue());
+        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        column.dataType(),
+        column.comment(),
+        normalizeColumnPosition(addColumn.getPosition(), capabilities, topLevel),
+        column.nullable(),
+        column.autoIncrement(),
+        column.defaultValue());
+  }
+
+  private static TableChange.ColumnPosition normalizeColumnPosition(
+      TableChange.ColumnPosition position, Capability capabilities, boolean topLevel) {
+    // Nested siblings follow the connector's own field rules rather than top-level name rules.
+    if (position instanceof TableChange.After && topLevel) {
+      // AFTER identifies an existing sibling; it does not introduce a new column name.
+      String afterColumn = ((TableChange.After) position).getColumn();
+      applyExistingColumnName(afterColumn, capabilities);
+      return TableChange.ColumnPosition.after(
+          applyCaseSensitiveOnName(Capability.Scope.COLUMN, afterColumn, capabilities));
+    }
+    return position;
   }
 
   private static TableChange applyCapabilities(
@@ -478,7 +651,7 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
       newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);
@@ -496,10 +669,11 @@ public class CapabilityHelpers {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        column.defaultValue());
+        column.defaultValue(),
+        column.initialDefaultValue());
   }
 
-  private static String applyCapabilitiesOnName(
+  static String applyCapabilitiesOnName(
       Capability.Scope scope, String name, Capability capabilities) {
     applyNameSpecification(scope, name, capabilities);
     return applyCaseSensitiveOnName(scope, name, capabilities);
@@ -544,6 +718,7 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue());
   }
 
   private static void applyColumnDefaultValue(
@@ -551,6 +726,23 @@ public class CapabilityHelpers {
     Preconditions.checkArgument(
         capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+  }
+
+  /**
+   * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
+   * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
+   * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
+   * catalog can write initial defaults, require unset ({@code null} or {@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
+   */
+  private static void applyColumnInitialDefaultValue(
+      String columnName, Expression initialDefaultValue) {
+    Preconditions.checkArgument(
+        initialDefaultValue == null || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        "Column initial default value is read-only for now: catalogs may return it on load "
+            + "(e.g. Iceberg v3), but setting it on create/add-column is not supported by any "
+            + "catalog capability yet. Illegal column: "
+            + columnName);
   }
 
   private static void applyNameSpecification(

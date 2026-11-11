@@ -35,7 +35,6 @@ import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.credential.config.CredentialConfig;
 
 public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
 
@@ -223,7 +222,6 @@ public class FilesetCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
           // The following two are about authentication.
           .putAll(KERBEROS_PROPERTY_ENTRIES)
           .putAll(AUTHENTICATION_PROPERTY_ENTRIES)
-          .putAll(CredentialConfig.CREDENTIAL_PROPERTY_ENTRIES)
           .build();
 
   @Override

@@ -138,7 +138,7 @@ public class TestJsonAuditFormatter {
 
   static class StubEventWithSensitiveCustomInfo extends StubEvent {
     @Override
-    public Map<String, String> customInfo() {
+    protected Map<String, String> ownCustomInfo() {
       return ImmutableMap.<String, String>builder()
           .put("Authorization", "Bearer token")
           .put("cookie", "a=b")
@@ -161,7 +161,7 @@ public class TestJsonAuditFormatter {
     }
 
     @Override
-    public Map<String, String> customInfo() {
+    protected Map<String, String> ownCustomInfo() {
       return ImmutableMap.of("env", "prod");
     }
   }

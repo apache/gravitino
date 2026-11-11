@@ -18,18 +18,76 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.ibatis.mapping.BoundSql;
 import org.apache.ibatis.mapping.SqlSource;
 import org.apache.ibatis.scripting.xmltags.XMLLanguageDriver;
 import org.apache.ibatis.session.Configuration;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestGroupRoleRelPostgreSQLProvider {
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2})
+  void testBatchInsertGroupRoleRelOnDuplicateKeyUpdate(int batchSize) {
+    List<GroupRoleRelPO> relations = new ArrayList<>();
+    List<Object> expectedParameters = new ArrayList<>();
+    for (int i = 0; i < batchSize; i++) {
+      GroupRoleRelPO relation =
+          GroupRoleRelPO.builder()
+              .withGroupId(10L + i)
+              .withRoleId(20L + i)
+              .withAuditInfo("audit-" + i)
+              .withCurrentVersion(30L + i)
+              .withLastVersion(40L + i)
+              .withDeletedAt(50L + i)
+              .build();
+      relations.add(relation);
+      expectedParameters.addAll(
+          Arrays.asList(
+              relation.getGroupId(),
+              relation.getRoleId(),
+              relation.getAuditInfo(),
+              relation.getCurrentVersion(),
+              relation.getLastVersion(),
+              relation.getDeletedAt()));
+    }
+
+    String script =
+        new GroupRoleRelPostgreSQLProvider().batchInsertGroupRoleRelOnDuplicateKeyUpdate(relations);
+    SqlSource sqlSource =
+        new XMLLanguageDriver().createSqlSource(new Configuration(), script, Map.class);
+    BoundSql boundSql = sqlSource.getBoundSql(Map.of("groupRoleRels", relations));
+    String sql = boundSql.getSql().replaceAll("\\s+", " ").trim();
+
+    Assertions.assertTrue(sql.startsWith("INSERT INTO group_role_rel "));
+    Assertions.assertTrue(
+        sql.contains("ON CONFLICT (group_id, role_id, deleted_at) DO UPDATE SET"));
+    Assertions.assertFalse(sql.contains("ON DUPLICATE KEY UPDATE"));
+    Assertions.assertFalse(sql.contains("VALUES("));
+    for (String column :
+        Arrays.asList(
+            "group_id", "role_id", "audit_info", "current_version", "last_version", "deleted_at")) {
+      Assertions.assertTrue(sql.contains(column + " = EXCLUDED." + column));
+    }
+
+    List<Object> actualParameters = new ArrayList<>();
+    boundSql
+        .getParameterMappings()
+        .forEach(
+            mapping ->
+                actualParameters.add(boundSql.getAdditionalParameter(mapping.getProperty())));
+    Assertions.assertEquals(expectedParameters, actualParameters);
+  }
 
   @Test
   void testSoftDeleteGroupRoleRelByGroupAndRolesWithEmptyRoles() {

@@ -80,10 +80,10 @@ When using Gravitino authorization for Hive with Apache Ranger, see the [Authori
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Recover credential fields via the [credential vending API](security/credential-vending.md) (`getCredentials`). Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
@@ -103,14 +103,14 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema Operations
 
-see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+see [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table
 
 ### Table Capabilities
 
 - The Hive catalog supports creating, updating, and deleting tables in the HMS.
-- Doesn't support column default value.
+- Column `NOT NULL` and `DEFAULT` constraints are supported only when the connected HMS is Hive 3.x; on Hive 2.x they are rejected.
 
 ### Table Partitioning
 
@@ -124,7 +124,7 @@ The `fieldName` specified in the partitioning attribute must be the name of a co
 ### Table Sort Orders and Distributions
 
 The Hive catalog supports [bucketed sorted tables](https://cwiki.apache.org/confluence/display/Hive/LanguageManual+DDL#LanguageManualDDL-BucketedSortedTables). Users can create bucketed sorted tables in the Hive catalog with specific `distribution` and `sortOrders` attributes.
-Although Gravitino supports several distribution strategies, Apache Hive inherently only supports a single distribution strategy (clustered by column). Therefore the Hive catalog only supports `Hash` distribution.
+Although Gravitino supports several distribution strategies, Apache Hive inherently only supports a single distribution strategy (clustered by column). Therefore the Hive catalog only supports `Hash` bucketing. Use `none` (zero buckets and no expressions) for an unbucketed table. Other distribution strategies are rejected rather than silently converted to hash bucketing.
 
 :::caution
 The `fieldName` specified in the `distribution` and `sortOrders` attribute must be the name of a column defined in the table.
@@ -159,7 +159,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `union`             |
 
 :::info
-1. The data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+1. The data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type from the Hive catalog.
 2. Using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
@@ -222,12 +222,14 @@ As Gravitino has a separate interface for updating the comment of a table, the H
 
 ##### Alter column
 
-| Hive Alter Operation     | Gravitino Table Update Request    |
-|--------------------------|-----------------------------------|
-| `Change Column Name`     | `Rename a column`                 |
-| `Change Column Type`     | `Update the type of a column`     |
-| `Change Column Position` | `Update the position of a column` |
-| `Change Column Comment`  | `Update the column comment`       |
+| Hive Alter Operation        | Gravitino Table Update Request                         |
+|-----------------------------|--------------------------------------------------------|
+| `Change Column Name`        | `Rename a column`                                      |
+| `Change Column Type`        | `Update the type of a column`                          |
+| `Change Column Position`    | `Update the position of a column`                      |
+| `Change Column Comment`     | `Update the column comment`                            |
+| `Change Column Nullability` | `Update the nullability of a column` (Hive 3.x only)   |
+| `Change Column Default`     | `Update the default value of a column` (Hive 3.x only) |
 
 ##### Alter partition
 
@@ -241,9 +243,11 @@ Support for altering partitions is under development.
 
 - Supports list, create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
 - Each view must contain exactly one SQL representation.
-- Supports creating views with the `hive`, `flink`, or `spark` dialect.
-- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, `spark`, or `trino` dialect.
+- Supports creating views with the `hive`, `trino`, `flink`, or `spark` dialect.
+- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, `flink`, or `spark` dialect.
 - For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
+- For the `trino` dialect, `defaultSchema` requires `defaultCatalog` to also be set (a schema without a catalog cannot be represented).
+- The `trino` dialect requires at least one output column, and is stored using Trino's own native "Presto View" Hive Metastore encoding, so a view created through Gravitino is interoperable with a native Trino/Presto Hive connector pointed at the same Hive Metastore, and vice versa. The HMS `presto_view` property this relies on is reserved and managed internally based on the view's dialect; it cannot be set or removed directly. Gravitino's view model cannot represent a native Trino view's owner, `runAsInvoker`, or SQL path, so replacing an existing native view that has a non-default value for any of them is rejected rather than silently discarding it.
 - The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
 - The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
 
@@ -255,3 +259,38 @@ Refer to [Manage view metadata using Gravitino](./manage-view-metadata-using-gra
 
 To create a Hive catalog with S3 storage, you can refer to the [Hive catalog with S3](./hive-catalog-with-cloud-storage.md) documentation. No special configurations are required for the Hive catalog to work with S3 storage.
 The only difference is the storage location of the files, which is in S3. Use `location` to specify the S3 path for the database or table.
+
+### SerDe-derived schemas
+
+Tables with `<derived from deserializer>` storage column types are resolved through Hive
+Metastore's `getFields` API when loaded individually or in a batch. Ordinary tables do not
+require an additional schema-resolution request. Hudi table listing filters raw storage
+metadata without resolving unrelated table schemas, so an unresolvable non-Hudi SerDe
+table does not prevent Hudi tables from being listed. Full schema batch reads still fail
+if a requested table cannot be resolved. The table SerDe and its dependencies must
+be available on the Hive Metastore classpath.
+
+Hive 3's default storage schema reader cannot resolve these schemas. Configure the following
+property in the **Hive Metastore server's** `hive-site.xml` and restart Hive Metastore:
+
+```xml
+<property>
+  <name>metastore.storage.schema.reader.impl</name>
+  <value>org.apache.hadoop.hive.metastore.SerDeStorageSchemaReader</value>
+</property>
+```
+
+This server setting is also required when a Hive 2 client connects to a Hive 3 Metastore.
+If resolution fails or returns unresolved types, Gravitino reports an error with configuration
+guidance rather than treating the marker as a Hive data type.
+
+Property, table-comment, and table-name changes preserve the original storage column schema
+in Hive Metastore. Hive 2 HMS can reject even metadata-only alters when
+`hive.metastore.disallow.incompatible.col.type.changes=true`, because its compatibility
+check attempts to parse the stored marker as a type. Preserving the marker requires an
+HMS administrator to evaluate setting this property to `false` on the server and restarting
+HMS. This disables column type compatibility checks for **all tables**; Gravitino does not
+change this server setting. If the check rejects the marker, the error explains this limitation.
+
+Column changes on SerDe-derived tables are rejected: modify those schemas
+through the SerDe or its external schema definition (for example, `avro.schema.url`) instead.

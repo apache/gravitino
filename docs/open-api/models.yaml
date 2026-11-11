@@ -133,6 +133,15 @@ paths:
               examples:
                 NoSuchModelException:
                   $ref: "#/components/examples/NoSuchModelException"
+        "409":
+          description: Conflict - The target model already exists
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                ModelAlreadyExistsErrorResponse:
+                  $ref: "#/components/examples/ModelAlreadyExistsException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

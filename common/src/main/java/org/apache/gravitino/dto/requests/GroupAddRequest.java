@@ -20,7 +20,6 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -40,13 +39,9 @@ public class GroupAddRequest implements RESTRequest {
   @JsonProperty("name")
   private final String name;
 
-  @Nullable
-  @JsonProperty("externalId")
-  private final String externalId;
-
   /** Default constructor for GroupAddRequest. (Used for Jackson deserialization.) */
   public GroupAddRequest() {
-    this(null, null);
+    this(null);
   }
 
   /**
@@ -55,19 +50,7 @@ public class GroupAddRequest implements RESTRequest {
    * @param name The name of the group.
    */
   public GroupAddRequest(String name) {
-    this(name, null);
-  }
-
-  /**
-   * Creates a new GroupAddRequest.
-   *
-   * @param name The name of the group.
-   * @param externalId The external identifier of the group.
-   */
-  public GroupAddRequest(String name, String externalId) {
-    super();
     this.name = name;
-    this.externalId = externalId;
   }
 
   /**
@@ -79,9 +62,5 @@ public class GroupAddRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
-    if (externalId != null) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(externalId), "\"externalId\" field cannot be blank when provided");
-    }
   }
 }

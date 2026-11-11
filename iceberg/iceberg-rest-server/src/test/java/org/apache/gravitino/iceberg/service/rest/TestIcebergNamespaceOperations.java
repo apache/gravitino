@@ -198,8 +198,9 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     Assertions.assertTrue(
         dummyEventListener.popPostEvent() instanceof IcebergDropNamespaceFailureEvent);
 
-    // jersery route failed
-    verifyDropNamespaceFail(500, Namespace.of(""));
+    // Empty namespace encodes to a path Jersey cannot bind for DELETE → 405 Method Not Allowed
+    // (previously mis-mapped to 500 by IcebergExceptionMapper).
+    verifyDropNamespaceFail(405, Namespace.of(""));
 
     verifyCreateNamespaceSucc(Namespace.of("drop_foo3", "a"));
     verifyDropNamespaceFail(404, Namespace.of("drop_foo3", "b"));
@@ -322,10 +323,23 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
     doCreateNamespace(Namespace.of("page_ns2"));
     doCreateNamespace(Namespace.of("page_ns3"));
 
-    // First page: pageSize=2, no pageToken
-    Response firstPageResponse =
+    // pageSize alone must not truncate the list.
+    try (Response response =
         getNamespaceClientBuilder(
                 Optional.empty(), Optional.empty(), Optional.of(ImmutableMap.of("pageSize", "2")))
+            .get()) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+      ListNamespacesResponse all = response.readEntity(ListNamespacesResponse.class);
+      Assertions.assertEquals(3, all.namespaces().size());
+      Assertions.assertNull(all.nextPageToken());
+    }
+
+    // First page: an empty pageToken starts paging
+    Response firstPageResponse =
+        getNamespaceClientBuilder(
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(ImmutableMap.of("pageToken", "", "pageSize", "2")))
             .get();
     Assertions.assertEquals(Status.OK.getStatusCode(), firstPageResponse.getStatus());
     ListNamespacesResponse firstPage = firstPageResponse.readEntity(ListNamespacesResponse.class);
@@ -384,6 +398,21 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   }
 
   @Test
+  void testUpdateNamespaceRejectsNullPropertyValue() {
+    verifyCreateNamespaceSucc("update_null_value");
+    Response response =
+        getUpdateNamespaceClientBuilder(Namespace.of("update_null_value"))
+            .post(
+                Entity.entity(
+                    "{\"removals\":[],\"updates\":{\"k\":null}}", MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(400, response.getStatus());
+
+    // Nothing was stored, so the namespace can still be loaded and changed.
+    verifyLoadNamespaceSucc(Namespace.of("update_null_value"));
+    verifyUpdateNamespaceSucc(Namespace.of("update_null_value"));
+  }
+
+  @Test
   void testRegisterTableWithCredentialVending() {
     // register without credential vending -- no credentials in response
     verifyRegisterTableSucc("register_cred_foo1", Namespace.of("register_cred_ns"));
@@ -414,36 +443,30 @@ public class TestIcebergNamespaceOperations extends IcebergNamespaceTestBase {
   }
 
   @Test
-  void testRegisterTableRemoteSigningNotSupported() {
+  void testRegisterTableWithOtherAccessDelegationIsNotRefused() {
     RegisterTableRequest request =
         ImmutableRegisterTableRequest.builder()
             .name("remote_signing_test")
             .metadataLocation("mock")
             .build();
-    Response response =
+    // A delegation mechanism the server does not offer does not change the outcome: the request
+    // is handled exactly as without the header.
+    int withoutHeader =
         getNamespaceClientBuilder(
                 Optional.of(Namespace.of("register_remote_ns")),
                 Optional.of("register"),
                 Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "remote-signing")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(406, response.getStatus());
-  }
-
-  @Test
-  void testRegisterTableInvalidAccessDelegation() {
-    RegisterTableRequest request =
-        ImmutableRegisterTableRequest.builder()
-            .name("invalid_delegation_test")
-            .metadataLocation("mock")
-            .build();
-    Response response =
-        getNamespaceClientBuilder(
-                Optional.of(Namespace.of("register_invalid_ns")),
-                Optional.of("register"),
-                Optional.empty())
-            .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "invalid-value")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-    Assertions.assertEquals(400, response.getStatus());
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))
+            .getStatus();
+    for (String header : new String[] {"remote-signing", "invalid-value"}) {
+      Response response =
+          getNamespaceClientBuilder(
+                  Optional.of(Namespace.of("register_remote_ns")),
+                  Optional.of("register"),
+                  Optional.empty())
+              .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, header)
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(withoutHeader, response.getStatus(), header);
+    }
   }
 }

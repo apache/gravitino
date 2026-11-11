@@ -32,6 +32,9 @@ public class MySQLExceptionConverter implements SQLExceptionConverter {
   /** It means found a duplicated primary key or unique key entry in MySQL. */
   static final int DUPLICATED_ENTRY_ERROR_CODE = 1062;
 
+  /** It means a value is too long for its column in MySQL. */
+  private static final int DATA_TOO_LONG_ERROR_CODE = 1406;
+
   @SuppressWarnings("FormatStringAnnotation")
   @Override
   public void toGravitinoException(SQLException se, Entity.EntityType type, String name)
@@ -40,6 +43,8 @@ public class MySQLExceptionConverter implements SQLExceptionConverter {
       case DUPLICATED_ENTRY_ERROR_CODE:
         throw new EntityAlreadyExistsException(
             se, "The %s entity: %s already exists.", type.name(), name);
+      case DATA_TOO_LONG_ERROR_CODE:
+        throw ValueTooLongExceptions.of(se, type, name);
       default:
         throw new IOException(se);
     }

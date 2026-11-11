@@ -23,66 +23,35 @@ import org.junit.jupiter.api.Test;
 
 public class TestFakeKmsClient extends TestKmsClientContract {
 
-  private static final String API = "test-kms";
-  private static final String SOURCE = "test";
+  private static final String PROVIDER = "test";
   private static final String USABLE_KEY = "usable";
   private static final String DISABLED_KEY = "disabled";
   private static final String MISSING_KEY = "missing";
 
   private final FakeKmsClient client =
-      new FakeKmsClient(API, SOURCE)
+      new FakeKmsClient(PROVIDER)
           .putKey(USABLE_KEY, true, true, true)
           .putKey(DISABLED_KEY, false, true, true);
 
   @Test
-  void testRejectsBlankApi() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(null, SOURCE));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient("", SOURCE));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(" ", SOURCE));
+  void testRejectsBlankProvider() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(""));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(" "));
   }
 
   @Test
-  void testRejectsPaddedApi() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new FakeKmsClient(" " + API, SOURCE));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new FakeKmsClient(API + " ", SOURCE));
-  }
-
-  @Test
-  void testRejectsInvalidApiFormat() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new FakeKmsClient("TEST-KMS", SOURCE));
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new FakeKmsClient("test_kms", SOURCE));
-  }
-
-  @Test
-  void testMatchesApiExactly() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> client.getKeyProperties(new KmsReference("other-kms", SOURCE, USABLE_KEY)));
-  }
-
-  @Test
-  void testRejectsBlankSource() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, null));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, ""));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> new FakeKmsClient(API, " "));
-  }
-
-  @Test
-  void testNormalizesSource() {
-    FakeKmsClient paddedSourceClient = new FakeKmsClient(API, " " + SOURCE + " ");
+  void testNormalizesProvider() {
+    FakeKmsClient paddedProviderClient = new FakeKmsClient(" " + PROVIDER + " ");
 
     Assertions.assertDoesNotThrow(
-        () -> paddedSourceClient.getKeyProperties(new KmsReference(API, SOURCE, MISSING_KEY)));
+        () -> paddedProviderClient.getKeyProperties(new KmsReference(PROVIDER, MISSING_KEY)));
   }
 
   @Test
   void testReportsDisabledKeyAsPresent() {
     KmsKeyProperties properties =
-        client.getKeyProperties(new KmsReference(API, SOURCE, DISABLED_KEY)).orElseThrow();
+        client.getKeyProperties(new KmsReference(PROVIDER, DISABLED_KEY)).orElseThrow();
 
     Assertions.assertFalse(properties.enabled());
   }
@@ -94,11 +63,11 @@ public class TestFakeKmsClient extends TestKmsClientContract {
 
   @Override
   protected KmsReference usableKey() {
-    return new KmsReference(API, SOURCE, USABLE_KEY);
+    return new KmsReference(PROVIDER, USABLE_KEY);
   }
 
   @Override
   protected KmsReference missingKey() {
-    return new KmsReference(API, SOURCE, MISSING_KEY);
+    return new KmsReference(PROVIDER, MISSING_KEY);
   }
 }

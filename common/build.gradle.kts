@@ -43,10 +43,12 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.commons.dbcp2)
+  compileOnly(libs.jackson.dataformat.yaml)
   compileOnly(libs.lombok)
   testAnnotationProcessor(libs.lombok)
   testCompileOnly(libs.lombok)
 
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
@@ -54,6 +56,7 @@ dependencies {
 
   testFixturesApi(project(":api"))
   testFixturesApi(libs.junit.jupiter.api)
+  testFixturesImplementation(libs.commons.lang3)
 }
 
 fun getGitCommitId(): String {

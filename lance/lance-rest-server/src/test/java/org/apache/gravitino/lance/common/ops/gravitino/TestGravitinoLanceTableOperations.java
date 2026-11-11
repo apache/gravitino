@@ -33,6 +33,9 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -97,11 +100,43 @@ class TestGravitinoLanceTableOperations {
         "Only RENAME alteration is supported currently.", exception.getMessage());
   }
 
+  @ParameterizedTest
+  @CsvSource(
+      value = {"NULL", "false", "true"},
+      nullValues = "NULL")
+  void testDeregisterLegacyRegisteredTable(String external) {
+    Table table = Mockito.mock(Table.class);
+    Map<String, String> properties =
+        new HashMap<>(
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                "lance",
+                "lance.register",
+                "true",
+                "location",
+                "/existing"));
+    if (external != null) {
+      properties.put(Table.PROPERTY_EXTERNAL, external);
+    }
+    Mockito.when(table.properties()).thenReturn(properties);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
+    Mockito.when(tableCatalog.dropTable(Mockito.any(NameIdentifier.class))).thenReturn(true);
+
+    Assertions.assertEquals(
+        "/existing",
+        operations(tableCatalog).deregisterTable("catalog.schema.table", ".").getLocation());
+
+    Mockito.verify(tableCatalog).dropTable(NameIdentifier.of("schema", "table"));
+    Mockito.verify(tableCatalog, Mockito.never()).purgeTable(Mockito.any());
+  }
+
   @Test
   void testDeregisterTableRejectsManagedTable() {
     // Mock a managed table (no PROPERTY_EXTERNAL=true)
     Table managedTable = Mockito.mock(Table.class);
-    Mockito.when(managedTable.properties()).thenReturn(new HashMap<>());
+    Mockito.when(managedTable.properties())
+        .thenReturn(new HashMap<>(Map.of(Table.PROPERTY_TABLE_FORMAT, "lance")));
 
     TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
     Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class)))
@@ -125,5 +160,81 @@ class TestGravitinoLanceTableOperations {
 
     // Verify dropTable was never called — the guard must reject before reaching the catalog layer.
     Mockito.verify(tableCatalog, Mockito.never()).dropTable(Mockito.any());
+  }
+
+  @Test
+  void testDescribeTableRejectsNonLanceTable() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+
+    InvalidInputException exception =
+        Assertions.assertThrows(
+            InvalidInputException.class,
+            () ->
+                ops.describeTable(
+                    "catalog.schema.table", ".", java.util.Optional.empty(), false, false));
+
+    Assertions.assertTrue(exception.getMessage().contains("not a Lance table"));
+  }
+
+  @Test
+  void testTableExistsTreatsNonLanceTableAsAbsent() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+
+    Assertions.assertFalse(ops.tableExists("catalog.schema.table", "."));
+    Mockito.verify(tableCatalog, Mockito.never()).tableExists(Mockito.any());
+  }
+
+  @Test
+  void testDropTableRejectsNonLanceTableBeforePurge() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+
+    Assertions.assertThrows(
+        InvalidInputException.class, () -> ops.dropTable("catalog.schema.table", "."));
+
+    Mockito.verify(tableCatalog, Mockito.never()).purgeTable(Mockito.any());
+  }
+
+  @Test
+  void testDeregisterTableRejectsNonLanceTableBeforeDrop() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+
+    Assertions.assertThrows(
+        InvalidInputException.class, () -> ops.deregisterTable("catalog.schema.table", "."));
+
+    Mockito.verify(tableCatalog, Mockito.never()).dropTable(Mockito.any());
+  }
+
+  @Test
+  void testAlterTableRejectsNonLanceTableBeforeAlter() {
+    TableCatalog tableCatalog = tableCatalogWithTable("delta");
+    GravitinoLanceTableOperations ops = operations(tableCatalog);
+    AlterTableDropColumnsRequest request = new AlterTableDropColumnsRequest();
+    request.setColumns(List.of("col1"));
+
+    Assertions.assertThrows(
+        InvalidInputException.class, () -> ops.alterTable("catalog.schema.table", ".", request));
+
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  private static TableCatalog tableCatalogWithTable(String format) {
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties())
+        .thenReturn(Map.of(Table.PROPERTY_TABLE_FORMAT, format, Table.PROPERTY_EXTERNAL, "true"));
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(tableCatalog.loadTable(Mockito.any(NameIdentifier.class))).thenReturn(table);
+    return tableCatalog;
+  }
+
+  private static GravitinoLanceTableOperations operations(TableCatalog tableCatalog) {
+    Catalog catalog = Mockito.mock(Catalog.class);
+    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
+    Mockito.when(wrapper.loadAndValidateLakehouseCatalog(Mockito.anyString())).thenReturn(catalog);
+    Mockito.when(wrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
+    return new GravitinoLanceTableOperations(wrapper);
   }
 }

@@ -23,55 +23,54 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import org.apache.gravitino.Config;
 
-/** Creates, resolves, and owns server-private KMS clients by configured source. */
+/** Creates, resolves, and owns server-private KMS clients by configured provider. */
 public final class KmsClientRegistry implements AutoCloseable {
 
-  private final Map<String, ConfiguredClient> clients;
+  private final Map<String, KmsClient> clients;
   private volatile boolean closed;
 
   /**
-   * Loads configuration and available {@link KmsClientFactory} implementations, then creates one
-   * client for each configured source.
+   * Loads configuration and creates one client for each configured provider by instantiating {@code
+   * gravitino.kms.provider.<name>.className}.
    *
    * @param config Gravitino server configuration
-   * @throws IllegalArgumentException if configuration or factory discovery is invalid
+   * @throws IllegalArgumentException if configuration or factory construction is invalid
    */
   public KmsClientRegistry(Config config) {
-    this(config, loadFactories());
+    this(config, KmsClientRegistry::loadFactory);
   }
 
-  KmsClientRegistry(Config config, Iterable<KmsClientFactory> factories) {
+  KmsClientRegistry(Config config, FactoryLoader loader) {
     KmsConfig kmsConfig = new KmsConfig(config);
-    if (kmsConfig.sources().isEmpty()) {
+    if (kmsConfig.providers().isEmpty()) {
       this.clients = Collections.emptyMap();
       return;
     }
 
-    if (factories == null) {
-      throw new IllegalArgumentException("KMS client factories cannot be null");
+    if (loader == null) {
+      throw new IllegalArgumentException("KMS client factory loader cannot be null");
     }
 
-    Map<String, KmsClientFactory> factoriesByApi = indexFactories(factories);
-    this.clients = createClients(kmsConfig.sources(), factoriesByApi);
+    this.clients = createClients(kmsConfig.providers(), loader);
   }
 
   /**
    * Resolves the client configured for a key reference.
    *
    * <p>The registry owns the returned client. Callers must not close it or use it after the
-   * registry is closed.
+   * registry is closed. Lookup is by {@link KmsReference#provider()} only; the provider's factory
+   * was loaded at startup from {@code gravitino.kms.provider.<name>.className}.
    *
-   * @param reference key whose source and API select the client
+   * @param reference key whose provider name selects the client
    * @return client configured for the reference
-   * @throws IllegalArgumentException if the source is unknown or configured for another API
+   * @throws IllegalArgumentException if the provider is unknown
    * @throws IllegalStateException if the registry is closed
    */
   public KmsClient getClient(KmsReference reference) {
     checkOpen();
-    return resolveClient(reference).client;
+    return resolveClient(reference);
   }
 
   /** Closes all configured clients. This operation is idempotent. */
@@ -87,52 +86,55 @@ public final class KmsClientRegistry implements AutoCloseable {
     }
   }
 
-  private static Map<String, KmsClientFactory> indexFactories(
-      Iterable<KmsClientFactory> factories) {
-    Map<String, KmsClientFactory> factoriesByApi = new LinkedHashMap<>();
-    for (KmsClientFactory factory : factories) {
-      if (factory == null) {
-        throw new IllegalArgumentException("KMS client factory cannot be null");
-      }
-      String api = KmsApiIdentifiers.requireValid(factory.api());
-      KmsClientFactory existing = factoriesByApi.putIfAbsent(api, factory);
-      if (existing != null) {
-        throw new IllegalArgumentException(
-            String.format("Multiple KMS client factories support API '%s'", api));
-      }
-    }
-    return factoriesByApi;
+  /** Loads a {@link KmsClientFactory} from a configured class name. */
+  @FunctionalInterface
+  interface FactoryLoader {
+    /**
+     * Instantiates the factory named by {@code className}.
+     *
+     * @param className factory class name
+     * @return the factory
+     */
+    KmsClientFactory load(String className);
   }
 
-  private static Iterable<KmsClientFactory> loadFactories() {
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    if (classLoader == null) {
-      classLoader = KmsClientRegistry.class.getClassLoader();
-    }
-    return ServiceLoader.load(KmsClientFactory.class, classLoader);
-  }
-
-  private static Map<String, ConfiguredClient> createClients(
-      Map<String, KmsConfig.SourceConfig> sourceConfigs,
-      Map<String, KmsClientFactory> factoriesByApi) {
-    Map<String, ConfiguredClient> clients = new LinkedHashMap<>();
+  private static KmsClientFactory loadFactory(String className) {
     try {
-      sourceConfigs.forEach(
-          (source, sourceConfig) -> {
-            KmsClientFactory factory = factoriesByApi.get(sourceConfig.api());
+      Object instance = Class.forName(className).getDeclaredConstructor().newInstance();
+      if (!(instance instanceof KmsClientFactory)) {
+        throw new IllegalArgumentException(
+            String.format("KMS factory class '%s' does not implement KmsClientFactory", className));
+      }
+      return (KmsClientFactory) instance;
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(
+          String.format("No KMS client factory class '%s'", className), e);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalArgumentException(
+          String.format("Failed to create KMS client factory '%s'", className), e);
+    }
+  }
+
+  private static Map<String, KmsClient> createClients(
+      Map<String, KmsConfig.ProviderConfig> providerConfigs, FactoryLoader loader) {
+    Map<String, KmsClient> clients = new LinkedHashMap<>();
+    try {
+      providerConfigs.forEach(
+          (provider, providerConfig) -> {
+            KmsClientFactory factory = loader.load(providerConfig.className());
             if (factory == null) {
-              throw new IllegalArgumentException(
+              throw new IllegalStateException(
                   String.format(
-                      "No KMS client factory supports API '%s' for source '%s'",
-                      sourceConfig.api(), source));
+                      "KMS client factory '%s' returned null", providerConfig.className()));
             }
-            KmsClient client = factory.create(source, sourceConfig.properties());
+            KmsClient client = factory.create(provider, providerConfig.properties());
             if (client == null) {
               throw new IllegalStateException(
                   String.format(
-                      "KMS client factory for API '%s' returned null", sourceConfig.api()));
+                      "KMS client factory '%s' returned a null client",
+                      providerConfig.className()));
             }
-            clients.put(source, new ConfiguredClient(sourceConfig.api(), client));
+            clients.put(provider, client);
           });
       return Collections.unmodifiableMap(clients);
     } catch (RuntimeException | Error e) {
@@ -144,11 +146,11 @@ public final class KmsClientRegistry implements AutoCloseable {
     }
   }
 
-  private static RuntimeException closeClients(List<ConfiguredClient> clients) {
+  private static RuntimeException closeClients(List<KmsClient> clients) {
     RuntimeException failure = null;
     for (int index = clients.size() - 1; index >= 0; index--) {
       try {
-        clients.get(index).client.close();
+        clients.get(index).close();
       } catch (RuntimeException e) {
         if (failure == null) {
           failure = e;
@@ -160,38 +162,22 @@ public final class KmsClientRegistry implements AutoCloseable {
     return failure;
   }
 
-  private ConfiguredClient resolveClient(KmsReference reference) {
+  private KmsClient resolveClient(KmsReference reference) {
     if (reference == null) {
       throw new IllegalArgumentException("KMS reference cannot be null");
     }
 
-    ConfiguredClient configuredClient = clients.get(reference.source());
-    if (configuredClient == null) {
+    KmsClient client = clients.get(reference.provider());
+    if (client == null) {
       throw new IllegalArgumentException(
-          String.format("No KMS client is configured for source '%s'", reference.source()));
+          String.format("No KMS client is configured for provider '%s'", reference.provider()));
     }
-    if (!configuredClient.api.equals(reference.api())) {
-      throw new IllegalArgumentException(
-          String.format(
-              "KMS source '%s' uses API '%s', not '%s'",
-              reference.source(), configuredClient.api, reference.api()));
-    }
-    return configuredClient;
+    return client;
   }
 
   private void checkOpen() {
     if (closed) {
       throw new IllegalStateException("KMS client registry is closed");
-    }
-  }
-
-  private static final class ConfiguredClient {
-    private final String api;
-    private final KmsClient client;
-
-    private ConfiguredClient(String api, KmsClient client) {
-      this.api = api;
-      this.client = client;
     }
   }
 }

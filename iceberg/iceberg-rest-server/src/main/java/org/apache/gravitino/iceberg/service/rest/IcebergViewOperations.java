@@ -155,6 +155,7 @@ public class IcebergViewOperations {
       CreateViewRequest createViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
+    IcebergRESTUtils.validateRequest(createViewRequest, "CreateViewRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
@@ -247,6 +248,7 @@ public class IcebergViewOperations {
       UpdateTableRequest replaceViewRequest,
       @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
       @Context UriInfo uriInfo) {
+    IcebergRESTUtils.validateRequest(replaceViewRequest, "UpdateTableRequest");
     return idempotencyManager.replayOrExecute(
         idempotencyKey,
         IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),

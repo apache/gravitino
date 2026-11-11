@@ -24,6 +24,17 @@ import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 
 public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthorization> {
+  /** Metalake ID received by the Hadoop SQL test plugin. */
+  public static String hadoopSqlMetalakeId;
+
+  /** Catalog ID received by the Hadoop SQL test plugin. */
+  public static String hadoopSqlCatalogId;
+
+  /** Metalake ID received by the HDFS test plugin. */
+  public static String hdfsMetalakeId;
+
+  /** Catalog ID received by the HDFS test plugin. */
+  public static String hdfsCatalogId;
 
   public TestRangerAuthorization() {}
 
@@ -41,8 +52,12 @@ public class TestRangerAuthorization extends BaseAuthorization<TestRangerAuthori
     String serviceType = properties.get("authorization.ranger.service.type").toUpperCase();
     switch (serviceType) {
       case "HADOOPSQL":
+        hadoopSqlMetalakeId = properties.get(BaseAuthorization.METALAKE_ID);
+        hadoopSqlCatalogId = properties.get(BaseAuthorization.CATALOG_ID);
         return new TestRangerAuthorizationHadoopSQLPlugin();
       case "HDFS":
+        hdfsMetalakeId = properties.get(BaseAuthorization.METALAKE_ID);
+        hdfsCatalogId = properties.get(BaseAuthorization.CATALOG_ID);
         return new TestRangerAuthorizationHDFSPlugin();
       default:
         throw new IllegalArgumentException("Unsupported service type: " + serviceType);

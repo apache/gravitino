@@ -17,11 +17,12 @@
 
 from abc import abstractmethod
 from dataclasses import field, dataclass
-from typing import Optional
+from typing import Dict, Optional
 
 from dataclasses_json import config
 
 from gravitino.api.catalog_change import CatalogChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
 
 
@@ -124,3 +125,64 @@ class CatalogUpdateRequest:
         def validate(self):
             if not self._property:
                 raise ValueError('"property" field is required and cannot be empty')
+
+    @dataclass
+    class SetCatalogSecretBindingRequest(CatalogUpdateRequestBase):
+        """Request to bind a write-through secret for a catalog property."""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _provider: Optional[str] = field(metadata=config(field_name="provider"))
+        _plaintext: Optional[str] = field(metadata=config(field_name="plaintext"))
+
+        def __init__(self, catalog_property: str, provider: str, plaintext: str):
+            super().__init__("setSecretBinding")
+            self._property = catalog_property
+            self._provider = provider
+            self._plaintext = plaintext
+
+        def catalog_change(self):
+            return CatalogChange.set_secret_binding(
+                self._property,
+                SecretBinding(self._provider, self._plaintext),
+            )
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required and cannot be empty')
+            if not self._provider:
+                raise ValueError('"provider" field is required and cannot be empty')
+            if self._plaintext is None:
+                raise ValueError('"plaintext" field is required and cannot be null')
+
+    @dataclass
+    class SetCatalogSecretReferenceRequest(CatalogUpdateRequestBase):
+        """Request to bind an external secret reference for a catalog property."""
+
+        _property: Optional[str] = field(metadata=config(field_name="property"))
+        _provider: Optional[str] = field(metadata=config(field_name="provider"))
+        _attributes: Optional[Dict[str, str]] = field(
+            metadata=config(field_name="attributes")
+        )
+
+        def __init__(
+            self,
+            catalog_property: str,
+            provider: str,
+            attributes: Optional[Dict[str, str]] = None,
+        ):
+            super().__init__("setSecretReference")
+            self._property = catalog_property
+            self._provider = provider
+            self._attributes = attributes
+
+        def catalog_change(self):
+            return CatalogChange.set_secret_reference(
+                self._property,
+                SecretReference(self._provider, self._attributes or {}),
+            )
+
+        def validate(self):
+            if not self._property:
+                raise ValueError('"property" field is required and cannot be empty')
+            if not self._provider:
+                raise ValueError('"provider" field is required and cannot be empty')

@@ -64,8 +64,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
 
   @BeforeAll
   void startUp() throws Exception {
-    // Start Gravitino server
-    super.startIntegrationTest();
+    // JUnit starts the server through BaseIT before this method.
     initGravitinoEnv();
     initMetalake();
     initFlinkEnv();
@@ -75,7 +74,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
   @AfterAll
   void stop() throws Exception {
     stopFlinkEnv();
-    super.stopIntegrationTest();
+    // JUnit stops the server through BaseIT after this method.
     LOG.info("Stop Flink env successfully.");
   }
 
@@ -89,6 +88,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
     metalake = client.createMetalake(GRAVITINO_METALAKE, "", Collections.emptyMap());
   }
 
+  @SuppressWarnings("deprecation")
   private static void initFlinkEnv() throws Exception {
     sqlGatewayPort = RESTUtils.findAvailablePort(3000, 4000);
     sqlGatewayRestUri = String.format("http://%s:%d", sqlGatewayHost, sqlGatewayPort);
@@ -99,7 +99,7 @@ public abstract class GravitinoCatalogManagerIT extends BaseIT {
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
     configuration.setString("sql-gateway.endpoint.rest.address", sqlGatewayHost);
-    configuration.setInteger("sql-gateway.endpoint.rest.port", sqlGatewayPort);
+    configuration.setString("sql-gateway.endpoint.rest.port", String.valueOf(sqlGatewayPort));
     EnvironmentSettings.Builder builder =
         EnvironmentSettings.newInstance().withConfiguration(configuration);
     tableEnv = TableEnvironment.create(builder.inBatchMode().build());

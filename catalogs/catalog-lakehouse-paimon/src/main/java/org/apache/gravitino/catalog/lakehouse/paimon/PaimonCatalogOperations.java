@@ -112,21 +112,31 @@ public class PaimonCatalogOperations
   public void initialize(
       Map<String, String> conf, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
-    // Key format like gravitino.bypass.a.b
-    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
-
-    // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
-    Map<String, String> gravitinoConfig =
-        ((PaimonCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata())
-            .transformProperties(conf);
-
-    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
-    resultConf.putAll(gravitinoConfig);
-
-    this.paimonCatalogOps = new PaimonCatalogOps(new PaimonConfig(resultConf));
+    this.paimonCatalogOps =
+        new PaimonCatalogOps(
+            toPaimonConfig(
+                conf,
+                (PaimonCatalogPropertiesMetadata) propertiesMetadata.catalogPropertiesMetadata()));
     this.paimonViewCatalogOps =
         new PaimonViewCatalogOps(
             paimonCatalogOps, this::buildPaimonNameIdentifier, this::schemaExists);
+  }
+
+  /**
+   * Converts the Gravitino catalog configuration to the Paimon configuration.
+   *
+   * @param conf The Gravitino catalog configuration.
+   * @param catalogPropertiesMetadata The Paimon catalog properties metadata.
+   * @return The Paimon configuration.
+   */
+  static PaimonConfig toPaimonConfig(
+      Map<String, String> conf, PaimonCatalogPropertiesMetadata catalogPropertiesMetadata) {
+    // Key format like gravitino.bypass.a.b
+    Map<String, String> resultConf =
+        Maps.newHashMap(MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX));
+    // Hold keys that lie in GRAVITINO_CONFIG_TO_PAIMON
+    resultConf.putAll(catalogPropertiesMetadata.transformProperties(conf));
+    return new PaimonConfig(resultConf);
   }
 
   /**
@@ -162,6 +172,11 @@ public class PaimonCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       paimonCatalogOps.listDatabases();
     } catch (Exception e) {

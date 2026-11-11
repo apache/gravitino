@@ -20,15 +20,45 @@ package org.apache.gravitino.catalog.jdbc.config;
 
 import com.google.common.collect.Maps;
 import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJdbcConfig {
+
+  /** Checks URL credential rejection does not expose the supplied password. */
+  @Test
+  public void testUrlCredentialsAreRejectedWithoutEchoingTheSecret() {
+    String password = "never-echo-this";
+    JdbcConfig config =
+        new JdbcConfig(Map.of("jdbc-url", "jdbc:postgresql://host/db?password=" + password));
+    IllegalArgumentException error =
+        Assertions.assertThrows(IllegalArgumentException.class, config::getJdbcUrl);
+    Assertions.assertFalse(error.getMessage().contains(password));
+    Assertions.assertTrue(error.getMessage().contains("jdbc-password"));
+  }
 
   @Test
   public void testCreateDataSourceConfig() {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
     Assertions.assertDoesNotThrow(() -> new JdbcConfig(properties));
+  }
+
+  @Test
+  public void testMaxIdleDefaultsAndCap() {
+    JdbcConfig defaultConfig = new JdbcConfig(Maps.newHashMap());
+    Assertions.assertEquals(8, defaultConfig.getPoolMaxIdle());
+
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.POOL_MAX_SIZE.getKey(), "6");
+    Assertions.assertEquals(6, new JdbcConfig(properties).getPoolMaxIdle());
+
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "4");
+    Assertions.assertEquals(4, new JdbcConfig(properties).getPoolMaxIdle());
+
+    properties.put(JdbcConfig.POOL_MAX_IDLE.getKey(), "0");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new JdbcConfig(properties).getPoolMaxIdle());
   }
 }

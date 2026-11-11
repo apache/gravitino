@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -53,6 +55,9 @@ public class AuxiliaryServiceManager {
 
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
+  // Tracks which deprecated keys have already been warned about, since getAuxServiceConfig
+  // re-extracts the config on every call.
+  private static final Set<String> warnedDeprecatedAuxServiceKeys = ConcurrentHashMap.newKeySet();
 
   private Map<String, GravitinoAuxiliaryService> auxServices = new HashMap<>();
   private Map<String, IsolatedClassLoader> auxServiceClassLoaders = new HashMap<>();
@@ -94,9 +99,37 @@ public class AuxiliaryServiceManager {
         });
   }
 
+  /**
+   * Returns whether the given auxiliary service was configured and registered.
+   *
+   * @param auxServiceName the auxiliary service's short name, e.g. {@code iceberg-rest}
+   * @return true if the service is registered
+   */
+  public boolean isAuxServiceRegistered(String auxServiceName) {
+    return auxServices.containsKey(auxServiceName);
+  }
+
   @VisibleForTesting
   public IsolatedClassLoader getIsolatedClassLoader(List<String> classPaths) {
     return IsolatedClassLoader.buildClassLoader(classPaths);
+  }
+
+  /**
+   * Returns the effective configuration for one auxiliary service, with keys stripped of the {@code
+   * gravitino.<name>.} prefix (or the deprecated {@code gravitino.auxService.<name>.} prefix, which
+   * is still honored) — the same map the service itself receives in {@link
+   * GravitinoAuxiliaryService#serviceInit}. Callers outside this service (e.g. reporting an
+   * auxiliary service's own endpoint) should read its config through this method rather than the
+   * raw {@code gravitino.<name>.} prefix directly, so both config forms are honored consistently.
+   *
+   * @param gravitinoConfig the Gravitino server's configuration
+   * @param auxServiceName the auxiliary service's short name, e.g. {@code iceberg-rest}
+   * @return the auxiliary service's own configuration, with keys unprefixed
+   */
+  public static Map<String, String> getAuxServiceConfig(
+      Config gravitinoConfig, String auxServiceName) {
+    Map<String, String> serviceConfigs = extractAuxiliaryServiceConfigs(gravitinoConfig);
+    return MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, ""));
   }
 
   @VisibleForTesting
@@ -240,10 +273,12 @@ public class AuxiliaryServiceManager {
         .forEach(
             entry -> {
               String extractKey = entry.getKey().substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
-              LOG.warn(
-                  "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
-                  entry.getKey(),
-                  extractKey);
+              if (warnedDeprecatedAuxServiceKeys.add(entry.getKey())) {
+                LOG.warn(
+                    "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
+                    entry.getKey(),
+                    extractKey);
+              }
               serviceConfigs.put(extractKey, entry.getValue());
             });
     splitter

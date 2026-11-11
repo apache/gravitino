@@ -114,13 +114,15 @@ public class BaseIT {
       "https://repo1.maven.org/maven2/mysql/mysql-connector-java/8.0.26/mysql-connector-java-8.0.26.jar";
 
   public static final String DOWNLOAD_POSTGRESQL_JDBC_DRIVER_URL =
-      "https://jdbc.postgresql.org/download/postgresql-42.7.11.jar";
+      "https://jdbc.postgresql.org/download/postgresql-42.7.14.jar";
 
   public static final String DOWNLOAD_CLICKHOUSE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/com/clickhouse/clickhouse-jdbc/0.7.1/clickhouse-jdbc-0.7.1-all.jar";
 
   public static final String DOWNLOAD_SQLITE_JDBC_DRIVER_URL =
       "https://repo1.maven.org/maven2/org/xerial/sqlite-jdbc/3.42.0.0/sqlite-jdbc-3.42.0.0.jar";
+
+  public static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
 
   public static final Map<String, Pattern> SUPPORTED_CLEAN_CONFLICTS_DRIVER_TYPES =
       ImmutableMap.of(
@@ -410,6 +412,12 @@ public class BaseIT {
 
       setupJdbcDrivers();
 
+      JettyServerConfig configuredJetty =
+          JettyServerConfig.fromConfig(serverConfig, WEBSERVER_CONF_PREFIX);
+      // The readiness check below only asks whether an HTTP server answers, so a Gravitino left
+      // behind by an earlier run would pass it and the suite would run against that process.
+      ITUtils.checkServerPortIsFree(configuredJetty.getHost(), configuredJetty.getHttpPort());
+
       GravitinoITUtils.startGravitinoServer();
 
       JettyServerConfig jettyServerConfig =
@@ -674,9 +682,21 @@ public class BaseIT {
     return null;
   }
 
+  /**
+   * Enables the Iceberg REST auxiliary service before the server starts. Callers that hold a {@link
+   * BaseIT} instance rather than extending it use this instead of the protected fields.
+   *
+   * @param icebergRestConfigs extra server configs, typically the dynamic config provider and the
+   *     metalake the Iceberg REST service should serve
+   */
+  public void enableIcebergAuxRestService(Map<String, String> icebergRestConfigs) {
+    this.ignoreIcebergAuxRestService = false;
+    this.customConfigs.putAll(icebergRestConfigs);
+  }
+
   protected String getIcebergRestServiceUri() {
     JettyServerConfig jettyServerConfig =
-        JettyServerConfig.fromConfig(serverConfig, String.format("gravitino.iceberg-rest."));
+        JettyServerConfig.fromConfig(serverConfig, GRAVITINO_ICEBERG_REST_PREFIX);
     return String.format(
         "http://%s:%d/iceberg/", jettyServerConfig.getHost(), jettyServerConfig.getHttpPort());
   }

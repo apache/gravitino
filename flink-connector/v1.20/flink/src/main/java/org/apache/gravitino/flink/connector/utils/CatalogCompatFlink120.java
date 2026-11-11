@@ -21,10 +21,12 @@ package org.apache.gravitino.flink.connector.utils;
 
 import java.util.List;
 import java.util.Map;
+import org.apache.flink.connector.jdbc.core.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogPropertiesUtil;
 import org.apache.flink.table.catalog.CatalogTable;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.flink.table.factories.Factory;
 
 /** {@link CatalogCompat} implementation for Flink 1.20. */
 public enum CatalogCompatFlink120 implements CatalogCompat {
@@ -45,5 +47,10 @@ public enum CatalogCompatFlink120 implements CatalogCompat {
   @Override
   public Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable) {
     return CatalogPropertiesUtil.serializeCatalogTable(resolvedTable);
+  }
+
+  @Override
+  public Factory jdbcDynamicTableFactory() {
+    return new JdbcDynamicTableFactory();
   }
 }

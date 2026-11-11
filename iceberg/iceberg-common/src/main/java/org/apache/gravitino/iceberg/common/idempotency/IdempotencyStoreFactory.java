@@ -19,7 +19,6 @@
 package org.apache.gravitino.iceberg.common.idempotency;
 
 import com.google.common.collect.ImmutableMap;
-import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,9 +33,7 @@ public class IdempotencyStoreFactory {
    * fully-qualified class name for them.
    */
   private static final ImmutableMap<String, String> STORE_CLASS_NAMES =
-      ImmutableMap.of(
-          IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_IN_MEMORY,
-          InMemoryIdempotencyStore.class.getCanonicalName());
+      ImmutableMap.of("in-memory", InMemoryIdempotencyStore.class.getCanonicalName());
 
   private IdempotencyStoreFactory() {}
 

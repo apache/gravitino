@@ -22,3 +22,4 @@ org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryFlink12
 org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFactoryFlink120
 org.apache.gravitino.flink.connector.jdbc.mysql.GravitinoMysqlJdbcCatalogFactoryFlink120
 org.apache.gravitino.flink.connector.jdbc.postgresql.GravitinoPostgresJdbcCatalogFactoryFlink120
+org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactory

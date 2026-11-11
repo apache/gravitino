@@ -20,8 +20,13 @@ from __future__ import annotations
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.generic_tag import GenericTag
-from gravitino.dto.requests.tag_associate_request import TagsAssociateRequest
+from gravitino.dto.requests.tag_associate_request import (
+    TagsAssociateRequest,
+    TagValuePairRequest,
+    TagValuesAssociateRequest,
+)
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
     TagNamesListResponse,
@@ -36,11 +41,16 @@ from gravitino.utils.string_utils import StringUtils
 
 class MetadataObjectTagOperations(SupportsTags):
     """
-    The implementation of SupportsTags. This helper is composed into supported metadata
-    objects to provide tag operations.
+    The implementation of SupportsTags. This helper is composed into metadata objects,
+    including catalog, schema, table, column, fileset, and topic, to provide tag
+    operations for these objects.
     """
 
     TAG_REQUEST_PATH = "api/metalakes/{}/objects/{}/{}/tags"
+    TAG_VALUES_JSON_HEADER = {
+        "Content-Type": "application/vnd.gravitino.v2+json",
+        "Accept": "application/vnd.gravitino.v2+json",
+    }
 
     def __init__(
         self,
@@ -59,6 +69,9 @@ class MetadataObjectTagOperations(SupportsTags):
         )
 
     def list_tags(self) -> list[str]:
+        return self.list_tags_with_visibility().tags()
+
+    def list_tags_with_visibility(self) -> TagList[str]:
         response = self.rest_client.get(
             self.tag_request_path,
             params={},
@@ -69,9 +82,14 @@ class MetadataObjectTagOperations(SupportsTags):
         )
         list_tags_resp.validate()
 
-        return list_tags_resp.tag_names()
+        return TagList(
+            list_tags_resp.tag_names(), list_tags_resp.has_inaccessible_tags()
+        )
 
     def list_tags_info(self) -> list[Tag]:
+        return self.list_tags_info_with_visibility().tags()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
         response = self.rest_client.get(
             self.tag_request_path,
             params={"details": "true"},
@@ -81,14 +99,17 @@ class MetadataObjectTagOperations(SupportsTags):
         list_info_resp = TagListResponse.from_json(response.body, infer_missing=True)
         list_info_resp.validate()
 
-        return [
-            GenericTag(
-                self.metalake_name,
-                tag_dto,
-                self.rest_client,
-            )
-            for tag_dto in list_info_resp.tags()
-        ]
+        return TagList(
+            [
+                GenericTag(
+                    self.metalake_name,
+                    tag_dto,
+                    self.rest_client,
+                )
+                for tag_dto in list_info_resp.tags()
+            ],
+            list_info_resp.has_inaccessible_tags(),
+        )
 
     def get_tag(self, name: str) -> Tag:
         Precondition.check_argument(
@@ -109,6 +130,32 @@ class MetadataObjectTagOperations(SupportsTags):
             get_resp.tag(),
             self.rest_client,
         )
+
+    def assign_tags(
+        self,
+        tags_to_add: (
+            list[str | dict[str, str | None] | TagValuePairRequest] | None
+        ) = None,
+        tags_to_remove: (
+            list[str | dict[str, str | None] | TagValuePairRequest] | None
+        ) = None,
+    ) -> list[str]:
+        associate_request = TagValuesAssociateRequest(tags_to_add, tags_to_remove)
+        associate_request.validate()
+
+        response = self.rest_client.post(
+            self.tag_request_path,
+            json=associate_request,
+            headers=self.TAG_VALUES_JSON_HEADER,
+            error_handler=TAG_ERROR_HANDLER,
+        )
+
+        associate_resp = TagNamesListResponse.from_json(
+            response.body, infer_missing=True
+        )
+        associate_resp.validate()
+
+        return associate_resp.tag_names()
 
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]

@@ -26,9 +26,13 @@ import javax.servlet.ServletException;
 import javax.servlet.ServletRequest;
 import javax.servlet.ServletResponse;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.utils.PrincipalUtils;
 
-/** Executes Lance REST requests as the configured service identity in auxiliary mode. */
+/**
+ * Supplies the configured service identity for anonymous Lance REST requests in auxiliary mode.
+ * Authenticated requests keep their caller identity.
+ */
 public class LanceServiceIdentityFilter implements Filter {
 
   private final UserPrincipal servicePrincipal;
@@ -49,6 +53,18 @@ public class LanceServiceIdentityFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     try {
+      // AuthenticationFilter runs before this filter and keeps the rest of the filter chain inside
+      // the caller's Subject. Starting another doAs block here would make the service user the
+      // effective identity, so downstream code would no longer see the real caller. Continue the
+      // existing chain directly to preserve the caller's active roles and other principal details.
+      if (!AuthConstants.ANONYMOUS_USER.equals(PrincipalUtils.getCurrentUserName())) {
+        chain.doFilter(request, response);
+        return;
+      }
+
+      // When authentication is disabled, or simple authentication accepted an anonymous request,
+      // there is no user identity for internal Gravitino dispatcher calls. Use the configured
+      // service identity only for this fallback case.
       PrincipalUtils.doAs(
           servicePrincipal,
           () -> {
@@ -58,7 +74,7 @@ public class LanceServiceIdentityFilter implements Filter {
     } catch (IOException | ServletException e) {
       throw e;
     } catch (Exception e) {
-      throw new ServletException("Failed to execute as the Lance REST service identity", e);
+      throw new ServletException("Failed to execute the Lance REST request", e);
     }
   }
 

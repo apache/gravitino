@@ -20,6 +20,7 @@
 package org.apache.gravitino.utils;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
@@ -27,18 +28,71 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.ResourceAccessMode;
 import org.junit.jupiter.api.parallel.ResourceLock;
 import org.junit.jupiter.api.parallel.Resources;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestJdbcUrlUtils {
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/db?user=u&password=hidden",
+        "jdbc:postgresql://host/db?%70assword=hidden",
+        "jdbc:sqlserver://host;databaseName=db;PASSWORD={hidden;value}",
+        "jdbc:mysql://user:hidden@host/db",
+        "jdbc:mysql://user:pass%2Fword@host/db",
+        "jdbc:mysql://user:pass%3Fword@host/db",
+        "jdbc:mysql://user:pass%23word@host/db",
+        "jdbc:mysql://user:pass%252Fword@host/db",
+        "jdbc:mysql:loadbalance://user:pass%2Fword@host1,host2/db",
+        "jdbc:mysql://(host=host,user=u,password=hidden)/db",
+        "jdbc:oracle:oci:user/hidden@service",
+        "jdbc:oracle:thin:user/hidden@host:1521/db",
+        "jdbc:postgresql://host/db?sslpassword=hidden",
+        "jdbc:sqlserver://host;accessToken=hidden",
+        "jdbc:postgresql://host/db?password=",
+        "jdbc:postgresql://host/db?%2570assword=hidden#%zz",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8&password=hidden",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false&%70assword2=hidden",
+        "jdbc:mysql://host/db?password1=hidden",
+        "jdbc:mysql://host/db?password3=hidden",
+        "jdbc:mysql+srv://host/db?passwordCharacterEncoding=UTF-8&password=hidden",
+        "jdbc:mysql+srv:loadbalance://host/db?disconnectOnExpiredPasswords=false&%70assword2=hidden",
+        "jdbc:postgresql://host/db?passwordCharacterEncoding=hidden"
+      })
+  void testCredentialsAreDetected(String url) {
+    Assertions.assertTrue(JdbcUrlUtils.containsCredentials(url));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:postgresql://host/password?user=reader&sslmode=require",
+        "jdbc:sqlserver://host;databaseName=db;encrypt=true",
+        "jdbc:oracle:thin:@host:1521/service",
+        "jdbc:sqlite::memory:",
+        "jdbc:mysql://host/db?useSSL=true",
+        "jdbc:mysql://host/db?passwordCharacterEncoding=UTF-8",
+        "jdbc:mysql://host/db?disconnectOnExpiredPasswords=false",
+        "jdbc:mysql://host/db?%70asswordCharacterEncoding=UTF-8&disconnectOnExpiredPasswords=false",
+        "jdbc:mysql+srv://host/db?passwordCharacterEncoding=UTF-8",
+        "jdbc:mysql+srv:loadbalance://host/db?disconnectOnExpiredPasswords=false",
+        "jdbc:mysql+srv:replication://host/db?%70asswordCharacterEncoding=UTF-8&disconnectOnExpiredPasswords=false"
+      })
+  void testPublicConnectionOptionsRemainVisible(String url) {
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(url));
+    Assertions.assertFalse(JdbcUrlUtils.containsCredentials(null));
+  }
 
   @Test
-  public void whenMalformedUrlGiven_ShouldThrowGravitinoRuntimeException() {
-    GravitinoRuntimeException gre =
-        Assertions.assertThrows(
-            GravitinoRuntimeException.class,
-            () ->
-                JdbcUrlUtils.validateJdbcConfig(
-                    "testDriver", "malformed%ZZurl", Collections.singletonMap("test", "test")));
-    Assertions.assertEquals("Unable to decode JDBC URL", gre.getMessage());
+  public void whenMalformedUrlGiven_ShouldFallBackToLastDecodedForm() {
+    // A percent escape that URLDecoder cannot decode (e.g. a literal '%' in a password) no
+    // longer rejects the whole URL: JDBC URLs are not required to be percent-encoded. The
+    // validation still scans the last successfully decoded form, so unsafe parameters remain
+    // detectable (see unsafeParameterBehindEncodingIsStillDetectedWithLiteralPercent).
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver", "malformed%ZZurl", Collections.singletonMap("test", "test")));
   }
 
   @Test
@@ -60,6 +114,127 @@ public class TestJdbcUrlUtils {
                 "testDriver",
                 "jdbc:mysql://localhost:0000/test",
                 Collections.singletonMap("test", "test")));
+  }
+
+  @Test
+  public void testValidateJdbcConfigWithLiteralPercentInUrl() {
+    // A literal '%' (e.g. a password like "100%") is legal in a JDBC URL; before the fix the
+    // decoder threw "Unable to decode JDBC URL" for it.
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?password=100%",
+                Collections.emptyMap()));
+
+    // A once-encoded '%25' decodes to a literal '%', which must not be rejected either.
+    Assertions.assertDoesNotThrow(
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:postgresql://localhost:5432/test?password=pa%25ss",
+                Collections.emptyMap()));
+  }
+
+  @Test
+  public void unsafeParameterBehindEncodingWithFragmentPoisonIsStillDetected() {
+    // MySQL Connector/J decodes query tokens independently and ignores the URL fragment, so a
+    // malformed escape in the fragment must not stop the scan from revealing an encoded unsafe
+    // parameter name in the query.
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?%61utoDeserialize=true#%zz",
+                Collections.emptyMap()));
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?%71ueryInterceptors=x#frag%25",
+                Collections.emptyMap()));
+  }
+
+  @Test
+  public void doubleEncodedUnsafeParamWithPoisonedFragmentIsRejected() {
+    // Copilot's alleged bypass on PR #13239: a double-encoded parameter name combined with a
+    // malformed '#%zz' fragment. The discriminating case hides the FIRST letter of the name behind
+    // the double encoding (%2561 -> %61 -> 'a'), so no scanned form contains the literal name until
+    // the query token is fully decoded. Because a single pre-pass sanitization turns '%zz' into
+    // '%25zz' but the first decode pass regenerates '%zz', the second pass would halt at the
+    // malformed fragment before '%61' becomes 'a' -- unless malformed escapes are sanitized on
+    // every pass. MySQL Connector/J decodes query tokens independently and ignores the fragment.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561utoDeserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mariadb://h/db?%2561utoDeserialize=true#%zz");
+    // Without the poisoned fragment, recursive decoding already reveals the hidden name.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561utoDeserialize=true");
+
+    // The exact strings from the report keep the literal 'autoDeserialize' after the double
+    // encoding, so they are rejected on the cleartext substring alone (a weaker path than the one
+    // under test); kept as a regression anchor for the reported input.
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561autoDeserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mysql://h/db?%2561autoDeserialize=true");
+  }
+
+  private static void assertUnsafeRejected(String url) {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> JdbcUrlUtils.validateJdbcConfig("testDriver", url, Collections.emptyMap()),
+        () -> "Expected unsafe URL to be rejected but it was accepted: " + url);
+  }
+
+  @Test
+  public void unsafeParamBehindUpperCaseHexEscapeMidDecodeIsRejected() {
+    // Regression for a case-sensitivity gap in the malformed-escape sanitizer. A decode pass can
+    // regenerate a percent escape whose hex digits include an upper-case letter: "%25%36%46"
+    // decodes to "%6F", the escape for 'o'. The caller only lower-cases the ORIGINAL URL, so this
+    // "%6F" appears mid-decode. A sanitizer that recognizes only lower-case hex treats "%6F" as
+    // malformed and rewrites it to "%256F", so it never decodes to 'o' and the hidden
+    // 'autoDeserialize' is missed. The '#%zz' fragment poisons the non-sanitizing decode path
+    // (MySQL Connector/J decodes query tokens independently and ignores the fragment), forcing
+    // detection through the sanitizing path under test.
+    assertUnsafeRejected("jdbc:mysql://h/db?aut%25%36%46deserialize=true#%zz");
+    assertUnsafeRejected("jdbc:mariadb://h/db?aut%25%36%46deserialize=true#%zz");
+  }
+
+  @Test
+  public void validUpperCaseHexEscapeIsNotMangledBySanitizer() {
+    // A valid percent escape whose hex digits include an upper-case letter ("%2F", identical to
+    // "%2f") must decode the same as its lower-case form and must not be mangled into a literal
+    // '%'. Such an escape reaches the sanitizer only mid-decode, past the caller's initial
+    // lower-casing, so exercise the sanitizing decode path directly: "%25%32%46" -> "%2F" -> '/',
+    // and "%25%32%66" -> "%2f" -> '/'. The '#%zz' fragment keeps the non-sanitizing path from
+    // decoding, so the fully decoded form is produced by the path under test.
+    List<String> upperHexForms =
+        JdbcUrlUtils.decodedFormsForScan("jdbc:mysql://h/db?p=a%25%32%46b#%zz");
+    List<String> lowerHexForms =
+        JdbcUrlUtils.decodedFormsForScan("jdbc:mysql://h/db?p=a%25%32%66b#%zz");
+
+    String upperDecoded = upperHexForms.get(upperHexForms.size() - 1);
+    String lowerDecoded = lowerHexForms.get(lowerHexForms.size() - 1);
+    Assertions.assertEquals(
+        lowerDecoded,
+        upperDecoded,
+        "Upper-case hex escape must decode identically to its lower-case form");
+    Assertions.assertTrue(
+        upperDecoded.contains("a/b"),
+        () -> "Expected '%2F' to decode to '/', but the sanitizer mangled it: " + upperDecoded);
+  }
+
+  @Test
+  public void unsafeParameterBehindEncodingIsStillDetectedWithLiteralPercent() {
+    // The decoded fallback must not weaken detection: an unsafe parameter that remains readable
+    // after the last successful decode is still rejected even when the URL also carries a
+    // literal '%'.
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () ->
+            JdbcUrlUtils.validateJdbcConfig(
+                "testDriver",
+                "jdbc:mysql://localhost:3306/test?password=100%&autoDeserialize=true",
+                Collections.emptyMap()));
   }
 
   @Test

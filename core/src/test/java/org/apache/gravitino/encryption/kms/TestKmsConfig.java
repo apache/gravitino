@@ -26,97 +26,109 @@ import org.junit.jupiter.api.Test;
 
 public class TestKmsConfig {
 
-  private static final String AWS_API = "aws-kms";
-  private static final String GCP_API = "google-cloud-kms";
+  private static final String AWS_FACTORY =
+      "org.apache.gravitino.encryption.kms.aws.AwsKmsClientFactory";
+  private static final String GCP_FACTORY =
+      "org.apache.gravitino.encryption.kms.gcp.GcpKmsClientFactory";
 
   @Test
-  void testParsesSourcesAndProviderProperties() {
+  void testParsesProvidersAndProperties() {
     KmsConfig config =
         parse(
             Map.of(
-                "gravitino.kms.sources", "primary, disaster-recovery",
-                "gravitino.kms.source.primary.api", AWS_API,
-                "gravitino.kms.source.primary.endpoint.region", "us-west-2",
-                "gravitino.kms.source.primary.credential.method", "default",
-                "gravitino.kms.source.disaster-recovery.api", "google-cloud-kms",
-                "gravitino.kms.source.disaster-recovery.endpoint.projectId", "backup-project",
-                "gravitino.kms.source.disaster-recovery.credential.method", "default"));
+                "gravitino.kms.providers",
+                "primary,disaster-recovery",
+                "gravitino.kms.provider.primary.className",
+                AWS_FACTORY,
+                "gravitino.kms.provider.primary.endpoint.region",
+                "us-west-2",
+                "gravitino.kms.provider.primary.credential.method",
+                "default",
+                "gravitino.kms.provider.disaster-recovery.className",
+                GCP_FACTORY,
+                "gravitino.kms.provider.disaster-recovery.endpoint.projectId",
+                "backup-project",
+                "gravitino.kms.provider.disaster-recovery.credential.method",
+                "default"));
 
-    Assertions.assertEquals(2, config.sources().size());
-    Assertions.assertEquals(AWS_API, config.sources().get("primary").api());
+    Assertions.assertEquals(2, config.providers().size());
+    Assertions.assertEquals(AWS_FACTORY, config.providers().get("primary").className());
     Assertions.assertEquals(
         Map.of("endpoint.region", "us-west-2", "credential.method", "default"),
-        config.sources().get("primary").properties());
-    Assertions.assertEquals(GCP_API, config.sources().get("disaster-recovery").api());
+        config.providers().get("primary").properties());
+    Assertions.assertEquals(GCP_FACTORY, config.providers().get("disaster-recovery").className());
     Assertions.assertEquals(
         Map.of("endpoint.projectId", "backup-project", "credential.method", "default"),
-        config.sources().get("disaster-recovery").properties());
+        config.providers().get("disaster-recovery").properties());
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> config.sources().get("primary").properties().put("endpoint.region", "other"));
+        () -> config.providers().get("primary").properties().put("endpoint.region", "other"));
   }
 
   @Test
-  void testAllowsNoConfiguredSources() {
-    Assertions.assertTrue(parse(Map.of()).sources().isEmpty());
-    Assertions.assertTrue(parse(Map.of("gravitino.kms.sources", "  ")).sources().isEmpty());
+  void testAllowsNoConfiguredProviders() {
+    Assertions.assertTrue(parse(Map.of()).providers().isEmpty());
+    Assertions.assertTrue(parse(Map.of("gravitino.kms.providers", "  ")).providers().isEmpty());
   }
 
   @Test
-  void testRejectsInvalidOrDuplicateSourceNames() {
-    assertInvalid(Map.of("gravitino.kms.sources", "primary,"), "Invalid KMS source name");
-    assertInvalid(Map.of("gravitino.kms.sources", "bad.name"), "Invalid KMS source name");
+  void testRejectsInvalidOrDuplicateProviderNames() {
+    assertInvalid(Map.of("gravitino.kms.providers", "primary,"), "Invalid KMS provider name");
+    assertInvalid(Map.of("gravitino.kms.providers", "bad.name"), "Invalid KMS provider name");
     assertInvalid(
-        Map.of("gravitino.kms.sources", "primary,primary"), "Duplicate KMS source 'primary'");
+        Map.of("gravitino.kms.providers", "primary,primary"), "Duplicate KMS provider 'primary'");
   }
 
   @Test
-  void testRejectsMalformedOrUnlistedSourceProperties() {
+  void testRejectsMalformedOrUnlistedProviderProperties() {
     assertInvalid(Map.of("gravitino.kms.unexpected", "value"), "Invalid KMS configuration key");
-    assertInvalid(Map.of("gravitino.kms.source.primary", "value"), "Invalid KMS configuration key");
-    assertInvalid(Map.of("gravitino.kms.source..api", AWS_API), "Invalid KMS configuration key");
     assertInvalid(
-        Map.of("gravitino.kms.source.bad$name.api", AWS_API), "Invalid KMS configuration key");
+        Map.of("gravitino.kms.provider.primary", "value"), "Invalid KMS configuration key");
     assertInvalid(
-        Map.of(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.other.api", "aws-kms"),
-        "unlisted source 'other'");
+        Map.of("gravitino.kms.provider..className", AWS_FACTORY), "Invalid KMS configuration key");
+    assertInvalid(
+        Map.of("gravitino.kms.provider.bad$name.className", AWS_FACTORY),
+        "Invalid KMS configuration key");
     assertInvalid(
         Map.of(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.primary.", "value"),
+            "gravitino.kms.providers",
+            "primary",
+            "gravitino.kms.provider.other.className",
+            AWS_FACTORY),
+        "unlisted provider 'other'");
+    assertInvalid(
+        Map.of(
+            "gravitino.kms.providers", "primary",
+            "gravitino.kms.provider.primary.", "value"),
         "Invalid KMS configuration key");
   }
 
   @Test
-  void testRequiresApi() {
+  void testRequiresClassName() {
     assertInvalid(
-        Map.of("gravitino.kms.sources", "primary"),
-        "gravitino.kms.source.primary.api' cannot be blank");
-    assertInvalid(
-        Map.of(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.primary.api", " "),
-        "gravitino.kms.source.primary.api' cannot be blank");
+        Map.of("gravitino.kms.providers", "primary"),
+        "gravitino.kms.provider.primary.className' cannot be blank");
     assertInvalid(
         Map.of(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.primary.api", "Custom-KMS"),
-        "must be lowercase kebab-case");
+            "gravitino.kms.providers", "primary",
+            "gravitino.kms.provider.primary.className", " "),
+        "gravitino.kms.provider.primary.className' cannot be blank");
   }
 
   @Test
-  void testAllowsMoreThanOneSourceForAnApi() {
+  void testAllowsMoreThanOneProviderForAClass() {
     KmsConfig config =
         parse(
             Map.of(
-                "gravitino.kms.sources", "primary,secondary",
-                "gravitino.kms.source.primary.api", "aws-kms",
-                "gravitino.kms.source.secondary.api", "aws-kms"));
+                "gravitino.kms.providers",
+                "primary,secondary",
+                "gravitino.kms.provider.primary.className",
+                AWS_FACTORY,
+                "gravitino.kms.provider.secondary.className",
+                AWS_FACTORY));
 
-    Assertions.assertEquals(AWS_API, config.sources().get("primary").api());
-    Assertions.assertEquals(AWS_API, config.sources().get("secondary").api());
+    Assertions.assertEquals(AWS_FACTORY, config.providers().get("primary").className());
+    Assertions.assertEquals(AWS_FACTORY, config.providers().get("secondary").className());
   }
 
   @Test
