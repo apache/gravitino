@@ -66,7 +66,7 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String UNIONTYPE = "uniontype";
 
   // Hive length limits, see
-  // https://cwiki.apache.org/confluence/display/hive/languagemanual+types#LanguageManualTypes-char
+  // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
   static final int MAX_CHAR_LENGTH = 255;
   static final int MAX_VARCHAR_LENGTH = 65535;
 

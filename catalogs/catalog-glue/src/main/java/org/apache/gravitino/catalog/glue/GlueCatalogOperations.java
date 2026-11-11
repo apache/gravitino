@@ -878,6 +878,17 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         return true;
       }
 
+      if (change instanceof TableChange.UpdateColumnNullability) {
+        requireColumn(indexOf(dataCols, name) >= 0 ? dataCols : partCols, name);
+        Preconditions.checkArgument(
+            ((TableChange.UpdateColumnNullability) change).nullable(),
+            HIVE_NOT_NULL_UNSUPPORTED,
+            name);
+        // Every Hive-format column, partition columns included, is nullable already, so this is a
+        // no-op.
+        return false;
+      }
+
       Preconditions.checkArgument(
           indexOf(partCols, name) < 0,
           "Glue does not support %s on partition column %s",
@@ -919,13 +930,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       } else if (change instanceof TableChange.UpdateColumnType) {
         Type newType = ((TableChange.UpdateColumnType) change).getNewDataType();
         dataCols.set(index, old.toBuilder().type(toGlueType(name, newType)).build());
-      } else if (change instanceof TableChange.UpdateColumnNullability) {
-        Preconditions.checkArgument(
-            ((TableChange.UpdateColumnNullability) change).nullable(),
-            HIVE_NOT_NULL_UNSUPPORTED,
-            name);
-        // Every Hive-format column is nullable already.
-        return false;
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         dataCols.remove(index);
         dataCols.add(

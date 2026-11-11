@@ -44,6 +44,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.api.function.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -368,8 +369,8 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       assertTrue(ops.loadTable(ident).columns()[0].nullable());
 
       // Iceberg refuses optional -> required as an incompatible change.
-      assertThrows(
-          IllegalArgumentException.class,
+      assertIllegalArgument(
+          "optional -> required",
           () ->
               ops.alterTable(
                   ident, TableChange.updateColumnNullability(new String[] {"name"}, false)));
@@ -385,11 +386,11 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
     NameIdentifier ident = NameIdentifier.of("ml", "cat", schema, "hive_constraints");
     ops.createSchema(NameIdentifier.of("ml", "cat", schema), null, Collections.emptyMap());
     try {
-      assertThrows(
-          IllegalArgumentException.class,
+      assertIllegalArgument(
+          "char length must be in [1, 255]",
           () -> createHiveTable(ident, Column.of("c", Types.FixedCharType.of(256), null)));
-      assertThrows(
-          IllegalArgumentException.class,
+      assertIllegalArgument(
+          "NOT NULL",
           () ->
               createHiveTable(
                   ident,
@@ -409,14 +410,14 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       assertEquals(Types.FixedCharType.of(255), loaded.columns()[0].dataType());
       assertEquals(Types.VarCharType.of(65535), loaded.columns()[1].dataType());
 
-      assertThrows(
-          IllegalArgumentException.class,
+      assertIllegalArgument(
+          "varchar length must be in [1, 65535]",
           () ->
               ops.alterTable(
                   ident,
                   TableChange.updateColumnType(new String[] {"v"}, Types.VarCharType.of(0))));
-      assertThrows(
-          IllegalArgumentException.class,
+      assertIllegalArgument(
+          "NOT NULL",
           () ->
               ops.alterTable(
                   ident, TableChange.updateColumnNullability(new String[] {"c"}, false)));
@@ -424,6 +425,11 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
       ops.dropTable(ident);
       ops.dropSchema(NameIdentifier.of("ml", "cat", schema), true);
     }
+  }
+
+  private static void assertIllegalArgument(String messagePart, Executable executable) {
+    IllegalArgumentException e = assertThrows(IllegalArgumentException.class, executable);
+    assertTrue(e.getMessage().contains(messagePart), e.getMessage());
   }
 
   private void createHiveTable(NameIdentifier ident, Column... columns) {

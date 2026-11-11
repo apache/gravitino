@@ -1329,7 +1329,8 @@ class TestGlueCatalogTableOperations {
     for (TableChange change :
         new TableChange[] {
           TableChange.addColumn(new String[] {"c"}, Types.StringType.get(), false),
-          TableChange.updateColumnNullability(new String[] {"id"}, false)
+          TableChange.updateColumnNullability(new String[] {"id"}, false),
+          TableChange.updateColumnNullability(new String[] {"dt"}, false)
         }) {
       IllegalArgumentException e =
           assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
@@ -1342,7 +1343,32 @@ class TestGlueCatalogTableOperations {
   void testAlterColumnToNullableIsNoOpOnHiveTable() {
     useFakeGlueTable(nativeTable());
     ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"id"}, true));
+    ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"dt"}, true));
     verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTable(
+                    ALTER_IDENT,
+                    TableChange.updateColumnNullability(new String[] {"missing"}, true)));
+    assertTrue(e.getMessage().contains("missing"), e.getMessage());
+  }
+
+  @Test
+  void testAlterColumnToNullableKeepsOtherChangesOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(
+        ALTER_IDENT,
+        TableChange.updateColumnNullability(new String[] {"id"}, true),
+        TableChange.updateColumnComment(new String[] {"id"}, "new comment"));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    assertEquals(
+        "new comment",
+        captor.getValue().tableInput().storageDescriptor().columns().get(0).comment());
   }
 
   @Test
