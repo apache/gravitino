@@ -149,8 +149,12 @@ A concurrent request that returns the existing table does not initialize ownersh
 initialization is bound to the created table's ID and does not overwrite an owner assigned in the
 meantime or follow the name to a replacement table.
 
-Creation and owner initialization remain separate operations. If the server stops between them,
-the table can remain unowned; a later `EXIST_OK` request does not claim it.
+Creation and owner initialization remain separate operations. If the server stops or owner
+initialization fails after creation (for example, on a lock timeout), the table can remain unowned.
+Repair the failure and use an authorized explicit owner assignment to reconcile it; a later
+`EXIST_OK` request does not claim it. If an authorization-plugin callback fails after ownership was
+persisted, `EXIST_OK` also does not replay that callback. An explicit owner assignment can
+resynchronize the plugin after it is repaired.
 
 ### Table Properties
 

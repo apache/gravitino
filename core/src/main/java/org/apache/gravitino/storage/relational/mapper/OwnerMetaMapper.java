@@ -154,8 +154,8 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectType") String metadataObjectType);
 
   /**
-   * Reads the current owner while the caller holds the metadata object's write lock, including
-   * under repeatable-read isolation.
+   * Reads the current owner while the caller holds the metadata object's write lock. The owner
+   * write transaction uses the store's READ_COMMITTED isolation.
    *
    * @param metadataObjectId the object ID
    * @param metadataObjectType the object type

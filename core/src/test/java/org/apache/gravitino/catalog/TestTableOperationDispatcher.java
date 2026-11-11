@@ -77,6 +77,7 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
@@ -465,6 +466,114 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       release.countDown();
       executor.shutdownNow();
       Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      FieldUtils.writeField(source, "capability", originalCapability, true);
+      FieldUtils.writeField(source, "ops", originalOps, true);
+    }
+  }
+
+  @Test
+  void testManagedCreateWithoutReturnedIdentifierUsesStoredIdentity() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "managed_sanitized_create");
+    Map<String, String> props = Map.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(ns.levels()), "", props);
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = (TestCatalogOperations) source.ops();
+    TestCatalogOperations operations = spy(originalOps);
+    Capability originalCapability = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : originalCapability.managedStorage(scope);
+          }
+        };
+    doAnswer(
+            invocation -> {
+              Table table;
+              try {
+                table = originalOps.loadTable(ident);
+              } catch (NoSuchTableException e) {
+                table = (Table) invocation.callRealMethod();
+                TableEntity entity =
+                    TableEntity.builder()
+                        .withId(StringIdentifier.fromProperties(table.properties()).id())
+                        .withName(ident.name())
+                        .withNamespace(ns)
+                        .withProperties(table.properties())
+                        .withColumns(List.of())
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build();
+                entityStore.put(entity, false);
+              }
+              // A valid managed connector can sanitize its return value while preserving the
+              // identifier
+              // in storage. The same sanitized result is used for a new table and for EXIST_OK.
+              return GenericTable.builder()
+                  .withName(table.name())
+                  .withColumns(new Column[0])
+                  .withPartitioning(new Transform[0])
+                  .withDistribution(Distributions.NONE)
+                  .withSortOrders(new SortOrder[0])
+                  .withIndexes(Indexes.EMPTY_INDEXES)
+                  .withProperties(StringIdentifier.newPropertiesWithoutId(table.properties()))
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build();
+            })
+        .when(operations)
+        .createTable(eq(ident), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(source, "capability", managed, true);
+    FieldUtils.writeField(source, "ops", operations, true);
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    when(owners.supportsOwnerInitialization()).thenReturn(true);
+    TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
+    try {
+      EntityCombinedTable created =
+          (EntityCombinedTable) hook.createTable(ident, new Column[0], "", props);
+      long createdId = entityStore.get(ident, TABLE, TableEntity.class).id();
+      Assertions.assertEquals(createdId, created.createdTableId().orElseThrow());
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).initializeOwner(eq(metalake), any(), eq(createdId), any(), any());
+
+      // A replacement observed by the fallback belongs to another request.
+      TableEntity replacement =
+          TableEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(ident.name())
+              .withNamespace(ns)
+              .withColumns(List.of())
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      entityStore.delete(ident, TABLE);
+      entityStore.put(replacement, false);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      entityStore.delete(ident, TABLE);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).initializeOwner(any(), any(), anyLong(), any(), any());
+
+      IOException failure = new IOException("entity store unavailable");
+      doThrow(failure).when(entityStore).get(ident, TABLE, TableEntity.class);
+      GravitinoRuntimeException error =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class,
+              () -> hook.createTable(ident, new Column[0], "", props));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertTrue(error.getMessage().contains(ident.toString()));
+      verify(owners, times(1)).initializeOwner(any(), any(), anyLong(), any(), any());
+    } finally {
       FieldUtils.writeField(source, "capability", originalCapability, true);
       FieldUtils.writeField(source, "ops", originalOps, true);
     }

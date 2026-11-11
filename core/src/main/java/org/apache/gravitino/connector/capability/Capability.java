@@ -126,13 +126,6 @@ public interface Capability {
    * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will
    * also delete all underlying data associated with the catalog.
    *
-   * <p>For {@link Scope#TABLE}, successful creation must return the persistent {@code
-   * gravitino.identifier} in the unmasked table properties. A newly inserted table must retain the
-   * server-issued identifier supplied to create; a create mode returning an existing table must
-   * retain that table's original identifier. Core uses this identity to distinguish creation from a
-   * no-op before initializing ownership. {@code ManagedTableOperations} implements this contract
-   * for tables stored in Gravitino.
-   *
    * @param scope The scope of the capability.
    * @return The capability of the managed storage.
    */
