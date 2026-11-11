@@ -64,6 +64,15 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
+    // Paimon's SparkCatalog returns a SparkTable only for Paimon file store tables. Other table
+    // types, such as format tables backed by a metastore (CSV, JSON, ORC, Parquet or text files
+    // registered in Hive), come back as a different Spark table (a FileTable or, in newer Paimon
+    // versions, a PaimonFormatTable). Their schema and partitions are already resolved by Paimon
+    // and they read and write through their own code path, so return them as they are instead of
+    // failing with a ClassCastException.
+    if (!(sparkTable instanceof SparkTable)) {
+      return sparkTable;
+    }
     return new SparkPaimonTable(
         identifier,
         gravitinoTable,
