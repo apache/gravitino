@@ -119,14 +119,20 @@ public class RoleMetaService {
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
+        NameIdentifierUtil.toMetadataObjectForRead(metadataObjectIdent, metadataObjectType);
     long metadataObjectId = EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
-        SessionUtils.getWithoutCommit(
-            RoleMetaMapper.class,
-            mapper ->
-                mapper.listRolesByMetadataObjectIdAndType(
-                    metadataObjectId, metadataObject.type().name()));
+        allFields
+            ? SessionUtils.getWithoutCommitFresh(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()))
+            : SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()));
     return rolePOs.stream()
         .map(
             po -> {
@@ -448,7 +454,7 @@ public class RoleMetaService {
 
   private static RolePO getRolePOByMetalakeIdAndName(Long metalakeId, String roleName) {
     RolePO rolePO =
-        SessionUtils.getWithoutCommit(
+        SessionUtils.getWithoutCommitFresh(
             RoleMetaMapper.class,
             mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
 

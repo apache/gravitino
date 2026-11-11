@@ -190,7 +190,9 @@ public class OwnerMetaService {
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
                         entityId,
-                        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name())),
+                        NameIdentifierUtil.toMetadataObjectForRead(entity, entityType)
+                            .type()
+                            .name())),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
@@ -225,7 +227,7 @@ public class OwnerMetaService {
       deletions.add(
           new OwnerRelForDeletion(
               entityId,
-              NameIdentifierUtil.toMetadataObject(entity, ownedObjectType).type().name()));
+              NameIdentifierUtil.toMetadataObjectForRead(entity, ownedObjectType).type().name()));
       ownerRelPOs.add(
           POConverters.initializeOwnerRelPOsWithVersion(
               metalakeId, ownerType.name(), ownerId, ownedObjectType.name(), entityId));
