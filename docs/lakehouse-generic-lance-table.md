@@ -143,18 +143,15 @@ blob columns stored as `External(arrow_field_json_str)` keep that form instead o
 ### Ownership with `EXIST_OK`
 
 `lance.creation-mode=EXIST_OK` is supported by the Gravitino table creation API as well as Lance
-REST. If the table already exists, its owner is unchanged, including when it has no owner. If this
-request creates a new table, its effective caller becomes the owner when authorization is enabled.
-A concurrent request that returns the existing table does not initialize ownership. Ownership
-initialization is bound to the created table's ID and does not overwrite an owner assigned in the
-meantime or follow the name to a replacement table.
+REST. Returning an existing table does not change its owner, including when it has no owner. A
+concurrent request that returns an already-created table also skips ownership assignment, even if
+its creator has not assigned the owner yet. An actual creation still uses the existing owner hook
+to assign the effective caller when authorization is enabled.
 
-Creation and owner initialization remain separate operations. If the server stops or owner
-initialization fails after creation (for example, on a lock timeout), the table can remain unowned.
-Repair the failure and use an authorized explicit owner assignment to reconcile it; a later
-`EXIST_OK` request does not claim it. If an authorization-plugin callback fails after ownership was
-persisted, `EXIST_OK` also does not replay that callback. An explicit owner assignment can
-resynchronize the plugin after it is repaired.
+Creation and owner assignment remain separate operations. If creation succeeded but its owner hook
+failed, repeating `EXIST_OK` does not repair ownership or replay authorization-plugin callbacks.
+Repair the failure and use an authorized explicit owner assignment to reconcile it. This fix does
+not change owner-transfer semantics or add atomicity between creation and owner assignment.
 
 ### Table Properties
 

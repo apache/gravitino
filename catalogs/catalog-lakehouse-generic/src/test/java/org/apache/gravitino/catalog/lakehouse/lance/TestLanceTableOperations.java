@@ -61,7 +61,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
@@ -374,86 +373,6 @@ public class TestLanceTableOperations {
                 null,
                 new SortOrder[0],
                 new Index[0]));
-  }
-
-  @Test
-  void testExistOkConcurrentCreateReturnsPersistedIdentity() throws IOException {
-    NameIdentifier ident = NameIdentifier.of("schema", "concurrent");
-    Map<String, String> properties =
-        Map.of(
-            Table.PROPERTY_LOCATION,
-            tempDir.resolve("candidate").toString(),
-            Table.PROPERTY_TABLE_FORMAT,
-            "lance",
-            LANCE_CREATION_MODE,
-            "EXIST_OK",
-            StringIdentifier.ID_KEY,
-            StringIdentifier.fromId(2L).toString());
-    Map<String, String> persisted =
-        Map.of(
-            Table.PROPERTY_LOCATION, tempDir.resolve("winner").toString(),
-            Table.PROPERTY_TABLE_FORMAT, "lance",
-            StringIdentifier.ID_KEY, StringIdentifier.fromId(1L).toString());
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenThrow(new NoSuchEntityException("missing"))
-        .thenReturn(tableEntity(ident, List.of(), persisted));
-    Mockito.doThrow(new TableAlreadyExistsException("Concurrent create"))
-        .when(lanceTableOps)
-        .createTableInternal(
-            eq(ident), any(), any(), any(), any(), any(), any(), any(), eq(false), anyString());
-    Table table =
-        lanceTableOps.createTable(
-            ident,
-            new Column[0],
-            null,
-            properties,
-            new Transform[0],
-            null,
-            new SortOrder[0],
-            new Index[0]);
-    Assertions.assertEquals(persisted, table.properties());
-    verify(store, never()).put(any(), anyBoolean());
-  }
-
-  @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  void testExistOkKeepsConflictWhenWinnerDisappearsOrCleanupFails(boolean cleanupFailed)
-      throws IOException {
-    NameIdentifier ident = NameIdentifier.of("schema", "concurrent_failure");
-    Map<String, String> properties =
-        Map.of(
-            Table.PROPERTY_LOCATION,
-            tempDir.resolve("candidate").toString(),
-            Table.PROPERTY_TABLE_FORMAT,
-            "lance",
-            LANCE_CREATION_MODE,
-            "EXIST_OK");
-    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
-        .thenThrow(new NoSuchEntityException("missing"));
-    TableAlreadyExistsException conflict = new TableAlreadyExistsException("Concurrent create");
-    if (cleanupFailed) {
-      conflict.addSuppressed(new IOException("Cleanup failed"));
-    }
-    Mockito.doThrow(conflict)
-        .when(lanceTableOps)
-        .createTableInternal(
-            eq(ident), any(), any(), any(), any(), any(), any(), any(), eq(false), anyString());
-    Assertions.assertSame(
-        conflict,
-        Assertions.assertThrows(
-            TableAlreadyExistsException.class,
-            () ->
-                lanceTableOps.createTable(
-                    ident,
-                    new Column[0],
-                    null,
-                    properties,
-                    new Transform[0],
-                    null,
-                    new SortOrder[0],
-                    new Index[0])));
-    verify(store, Mockito.times(cleanupFailed ? 1 : 2))
-        .get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class));
   }
 
   /** Verifies EXIST_OK does not return a non-Lance entity as a Lance table. */

@@ -23,7 +23,6 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.exceptions.NotFoundException;
 
 /** Dispatcher interface for managing owners of metadata objects. */
 public interface OwnerDispatcher {
@@ -67,44 +66,6 @@ public interface OwnerDispatcher {
     for (MetadataObject metadataObject : metadataObjects) {
       setOwner(metalake, metadataObject, ownerName, ownerType);
     }
-  }
-
-  /**
-   * Whether identity-bound, insert-only owner initialization is supported. Create hooks must check
-   * this before creating an object; there is no safe fallback to {@link #setOwner}.
-   *
-   * @return true if {@link #initializeOwner} is implemented
-   */
-  default boolean supportsOwnerInitialization() {
-    return false;
-  }
-
-  /**
-   * Initializes ownership of a newly created metadata object without replacing an existing owner.
-   * Callers must only pass objects actually created by their request.
-   *
-   * <p>Creation and initialization are separate operations. An initialization failure can leave an
-   * unowned object, and a plugin callback can fail after ownership has committed. Repeating a
-   * create that returns the existing object does not retry initialization or replay callbacks;
-   * after repairing the failure, use an authorized explicit owner assignment to reconcile it.
-   *
-   * @param metalake the metalake name
-   * @param metadataObject the object name and type
-   * @param expectedId the persistent identity returned by creation
-   * @param ownerName the initial owner name
-   * @param ownerType the initial owner type
-   * @return true if inserted; false if already owned, deleted or replaced by a different identity
-   * @throws NotFoundException if initialization needs an owner principal that does not exist
-   * @throws RuntimeException if persistence or an authorization-plugin callback fails
-   * @throws UnsupportedOperationException if initialization is unsupported
-   */
-  default boolean initializeOwner(
-      String metalake,
-      MetadataObject metadataObject,
-      long expectedId,
-      String ownerName,
-      Owner.Type ownerType) {
-    throw new UnsupportedOperationException("Identity-bound owner initialization is unsupported");
   }
 
   /**

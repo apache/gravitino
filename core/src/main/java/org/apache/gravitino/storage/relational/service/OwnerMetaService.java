@@ -36,7 +36,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -206,63 +205,6 @@ public class OwnerMetaService {
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
-  }
-
-  /**
-   * Initializes an owner without transferring ownership or following a name to a replacement.
-   *
-   * @param entity the object identifier
-   * @param entityType the object type
-   * @param expectedId the ID inserted by the create request
-   * @param owner the owner identifier
-   * @param ownerType USER or GROUP
-   * @return true if initialized; false if already owned or the original object is gone
-   * @throws NoSuchEntityException if the owner does not exist
-   */
-  public boolean initializeOwner(
-      NameIdentifier entity,
-      Entity.EntityType entityType,
-      long expectedId,
-      NameIdentifier owner,
-      Entity.EntityType ownerType) {
-    String metalake = NameIdentifierUtil.getMetalake(entity);
-    Preconditions.checkArgument(
-        metalake.equals(NameIdentifierUtil.getMetalake(owner)),
-        "The object and its owner must be in the same metalake");
-    long metalakeId;
-    try {
-      metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      if (EntityIdService.getEntityId(entity, entityType) != expectedId) {
-        return false;
-      }
-    } catch (NoSuchEntityException e) {
-      return false;
-    }
-    return SessionUtils.doWithCommitAndFetchResult(
-        OwnerMetaMapper.class,
-        mapper -> {
-          // Use the same lock order as explicit transfers. The expected ID fences drop/recreate
-          // even when the name resolved before a peer committed its deletion.
-          try {
-            lockMetalakeForOwnerWrite(
-                metalake, metalakeId, entityType == Entity.EntityType.METALAKE);
-            lockOwnedObjectsForOwnerWrite(List.of(expectedId), entityType, metalakeId);
-          } catch (NoSuchEntityException e) {
-            return false;
-          }
-          String metadataObjectType =
-              NameIdentifierUtil.toMetadataObjectForRead(entity, entityType).type().name();
-          if (mapper.selectOwnerByMetadataObjectIdAndTypeForUpdate(expectedId, metadataObjectType)
-              != null) {
-            return false;
-          }
-          long ownerId = EntityIdService.getEntityId(owner, ownerType);
-          lockPrincipalForOwnerWrite(owner, ownerType, ownerId, metalakeId);
-          mapper.insertOwnerRel(
-              POConverters.initializeOwnerRelPOsWithVersion(
-                  metalakeId, ownerType.name(), ownerId, entityType.name(), expectedId));
-          return true;
-        });
   }
 
   @Monitored(

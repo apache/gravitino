@@ -42,12 +42,10 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -287,138 +285,6 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
   private long latestRetiredAt(CatalogEntity owned) throws Exception {
     return queryLong(
         "SELECT MAX(deleted_at) FROM owner_meta WHERE metadata_object_id = " + owned.id());
-  }
-
-  @TestTemplate
-  void testInitializeOwnerPreservesExistingOwnerAndRejectsReplacement() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    CatalogEntity owned = createAndInsertCatalog(METALAKE, "initialized");
-    NameIdentifier first = insertPrincipal(false, "first");
-    NameIdentifier second = insertPrincipal(true, "second");
-    assertTrue(backend.supportsOwnerInitialization());
-    assertTrue(
-        backend.initializeOwner(
-            owned.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            owned.id(),
-            first,
-            Entity.EntityType.USER));
-    assertFalse(
-        backend.initializeOwner(
-            owned.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            owned.id(),
-            first,
-            Entity.EntityType.USER));
-    assertFalse(
-        backend.initializeOwner(
-            owned.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            owned.id(),
-            second,
-            Entity.EntityType.GROUP));
-    assertEquals(first.name(), ownerName(owned));
-    setOwner(owned, second, Entity.EntityType.GROUP);
-    assertFalse(
-        backend.initializeOwner(
-            owned.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            owned.id(),
-            first,
-            Entity.EntityType.USER));
-    assertEquals(second.name(), ownerName(owned));
-
-    assertTrue(CatalogMetaService.getInstance().deleteCatalog(owned.nameIdentifier(), false));
-    CatalogEntity replacement = createAndInsertCatalog(METALAKE, "initialized");
-    assertFalse(
-        backend.initializeOwner(
-            replacement.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            owned.id(),
-            first,
-            Entity.EntityType.USER));
-    assertTrue(owner(replacement).isEmpty());
-    assertTrue(
-        backend.initializeOwner(
-            replacement.nameIdentifier(),
-            Entity.EntityType.CATALOG,
-            replacement.id(),
-            second,
-            Entity.EntityType.GROUP));
-  }
-
-  @TestTemplate
-  void testInitializeOwnerWaitsForConcurrentTransfer() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    CatalogEntity owned = createAndInsertCatalog(METALAKE, "initializing");
-    NameIdentifier creator = insertPrincipal(false, "creator");
-    NameIdentifier transferred = insertPrincipal(true, "transferred");
-    Throwable failure =
-        whileTransactionHeld(
-            () -> setOwner(owned, transferred, Entity.EntityType.GROUP),
-            () ->
-                assertFalse(
-                    backend.initializeOwner(
-                        owned.nameIdentifier(),
-                        Entity.EntityType.CATALOG,
-                        owned.id(),
-                        creator,
-                        Entity.EntityType.USER)));
-    assertNull(failure);
-    assertEquals(transferred.name(), ownerName(owned));
-    assertEquals(1, liveOwnerRowsForObject(owned));
-  }
-
-  @TestTemplate
-  void testInitializeOwnerWaitsForConcurrentDelete() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    CatalogEntity owned = createAndInsertCatalog(METALAKE, "deleting");
-    NameIdentifier creator = insertPrincipal(false, "creator");
-    Throwable failure =
-        whileTransactionHeld(
-            () ->
-                assertTrue(
-                    CatalogMetaService.getInstance().deleteCatalog(owned.nameIdentifier(), false)),
-            () ->
-                assertFalse(
-                    backend.initializeOwner(
-                        owned.nameIdentifier(),
-                        Entity.EntityType.CATALOG,
-                        owned.id(),
-                        creator,
-                        Entity.EntityType.USER)));
-    assertNull(failure);
-    assertEquals(0, liveOwnerRowsForObject(owned));
-  }
-
-  @TestTemplate
-  void testTableOwnerInitializationDoesNotFollowDropAndRecreate() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    createAndInsertCatalog(METALAKE, "catalog");
-    createAndInsertSchema(METALAKE, "catalog", "schema");
-    Namespace namespace = Namespace.of(METALAKE, "catalog", "schema");
-    TableEntity old = createAndInsertTableEntity(namespace, "table");
-    NameIdentifier creator = insertPrincipal(false, "creator");
-    assertTrue(TableMetaService.getInstance().deleteTable(old.nameIdentifier()));
-    TableEntity replacement = createAndInsertTableEntity(namespace, "table");
-    assertFalse(
-        backend.initializeOwner(
-            old.nameIdentifier(),
-            Entity.EntityType.TABLE,
-            old.id(),
-            creator,
-            Entity.EntityType.USER));
-    assertTrue(
-        OwnerMetaService.getInstance()
-            .getOwner(replacement.nameIdentifier(), Entity.EntityType.TABLE)
-            .isEmpty());
-    assertTrue(
-        backend.initializeOwner(
-            replacement.nameIdentifier(),
-            Entity.EntityType.TABLE,
-            replacement.id(),
-            creator,
-            Entity.EntityType.USER));
   }
 
   private void setOwner(CatalogEntity owned, NameIdentifier owner, Entity.EntityType ownerType) {

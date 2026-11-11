@@ -121,7 +121,6 @@ public class TestTableHookDispatcher {
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.when(ownerDispatcher.supportsOwnerInitialization()).thenReturn(true);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     Table createdTable = createdTable();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
@@ -145,7 +144,7 @@ public class TestTableHookDispatcher {
 
     ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
     Mockito.verify(ownerDispatcher)
-        .initializeOwner(eq(METALAKE), captor.capture(), eq(42L), any(), eq(Owner.Type.USER));
+        .setOwner(eq(METALAKE), captor.capture(), any(), eq(Owner.Type.USER));
     assertEquals("my_table", captor.getValue().name());
     assertEquals(CATALOG + ".schema_norm", captor.getValue().parent());
   }
@@ -177,10 +176,9 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableThrowsWhenSetOwnerFails() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.when(ownerDispatcher.supportsOwnerInitialization()).thenReturn(true);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(ownerDispatcher)
-        .initializeOwner(any(), any(), Mockito.anyLong(), any(), any());
+        .setOwner(any(), any(), any(), any());
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     Table created = createdTable();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
@@ -211,10 +209,9 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableSucceedsWhenTableDroppedBeforeOwnerSet() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.when(ownerDispatcher.supportsOwnerInitialization()).thenReturn(true);
     Mockito.doThrow(new NoSuchMetadataObjectException("The table is gone"))
         .when(ownerDispatcher)
-        .initializeOwner(any(), any(), Mockito.anyLong(), any(), any());
+        .setOwner(any(), any(), any(), any());
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     Table createdTable = createdTable();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
@@ -227,10 +224,9 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableThrowsWhenOwnerNotFound() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.when(ownerDispatcher.supportsOwnerInitialization()).thenReturn(true);
     Mockito.doThrow(new NotFoundException("The owner is missing"))
         .when(ownerDispatcher)
-        .initializeOwner(any(), any(), Mockito.anyLong(), any(), any());
+        .setOwner(any(), any(), any(), any());
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     Table created = createdTable();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
@@ -243,26 +239,13 @@ public class TestTableHookDispatcher {
   @Test
   public void testExistingTableDoesNotInitializeOwner() {
     OwnerDispatcher owners = Mockito.mock(OwnerDispatcher.class);
-    Mockito.when(owners.supportsOwnerInitialization()).thenReturn(true);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
     EntityCombinedTable existing = EntityCombinedTable.of(Mockito.mock(Table.class));
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(existing);
     assertSame(existing, createTable(new TableHookDispatcher(dispatcher, () -> owners)));
-    Mockito.verify(owners, Mockito.never())
-        .initializeOwner(any(), any(), Mockito.anyLong(), any(), any());
     Mockito.verify(owners, Mockito.never()).getOwner(any(), any());
     Mockito.verify(owners, Mockito.never()).setOwner(any(), any(), any(), any());
-  }
-
-  @Test
-  public void testUnsupportedInitializerFailsBeforeCreatingTable() {
-    OwnerDispatcher owners = Mockito.mock(OwnerDispatcher.class);
-    TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    assertThrows(
-        UnsupportedOperationException.class,
-        () -> createTable(new TableHookDispatcher(dispatcher, () -> owners)));
-    Mockito.verifyNoInteractions(dispatcher);
   }
 
   private static EntityCombinedTable createdTable() {

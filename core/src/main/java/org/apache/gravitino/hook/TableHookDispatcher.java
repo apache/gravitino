@@ -93,12 +93,6 @@ public class TableHookDispatcher implements TableDispatcher {
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     OwnerDispatcher ownerManager = ownerDispatcher.get();
-    if (ownerManager != null && !ownerManager.supportsOwnerInitialization()) {
-      throw new UnsupportedOperationException(
-          "Cannot create table "
-              + ident
-              + ": configure an owner dispatcher and entity store supporting owner initialization");
-    }
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
@@ -113,10 +107,11 @@ public class TableHookDispatcher implements TableDispatcher {
         return table;
       }
       try {
-        ownerManager.initializeOwner(
+        // Preserve the existing owner hook for actual creations. Identity-bound initialization
+        // and its transfer/drop-recreate races are outside this EXIST_OK fix.
+        ownerManager.setOwner(
             ident.namespace().level(0),
             NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
-            createdId.getAsLong(),
             PrincipalUtils.getCurrentUserName(),
             Owner.Type.USER);
       } catch (NoSuchMetadataObjectException e) {

@@ -27,7 +27,6 @@ import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
@@ -40,7 +39,6 @@ import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -433,17 +431,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(source, "capability", managed, true);
     FieldUtils.writeField(source, "ops", operations, true);
     OwnerDispatcher owners = mock(OwnerDispatcher.class);
-    when(owners.supportsOwnerInitialization()).thenReturn(true);
     CountDownLatch initializing = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
     doAnswer(
             invocation -> {
               initializing.countDown();
               Assertions.assertTrue(release.await(30, TimeUnit.SECONDS));
-              return true;
+              return null;
             })
         .when(owners)
-        .initializeOwner(any(), any(), anyLong(), any(), any());
+        .setOwner(any(), any(), any(), any());
     TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
     ExecutorService executor = Executors.newSingleThreadExecutor();
     try {
@@ -460,7 +457,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       EntityCombinedTable created = (EntityCombinedTable) first.get(30, TimeUnit.SECONDS);
       long id = StringIdentifier.fromProperties(originalOps.loadTable(ident).properties()).id();
       Assertions.assertEquals(id, created.createdTableId().orElseThrow());
-      verify(owners, times(1)).initializeOwner(eq(metalake), any(), eq(id), any(), any());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
       verify(owners, never()).getOwner(any(), any());
     } finally {
       release.countDown();
@@ -529,7 +526,6 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(source, "capability", managed, true);
     FieldUtils.writeField(source, "ops", operations, true);
     OwnerDispatcher owners = mock(OwnerDispatcher.class);
-    when(owners.supportsOwnerInitialization()).thenReturn(true);
     TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
     try {
       EntityCombinedTable created =
@@ -540,7 +536,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
               .createdTableId()
               .isEmpty());
-      verify(owners, times(1)).initializeOwner(eq(metalake), any(), eq(createdId), any(), any());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
 
       // A replacement observed by the fallback belongs to another request.
       TableEntity replacement =
@@ -562,7 +558,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
               .createdTableId()
               .isEmpty());
-      verify(owners, times(1)).initializeOwner(any(), any(), anyLong(), any(), any());
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
 
       IOException failure = new IOException("entity store unavailable");
       doThrow(failure).when(entityStore).get(ident, TABLE, TableEntity.class);
@@ -572,7 +568,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
               () -> hook.createTable(ident, new Column[0], "", props));
       Assertions.assertSame(failure, error.getCause());
       Assertions.assertTrue(error.getMessage().contains(ident.toString()));
-      verify(owners, times(1)).initializeOwner(any(), any(), anyLong(), any(), any());
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
     } finally {
       FieldUtils.writeField(source, "capability", originalCapability, true);
       FieldUtils.writeField(source, "ops", originalOps, true);
