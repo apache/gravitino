@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.storage.relational.utils.ExceptionUtils.hasSqlException;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -235,12 +236,17 @@ public class TestSchemaMetaService extends TestJDBCBackend {
       Throwable secondFailure = secondResult.get(30, TimeUnit.SECONDS);
       assertTrue((firstFailure == null) != (secondFailure == null), "Exactly one revival must win");
       Throwable losingFailure = firstFailure == null ? secondFailure : firstFailure;
-      Assertions.assertInstanceOf(
-          EntityAlreadyExistsException.class,
-          losingFailure,
-          () -> ExceptionUtils.getStackTrace(losingFailure));
+      if (!hasSqlException(losingFailure, Collections.emptySet(), Set.of(1213))) {
+        Assertions.assertInstanceOf(
+            EntityAlreadyExistsException.class,
+            losingFailure,
+            () -> ExceptionUtils.getStackTrace(losingFailure));
+      }
       SchemaEntity winner = firstFailure == null ? first : second;
       SchemaEntity loser = firstFailure == null ? second : first;
+      // MySQL can roll back the competing insert as a deadlock victim (error 1213). Both
+      // transactions have now finished, so retrying the loser must report the existing ID.
+      assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(loser, false));
       Assertions.assertEquals(
           retired.id(),
           backend.<SchemaEntity>get(winner.nameIdentifier(), Entity.EntityType.SCHEMA).id());

@@ -212,7 +212,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         // A create-only import can conflict either because another Gravitino node won an HA race,
         // or because the external identifier is already stored under another Gravitino path.
         // Reload to distinguish a successful concurrent import from an identity conflict.
-        LOG.info("Table {} import conflicted with existing metadata; reloading from store.", ident);
+        LOG.info(
+            "Table {} import conflicted with existing metadata; reloading from store.", ident, e);
         entityCombinedTable =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
         if (!entityCombinedTable.imported()) {

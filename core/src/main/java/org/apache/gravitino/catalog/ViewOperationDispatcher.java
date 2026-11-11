@@ -156,7 +156,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         // A create-only import can conflict either because another Gravitino node won an HA race,
         // or because the external identifier is already stored under another Gravitino path.
         // Reload to distinguish a successful concurrent import from an identity conflict.
-        LOG.info("View {} import conflicted with existing metadata; reloading from store.", ident);
+        LOG.info(
+            "View {} import conflicted with existing metadata; reloading from store.", ident, e);
         entityCombinedView =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
         if (!entityCombinedView.imported()) {

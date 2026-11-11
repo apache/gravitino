@@ -328,7 +328,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         // or because the external identifier is already stored under another Gravitino path.
         // Reload to distinguish a successful concurrent import from an identity conflict.
         LOG.info(
-            "Schema {} import conflicted with existing metadata; reloading from store.", ident);
+            "Schema {} import conflicted with existing metadata; reloading from store.", ident, e);
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {

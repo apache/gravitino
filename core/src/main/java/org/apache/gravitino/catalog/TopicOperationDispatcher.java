@@ -131,7 +131,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       } catch (EntityAlreadyExistsException e) {
         // A create-only import can conflict either because another Gravitino node won an HA race,
         // or because the Kafka UUID is actively registered under another Gravitino path.
-        LOG.info("Topic {} import conflicted with existing metadata; reloading from store.", ident);
+        LOG.info(
+            "Topic {} import conflicted with existing metadata; reloading from store.", ident, e);
         topic = TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTopic(ident));
         if (!topic.imported()) {
           throw new UnsupportedOperationException(
