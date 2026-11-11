@@ -75,8 +75,9 @@ public final class PolicyBindingMigration {
   /**
    * Converts and verifies each policy's bindings before retiring its legacy rows in one
    * transaction. A failure rolls back that policy and is reported after the remaining policies are
-   * processed. Rerunning resumes from the active legacy rows. Missing owners and objects are logged
-   * and skipped without retiring their bindings.
+   * processed. If rollback fails, processing stops and the summary includes unprocessed policies.
+   * Rerunning resumes from the active legacy rows. Missing owners and objects are logged and
+   * skipped without retiring their bindings.
    *
    * @return The number of migrated bindings.
    * @throws SQLException If a binding cannot be converted or verified.
@@ -89,7 +90,10 @@ public final class PolicyBindingMigration {
     long skippedObjectBindings = 0;
     long failedPolicies = 0;
     SQLException firstFailure = null;
-    for (long policyId : pendingPolicies()) {
+    List<Long> policyIds = pendingPolicies();
+    long unprocessedPolicies = policyIds.size();
+    for (long policyId : policyIds) {
+      unprocessedPolicies--;
       try {
         long bindings =
             count(
@@ -129,13 +133,23 @@ public final class PolicyBindingMigration {
         skippedObjectBindings += bindings - converted;
         LOG.info("Migrated {} bindings for policy {}", converted, policyId);
       } catch (IOException | SQLException | RuntimeException e) {
-        connection.rollback();
         failedPolicies++;
         LOG.error("Failed to migrate policy_id={}; legacy bindings remain active", policyId, e);
         if (firstFailure == null) {
           firstFailure =
               new SQLException(
                   "Cannot migrate policy " + policyId + "; legacy bindings remain active", e);
+        }
+        try {
+          connection.rollback();
+        } catch (SQLException rollbackFailure) {
+          firstFailure.addSuppressed(rollbackFailure);
+          LOG.error(
+              "Rollback failed for policy_id={}; stopping migration with {} unprocessed policies",
+              policyId,
+              unprocessedPolicies,
+              rollbackFailure);
+          break;
         }
       } finally {
         // Balance this temporary reference; the caller still owns the thread-bound session.
@@ -145,12 +159,22 @@ public final class PolicyBindingMigration {
     }
     LOG.info(
         "Migration complete: migrated_bindings={}, skipped_orphan_policies={}, skipped_orphan_bindings={},"
-            + " skipped_missing_object_bindings={}, failed_policies={}; skipped bindings remain active",
+            + " skipped_missing_object_bindings={}, failed_policies={}, unprocessed_policies={};"
+            + " skipped bindings remain active",
         migrated,
         skippedPolicies,
         skippedBindings,
         skippedObjectBindings,
-        failedPolicies);
+        failedPolicies,
+        unprocessedPolicies);
+    if (skippedBindings > 0 || skippedObjectBindings > 0) {
+      LOG.warn(
+          "Migration left {} orphaned bindings and {} bindings to missing objects active in the legacy"
+              + " table. The new server does not read these bindings; review the logged IDs before"
+              + " completing the upgrade.",
+          skippedBindings,
+          skippedObjectBindings);
+    }
     if (firstFailure != null) {
       throw firstFailure;
     }

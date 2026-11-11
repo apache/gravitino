@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.spy;
 
 import java.sql.Connection;
@@ -310,18 +311,24 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     assertEquals(1, activeLegacyBindings());
   }
 
-  /** The summary distinguishes retained orphan policies and bindings from migrated bindings. */
+  /**
+   * Summaries distinguish skips, failures and unprocessed policies, and warn about retained rows.
+   */
   @TestTemplate
-  public void testOrphanSummaryAndRepeatExecution() throws Exception {
+  public void testMigrationSummaryAndRepeatExecution() throws Exception {
     LoggerContext context =
         (LoggerContext) LogManager.getContext(PolicyBindingMigration.class.getClassLoader(), false);
     Configuration config = context.getConfiguration();
     List<String> messages = new ArrayList<>();
+    List<String> warnings = new ArrayList<>();
     AbstractAppender appender =
         new AbstractAppender("migrationSummaryCapture", null, null, true, null) {
           @Override
           public void append(LogEvent event) {
             messages.add(event.getMessage().getFormattedMessage());
+            if (Level.WARN.equals(event.getLevel())) {
+              warnings.add(event.getMessage().getFormattedMessage());
+            }
           }
         };
     appender.start();
@@ -333,15 +340,16 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
     try {
       PolicyBindingMigration migration = new PolicyBindingMigration(connection, entityStore);
       assertEquals(1, migration.migrate());
+      assertTrue(warnings.isEmpty());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=1, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0;"
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0, unprocessed_policies=0;"
                   + " skipped bindings remain active"));
       messages.clear();
       assertEquals(0, migration.migrate());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=0, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0;"
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=0, skipped_orphan_bindings=0, skipped_missing_object_bindings=0, failed_policies=0, unprocessed_policies=0;"
                   + " skipped bindings remain active"));
 
       insertBinding(2, 18L, catalog.id(), "CATALOG");
@@ -358,18 +366,23 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
       assertEquals(3, activeLegacyBindings());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=1, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0;"
+              "Migration complete: migrated_bindings=1, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0, unprocessed_policies=0;"
                   + " skipped bindings remain active"));
       assertTrue(
           messages.contains(
               "Skipping 2 legacy bindings for policy_id=18: policy or metalake is missing or deleted;"
                   + " bindings remain active"));
+      assertTrue(
+          warnings.contains(
+              "Migration left 3 orphaned bindings and 0 bindings to missing objects active in the legacy"
+                  + " table. The new server does not read these bindings; review the logged IDs before"
+                  + " completing the upgrade."));
       messages.clear();
       assertEquals(0, migration.migrate());
       assertEquals(3, activeLegacyBindings());
       assertTrue(
           messages.contains(
-              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0;"
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3, skipped_missing_object_bindings=0, failed_policies=0, unprocessed_policies=0;"
                   + " skipped bindings remain active"));
       insertBinding(7, policy.id(), Long.MAX_VALUE, "TABLE");
       connection.commit();
@@ -379,12 +392,47 @@ public class TestPolicyBindingMigration extends TestJDBCBackend {
       assertTrue(
           messages.contains(
               "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3,"
-                  + " skipped_missing_object_bindings=1, failed_policies=0; skipped bindings remain active"));
+                  + " skipped_missing_object_bindings=1, failed_policies=0, unprocessed_policies=0; skipped bindings remain active"));
       assertTrue(
           messages.contains(
               "Skipping legacy binding for policy_id=20, metadata_object_id="
                   + Long.MAX_VALUE
                   + ", metadata_object_type=TABLE: target is missing or deleted; binding remains active"));
+      assertTrue(
+          warnings.contains(
+              "Migration left 3 orphaned bindings and 1 bindings to missing objects active in the legacy"
+                  + " table. The new server does not read these bindings; review the logged IDs before"
+                  + " completing the upgrade."));
+
+      PolicyEntity later = createPolicy(21L, policy.namespace(), "later_policy", AUDIT_INFO);
+      backend.insert(later, false);
+      removeAutomaticallyCreatedTag(later.id());
+      insertBinding(8, later.id(), catalog.id(), "CATALOG");
+      connection.commit();
+      Connection failing = spy(connection);
+      SQLException migrationFailure = new SQLException("Injected cleanup failure");
+      SQLException rollbackFailure = new SQLException("Injected rollback failure");
+      doThrow(migrationFailure)
+          .when(failing)
+          .prepareStatement(startsWith("UPDATE policy_relation_meta"));
+      doThrow(rollbackFailure).when(failing).rollback();
+      messages.clear();
+      SQLException failure =
+          assertThrows(
+              SQLException.class, () -> new PolicyBindingMigration(failing, entityStore).migrate());
+      assertSame(migrationFailure, failure.getCause());
+      assertEquals(1, failure.getSuppressed().length);
+      assertSame(rollbackFailure, failure.getSuppressed()[0]);
+      assertTrue(
+          messages.contains(
+              "Migration complete: migrated_bindings=0, skipped_orphan_policies=2, skipped_orphan_bindings=3,"
+                  + " skipped_missing_object_bindings=0, failed_policies=1, unprocessed_policies=1;"
+                  + " skipped bindings remain active"));
+      assertTrue(
+          messages.contains(
+              "Rollback failed for policy_id=20; stopping migration with 1 unprocessed policies"));
+      assertEquals(5, activeLegacyBindings());
+      assertEquals(1, count("tag_meta"));
     } finally {
       config.removeLogger(loggerName);
       context.updateLoggers();

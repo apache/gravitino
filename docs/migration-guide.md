@@ -120,13 +120,17 @@ store. H2, MySQL, and PostgreSQL are supported; use the same JDBC driver as the 
    bindings active. No tables, columns, or indexes are added.
    Bindings whose policy, metalake, or target object is missing or deleted are logged and left
    active. Other valid bindings still migrate. The final summary reports migrated bindings,
-   skipped owners and bindings, missing-object bindings, and failed policies. A run with skipped
-   bindings does not mean the legacy table is drained; review the logged IDs before completing the upgrade.
+   skipped owners and bindings, missing-object bindings, failed policies, and unprocessed policies.
+   Skipped bindings alone do not cause a nonzero exit code. A final WARN reports their counts:
+   the new server reads tag-based associations and does not read these retained legacy rows.
+   Review the logged IDs before completing the upgrade; a successful exit does not mean all
+   legacy bindings were migrated.
 3. If a policy fails, its changes roll back and other policies are still attempted. Any failed
-   policy makes the command exit unsuccessfully after printing the summary. Keep all servers and
-   policy consumers stopped on failure or interruption. Fix the reported cause and rerun the same
-   command: completed policies remain committed, while
-   the unfinished policy rolls back and is retried from its active legacy rows. A partially migrated
+   policy makes the command exit unsuccessfully after printing the summary. If rollback itself
+   fails, processing stops and the summary reports how many policies were not attempted.
+   Keep all servers and policy consumers stopped on failure or interruption. Fix the reported cause
+   and rerun the same command: completed policies remain committed, while unfinished policies are
+   retried from their active legacy rows. A partially migrated
    database is only an offline intermediate state, not a deployment to start serving requests.
    Restore the backup only when abandoning or rolling back the upgrade.
    A `Hidden tag name collision` error identifies the policy and tag and rolls back that policy. If an
