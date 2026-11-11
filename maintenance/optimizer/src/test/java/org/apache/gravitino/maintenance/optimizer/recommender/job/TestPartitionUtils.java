@@ -84,7 +84,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("colA = \"abc\" AND bucket(colB, 2) = 1", where);
+    Assertions.assertEquals("colA = \"abc\" AND bucket(2, colB) = 1", where);
   }
 
   @Test
@@ -102,7 +102,29 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("truncate(colC, 5) = \"prefix\" AND year(colD) = 2024", where);
+    Assertions.assertEquals("truncate(5, colC) = \"prefix\" AND years(colD) = 2024", where);
+  }
+
+  @Test
+  void testDayPartitionUsesIcebergDaysFunction() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "19723"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.day("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("days(event_time) = 19723", where);
+  }
+
+  @Test
+  void testMonthPartitionUsesIcebergMonthsFunction() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("month", "660"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.month("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("months(event_time) = 660", where);
   }
 
   @Test
@@ -191,8 +213,8 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning);
 
     Assertions.assertEquals(
-        "(hour(event.ts) = 8 AND truncate(country, 3) = \"usa\" AND bucket(user_id, 16) = 5 AND flag = false) "
-            + "OR (hour(event.ts) = 12 AND truncate(country, 3) = \"can\" AND bucket(user_id, 16) = 9 AND flag = true)",
+        "(hours(event.ts) = 8 AND truncate(3, country) = \"usa\" AND bucket(16, user_id) = 5 AND flag = false) "
+            + "OR (hours(event.ts) = 12 AND truncate(3, country) = \"can\" AND bucket(16, user_id) = 9 AND flag = true)",
         where);
   }
 

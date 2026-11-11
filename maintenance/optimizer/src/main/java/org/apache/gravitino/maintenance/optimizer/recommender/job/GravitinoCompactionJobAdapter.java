@@ -66,10 +66,7 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
     if (jobContext.getPartitions().isEmpty()) {
       return "";
     }
-    // generate where clause from jobContext.partitionNames()
-    // 1. get partition column type
-    // 2. generate partition filter name, like day(xxx)
-    // 3. generate partition filter value, like '2023-10-01', TIMESTAMP 'xxx'
+    // Generate Iceberg Spark system-function predicates (e.g. days(ts) = N, bucket(16, id) = V).
     return PartitionUtils.getWhereClauseForPartitions(
         jobContext.getPartitions(), jobContext.getColumns(), jobContext.getPartitioning());
   }

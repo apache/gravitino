@@ -54,13 +54,13 @@ public class PartitionUtils {
     return predicates.stream().map(p -> "(" + p + ")").collect(Collectors.joining(" OR "));
   }
 
-  // For Identity transform, the where clause is like "columnName = value"
-  // For bucket transform, the where clause is like "bucket(columnName, numBuckets) = value"
-  // For truncate transform, the where clause is like "truncate(columnName, width) = value"
-  // For year/month/day/hour transform, the where clause is like "year(columnName) = value"
-  // We could get value from partition.get(i).partitionValue(), if the value type is string, we need
-  // to add quotes like "value",  if the value type is number, we don't need to add quotes. if the
-  // value type is date/datetime, we need to add quotes like TIMESTAMP '2024-01-01'
+  // Predicates use Iceberg Spark system-function forms so rewrite_data_files can translate them
+  // via SparkV2Filters (Iceberg 1.4+ / 1.11). Spark builtins such as day()/year() are not used.
+  // Identity: "columnName = value"
+  // Bucket: "bucket(numBuckets, columnName) = value"
+  // Truncate: "truncate(width, columnName) = value"
+  // Temporal: "years|months|days|hours(columnName) = value"
+  // Literals: strings quoted, numbers bare, date/timestamp as DATE/TIMESTAMP '...'
   public static String getWhereClauseForPartition(
       List<PartitionEntry> partition, Column[] columns, Transform[] partitioning) {
     Preconditions.checkArgument(
@@ -110,25 +110,35 @@ public class PartitionUtils {
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
+  /**
+   * Builds the left-hand side of a partition predicate using Iceberg Spark system functions.
+   *
+   * <p>Temporal transforms use plural names ({@code years}/{@code months}/{@code days}/{@code
+   * hours}) matching {@code org.apache.iceberg.spark.functions.SparkFunctions}. {@code bucket} and
+   * {@code truncate} put the width argument first, matching Iceberg's Spark UDF signatures.
+   */
   private static String buildExpression(Transform transform, String columnName) {
     if (transform instanceof Transforms.IdentityTransform) {
       return columnName;
-    } else if (transform instanceof Transforms.YearTransform
-        || transform instanceof Transforms.MonthTransform
-        || transform instanceof Transforms.DayTransform
-        || transform instanceof Transforms.HourTransform) {
-      return transform.name() + "(" + columnName + ")";
+    } else if (transform instanceof Transforms.YearTransform) {
+      return "years(" + columnName + ")";
+    } else if (transform instanceof Transforms.MonthTransform) {
+      return "months(" + columnName + ")";
+    } else if (transform instanceof Transforms.DayTransform) {
+      return "days(" + columnName + ")";
+    } else if (transform instanceof Transforms.HourTransform) {
+      return "hours(" + columnName + ")";
     } else if (transform instanceof Transforms.BucketTransform) {
       return "bucket("
-          + columnName
-          + ", "
           + ((Transforms.BucketTransform) transform).numBuckets()
+          + ", "
+          + columnName
           + ")";
     } else if (transform instanceof Transforms.TruncateTransform) {
       return "truncate("
-          + columnName
-          + ", "
           + ((Transforms.TruncateTransform) transform).width()
+          + ", "
+          + columnName
           + ")";
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());

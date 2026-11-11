@@ -120,12 +120,13 @@ layouts. A **direct** `builtin-iceberg-rewrite-data-files` submit with an empty 
 rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and similar). You may
 still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
-The failure mode
-`Cannot translate Spark expression ... day(...) ... to data source filter` still happens when
-the submit uses a **partition `where_clause` that applies time/bucket transforms** — the form
-the compaction adapter builds via `PartitionUtils` (for example `p = "a" AND day(ts) = 19723`).
-That is a strategy-generated filter path, not a limitation of empty-`where_clause` direct
-submits. Confirm in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
+Strategy-generated partition filters use Iceberg Spark system functions (for example
+`days(ts) = 19723`, `bucket(16, id) = 3`), not Spark builtins such as `day()`. With Iceberg Spark
+runtime 1.4+ these forms are translated by `SparkV2Filters`. If
+`Cannot translate Spark expression ...` still appears, confirm the job classpath uses a matching
+Iceberg Spark runtime and that the predicate resolved as an Iceberg function (not Spark
+`day()`/`year()`). Empty-`where_clause` direct submits remain the whole-table fallback. Confirm
+in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 
 ## Related
 
