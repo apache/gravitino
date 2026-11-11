@@ -27,7 +27,6 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 
 /** Interface for converter JDBC exceptions to Gravitino exceptions. */
@@ -70,9 +69,6 @@ public class JdbcExceptionConverter {
           3730, // cannot drop a table referenced by a foreign key constraint
           3780); // referencing and referenced columns in a foreign key are incompatible
 
-  /** A lock wait timed out or a deadlock was detected; the request can be retried. */
-  private static final Set<Integer> BUSY_CODES = ImmutableSet.of(1205, 1213);
-
   /**
    * Convert JDBC exception to GravitinoException. The default implementation of this method is
    * based on MySQL exception code, and if the catalog does not compatible with MySQL exception
@@ -98,13 +94,12 @@ public class JdbcExceptionConverter {
         if (INVALID_REQUEST_CODES.contains(sqlException.getErrorCode())) {
           return new BadRequestException(sqlException, "%s", sqlException.getMessage());
         }
-        if (BUSY_CODES.contains(sqlException.getErrorCode())) {
-          return new ServiceUnavailableException(sqlException, "%s", sqlException.getMessage());
-        }
         if (sqlException.getMessage() != null
             && sqlException.getMessage().contains("Access denied")) {
           return new ConnectionFailedException(sqlException, "%s", sqlException.getMessage());
         }
+        // Keep lock timeouts (1205) and deadlocks (1213) as generic failures: HTTP 503 can
+        // trigger automatic retries of DDL requests that have already partially committed.
         return new GravitinoRuntimeException(sqlException, "%s", sqlException.getMessage());
     }
   }

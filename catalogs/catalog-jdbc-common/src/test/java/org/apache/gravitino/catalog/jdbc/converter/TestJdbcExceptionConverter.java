@@ -23,7 +23,6 @@ import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -75,12 +74,12 @@ public class TestJdbcExceptionConverter {
 
   @ParameterizedTest
   @ValueSource(ints = {1205, 1213})
-  void testLockTimeoutAndDeadlockAreServiceUnavailable(int errorCode) {
-    Assertions.assertInstanceOf(
-        ServiceUnavailableException.class,
-        new JdbcExceptionConverter()
-            .toGravitinoException(
-                new SQLException("Lock wait timeout exceeded", "HY000", errorCode)));
+  void testLockTimeoutAndDeadlockStayServerErrors(int errorCode) {
+    SQLException failure = new SQLException("Lock failure at 100%", "HY000", errorCode);
+    GravitinoRuntimeException error = new JdbcExceptionConverter().toGravitinoException(failure);
+    Assertions.assertEquals(GravitinoRuntimeException.class, error.getClass());
+    Assertions.assertSame(failure, error.getCause());
+    Assertions.assertEquals(failure.getMessage(), error.getMessage());
   }
 
   @ParameterizedTest
