@@ -144,6 +144,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -4221,6 +4222,41 @@ public class TestJcasbinAuthorizer {
     } finally {
       when(gravitinoEnv.catalogManager()).thenReturn(null);
     }
+  }
+
+  /**
+   * Legacy names remain usable when invalidating their authorization mappings and owner cache.
+   *
+   * @param type the single-level metadata type
+   * @throws Exception if the test cache cannot be inspected
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TAG", "POLICY"})
+  public void testLegacyNameCacheInvalidation(Entity.EntityType type) throws Exception {
+    NameIdentifier identifier =
+        type == Entity.EntityType.TAG
+            ? NameIdentifierUtil.ofTag(METALAKE, "legacy.with.dot")
+            : NameIdentifierUtil.ofPolicy(METALAKE, "legacy.with.dot");
+    MetadataObject object =
+        MetadataObjects.of(null, "legacy.with.dot", MetadataObject.Type.valueOf(type.name()));
+    GravitinoCache<String, Long> metadataIds = getMetadataIdCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
+    String key = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, object);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(object, METALAKE))
+        .thenReturn(Optional.of(CATALOG_ID));
+
+    metadataIds.put(key, CATALOG_ID);
+    jcasbinAuthorizer.handleEntityNameIdMappingChange(METALAKE, identifier, type);
+    assertFalse(metadataIds.getIfPresent(key).isPresent());
+
+    metadataIds.put(key, CATALOG_ID);
+    owners.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+    jcasbinAuthorizer.handleMetadataOwnerChange(METALAKE, USER_ID, identifier, type);
+    assertFalse(metadataIds.getIfPresent(key).isPresent());
+    assertFalse(owners.getIfPresent(CATALOG_ID).isPresent());
   }
 
   @Test

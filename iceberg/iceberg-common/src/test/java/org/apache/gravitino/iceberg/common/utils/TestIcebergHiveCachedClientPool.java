@@ -22,9 +22,15 @@ package org.apache.gravitino.iceberg.common.utils;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.security.PrivilegedAction;
+import java.util.List;
 import java.util.Map;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.hive.thrift.DelegationTokenIdentifier;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
+import org.apache.hadoop.security.token.Token;
+import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.hive.HiveClientPool;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -101,6 +107,105 @@ public class TestIcebergHiveCachedClientPool {
   }
 
   @Test
+  void testClientPoolsIsolateSubjectsEvenWithUsernameCacheKey() throws Exception {
+    Configuration configuration = new Configuration(false);
+    configuration.set("hive.metastore.uris", "thrift://identity-test:9083");
+    UserGroupInformation login = UserGroupInformation.createRemoteUser("catalog");
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("catalog", login);
+    try (IcebergHiveCachedClientPool pool =
+        new IcebergHiveCachedClientPool(
+            configuration, Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"))) {
+      HiveClientPool loginPool = login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      HiveClientPool proxyPool = proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      Assertions.assertNotSame(loginPool, proxyPool);
+      Assertions.assertSame(
+          loginPool, login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+      Assertions.assertSame(
+          proxyPool, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+    }
+  }
+
+  @Test
+  void testClientPoolsIsolateDefaultSubjectsAndAuthenticationSettings() throws Exception {
+    Configuration simple = new Configuration(false);
+    simple.set("hive.metastore.uris", "thrift://authentication-test:9083");
+    Configuration kerberos = new Configuration(simple);
+    kerberos.setBoolean("hive.metastore.sasl.enabled", true);
+    kerberos.set("hive.metastore.kerberos.principal", "hive/_HOST@EXAMPLE.COM");
+    UserGroupInformation first = UserGroupInformation.createRemoteUser("first");
+    UserGroupInformation second = UserGroupInformation.createRemoteUser("second");
+    try (IcebergHiveCachedClientPool simplePool =
+            new IcebergHiveCachedClientPool(simple, Map.of());
+        IcebergHiveCachedClientPool kerberosPool =
+            new IcebergHiveCachedClientPool(kerberos, Map.of())) {
+      HiveClientPool firstPool =
+          first.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool);
+      Assertions.assertNotSame(
+          firstPool, second.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool));
+      Assertions.assertNotSame(
+          firstPool, first.doAs((PrivilegedAction<HiveClientPool>) kerberosPool::clientPool));
+    }
+  }
+
+  @Test
+  void testRepeatedProxyRequestsReusePool() throws Exception {
+    Configuration configuration = new Configuration(false);
+    configuration.set("hive.metastore.uris", "thrift://proxy-reuse-test:9083");
+    UserGroupInformation login = UserGroupInformation.createRemoteUser("service");
+    login.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
+    for (Map<String, String> properties :
+        List.of(
+            Map.<String, String>of(),
+            Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"))) {
+      try (IcebergHiveCachedClientPool pool =
+          new IcebergHiveCachedClientPool(configuration, properties)) {
+        HiveClientPool first =
+            proxyWithToken(login, 0).doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+        for (int request = 1; request <= 10; request++) {
+          UserGroupInformation proxy = proxyWithToken(login, request);
+          Assertions.assertSame(
+              first, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+        }
+      }
+    }
+  }
+
+  @Test
+  void testRealUsersAndAuthenticationMethodsRemainIsolated() throws Exception {
+    Configuration configuration = new Configuration(false);
+    UserGroupInformation first = UserGroupInformation.createRemoteUser("service");
+    first.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
+    UserGroupInformation second = UserGroupInformation.createRemoteUser("other");
+    second.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
+    UserGroupInformation simple = UserGroupInformation.createRemoteUser("service");
+    try (IcebergHiveCachedClientPool pool =
+        new IcebergHiveCachedClientPool(configuration, Map.of())) {
+      HiveClientPool original =
+          UserGroupInformation.createProxyUser("alice", first)
+              .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      for (UserGroupInformation real : List.of(second, simple)) {
+        Assertions.assertNotSame(
+            original,
+            UserGroupInformation.createProxyUser("alice", real)
+                .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+      }
+    }
+  }
+
+  @Test
+  void testTokenSignatureSettingsRemainIsolated() throws Exception {
+    Configuration first = new Configuration(false);
+    first.set("hive.metastore.token.signature", "first");
+    Configuration second = new Configuration(first);
+    second.set("hive.metastore.token.signature", "second");
+    try (IcebergHiveCachedClientPool firstPool = new IcebergHiveCachedClientPool(first, Map.of());
+        IcebergHiveCachedClientPool secondPool =
+            new IcebergHiveCachedClientPool(second, Map.of())) {
+      Assertions.assertNotSame(firstPool.clientPool(), secondPool.clientPool());
+    }
+  }
+
+  @Test
   void testCloseMultipleInstances() throws IOException {
     Configuration configuration = new Configuration();
     Map<String, String> properties = Maps.newHashMap();
@@ -112,5 +217,19 @@ public class TestIcebergHiveCachedClientPool {
           pool1.close();
           pool2.close();
         });
+  }
+
+  private static UserGroupInformation proxyWithToken(UserGroupInformation login, int sequence) {
+    UserGroupInformation proxy = UserGroupInformation.createProxyUser("alice", login);
+    DelegationTokenIdentifier identifier =
+        new DelegationTokenIdentifier(new Text("alice"), new Text("service"), new Text("service"));
+    identifier.setSequenceNumber(sequence);
+    proxy.addToken(
+        new Token<>(
+            identifier.getBytes(),
+            new byte[] {(byte) sequence},
+            identifier.getKind(),
+            new Text("metastore")));
+    return proxy;
   }
 }
