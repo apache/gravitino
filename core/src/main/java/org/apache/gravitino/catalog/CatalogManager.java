@@ -1451,22 +1451,24 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               }
               secretManager.deleteSecretsFromProperties(catalogProperties);
             }
-            catalogCache.invalidate(ident);
             return deleted;
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
           } catch (NoSuchEntityException ignored) {
             // Another server deleted the catalog after it was loaded above, so a later store read
-            // such as listing its schemas no longer finds it. The drop stays idempotent, but the
-            // wrapper cached by loadCatalogAndWrap has to be discarded. store.delete itself never
-            // reaches here: it maps a missing entity to false on its own.
-            catalogCache.invalidate(ident);
+            // such as listing its schemas no longer finds it. The drop stays idempotent.
+            // store.delete itself never reaches here: it maps a missing entity to false on its own.
             return false;
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
+          } finally {
+            // Discard the wrapper on every outcome. Operations initialized during the drop skip the
+            // catalog in-use check, so a refused or failed drop must not leave them cached for
+            // later calls on a disabled catalog.
+            catalogCache.invalidate(ident);
           }
         });
   }

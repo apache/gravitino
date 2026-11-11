@@ -204,6 +204,9 @@ public class CompatibilityUtils {
           .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
           .put(OperationType.LIST_SEMANTIC_MODEL_METRIC, Operation.LIST_SEMANTIC_MODEL_METRIC)
           .put(
+              OperationType.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+              Operation.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE)
+          .put(
               OperationType.LIST_SEMANTIC_MODEL_METRIC_INFOS,
               Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS)
           .put(OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL)

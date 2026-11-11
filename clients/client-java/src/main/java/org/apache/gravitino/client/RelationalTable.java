@@ -59,6 +59,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -90,6 +91,7 @@ class RelationalTable
   private final Namespace namespace;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectStatisticsOperations objectStatisticsOperations;
@@ -123,6 +125,8 @@ class RelationalTable
         MetadataObjects.of(
             Arrays.asList(namespace.level(1), namespace.level(2), tableDTO.name()),
             MetadataObject.Type.TABLE);
+    this.objectSemanticModelOperations =
+        new MetadataObjectSemanticModelOperations(namespace.level(0), tableObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
@@ -351,6 +355,11 @@ class RelationalTable
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
   protected static String formatPartitionRequestPath(String prefix, String partitionName) {
     return prefix + "/" + RESTUtils.encodeString(partitionName);
+  }
+
+  @Override
+  public SupportsSemanticModels supportsSemanticModels() {
+    return objectSemanticModelOperations;
   }
 
   @Override

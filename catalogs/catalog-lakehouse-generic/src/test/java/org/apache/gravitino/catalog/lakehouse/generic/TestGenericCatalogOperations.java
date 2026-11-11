@@ -50,7 +50,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -316,28 +315,18 @@ public class TestGenericCatalogOperations {
     store.put(entity, false);
 
     if ("purge".equals(operation)) {
-      Assertions.assertTrue(opsWithFakeProvider.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> opsWithFakeProvider.purgeTable(ident));
     } else if ("cascade".equals(operation)) {
       Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true));
     } else {
       Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
     }
 
-    Assertions.assertFalse(opsWithFakeProvider.tableExists(ident));
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
-      Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
-      Assertions.assertEquals(
-          location,
-          FakeTableLocationProvider.unprovisioned()
-              .get(0)
-              .tableProperties()
-              .get(Table.PROPERTY_LOCATION));
-    } else {
-      Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
-      try (Dataset dataset = Dataset.open().uri(location).build()) {
-        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
-      }
+    Assertions.assertEquals("purge".equals(operation), opsWithFakeProvider.tableExists(ident));
+    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 

@@ -46,6 +46,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -101,6 +102,43 @@ public class TestDorisTableOperations extends TestDoris {
   private static Map<String, String> createProperties() {
     Map<String, String> properties = Maps.newHashMap();
     return properties;
+  }
+
+  @Test
+  void testLargeIntMetadataRoundTrip() {
+    String tableName = GravitinoITUtils.genRandomName("doris_largeint");
+    String largeDefault = "170141183460469231731687303715884105727";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder().withName("id").withType(INT).withNullable(false).build(),
+      JdbcColumn.builder()
+          .withName("large_value")
+          .withType(Types.ExternalType.of("largeint"))
+          .withComment("128-bit value")
+          .withNullable(true)
+          .withDefaultValue(Literals.stringLiteral(largeDefault))
+          .build(),
+      JdbcColumn.builder().withName("long_value").withType(Types.LongType.get()).build()
+    };
+    TABLE_OPERATIONS.create(
+        databaseName,
+        tableName,
+        columns,
+        "largeint metadata",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.hash(DEFAULT_BUCKET_SIZE, NamedReference.field("id")),
+        Indexes.EMPTY_INDEXES);
+    try {
+      Column[] loaded = TABLE_OPERATIONS.load(databaseName, tableName).columns();
+      Assertions.assertEquals(INT, loaded[0].dataType());
+      Assertions.assertEquals(Types.ExternalType.of("largeint"), loaded[1].dataType());
+      Assertions.assertEquals(UnparsedExpression.of(largeDefault), loaded[1].defaultValue());
+      Assertions.assertEquals("128-bit value", loaded[1].comment());
+      Assertions.assertTrue(loaded[1].nullable());
+      Assertions.assertEquals(Types.LongType.get(), loaded[2].dataType());
+    } finally {
+      TABLE_OPERATIONS.drop(databaseName, tableName);
+    }
   }
 
   @Test
