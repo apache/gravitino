@@ -27,6 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
+/** Tests ClickHouse error classification and preservation of source error details. */
 public class TestClickHouseExceptionConverter {
 
   private final ClickHouseExceptionConverter converter = new ClickHouseExceptionConverter();
