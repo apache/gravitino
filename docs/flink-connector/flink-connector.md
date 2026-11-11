@@ -1,42 +1,59 @@
 ---
-title: "Apache Gravitino Flink connector"
-slug: /flink-connector/flink-connector
-keyword: flink connector federation query 
+title: "Flink Connector"
+slug: "/flink-connector/flink-connector"
+keyword: "flink connector federation query"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Overview
 
-The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.18/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
+The Apache Gravitino Flink connector implements the [Catalog Store](https://nightlies.apache.org/flink/flink-docs-release-1.20/docs/dev/table/catalogs/#catalog-store) to manage the catalogs under Gravitino.
 This capability allows users to perform federation queries, accessing data from various catalogs through a unified interface and consistent access control.
+
+The connector is published as a version-specific runtime JAR for each supported Flink minor version. Internally, Gravitino uses shared connector logic with version-specific catalog and factory entry points so that each runtime artifact matches the Flink APIs it runs against.
 
 ## Capabilities
 
-1. Supports [Hive catalog](flink-catalog-hive.md)
+1. Supports [Hive catalog](flink-catalog-hive.md) (Flink 1.19 and 1.20 only; not yet available on
+   Flink 2.x — see [Prerequisites](#prerequisites))
 2. Supports [Iceberg catalog](flink-catalog-iceberg.md)
 3. Supports [Paimon catalog](flink-catalog-paimon.md)
 4. Supports [Jdbc catalog](flink-catalog-jdbc.md)
 5. Supports most DDL and DML SQLs.
 
-## Requirement
+## Prerequisites
 
-* Flink 1.18
-* Scala 2.12
-* JDK 8, 11 or 17
+* Scala 2.12 (Flink 1.19 and 1.20 only; Flink 2.x removed the Scala APIs)
+* Flink 1.19, 1.20, 2.1, or 2.2
+* JDK 8, 11 or 17 for Flink 1.x; JDK 17 for Flink 2.x
 
-## How to use it
+On Flink 2.x, the Hive catalog is not supported: `flink-connector-hive` has not published a
+release targeting the Flink 2.x line yet (tracked upstream as
+[FLINK-38031](https://issues.apache.org/jira/browse/FLINK-38031)). Iceberg, Paimon, and JDBC
+catalogs are supported on Flink 2.x.
 
-1. [Build](../how-to-build.md) or [download](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-flink-connector-runtime-1.18) the Gravitino flink connector runtime jar, and place it to the classpath of Flink.
+## Usage
+
+1. [Build](../how-to-build.md) or download the Gravitino Flink connector runtime JAR that matches your Flink minor version, and place it in the classpath of Flink.
+
+| Flink version | Runtime artifact                                                       |
+|---------------|------------------------------------------------------------------------|
+| 1.19          | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
+| 1.20          | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+| 2.1           | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
+
+Do not mix runtime JARs from different Flink minor versions in the same Flink deployment.
 
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
-| Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
-|--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
-| table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No | 1.3.0 |
-| table.catalog-store.gravitino.gravitino.client.  | string | (none)            | The configuration key prefix for the Gravitino client config.        | No       | 1.0.0            |
+| Property                                                            | Type    | Default Value     | Description                                                                           | Required |
+|---------------------------------------------------------------------|---------|-------------------|---------------------------------------------------------------------------------------|----------|
+| table.catalog-store.kind                                            | string  | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                                 | Yes      |
+| table.catalog-store.gravitino.gravitino.metalake                    | string  | (none)            | The metalake name that flink connector used to request to Gravitino.                  | Yes      |
+| table.catalog-store.gravitino.gravitino.uri                         | string  | (none)            | The uri of Gravitino server address.                                                  | Yes      |
+| table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false             | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No       |
+| table.catalog-store.gravitino.gravitino.client.                     | string  | (none)            | The configuration key prefix for the Gravitino client config.                         | No       |
 
 When `table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport` is set to `true`, Gravitino uses `GravitinoSessionCatalogStore`, which combines a `GravitinoCatalogStore` (backed by the Gravitino server) with an in-memory store to support Flink's session catalog. When `false` (the default), only `GravitinoCatalogStore` is used.
 
@@ -53,7 +70,7 @@ To configure the Gravitino client, use properties prefixed with `table.catalog-s
 
 **Example:** Setting `table.catalog-store.gravitino.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
-**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#gravitino-java-client-configuration) for more support client configuration.
+**Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
 Set the flink configuration in flink-conf.yaml.
 ```yaml
@@ -97,7 +114,7 @@ INSERT INTO hive_students VALUES (1, 'Alice'), (2, 'Bob');
 SELECT * FROM hive_students;
 ```
 
-## Catalog naming restrictions
+## Catalog Naming Restrictions
 
 :::caution
 When creating catalogs that will be used with the Flink connector, the catalog name **cannot start with a number**. This is a Flink limitation. For example:
@@ -107,32 +124,32 @@ When creating catalogs that will be used with the Flink connector, the catalog n
 If you create a catalog with a name starting with a number, it will not be accessible from Flink.
 :::
 
-## Datatype mapping
+## Datatype Mapping
 
 Gravitino flink connector support the following datatype mapping between Flink and Gravitino.
 
-| Flink Type                       | Gravitino Type                | Since Version    |
-|----------------------------------|-------------------------------|------------------|
-| `array`                          | `list`                        | 0.6.0-incubating |
-| `bigint`                         | `long`                        | 0.6.0-incubating |
-| `binary`                         | `fixed`                       | 0.6.0-incubating |
-| `boolean`                        | `boolean`                     | 0.6.0-incubating |
-| `char`                           | `char`                        | 0.6.0-incubating |
-| `date`                           | `date`                        | 0.6.0-incubating |
-| `decimal`                        | `decimal`                     | 0.6.0-incubating |
-| `double`                         | `double`                      | 0.6.0-incubating |
-| `float`                          | `float`                       | 0.6.0-incubating |
-| `integer`                        | `integer`                     | 0.6.0-incubating |
-| `map`                            | `map`                         | 0.6.0-incubating |
-| `null`                           | `null`                        | 0.6.0-incubating |
-| `row`                            | `struct`                      | 0.6.0-incubating |
-| `smallint`                       | `short`                       | 0.6.0-incubating |
-| `time`                           | `time`                        | 0.6.0-incubating |
-| `timestamp`                      | `timestamp without time zone` | 0.6.0-incubating |
-| `timestamp without time zone`    | `timestamp without time zone` | 0.6.0-incubating |
-| `timestamp with time zone`       | `timestamp with time zone`    | 0.6.0-incubating |
-| `timestamp with local time zone` | `timestamp with time zone`    | 0.6.0-incubating |
-| `timestamp_ltz`                  | `timestamp with time zone`    | 0.6.0-incubating |
-| `tinyint`                        | `byte`                        | 0.6.0-incubating |
-| `varbinary`                      | `binary`                      | 0.6.0-incubating |
-| `varchar`                        | `string`                      | 0.6.0-incubating |
+| Flink Type                       | Gravitino Type                |
+|----------------------------------|-------------------------------|
+| `array`                          | `list`                        |
+| `bigint`                         | `long`                        |
+| `binary`                         | `fixed`                       |
+| `boolean`                        | `boolean`                     |
+| `char`                           | `char`                        |
+| `date`                           | `date`                        |
+| `decimal`                        | `decimal`                     |
+| `double`                         | `double`                      |
+| `float`                          | `float`                       |
+| `integer`                        | `integer`                     |
+| `map`                            | `map`                         |
+| `null`                           | `null`                        |
+| `row`                            | `struct`                      |
+| `smallint`                       | `short`                       |
+| `time`                           | `time`                        |
+| `timestamp`                      | `timestamp without time zone` |
+| `timestamp without time zone`    | `timestamp without time zone` |
+| `timestamp with time zone`       | `timestamp with time zone`    |
+| `timestamp with local time zone` | `timestamp with time zone`    |
+| `timestamp_ltz`                  | `timestamp with time zone`    |
+| `tinyint`                        | `byte`                        |
+| `varbinary`                      | `binary`                      |
+| `varchar`                        | `string`                      |

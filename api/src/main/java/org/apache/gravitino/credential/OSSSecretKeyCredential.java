@@ -115,6 +115,6 @@ public class OSSSecretKeyCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(secretAccessKey), "OSS secret access key should not empty");
     Preconditions.checkArgument(
-        expireTimeInMs == 0, "The expire time of OSSSecretKeyCredential is not 0");
+        expireTimeInMs == 0, "The expiration time of OSSSecretKeyCredential is not 0");
   }
 }

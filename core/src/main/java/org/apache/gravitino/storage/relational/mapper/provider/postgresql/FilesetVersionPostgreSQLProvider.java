@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.FilesetVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -38,23 +40,32 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
   public String softDeleteFilesetVersionsByCatalogId(Long catalogId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
   @Override
-  public String softDeleteFilesetVersionsBySchemaId(Long schemaId) {
-    return "UPDATE "
+  public String softDeleteFilesetVersionsBySchemaIds(List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override
   public String softDeleteFilesetVersionsByFilesetId(Long filesetId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 
@@ -73,7 +84,8 @@ public class FilesetVersionPostgreSQLProvider extends FilesetVersionBaseSQLProvi
       Long filesetId, long versionRetentionLine, int limit) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE id IN (SELECT id FROM "
         + VERSION_TABLE_NAME
         + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit})";

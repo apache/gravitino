@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -27,6 +28,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -38,6 +40,8 @@ import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -204,6 +208,7 @@ public class TestTagEvent {
     Assertions.assertEquals(ListMetadataObjectsForTagEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_METADATA_OBJECTS_FOR_TAG, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(1, ((ListMetadataObjectsForTagEvent) postevent).resultCount());
   }
 
   @Test
@@ -227,6 +232,7 @@ public class TestTagEvent {
     Assertions.assertEquals(ListTagsForMetadataObjectEvent.class, postevent.getClass());
     Assertions.assertEquals(OperationType.LIST_TAGS_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListTagsForMetadataObjectEvent) postevent).resultCount());
   }
 
   @Test
@@ -252,6 +258,7 @@ public class TestTagEvent {
     Assertions.assertEquals(
         OperationType.LIST_TAGS_INFO_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+    Assertions.assertEquals(2, ((ListTagsInfoForMetadataObjectEvent) postevent).resultCount());
   }
 
   @Test
@@ -296,6 +303,27 @@ public class TestTagEvent {
     Assertions.assertEquals(
         OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT, postevent.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, postevent.operationStatus());
+  }
+
+  @Test
+  void testAssociateTagValuesForMetadataObjectEvents() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    TagValue[] tagsToAdd = {TagValue.of("data_domain", "finance")};
+    TagValue[] tagsToRemove = {TagValue.noValue("pii")};
+    dispatcher.associateTagValuesForMetadataObject(
+        "metalake", metadataObject, tagsToAdd, tagsToRemove);
+
+    AssociateTagsForMetadataObjectPreEvent preEvent =
+        (AssociateTagsForMetadataObjectPreEvent) dummyEventListener.popPreEvent();
+    Assertions.assertArrayEquals(tagsToAdd, preEvent.tagValuesToAdd());
+    Assertions.assertArrayEquals(tagsToRemove, preEvent.tagValuesToRemove());
+    AssociateTagsForMetadataObjectEvent postEvent =
+        (AssociateTagsForMetadataObjectEvent) dummyEventListener.popPostEvent();
+    Assertions.assertArrayEquals(tagsToAdd, postEvent.tagValuesToAdd());
+    Assertions.assertArrayEquals(tagsToRemove, postEvent.tagValuesToRemove());
   }
 
   @Test
@@ -506,13 +534,65 @@ public class TestTagEvent {
     Assertions.assertEquals(
         MetadataObject.Type.CATALOG,
         ((AssociateTagsForMetadataObjectFailureEvent) event).objectType());
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         tagsToAssociate, ((AssociateTagsForMetadataObjectFailureEvent) event).tagsToAdd());
-    Assertions.assertEquals(
+    Assertions.assertArrayEquals(
         tagsToDisassociate, ((AssociateTagsForMetadataObjectFailureEvent) event).tagsToRemove());
     Assertions.assertEquals(
         OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT, event.operationType());
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  void testAssociateTagValuesForMetadataObjectFailureEvent() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    TagValue[] tagsToAdd = {TagValue.of("data_domain", "finance")};
+    TagValue[] tagsToRemove = {TagValue.noValue("pii")};
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.associateTagValuesForMetadataObject(
+                "metalake", metadataObject, tagsToAdd, tagsToRemove));
+
+    AssociateTagsForMetadataObjectFailureEvent event =
+        (AssociateTagsForMetadataObjectFailureEvent) dummyEventListener.popPostEvent();
+    Assertions.assertArrayEquals(tagsToAdd, event.tagValuesToAdd());
+    Assertions.assertArrayEquals(tagsToRemove, event.tagValuesToRemove());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListMetadataObjectsForTagEventDeprecatedConstructor() {
+    ListMetadataObjectsForTagEvent event =
+        new ListMetadataObjectsForTagEvent("user", "metalake", "tag");
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListTagsForMetadataObjectEventDeprecatedConstructor() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    ListTagsForMetadataObjectEvent event =
+        new ListTagsForMetadataObjectEvent("user", "metalake", metadataObject);
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  @SuppressWarnings("deprecation")
+  void testListTagsInfoForMetadataObjectEventDeprecatedConstructor() {
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofCatalog("metalake", "catalog_for_test"),
+            Entity.EntityType.CATALOG);
+    ListTagsInfoForMetadataObjectEvent event =
+        new ListTagsInfoForMetadataObjectEvent("user", "metalake", metadataObject);
+    Assertions.assertEquals(-1, event.resultCount());
   }
 
   private Tag mockTag() {
@@ -520,6 +600,8 @@ public class TestTagEvent {
     when(tag.name()).thenReturn("tag");
     when(tag.comment()).thenReturn("comment");
     when(tag.properties()).thenReturn(ImmutableMap.of("color", "#FFFFFF"));
+    when(tag.valueConstraint()).thenReturn(TagValueConstraint.anyValue());
+    when(tag.assignment()).thenReturn(Optional.empty());
     return tag;
   }
 
@@ -535,6 +617,13 @@ public class TestTagEvent {
     Assertions.assertEquals(expectedTag.name(), actualTagInfo.name());
     Assertions.assertEquals(expectedTag.comment(), actualTagInfo.comment());
     Assertions.assertEquals(expectedTag.properties(), actualTagInfo.properties());
+    Assertions.assertEquals(
+        expectedTag.valueConstraint().type(), actualTagInfo.valueConstraint().type());
+    Assertions.assertArrayEquals(
+        expectedTag.valueConstraint().allowedValues(),
+        actualTagInfo.valueConstraint().allowedValues());
+    Assertions.assertEquals(
+        expectedTag.assignment().isPresent(), actualTagInfo.assignment().isPresent());
   }
 
   private TagDispatcher mockTagDispatcher() {
@@ -544,7 +633,11 @@ public class TestTagEvent {
     Tag[] tags = new Tag[] {tag, tag};
 
     when(dispatcher.createTag(
-            any(String.class), any(String.class), any(String.class), any(Map.class)))
+            any(String.class),
+            any(String.class),
+            any(String.class),
+            any(Map.class),
+            nullable(TagValueConstraint.class)))
         .thenReturn(tag);
     when(dispatcher.listTags(metalake)).thenReturn(tagNames);
     when(dispatcher.listTagsInfo(metalake)).thenReturn(tags);

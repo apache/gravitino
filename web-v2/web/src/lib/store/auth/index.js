@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, getAuthMeApi, loginApi, basicLoginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -33,7 +33,6 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   let oauthUrl = null
   let authType = null
   let anthEnable = null
-  let serviceAdmins = null
   const [err, res] = await to(getAuthConfigsApi())
 
   if (err || !res) {
@@ -45,11 +44,26 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   // ** get the first authenticator from the response. response example: "[simple, oauth]"
   authType = res['gravitino.authenticators'][0].trim()
   anthEnable = res['gravitino.authorization.enable']
-  serviceAdmins = res['gravitino.authorization.serviceAdmins']
 
   localStorage.setItem('oauthUrl', oauthUrl)
 
-  return { oauthUrl, authType, anthEnable, serviceAdmins, systemConfig: res }
+  // Persist authType for axios interceptor to avoid circular dependency with Redux store
+  localStorage.setItem('authType', authType)
+
+  return { oauthUrl, authType, anthEnable, systemConfig: res }
+})
+
+export const getAuthMe = createAsyncThunk('auth/getAuthMe', async () => {
+  const [err, res] = await to(getAuthMeApi())
+
+  if (err) {
+    throw err instanceof Error ? err : new Error(String(err))
+  }
+  if (!res) {
+    throw new Error('The authenticated user endpoint returned an empty response')
+  }
+
+  return res
 })
 
 export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, { getState, dispatch }) => {
@@ -64,7 +78,7 @@ export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, {
     throw new Error(err)
   }
 
-  const { access_token, expires_in } = res.data
+  const { access_token, expires_in } = res // `expires_in ` is in seconds, default is 499
 
   return { token: access_token, expiredIn: expires_in }
 })
@@ -86,9 +100,9 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
 
   localStorage.setItem('accessToken', access_token)
   localStorage.setItem('expiredIn', expires_in)
-  localStorage.setItem('isIdle', false)
   dispatch(setAuthToken(access_token))
   dispatch(setExpiredIn(expires_in))
+  await dispatch(getAuthMe())
   await dispatch(initialVersion())
 
   router.push('/metalakes')
@@ -96,61 +110,116 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   return { token: access_token, expired: expires_in }
 })
 
-export const logoutAction = createAsyncThunk('auth/logoutAction', async ({ router }, { getState, dispatch }) => {
-  // Clear provider authentication data first
-  if (getState().auth.authType === 'oauth') {
-    try {
-      const provider = await oauthProviderFactory.getProvider()
-      if (provider) {
-        // For OIDC providers, use signoutRedirect to end IdP session
-        if (provider.getUserManager) {
-          const userManager = provider.getUserManager()
-          if (userManager) {
-            // Read id_token before clearing — needed for id_token_hint
-            const user = await userManager.getUser()
+export const basicLoginAction = createAsyncThunk(
+  'auth/basicLoginAction',
+  async ({ username, password, router }, { dispatch }) => {
+    const basicToken = `Basic ${btoa(`${username}:${password}`)}`
 
-            // Clear OIDC user data from store
-            await provider.clearAuthData()
+    const [err, res] = await to(basicLoginApi(basicToken))
 
-            // Clear legacy auth tokens
-            localStorage.removeItem('accessToken')
-            localStorage.removeItem('authParams')
-            localStorage.removeItem('expiredIn')
-            localStorage.removeItem('isIdle')
-            localStorage.removeItem('version')
+    if (err || !res) {
+      const message =
+        err?.response?.status === 401 ? 'Invalid username or password' : err?.response?.data?.err || err?.message
 
-            dispatch(clearIntervalId())
-            dispatch(setAuthToken(''))
+      toast.error(message, {
+        id: `global_error_message_status_${err?.response?.status}`
+      })
 
-            // Redirect to IdP logout endpoint — browser navigates away, must be last
-            await userManager.signoutRedirect({ id_token_hint: user?.id_token })
-
-            return { token: null } // unreachable — browser navigates away
-          }
-        }
-
-        await provider.clearAuthData()
-      }
-    } catch (error) {
-      console.warn('[Logout Action] Provider cleanup failed:', error)
+      throw new Error(message)
     }
 
-    // Clear legacy auth tokens
+    sessionStorage.setItem('accessToken', basicToken)
+    sessionStorage.setItem('isIdle', false)
+    sessionStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
+
+    dispatch(setAuthToken(basicToken))
+    await dispatch(getAuthMe())
+    await dispatch(initialVersion())
+    router.push('/metalakes')
+
+    return { token: basicToken, expired: '' }
+  }
+)
+
+export const logoutAction = createAsyncThunk(
+  'auth/logoutAction',
+  async ({ router, reason }, { getState, dispatch }) => {
+    // Clear provider authentication data first
+    if (getState().auth.authType === 'oauth') {
+      try {
+        const provider = await oauthProviderFactory.getProvider()
+        if (provider) {
+          // For OIDC providers, use signoutRedirect to end IdP session
+          if (provider.getUserManager) {
+            const userManager = provider.getUserManager()
+            if (userManager) {
+              // Read id_token before clearing — needed for id_token_hint
+              const user = await userManager.getUser()
+
+              // Clear OIDC user data from store
+              await provider.clearAuthData()
+
+              // Clear legacy auth tokens
+              localStorage.removeItem('accessToken')
+              localStorage.removeItem('authParams')
+              localStorage.removeItem('expiredIn')
+              localStorage.removeItem('version')
+
+              dispatch(clearIntervalId())
+              dispatch(setAuthToken(''))
+
+              // Only redirect to IdP logout endpoint if we have an id_token.
+              // After a completed signout redirect callback, getUser() returns null
+              // and calling signoutRedirect() without id_token_hint would cause a
+              // redirect loop (/oauth/logout -> signoutRedirect -> /oauth/logout ...).
+              if (user?.id_token) {
+                await userManager.signoutRedirect({ id_token_hint: user.id_token })
+
+                return { token: null } // unreachable — browser navigates away
+              }
+
+              // No id_token available — fall through to local cleanup + navigation
+            }
+          }
+
+          await provider.clearAuthData()
+        }
+      } catch (error) {
+        console.warn('[Logout Action] Provider cleanup failed:', error)
+      }
+    }
+
+    // Clear legacy auth tokens (local and session storage) after provider cleanup
     localStorage.removeItem('accessToken')
+    sessionStorage.removeItem('accessToken')
+
     localStorage.removeItem('authParams')
+    sessionStorage.removeItem('authParams')
+
     localStorage.removeItem('expiredIn')
-    localStorage.removeItem('isIdle')
+    sessionStorage.removeItem('expiredIn')
+
     localStorage.removeItem('version')
+    sessionStorage.removeItem('version')
 
     dispatch(clearIntervalId())
     dispatch(setAuthToken(''))
-  } else {
-    dispatch(setAuthUser(null))
-  }
-  await router.push('/login')
 
-  return { token: null }
-})
+    // Always clear authUser in Redux and sessionStorage on logout
+    // This ensures consistent behavior for both OAuth and simple auth
+    dispatch(setAuthUser(null))
+    sessionStorage.removeItem('simpleAuthToken')
+
+    // Reset provider factory to ensure clean state for next login
+    oauthProviderFactory.reset()
+
+    // Build login URL with optional reason parameter
+    const loginUrl = reason ? `/login?reason=${encodeURIComponent(reason)}` : '/login'
+    await router.push(loginUrl)
+
+    return { token: null }
+  }
+)
 
 export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', async (expiredIn, { dispatch }) => {
   const localExpiredIn = localStorage.getItem('expiredIn')
@@ -158,14 +227,6 @@ export const setIntervalIdAction = createAsyncThunk('auth/setIntervalIdAction', 
   const defaultExpired = 299 * (2 / 3) * 1000
 
   let intervalId = setInterval(() => {
-    if (localStorage.getItem('isIdle') === 'true') {
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('authParams')
-      dispatch(clearIntervalId())
-      dispatch(setAuthToken(''))
-
-      return
-    }
     dispatch(refreshToken())
   }, expired || defaultExpired)
 
@@ -180,13 +241,18 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState: {
     oauthUrl: null,
-    authType: null,
-    authToken: null,
-    authParams: null,
-    expiredIn: null,
+    authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
+    authToken:
+      typeof window !== 'undefined'
+        ? localStorage.getItem('authType') === 'basic'
+          ? sessionStorage.getItem('accessToken')
+          : localStorage.getItem('accessToken')
+        : null,
+    authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
+    expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null,
     anthEnable: null,
-    serviceAdmins: null,
+    isServiceAdmin: false,
     systemConfig: null,
     authUser: null
   },
@@ -214,6 +280,7 @@ export const authSlice = createSlice({
         sessionStorage.setItem('simpleAuthUser', JSON.stringify(action.payload))
       } else {
         sessionStorage.removeItem('simpleAuthUser')
+        state.isServiceAdmin = false
       }
       state.authUser = action.payload
     }
@@ -223,13 +290,28 @@ export const authSlice = createSlice({
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
       state.anthEnable = action.payload.anthEnable
-      state.serviceAdmins = action.payload.serviceAdmins
       state.systemConfig = action.payload.systemConfig
+    })
+    builder.addCase(getAuthMe.fulfilled, (state, action) => {
+      if (action.payload?.principal) {
+        const authUser = {
+          ...(state.authUser || {}),
+          name: action.payload.principal,
+          type: state.authUser?.type || 'user'
+        }
+
+        sessionStorage.setItem('simpleAuthUser', JSON.stringify(authUser))
+        state.authUser = authUser
+      }
+
+      state.isServiceAdmin = action.payload?.serviceAdmin === true
+    })
+    builder.addCase(getAuthMe.rejected, state => {
+      state.isServiceAdmin = false
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
       localStorage.setItem('accessToken', action.payload.token)
       localStorage.setItem('expiredIn', action.payload.expiredIn)
-      localStorage.setItem('isIdle', false)
       state.authToken = action.payload.token
       state.expiredIn = action.payload.expiredIn
     })

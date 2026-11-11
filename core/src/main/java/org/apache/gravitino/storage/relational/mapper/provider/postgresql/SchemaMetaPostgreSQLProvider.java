@@ -20,11 +20,18 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
+  @Override
+  public String selectSchemaMetaByIdForShare(Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " FOR SHARE";
+  }
+
   @Override
   public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {
     return "INSERT INTO "
@@ -51,9 +58,53 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
+  }
+
+  @Override
+  public String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return "<script>"
+        + "INSERT INTO "
+        + TABLE_NAME
+        + " (schema_id, schema_name, metalake_id, catalog_id, schema_comment,"
+        + " properties, audit_info, current_version, last_version, deleted_at) VALUES "
+        + "<foreach collection='schemaMetas' item='po' separator=','>"
+        + "(#{po.schemaId}, #{po.schemaName}, #{po.metalakeId}, #{po.catalogId},"
+        + " #{po.schemaComment}, #{po.properties}, #{po.auditInfo},"
+        + " #{po.currentVersion}, #{po.lastVersion}, #{po.deletedAt})"
+        + "</foreach>"
+        + " ON CONFLICT(schema_id) DO UPDATE SET"
+        + " schema_name = EXCLUDED.schema_name,"
+        + " metalake_id = EXCLUDED.metalake_id,"
+        + " catalog_id = EXCLUDED.catalog_id,"
+        + " schema_comment = EXCLUDED.schema_comment,"
+        + " properties = EXCLUDED.properties,"
+        + " audit_info = EXCLUDED.audit_info,"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " deleted_at = EXCLUDED.deleted_at"
+        + "</script>";
   }
 
   @Override
@@ -71,41 +122,52 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
-        + " AND schema_name = #{oldSchemaMeta.schemaName}"
-        + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
-        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
-        + "   OR (CAST(schema_comment AS VARCHAR) IS NULL"
-        + "   AND CAST(#{oldSchemaMeta.schemaComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldSchemaMeta.properties}"
-        + " AND audit_info = #{oldSchemaMeta.auditInfo}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
-        + " AND last_version = #{oldSchemaMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
   @Override
-  public String softDeleteSchemaMetasBySchemaId(Long schemaId) {
-    return "UPDATE "
+  public String softDeleteSchemaMetasBySchemaIds(List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override
-  public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(Long schemaId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE schema_id = #{schemaId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
+  /** {@inheritDoc} */
   @Override
-  public String softDeleteSchemaMetasByCatalogId(Long catalogId) {
-    return "UPDATE "
+  public String softDeleteSchemaMetasWithVersion(List<SchemaPO> schemaPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
+        + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   @Override

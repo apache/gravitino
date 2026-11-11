@@ -25,15 +25,48 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represent an event after listing Iceberg namespace successfully.
  *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of namespaces directly within the ListNamespaceEvent, the actual namespaces listed are not
- * maintained in this event.
+ * <p>Only the result count is stored rather than the full list of namespaces to avoid excessive
+ * memory usage in environments with large namespace listings.
  */
 @DeveloperApi
-public class IcebergListNamespacesEvent extends IcebergNamespaceEvent {
+public class IcebergListNamespacesEvent extends IcebergNamespaceEvent implements ListEvent {
+
+  private final int namespaceCount;
+
+  /**
+   * Constructs an instance of {@code IcebergListNamespacesEvent}.
+   *
+   * @param icebergRequestContext the request context.
+   * @param nameIdentifier the parent namespace identifier.
+   * @param namespaceCount the number of namespaces returned by the list operation.
+   */
+  public IcebergListNamespacesEvent(
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier nameIdentifier,
+      int namespaceCount) {
+    super(icebergRequestContext, nameIdentifier);
+    this.namespaceCount = namespaceCount;
+  }
+
+  /**
+   * Constructs an instance of {@code IcebergListNamespacesEvent} without a count.
+   *
+   * @param icebergRequestContext the request context.
+   * @param nameIdentifier the parent namespace identifier.
+   * @deprecated Use {@link #IcebergListNamespacesEvent(IcebergRequestContext, NameIdentifier, int)}
+   *     instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
   public IcebergListNamespacesEvent(
       IcebergRequestContext icebergRequestContext, NameIdentifier nameIdentifier) {
-    super(icebergRequestContext, nameIdentifier);
+    this(icebergRequestContext, nameIdentifier, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return namespaceCount;
   }
 
   @Override

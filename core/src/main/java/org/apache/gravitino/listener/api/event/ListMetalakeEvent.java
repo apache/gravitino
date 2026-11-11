@@ -23,14 +23,37 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of metalakes. */
 @DeveloperApi
-public final class ListMetalakeEvent extends MetalakeEvent {
+public final class ListMetalakeEvent extends MetalakeEvent implements ListEvent {
+
+  private final int metalakeCount;
+
   /**
    * Constructs an instance of {@code ListMetalakeEvent}.
    *
    * @param user The username of the individual who initiated the metalake listing.
+   * @param metalakeCount The number of metalakes returned by the list operation.
    */
-  public ListMetalakeEvent(String user) {
+  public ListMetalakeEvent(String user, int metalakeCount) {
     super(user, null);
+    this.metalakeCount = metalakeCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListMetalakeEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the metalake listing.
+   * @deprecated Use {@link #ListMetalakeEvent(String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListMetalakeEvent(String user) {
+    this(user, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return metalakeCount;
   }
 
   /**

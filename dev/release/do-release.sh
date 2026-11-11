@@ -139,44 +139,110 @@ function should_build {
   [ -z "$RELEASE_STEP" ] || [ "$WHAT" = "$RELEASE_STEP" ]
 }
 
-if should_build "tag" && [ $SKIP_TAG = 0 ]; then
-  run_silent "Creating release tag $RELEASE_TAG..." "tag.log" \
-    "$SELF/release-tag.sh"
-  echo "It may take some time for the tag to be synchronized to github."
-  if is_force; then
-    echo "Force mode: skipping wait."
+# ---------------------------------------------------------------------------
+# Stage state tracking
+# Each completed stage writes a marker file to STATE_DIR so that re-runs can
+# detect what has already been done and skip those stages automatically.
+# Override the directory with RELEASE_STATE_DIR env var if needed.
+# ---------------------------------------------------------------------------
+STATE_DIR="${RELEASE_STATE_DIR:-$SELF/.release-state}/${RELEASE_TAG}"
+mkdir -p "$STATE_DIR"
+
+function stage_file { echo "$STATE_DIR/$1.done"; }
+
+function is_stage_done { [ -f "$(stage_file "$1")" ]; }
+
+function mark_stage_done {
+  local STEP="$1" INFO="${2:-}"
+  {
+    echo "completed_at=$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "release=$RELEASE_TAG"
+    [ -n "$INFO" ] && echo "info=$INFO"
+  } > "$(stage_file "$STEP")"
+  echo "Stage '$STEP' marked as done. State file: $(stage_file "$STEP")"
+}
+
+# Returns 0 (proceed) if stage is NOT done; returns 1 (skip) and prints a
+# message if the stage is already complete.
+function check_stage_guard {
+  local STEP="$1"
+  if is_stage_done "$STEP"; then
+    echo ""
+    echo "=== Stage '$STEP' is already complete ==="
+    cat "$(stage_file "$STEP")"
+    echo "To re-run this stage, delete: $(stage_file "$STEP")"
+    echo ""
+    return 1
+  fi
+  return 0
+}
+
+if should_build "tag"; then
+  if [ $SKIP_TAG = 1 ]; then
+    echo "Tag $RELEASE_TAG already exists on remote. Skipping tag creation."
+    is_stage_done "tag" || mark_stage_done "tag" "Tag $RELEASE_TAG already existed on remote"
   else
-    echo "Press enter when you've verified that the new tag ($RELEASE_TAG) is available."
-    read
+    check_stage_guard "tag" && {
+      run_silent "Creating release tag $RELEASE_TAG..." "tag.log" \
+        "$SELF/release-tag.sh"
+      if is_force; then
+        echo "Force mode: skipping wait for tag sync."
+      else
+        echo "It may take some time for the tag to be synchronized to github."
+        echo "Press enter when you've verified that the new tag ($RELEASE_TAG) is available."
+        read
+      fi
+      if check_for_tag "$RELEASE_TAG"; then
+        mark_stage_done "tag" "Tag $RELEASE_TAG verified on github.com/apache/gravitino"
+      else
+        echo "WARNING: Tag $RELEASE_TAG not found on remote after creation. Stage not marked as done."
+      fi
+    }
   fi
 else
-  echo "Skipping tag creation for $RELEASE_TAG."
+  echo "Skipping tag stage."
 fi
 
 if should_build "build"; then
-  run_silent "Building Gravitino..." "build.log" \
-    "$SELF/release-build.sh" package
+  check_stage_guard "build" && {
+    run_silent "Building Gravitino..." "build.log" \
+      "$SELF/release-build.sh" package
+    mark_stage_done "build" "Artifacts built and uploaded to ASF SVN staging"
+  }
 else
   echo "Skipping build step."
 fi
 
 if should_build "docs"; then
-  run_silent "Building documentation..." "docs.log" \
-    "$SELF/release-build.sh" docs
+  check_stage_guard "docs" && {
+    run_silent "Building documentation..." "docs.log" \
+      "$SELF/release-build.sh" docs
+    mark_stage_done "docs" "Javadoc and Python docs built locally"
+  }
 else
   echo "Skipping docs step."
 fi
 
 if should_build "publish"; then
-  run_silent "Publishing release" "publish.log" \
-    "$SELF/release-build.sh" publish-release
+  check_stage_guard "publish" && {
+    run_silent "Publishing release" "publish.log" \
+      "$SELF/release-build.sh" publish-release
+    mark_stage_done "publish" "Maven artifacts uploaded to Apache Nexus staging"
+  }
 else
   echo "Skipping publish step."
 fi
 
 if [ "$RELEASE_STEP" = "finalize" ]; then
-  run_silent "Finalizing release" "finalize.log" \
-    "$SELF/release-build.sh" finalize
+  check_stage_guard "finalize" && {
+    run_silent "Finalizing release" "finalize.log" \
+      "$SELF/release-build.sh" finalize
+    if check_for_tag "v$RELEASE_VERSION"; then
+      mark_stage_done "finalize" "Release v$RELEASE_VERSION promoted: PyPI uploaded, SVN moved to release, KEYS updated"
+    else
+      mark_stage_done "finalize" "Finalize script completed (verify v$RELEASE_VERSION tag manually)"
+    fi
+  }
 fi
 
 echo "Release build and publish completed"

@@ -38,37 +38,60 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.lineage.source.rest.LineageOperations;
+import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.ExceptionHandlers;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
+import org.apache.gravitino.server.web.rest.OperationType;
 import org.apache.gravitino.server.web.rest.OwnerOperations;
 import org.apache.gravitino.server.web.rest.PartitionOperations;
 import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.PolicyOperations;
 import org.apache.gravitino.server.web.rest.RoleOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
+import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
+import org.apache.gravitino.server.web.rest.SemanticModelMetricOperations;
+import org.apache.gravitino.server.web.rest.SemanticModelOperations;
 import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.apache.gravitino.server.web.rest.TagOperations;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
+import org.apache.gravitino.server.web.rest.ViewOperations;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -91,10 +114,15 @@ public class GravitinoInterceptionService implements InterceptionService {
             CatalogOperations.class.getName(),
             SchemaOperations.class.getName(),
             TableOperations.class.getName(),
+            ViewOperations.class.getName(),
             ModelOperations.class.getName(),
             FunctionOperations.class.getName(),
+            SemanticModelOperations.class.getName(),
+            SemanticModelMetricOperations.class.getName(),
+            MetadataObjectSemanticModelOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
+            BulkOperations.class.getName(),
             UserOperations.class.getName(),
             GroupOperations.class.getName(),
             PermissionOperations.class.getName(),
@@ -107,7 +135,10 @@ public class GravitinoInterceptionService implements InterceptionService {
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
-            MetadataObjectCredentialOperations.class.getName()));
+            MetadataObjectCredentialOperations.class.getName(),
+            MetadataObjectSecretOperations.class.getName(),
+            SecretsProviderOperations.class.getName(),
+            LineageOperations.class.getName()));
   }
 
   @Override
@@ -143,8 +174,8 @@ public class GravitinoInterceptionService implements InterceptionService {
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
 
-      try {
-        AuthorizationExecutor executor;
+      try (AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+        AuthorizationExecutor executor = null;
         if (expressionAnnotation != null) {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
@@ -153,31 +184,18 @@ public class GravitinoInterceptionService implements InterceptionService {
               extractNameIdentifierFromParameters(parameters, args);
 
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          AuthorizationRequestContext authorizationRequestContext =
+              new AuthorizationRequestContext();
 
-          // Check metalake and user existence before authorization
+          Optional<String> authorizationMetalake = Optional.empty();
           NameIdentifier metalakeIdent = metadataContext.get(Entity.EntityType.METALAKE);
           if (metalakeIdent != null) {
-            String currentUser = PrincipalUtils.getCurrentUserName();
-            try {
-              AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
-            } catch (NoSuchMetalakeException e) {
-              LOG.warn(
-                  "Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
-            } catch (ForbiddenException ex) {
-              LOG.warn(
-                  "User validation failed - User: {}, Metalake: {}, Reason: {}",
-                  currentUser,
-                  metalakeIdent.name(),
-                  ex.getMessage());
-              return Utils.forbidden(ex.getMessage(), ex);
-            } catch (Exception ex) {
-              LOG.error(
-                  "Unexpected error during user validation - User: {}, Metalake: {}",
-                  currentUser,
-                  metalakeIdent.name(),
-                  ex);
-              return Utils.internalError("Failed to validate user", ex);
+            authorizationMetalake = Optional.of(metalakeIdent.name());
+            Optional<Response> validationFailure =
+                validateCurrentUserAndActiveRoles(
+                    metalakeIdent, authorizationRequestContext, method, expression);
+            if (validationFailure.isPresent()) {
+              return validationFailure.get();
             }
           }
 
@@ -186,7 +204,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             AuthorizationRequest.RequestType requestType =
                 extractAuthorizationRequestTypeFromParameters(parameters);
             String secondaryExpression = expressionAnnotation.secondaryExpression();
-            String secondaryExpressionCondition =
+            ExpressionCondition secondaryExpressionCondition =
                 expressionAnnotation.secondaryExpressionCondition();
             executor =
                 AuthorizeExecutorFactory.create(
@@ -198,14 +216,94 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
-            boolean authorizeResult = executor.execute();
-            if (!authorizeResult) {
-              return buildNoAuthResponse(expressionAnnotation, metadataContext, method, expression);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
+            Optional<String> dynamicMetalake;
+            try {
+              dynamicMetalake = executor.getAuthorizationMetalake();
+              if (dynamicMetalake.isPresent()
+                  && authorizationMetalake.isPresent()
+                  && !dynamicMetalake.get().equals(authorizationMetalake.get())) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Authorization request metalake '%s' does not match path metalake '%s'",
+                        dynamicMetalake.get(), authorizationMetalake.get()));
+              }
+            } catch (IllegalArgumentException exception) {
+              LOG.warn("Invalid authorization request", exception);
+              return Utils.illegalArguments(exception.getMessage(), exception);
+            }
+
+            if (dynamicMetalake.isPresent() && authorizationMetalake.isEmpty()) {
+              Optional<Response> validationFailure =
+                  validateCurrentUserAndActiveRoles(
+                      NameIdentifier.of(dynamicMetalake.get()),
+                      authorizationRequestContext,
+                      method,
+                      expression);
+              if (validationFailure.isPresent()) {
+                return validationFailure.get();
+              }
             }
           }
+
+          if (executor != null) {
+            boolean authorizeResult;
+            try {
+              authorizeResult = executor.execute(authorizationRequestContext);
+            } catch (NoSuchTableException exception) {
+              NameIdentifier tableIdent = metadataContext.get(Entity.EntityType.TABLE);
+              if (tableIdent == null) {
+                throw exception;
+              }
+              return ExceptionHandlers.handleTableException(
+                  OperationType.LOAD,
+                  tableIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(tableIdent).name(),
+                  exception);
+            } catch (NoSuchViewException exception) {
+              NameIdentifier viewIdent = metadataContext.get(Entity.EntityType.VIEW);
+              if (viewIdent == null) {
+                throw exception;
+              }
+              // An authorized absence probe must terminate before the resource can load a view.
+              return ExceptionHandlers.handleViewException(
+                  OperationType.LOAD,
+                  viewIdent.name(),
+                  NameIdentifierUtil.getSchemaIdentifier(viewIdent).name(),
+                  exception);
+            }
+            if (!authorizeResult) {
+              MetadataObject.Type type = expressionAnnotation.accessMetadataType();
+              NameIdentifier accessMetadataName =
+                  metadataContext.get(Entity.EntityType.valueOf(type.name()));
+              // An executor can evaluate a request-specific expression, such as the secondary
+              // expression, so report the expression it evaluated when it recorded one.
+              String evaluatedExpression =
+                  StringUtils.defaultIfBlank(
+                      authorizationRequestContext.getOriginalAuthorizationExpression(), expression);
+              dispatchAuthzDenialEvent(
+                  PrincipalUtils.getCurrentUserName(),
+                  accessMetadataName,
+                  method.getName(),
+                  evaluatedExpression);
+              return buildNoAuthResponse(
+                  expressionAnnotation, metadataContext, method, evaluatedExpression);
+            }
+          }
+          scope.bindIfRead(method, metalakeIdent, authorizationRequestContext);
         }
         return methodInvocation.proceed();
+      } catch (BadRequestException ex) {
+        LOG.warn("Invalid authorization request", ex);
+        return Utils.illegalArguments(ex.getMessage(), ex);
+      } catch (IllegalMetadataObjectException ex) {
+        LOG.warn("Invalid metadata object during authorization", ex);
+        return Utils.illegalArguments(
+            IllegalArgumentException.class.getSimpleName(), ex.getMessage(), ex);
+      } catch (IllegalNameIdentifierException ex) {
+        LOG.warn("Invalid metadata object identifier during authorization", ex);
+        return Utils.illegalArguments(ex.getMessage(), ex);
       } catch (Exception ex) {
         String currentUser = PrincipalUtils.getCurrentUserName();
         String methodName = methodInvocation.getMethod().getName();
@@ -218,6 +316,70 @@ public class GravitinoInterceptionService implements InterceptionService {
         return Utils.internalError(
             "Authorization failed due to system internal error. Please contact administrator.", ex);
       }
+    }
+
+    private Optional<Response> validateCurrentUserAndActiveRoles(
+        NameIdentifier metalakeIdent,
+        AuthorizationRequestContext authorizationRequestContext,
+        Method method,
+        String expression) {
+      String currentUser = PrincipalUtils.getCurrentUserName();
+      try {
+        AuthorizationUtils.checkCurrentUser(
+            metalakeIdent.name(), currentUser, authorizationRequestContext);
+      } catch (NoSuchMetalakeException e) {
+        // A custom authorizer may report a missing metalake directly; JCasbin reports it as
+        // non-membership instead.
+        LOG.warn("Metalake {} does not exist when validating user {}", metalakeIdent, currentUser);
+        // A missing metalake is not an authorization denial, so skip the denial event. Return the
+        // same client-visible response as a failed membership check to avoid exposing existence.
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
+      } catch (ForbiddenException ex) {
+        LOG.warn(
+            "User validation failed - User: {}, Metalake: {}, Reason: {}",
+            currentUser,
+            metalakeIdent.name(),
+            ex.getMessage(),
+            ex);
+        dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
+        return Optional.of(metalakeMembershipFailure(currentUser, metalakeIdent.name()));
+      } catch (Exception ex) {
+        LOG.error(
+            "Unexpected error during user validation - User: {}, Metalake: {}",
+            currentUser,
+            metalakeIdent.name(),
+            ex);
+        return Optional.of(Utils.internalError("Failed to validate user", ex));
+      }
+
+      // Role assumption: reject a NAMED declaration that names roles the caller does not hold
+      // (403); ALL/NONE need no membership check.
+      ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
+      if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
+        Set<String> unheldRoles =
+            GravitinoAuthorizerProvider.getInstance()
+                .getGravitinoAuthorizer()
+                .findUnheldRoles(
+                    PrincipalUtils.getCurrentPrincipal(),
+                    metalakeIdent.name(),
+                    activeRoles.roleNames(),
+                    authorizationRequestContext);
+        if (!unheldRoles.isEmpty()) {
+          dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
+          return Optional.of(
+              Utils.forbidden(
+                  String.format(
+                      "User '%s' cannot assume active role(s) that are not held: %s",
+                      currentUser, unheldRoles),
+                  null));
+        }
+      }
+      return Optional.empty();
+    }
+
+    private Response metalakeMembershipFailure(String user, String metalake) {
+      return Utils.forbidden(
+          AuthorizationUtils.metalakeMembershipFailureMessage(metalake, user), null);
     }
 
     private Response buildNoAuthResponse(
@@ -242,6 +404,21 @@ public class GravitinoInterceptionService implements InterceptionService {
       return buildNoAuthResponse(errorMessage, accessMetadataName, currentUser, methodName);
     }
 
+    private void dispatchAuthzDenialEvent(
+        String user, NameIdentifier accessMetadataName, String methodName, String expression) {
+      try {
+        AuthorizationDenialFailureEvent event =
+            new AuthorizationDenialFailureEvent(user, accessMetadataName, methodName, expression);
+        GravitinoEnv.getInstance().eventBus().dispatchEvent(event);
+      } catch (Exception e) {
+        LOG.error(
+            "Failed to dispatch authorization denial event for user {} on operation {}",
+            user,
+            methodName,
+            e);
+      }
+    }
+
     private Response buildNoAuthResponse(
         String errorMessage,
         NameIdentifier accessMetadataName,
@@ -250,7 +427,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       String contextualMessage;
       String accessMetadataMessage =
           accessMetadataName != null
-              ? String.format("on metadata '%s'", accessMetadataName.name())
+              ? String.format("on metadata '%s'", accessMetadataName.toString())
               : "";
       if (StringUtils.isNotBlank(errorMessage)) {
         contextualMessage =

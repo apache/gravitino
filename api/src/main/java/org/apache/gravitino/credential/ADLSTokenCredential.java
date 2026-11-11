@@ -112,6 +112,6 @@ public class ADLSTokenCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sasToken), "ADLS SAS token should not be empty.");
     Preconditions.checkArgument(
-        expireTimeInMS > 0, "The expire time of ADLSTokenCredential should great than 0");
+        expireTimeInMS > 0, "The expiration time of ADLSTokenCredential should be greater than 0");
   }
 }

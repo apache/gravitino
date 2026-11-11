@@ -721,6 +721,8 @@
    side-channel-map
    side-channel-weakmap
    sirv
+   sql-formatter
+   sql-highlight
    stable-hash
    stack-generator
    stackback

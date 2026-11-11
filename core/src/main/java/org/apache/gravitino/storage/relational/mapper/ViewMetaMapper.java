@@ -21,26 +21,69 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.po.ViewPO;
+import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.One;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/**
- * A MyBatis Mapper for view meta operation SQLs.
- *
- * <p>This interface class is a specification defined by MyBatis. It requires this interface class
- * to identify the corresponding SQLs for execution. We can write SQLs in an additional XML file, or
- * write SQLs with annotations in this interface Mapper. See: <a
- * href="https://mybatis.org/mybatis-3/getting-started.html"></a>
- */
+/** A MyBatis Mapper for view meta operation SQLs. */
 public interface ViewMetaMapper {
   String TABLE_NAME = "view_meta";
+  String VERSION_TABLE_NAME = "view_version_info";
 
+  @Results(
+      id = "mapToViewVersionInfoPO",
+      value = {
+        @Result(property = "id", column = "id", id = true),
+        @Result(property = "metalakeId", column = "version_metalake_id"),
+        @Result(property = "catalogId", column = "version_catalog_id"),
+        @Result(property = "schemaId", column = "version_schema_id"),
+        @Result(property = "viewId", column = "version_view_id"),
+        @Result(property = "version", column = "version"),
+        @Result(property = "viewComment", column = "view_comment"),
+        @Result(property = "columns", column = "columns"),
+        @Result(property = "properties", column = "properties"),
+        @Result(property = "defaultCatalog", column = "default_catalog"),
+        @Result(property = "defaultSchema", column = "default_schema"),
+        @Result(property = "representations", column = "representations"),
+        @Result(property = "auditInfo", column = "version_audit_info"),
+        @Result(property = "deletedAt", column = "version_deleted_at")
+      })
+  @Select("SELECT 1") // Dummy SQL to avoid MyBatis error, never be executed
+  ViewVersionInfoPO mapToViewVersionInfoPO();
+
+  @Results(
+      id = "viewPOResultMap",
+      value = {
+        @Result(property = "viewId", column = "view_id", id = true),
+        @Result(property = "viewName", column = "view_name"),
+        @Result(property = "metalakeId", column = "metalake_id"),
+        @Result(property = "catalogId", column = "catalog_id"),
+        @Result(property = "schemaId", column = "schema_id"),
+        @Result(property = "currentVersion", column = "current_version"),
+        @Result(property = "lastVersion", column = "last_version"),
+        @Result(property = "auditInfo", column = "audit_info"),
+        @Result(property = "deletedAt", column = "deleted_at"),
+        @Result(
+            property = "viewVersionInfoPO",
+            javaType = ViewVersionInfoPO.class,
+            column =
+                "{id,version_metalake_id,version_catalog_id,version_schema_id,version_view_id,"
+                    + "version,view_comment,columns,properties,default_catalog,default_schema,"
+                    + "representations,version_audit_info,version_deleted_at}",
+            one = @One(resultMap = "mapToViewVersionInfoPO"))
+      })
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "listViewPOsBySchemaId")
   List<ViewPO> listViewPOsBySchemaId(@Param("schemaId") Long schemaId);
 
+  @ResultMap("viewPOResultMap")
   @SelectProvider(
       type = ViewMetaSQLProviderFactory.class,
       method = "listViewPOsByFullQualifiedName")
@@ -53,15 +96,49 @@ public interface ViewMetaMapper {
   Long selectViewIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name);
 
+  @ResultMap("viewPOResultMap")
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "listViewPOsByViewIds")
   List<ViewPO> listViewPOsByViewIds(@Param("viewIds") List<Long> viewIds);
 
+  @ResultMap("viewPOResultMap")
   @SelectProvider(
       type = ViewMetaSQLProviderFactory.class,
       method = "selectViewMetaBySchemaIdAndName")
   ViewPO selectViewMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name);
 
+  /**
+   * Selects and exclusively locks an active view by its natural key without joining a version row.
+   *
+   * @param schemaId the schema ID
+   * @param name the view name
+   * @return the locked view root, or {@code null} when it does not exist
+   */
+  @SelectProvider(
+      type = ViewMetaSQLProviderFactory.class,
+      method = "selectViewMetaBySchemaIdAndNameForUpdate")
+  ViewPO selectViewMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name);
+
+  /**
+   * Selects and exclusively locks an active view metadata row.
+   *
+   * @param viewId the view ID
+   * @return the active view metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewMetaByIdForUpdate")
+  ViewPO selectViewMetaByIdForUpdate(@Param("viewId") Long viewId);
+
+  /**
+   * Checks whether a soft-deleted view still owns the requested primary key.
+   *
+   * @param viewId the view ID
+   * @return one if a deleted row reserves the ID, otherwise zero
+   */
+  @Select("SELECT COUNT(*) FROM " + TABLE_NAME + " WHERE view_id = #{viewId} AND deleted_at > 0")
+  int countDeletedViewMetasById(@Param("viewId") Long viewId);
+
+  @ResultMap("viewPOResultMap")
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewByFullQualifiedName")
   ViewPO selectViewByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
@@ -72,17 +149,20 @@ public interface ViewMetaMapper {
   @InsertProvider(type = ViewMetaSQLProviderFactory.class, method = "insertViewMeta")
   void insertViewMeta(@Param("viewMeta") ViewPO viewPO);
 
-  @InsertProvider(
-      type = ViewMetaSQLProviderFactory.class,
-      method = "insertViewMetaOnDuplicateKeyUpdate")
-  void insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO);
-
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "updateViewMeta")
   Integer updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO);
 
+  /**
+   * Soft-deletes a view only if its version has not changed since the caller read it.
+   *
+   * @param viewId the view ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the view changed or disappeared
+   */
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasByViewId")
-  Integer softDeleteViewMetasByViewId(@Param("viewId") Long viewId);
+  Integer softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = ViewMetaSQLProviderFactory.class,
@@ -94,8 +174,10 @@ public interface ViewMetaMapper {
       method = "softDeleteViewMetasByCatalogId")
   Integer softDeleteViewMetasByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasBySchemaId")
-  Integer softDeleteViewMetasBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(
+      type = ViewMetaSQLProviderFactory.class,
+      method = "softDeleteViewMetasBySchemaIds")
+  Integer softDeleteViewMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
   @DeleteProvider(
       type = ViewMetaSQLProviderFactory.class,

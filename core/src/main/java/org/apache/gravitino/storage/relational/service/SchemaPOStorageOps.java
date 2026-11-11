@@ -1,0 +1,148 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.service;
+
+import java.util.List;
+import java.util.stream.Collectors;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+
+public class SchemaPOStorageOps extends BasePOStorageOps<SchemaPO, SchemaMetaMapper> {
+
+  /** Escape character used when matching the cascade-delete name prefix with SQL {@code LIKE}. */
+  private static final String LIKE_ESCAPE_CHAR = "!";
+
+  public SchemaPOStorageOps() {}
+
+  @Override
+  public void batchInsertPOs(SchemaMetaMapper mapper, List<SchemaPO> schemaPOs, boolean overwrite) {
+    if (overwrite) {
+      mapper.batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaPOs);
+    } else {
+      mapper.batchInsertSchemaMeta(schemaPOs);
+    }
+  }
+
+  @Override
+  public Integer updatePO(SchemaMetaMapper mapper, SchemaPO oldPO, SchemaPO newPO) {
+    return mapper.updateSchemaMeta(oldPO, newPO);
+  }
+
+  @Override
+  public SchemaPO getPO(SchemaMetaMapper mapper, Long parentId, String name) {
+    return mapper.selectSchemaMetaByCatalogIdAndName(parentId, name);
+  }
+
+  @Override
+  public SchemaPO getPOByFullName(SchemaMetaMapper mapper, NameIdentifier identifier) {
+    Namespace namespace = identifier.namespace();
+    SchemaPO po =
+        mapper.selectSchemaByFullQualifiedName(
+            namespace.level(0), namespace.level(1), identifier.name());
+    // INNER JOIN on metalake/catalog: a null PO means the metalake or catalog does not exist.
+    if (po == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // LEFT JOIN on schema_meta: a row with non-null catalogId but null schemaId means
+    // the catalog exists but the schema does not.
+    if (po.getSchemaId() == null) {
+      return null;
+    }
+    return po;
+  }
+
+  @Override
+  public List<SchemaPO> listPOs(SchemaMetaMapper schemaMetaMapper, Long parentId) {
+    return schemaMetaMapper.listSchemaPOsByCatalogId(parentId);
+  }
+
+  @Override
+  public List<SchemaPO> listPOs(
+      SchemaMetaMapper schemaMetaMapper, Namespace namespace, List<String> names) {
+    return schemaMetaMapper.batchSelectSchemaByIdentifier(
+        namespace.level(0), namespace.level(1), names);
+  }
+
+  @Override
+  public List<SchemaPO> listPOs(SchemaMetaMapper schemaMetaMapper, List<Long> entityIds) {
+    return schemaMetaMapper.listSchemaPOsBySchemaIds(entityIds);
+  }
+
+  @Override
+  public List<SchemaPO> listPOsByNSFullName(
+      SchemaMetaMapper schemaMetaMapper, Namespace namespace) {
+    List<SchemaPO> pos =
+        schemaMetaMapper.listSchemaPOsByFullQualifiedName(namespace.level(0), namespace.level(1));
+    // An empty result means the parent metalake or catalog does not exist.
+    if (pos.isEmpty()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          namespace.level(1));
+    }
+    // Same LEFT JOIN behavior as getPOByFullName: filter out the placeholder row that
+    // represents an existing catalog without any matching schema.
+    return pos.stream().filter(po -> po.getSchemaId() != null).collect(Collectors.toList());
+  }
+
+  @Override
+  public boolean supportsParentIdRelationalRead() {
+    return true;
+  }
+
+  /**
+   * For HierarchicalSchema, the name passed in is in storage (physical) form. Descendants are
+   * stored as {@code <name><physicalSeparator>...}; we build that prefix once and let SQL match the
+   * exact row plus everything starting with the prefix.
+   *
+   * <p>Schema names may contain SQL {@code LIKE} metacharacters ({@code %} and {@code _}), so the
+   * literal prefix is escaped here and matched with an {@code ESCAPE} clause (see {@link
+   * org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider}). This
+   * guarantees a literal prefix match and prevents e.g. {@code a_b} from also matching {@code axb}.
+   */
+  @Override
+  public List<SchemaPO> listPOsByNamePrefix(
+      SchemaMetaMapper mapper, Long catalogId, String physicalName) {
+    String descendantPrefix =
+        escapeLikeMetacharacters(physicalName) + HierarchicalSchemaUtil.physicalSeparator();
+    return mapper.listSchemaPOsByCatalogIdAndNamePrefix(catalogId, physicalName, descendantPrefix);
+  }
+
+  /**
+   * Escapes SQL {@code LIKE} metacharacters so the value matches literally. The escape character
+   * itself is escaped first, then the {@code %} and {@code _} wildcards. The {@code !} escape
+   * character is chosen to avoid the backslash string-literal escaping differences between MySQL,
+   * H2, and PostgreSQL, and must stay in sync with the {@code ESCAPE} clause in {@link
+   * org.apache.gravitino.storage.relational.mapper.provider.base.SchemaMetaBaseSQLProvider#listSchemaPOsByCatalogIdAndNamePrefix}.
+   */
+  private static String escapeLikeMetacharacters(String value) {
+    return value
+        .replace(LIKE_ESCAPE_CHAR, LIKE_ESCAPE_CHAR + LIKE_ESCAPE_CHAR)
+        .replace("%", LIKE_ESCAPE_CHAR + "%")
+        .replace("_", LIKE_ESCAPE_CHAR + "_");
+  }
+}

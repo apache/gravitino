@@ -24,18 +24,31 @@ plugins {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    compileOnly(libs.thrift)
+    testImplementation(libs.thrift)
+  }
+
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
-  compileOnly(libs.hive2.metastore)
+  compileOnly(libs.hive2.metastore) {
+    exclude(group = "log4j")
+    exclude(group = "org.apache.logging.log4j")
+  }
   compileOnly(libs.immutables.value)
   compileOnly(libs.lombok)
   compileOnly(libs.caffeine)
   compileOnly(libs.guava)
   compileOnly(libs.slf4j.api)
+  compileOnly(libs.log4j.api)
 
   implementation(project(":catalogs:catalog-common")) {
+    exclude("*")
+  }
+  implementation(project(":catalogs:hadoop-auth")) {
     exclude("*")
   }
 
@@ -55,15 +68,20 @@ dependencies {
   testImplementation(libs.datanucleus.jdo)
   testImplementation(libs.datanucleus.rdbms)
   testImplementation(libs.derby)
-  testImplementation(libs.hadoop2.auth) {
+  testImplementation(libs.hadoop3.auth) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
   testImplementation(libs.hive2.exec) {
     artifact {
       classifier = "core"
@@ -115,10 +133,10 @@ dependencies {
     exclude("org.openjdk.jol")
     exclude("org.slf4j")
   }
-  testImplementation(libs.htrace.core4)
   testImplementation(libs.caffeine)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.testcontainers)
   testImplementation(libs.woodstox.core)
 
@@ -138,12 +156,15 @@ artifacts {
   add("testArtifacts", testJar)
 }
 
-// Ensure the shaded Hive metastore lib jars exist before compiling this module,
-// since compileOnly(project(":catalogs:hive-metastore{2,3}-libs")) puts those
-// jars on the compile classpath and they are produced by the copyDepends tasks.
-tasks.named<JavaCompile>("compileJava") {
+// Ensure the shaded Hive metastore lib jars (plus the HiveShimV2/HiveShimV3 classes compiled in
+// those modules) exist before running tests: HiveClientClassLoader loads every jar under
+// hive-metastore{2,3}-libs/build/libs at test time (GRAVITINO_TEST), so their own compiled-source
+// jars must be built too, not just their copyDepends-copied external dependency jars. This is on
+// "test" rather than "compileJava": those two modules compileOnly this module (for the shared
+// HiveShim base class), so depending on their "jar" task from "compileJava" would be circular.
+tasks.named<Test>("test") {
   dependsOn(
-    ":catalogs:hive-metastore2-libs:copyDepends",
-    ":catalogs:hive-metastore3-libs:copyDepends"
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
   )
 }

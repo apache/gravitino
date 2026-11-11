@@ -18,10 +18,18 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import javax.ws.rs.NotAcceptableException;
+import javax.ws.rs.NotAllowedException;
 import javax.ws.rs.NotFoundException;
+import javax.ws.rs.NotSupportedException;
+import javax.ws.rs.ProcessingException;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.exceptions.TokenExpiredException;
+import org.apache.gravitino.server.web.ServerHealth;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.ForbiddenException;
@@ -33,22 +41,24 @@ import org.apache.iceberg.exceptions.NotAuthorizedException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.UnprocessableEntityException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.rest.responses.ErrorResponse;
+import org.glassfish.jersey.server.ParamException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 public class TestIcebergExceptionMapper {
   private final IcebergExceptionMapper icebergExceptionMapper = new IcebergExceptionMapper();
-
-  private void checkExceptionStatus(Exception exception, int statusCode) {
-    Response response = icebergExceptionMapper.toResponse(exception);
-    Assertions.assertEquals(statusCode, response.getStatus());
-  }
 
   @Test
   public void testIcebergExceptionMapper() {
     checkExceptionStatus(new IllegalArgumentException(""), 400);
     checkExceptionStatus(new ValidationException(""), 400);
-    checkExceptionStatus(new NamespaceNotEmptyException(""), 400);
+    checkExceptionStatus(new NamespaceNotEmptyException(""), 409);
     checkExceptionStatus(new NotAuthorizedException(""), 401);
     checkExceptionStatus(new TokenExpiredException("expired"), 419);
     checkExceptionStatus(new AuthenticationTimeoutException("expired"), 419);
@@ -58,11 +68,185 @@ public class TestIcebergExceptionMapper {
     checkExceptionStatus(new NoSuchTableException(""), 404);
     checkExceptionStatus(new NoSuchIcebergTableException(""), 404);
     checkExceptionStatus(new UnsupportedOperationException(""), 406);
+    checkExceptionStatus(new NotAcceptableException(), 406);
+    checkExceptionStatus(new NotAllowedException("GET"), 405);
+    checkExceptionStatus(new NotSupportedException("unsupported content type"), 415);
     checkExceptionStatus(new AlreadyExistsException(""), 409);
     checkExceptionStatus(new CommitFailedException(""), 409);
     checkExceptionStatus(new UnprocessableEntityException(""), 422);
     checkExceptionStatus(new CommitStateUnknownException("", new RuntimeException()), 500);
     checkExceptionStatus(new ServiceUnavailableException(""), 503);
     checkExceptionStatus(new RuntimeException(), 500);
+    // Iceberg NotFoundException stays unmapped → 500. Client-supplied metadata-location misses are
+    // converted to BadRequestException at the call site, not here.
+    checkExceptionStatus(new org.apache.iceberg.exceptions.NotFoundException(""), 500);
+    checkExceptionStatus(new BadRequestException(""), 400);
+  }
+
+  @Test
+  public void testRequestSuppliedMetadataLocationMissesAreBadRequestNotMapperNotFound() {
+    // Unconverted Iceberg NotFoundException would be 500 (mapper intentionally omits it).
+    checkExceptionStatus(
+        new org.apache.iceberg.exceptions.NotFoundException("Failed to open input stream"), 500);
+    // registerTable / registerView / loadTableMetadataFromLocation convert first; those messages
+    // must map to 400. Call-site conversion is covered in TestIcebergCatalogWrapper.
+    checkExceptionStatus(
+        new BadRequestException(
+            "Cannot register table ghost: metadata location file:/missing/v1.metadata.json does not"
+                + " exist"),
+        400);
+    checkExceptionStatus(
+        new BadRequestException(
+            "Cannot register view ghost: metadata location file:/missing/v1.metadata.json does not"
+                + " exist"),
+        400);
+    checkExceptionStatus(
+        new BadRequestException("Metadata location file:/missing/v1.metadata.json does not exist"),
+        400);
+  }
+
+  @Test
+  public void testWebApplicationExceptionPreservesStatusInErrorBody() {
+    try (Response response = icebergExceptionMapper.toResponse(new NotAcceptableException())) {
+      Assertions.assertEquals(406, response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals(406, entity.code());
+      Assertions.assertEquals("NotAcceptableException", entity.type());
+    }
+  }
+
+  @Test
+  public void testConvertToIcebergExceptionKeepsWebApplicationException() {
+    NotAcceptableException original = new NotAcceptableException();
+    Exception converted = IcebergExceptionMapper.convertToIcebergException(original);
+    Assertions.assertSame(original, converted);
+    Assertions.assertEquals(406, IcebergExceptionMapper.getErrorCode(converted));
+  }
+
+  /** Checks that errors retain their type and nested causes in the response. */
+  @Test
+  public void testErrorsRetainTypeAndCause() {
+    for (Error error :
+        new Error[] {
+          new OutOfMemoryError("Metaspace"), new StackOverflowError(),
+          new NoClassDefFoundError("catalog class"), new AssertionError("assertion")
+        }) {
+      error.initCause(new IllegalStateException("root cause"));
+      try (MockedStatic<ServerHealth> shared = Mockito.mockStatic(ServerHealth.class)) {
+        ServerHealth health = new ServerHealth();
+        shared.when(ServerHealth::getInstance).thenReturn(health);
+        try (Response response = icebergExceptionMapper.toResponse(error)) {
+          Assertions.assertEquals(500, response.getStatus());
+          ErrorResponse entity = (ErrorResponse) response.getEntity();
+          Assertions.assertEquals(error.getClass().getSimpleName(), entity.type());
+          // The ErrorModel message is required, so an error without one gets a default.
+          Assertions.assertEquals(
+              error.getMessage() == null ? "Internal server error" : error.getMessage(),
+              entity.message());
+          Assertions.assertTrue(
+              String.join("\n", entity.stack())
+                  .contains("Caused by: java.lang.IllegalStateException: root cause"));
+        }
+        Assertions.assertEquals(error instanceof OutOfMemoryError, health.hasOutOfMemoryError());
+      }
+    }
+  }
+
+  @Test
+  public void testSubclassOfMappedExceptionGetsParentStatus() {
+    checkExceptionStatus(new NumberFormatException("For input string: \"x\""), 400);
+  }
+
+  @Test
+  public void testJsonErrorsAreBadRequest() {
+    // Iceberg's parsers explain an invalid body with an IllegalArgumentException cause.
+    JsonMappingException withParserCause =
+        JsonMappingException.from(
+            (JsonParser) null,
+            "deserialize failed",
+            new IllegalArgumentException("Cannot parse metadata update. Invalid action: bogus"));
+    assertBadRequest(new ProcessingException(withParserCause), "Invalid action: bogus");
+
+    JsonMappingException withPath = JsonMappingException.from((JsonParser) null, "wrong type");
+    withPath.prependPath(new JsonMappingException.Reference(null, "page-size"));
+    assertBadRequest(withPath, "page-size");
+
+    assertBadRequest(
+        JsonMappingException.from((JsonParser) null, "Unexpected end-of-input"), "malformed JSON");
+  }
+
+  @Test
+  public void testInvalidParameterIsBadRequest() {
+    assertBadRequest(
+        new ParamException.QueryParamException(new NumberFormatException("abc"), "pageSize", null),
+        "pageSize");
+  }
+
+  @Test
+  public void testStorageErrorsDoNotLeakSdkMessages() {
+    // A bucket that does not exist is a problem with the requested location.
+    S3Exception noSuchBucket =
+        (S3Exception)
+            S3Exception.builder()
+                .statusCode(404)
+                .message("The specified bucket does not exist (Request ID: SECRET-ID)")
+                .awsErrorDetails(AwsErrorDetails.builder().errorCode("NoSuchBucket").build())
+                .build();
+    Throwable mapped =
+        IcebergExceptionMapper.toClientFacingException(new RuntimeException(noSuchBucket));
+    Assertions.assertInstanceOf(BadRequestException.class, mapped);
+
+    // Access denied by the storage service is the service failing for this catalog: 503, and the
+    // SDK message, with its request id, is not returned.
+    S3Exception denied =
+        (S3Exception)
+            S3Exception.builder()
+                .statusCode(403)
+                .message("Access Denied (Service: S3, Status Code: 403, Request ID: SECRET-ID)")
+                .build();
+    try (Response response = icebergExceptionMapper.toResponse(new RuntimeException(denied))) {
+      Assertions.assertEquals(503, response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertFalse(entity.message().contains("SECRET-ID"), entity.message());
+    }
+
+    // A location the SDK cannot turn into a request (for example s3:// without a bucket).
+    SdkClientException marshall =
+        SdkClientException.create(
+            "Unable to marshall request to JSON: Parameter 'Bucket' is empty");
+    Assertions.assertInstanceOf(
+        BadRequestException.class, IcebergExceptionMapper.toClientFacingException(marshall));
+
+    // A missing object keeps its existing handling.
+    S3Exception missingObject = (S3Exception) S3Exception.builder().statusCode(404).build();
+    RuntimeException wrapper = new RuntimeException(missingObject);
+    Assertions.assertSame(wrapper, IcebergExceptionMapper.toClientFacingException(wrapper));
+  }
+
+  @Test
+  public void testErrorWithoutMessageGetsDefaultMessage() {
+    try (Response response = icebergExceptionMapper.toResponse(new RuntimeException())) {
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("Internal server error", entity.message());
+    }
+    try (Response response = icebergExceptionMapper.toResponse(new ForbiddenException(""))) {
+      Assertions.assertEquals(403, response.getStatus());
+    }
+  }
+
+  private void assertBadRequest(Throwable exception, String expectedInMessage) {
+    try (Response response = icebergExceptionMapper.toResponse(exception)) {
+      Assertions.assertEquals(400, response.getStatus());
+      ErrorResponse entity = (ErrorResponse) response.getEntity();
+      Assertions.assertEquals("BadRequestException", entity.type());
+      Assertions.assertTrue(
+          entity.message().contains(expectedInMessage),
+          "Expected '" + expectedInMessage + "' in: " + entity.message());
+    }
+  }
+
+  private void checkExceptionStatus(Exception exception, int statusCode) {
+    Response response = icebergExceptionMapper.toResponse(exception);
+    Assertions.assertEquals(statusCode, response.getStatus());
   }
 }

@@ -16,6 +16,7 @@
   specific language governing permissions and limitations
   under the License.
 -->
+
 # Design of Function Privilege Control in Gravitino
 
 ## Background
@@ -34,7 +35,7 @@ The existing Gravitino access control framework covers catalogs, schemas, tables
 
 1. **Integrate with Existing Access Control Framework**: Define function privilege types that follow established Gravitino naming conventions and privilege inheritance patterns.
 
-2. **Function Visibility Control**: Users should only see functions they have privileges on. `listFunctions` and `getFunction` should filter results based on user permissions, following the "can't see what you can't execute" pattern found across all surveyed systems.
+2. **Function Visibility Control**: Users should only see functions they have privileges on. `listFunctions` and `getFunction` should filter results based on user permissions, consistent with how tables and filesets handle visibility.
 
 3. **Ownership Tracking**: Functions should have owners, set automatically on registration and manageable through Gravitino's existing ownership mechanism.
 
@@ -106,7 +107,7 @@ This is consistent with tables, filesets, and other schema-scoped objects. Funct
 
 ### Visibility Control
 
-Function visibility follows the "can't see what you can't execute" pattern observed across all surveyed systems:
+Function visibility follows the same pattern as tables and filesets — users can only see functions they have at least one operational privilege on:
 
 1. **`listFunctions`**
    - Requires `USE_CATALOG` + `USE_SCHEMA` at the endpoint level to access the schema (consistent with `listTables`).

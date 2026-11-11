@@ -23,6 +23,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import javax.ws.rs.NotSupportedException;
 import lombok.Getter;
 
@@ -43,6 +44,12 @@ public class Dummy2CredentialProvider implements CredentialProvider {
     return CREDENTIAL_TYPE;
   }
 
+  @Override
+  public boolean supportsScheme(String scheme) {
+    return true;
+  }
+
+  @Nullable
   @Override
   public Credential getCredential(CredentialContext context) {
     Preconditions.checkArgument(

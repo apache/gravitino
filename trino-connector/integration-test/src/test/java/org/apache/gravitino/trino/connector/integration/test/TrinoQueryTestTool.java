@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.integration.test;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
 import org.apache.commons.cli.HelpFormatter;
@@ -69,6 +70,11 @@ public class TrinoQueryTestTool {
           "postgresql_uri",
           true,
           "URL for PostgreSQL, if --auto is set to 'all', this option is ignored");
+      options.addOption(
+          "skip_testsets",
+          true,
+          "Comma-separated list of testsets to skip, default is 'glue'. "
+              + "Pass an empty string to skip nothing.");
 
       options.addOption(
           "test_sets_dir",
@@ -93,14 +99,28 @@ public class TrinoQueryTestTool {
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
       options.addOption(
-          "trino_version", true, "Specify the Trino version to test, the default value is 435.");
+          "trino_version",
+          true,
+          "Specify the Trino version to test. If not specified, the version pinned in the test "
+              + "docker-compose file is used.");
 
       options.addOption(
           "trino_connector_dir",
           true,
           "Specify the Gravitino connector JAR path. "
               + "The JAR file under ${trino_connector_dir} will be copied into the test image, "
-              + "the default value is ${project_root}/trino-connector/trino-connector/build/libs.");
+              + "the default value is the connector directory pinned in the test docker-compose "
+              + "file.");
+
+      options.addOption(
+          "test_containers",
+          true,
+          "Specify the docker compose test containers to start, the default value is 'default'.");
+
+      options.addOption(
+          "env_only",
+          false,
+          "Start the environment (Gravitino + Trino) and keep it running for manual testing. Press Ctrl+C to shutdown.");
 
       options.addOption("help", false, "Print this help message");
 
@@ -117,7 +137,7 @@ public class TrinoQueryTestTool {
                 + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
                 + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino version:\n"
-                + "TrinoTestTool --auto=all --trino_version=435\n\n"
+                + "TrinoTestTool --auto=all --trino_version=483\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino connector JAR files:\n"
                 + "TrinoTestTool --auto=all --trino_connector_dir=./trino-connector/libs\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"
@@ -157,6 +177,15 @@ public class TrinoQueryTestTool {
       }
 
       TrinoQueryIT.ciTestsets.clear();
+
+      String skipTestsetsArg = commandLine.getOptionValue("skip_testsets");
+      if (skipTestsetsArg != null) {
+        TrinoQueryIT.skipTestsets.clear();
+        Arrays.stream(skipTestsetsArg.split(","))
+            .map(String::trim)
+            .filter(s -> !s.isEmpty())
+            .forEach(TrinoQueryIT.skipTestsets::add);
+      }
 
       String testHost = commandLine.getOptionValue("test_host");
       if (Strings.isNotEmpty(testHost)) {
@@ -238,6 +267,7 @@ public class TrinoQueryTestTool {
       TrinoQueryIT.trinoWorkerNum = extractIntValue(commandLine, "trino_worker_num");
       TrinoQueryIT.trinoVersion = extractIntValue(commandLine, "trino_version");
       TrinoQueryIT.trinoConnectorDir = commandLine.getOptionValue("trino_connector_dir");
+      TrinoQueryIT.testContainers = commandLine.getOptionValue("test_containers");
 
       checkEnv();
 
@@ -248,9 +278,28 @@ public class TrinoQueryTestTool {
       testerRunner.setup();
 
       if (commandLine.hasOption("gen_output")) {
-        String catalogFileName = "catalog_" + catalog + "_prepare.sql";
-        testerRunner.runOneTestSetAndGenOutput(testSetDir, catalogFileName, testerId);
+        testerRunner.runOneTestSetAndGenOutput(testSetDir, catalog, testerId);
         System.out.println("The output file is generated successfully in the path " + testSetDir);
+        return;
+      }
+
+      if (commandLine.hasOption("env_only")) {
+        CountDownLatch shutdownLatch = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(shutdownLatch::countDown));
+
+        System.out.println("=======================================================");
+        System.out.println("Environment is ready for manual testing.");
+        System.out.println("  Gravitino URI : " + TrinoQueryITBase.gravitinoUri);
+        System.out.println("  Trino URI     : " + TrinoQueryITBase.trinoUri);
+        System.out.println("Connect to Trino CLI:");
+        System.out.println("  docker exec -it trino-ci-trino trino");
+        System.out.println("Press Ctrl+C to shutdown the environment.");
+        System.out.println("=======================================================");
+        try {
+          shutdownLatch.await();
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
 

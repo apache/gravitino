@@ -50,7 +50,6 @@ public class UserAddRequest implements RESTRequest {
    * @param name The name of the user.
    */
   public UserAddRequest(String name) {
-    super();
     this.name = name;
   }
 

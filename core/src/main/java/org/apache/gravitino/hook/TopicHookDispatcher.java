@@ -66,7 +66,7 @@ public class TopicHookDispatcher implements TopicDispatcher {
     Topic topic = dispatcher.createTopic(ident, comment, dataLayout, properties);
 
     // Set the creator as the owner of the topic.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
       ownerManager.setOwner(
           ident.namespace().level(0),
@@ -88,8 +88,11 @@ public class TopicHookDispatcher implements TopicDispatcher {
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.TOPIC);
     boolean dropped = dispatcher.dropTopic(ident);
-    AuthorizationUtils.authorizationPluginRemovePrivileges(
-        ident, Entity.EntityType.TOPIC, locations);
+    // A false result means the topic was dropped out of band and the registration was kept.
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.TOPIC, locations);
+    }
     return dropped;
   }
 

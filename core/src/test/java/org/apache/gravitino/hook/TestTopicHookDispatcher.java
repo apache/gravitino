@@ -19,22 +19,37 @@
 package org.apache.gravitino.hook;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import java.io.IOException;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTopicOperationDispatcher;
+import org.apache.gravitino.catalog.TopicDispatcher;
+import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.messaging.Topic;
+import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestTopicHookDispatcher extends TestOperationDispatcher {
@@ -45,7 +60,7 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
   private static AuthorizationPlugin authorizationPlugin;
 
   @BeforeAll
-  public static void initialize() throws IOException, IllegalAccessException {
+  public static void initialize() throws Exception {
     TestTopicOperationDispatcher.initialize();
 
     topicHookDispatcher =
@@ -54,13 +69,132 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         new SchemaHookDispatcher(TestTopicOperationDispatcher.getSchemaOperationDispatcher());
 
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlManager, true);
+        GravitinoEnv.getInstance(), "internalAccessControlDispatcher", accessControlManager, true);
     catalogManager = Mockito.mock(CatalogManager.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     BaseCatalog catalog = Mockito.mock(BaseCatalog.class);
-    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
+  }
+
+  @Test
+  public void testDropTopicDoesNotRemovePrivilegesWhenTopicDoesNotExist() {
+    TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+    TopicHookDispatcher hook = new TopicHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "topic");
+    Mockito.when(dispatcher.dropTopic(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      Assertions.assertFalse(hook.dropTopic(ident));
+      authz.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TOPIC, null),
+          Mockito.never());
+    }
+  }
+
+  @Test
+  public void testCreateTopicSetsOwnerWithNormalizedIdentifier() throws Exception {
+    // Self-contained: use a fresh hook with a directly-mocked TopicDispatcher and a case-
+    // insensitive catalog so we can verify the helper passes a normalized ident to setOwner.
+    CatalogManager savedCatalogManager = GravitinoEnv.getInstance().catalogManager();
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(mockCatalog.capability()).thenReturn(new CaseInsensitiveCapability());
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
+
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    TopicDispatcher mockTopicDispatcher = Mockito.mock(TopicDispatcher.class);
+    Mockito.when(mockTopicDispatcher.createTopic(any(), any(), any(), any()))
+        .thenReturn(Mockito.mock(Topic.class));
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      TopicDispatcher localHook =
+          new TopicNormalizeDispatcher(
+              new TopicHookDispatcher(mockTopicDispatcher), mockCatalogManager);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "SCHEMA_NORM", "MY_TOPIC");
+      localHook.createTopic(ident, "comment", null, ImmutableMap.of());
+
+      ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
+      Mockito.verify(mockOwnerDispatcher)
+          .setOwner(eq(metalake), captor.capture(), any(), eq(Owner.Type.USER));
+      Assertions.assertEquals(
+          "my_topic",
+          captor.getValue().name(),
+          "Topic name passed to setOwner must be lowercased by Capability.Scope.TOPIC normalization");
+      Assertions.assertEquals(
+          catalog + ".schema_norm",
+          captor.getValue().parent(),
+          "Topic parent (catalog.schema) must have its schema component lowercased by"
+              + " Capability.Scope.TOPIC namespace normalization");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
+    }
+  }
+
+  @Test
+  public void testCreateTopicThrowsWhenSetOwnerFails() throws IllegalAccessException {
+    // Save the original ownerDispatcher so we can restore it in the finally block instead of
+    // wiping it to null and leaking that into other tests in the suite.
+    OwnerDispatcher savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
+
+    // Create the schema first with the existing (non-throwing) ownerDispatcher, then swap to the
+    // throwing mock only for the topic create we actually want to exercise. Otherwise the throwing
+    // mock would fire during schema creation and we would never reach the topic call.
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_owner_fail");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaHookDispatcher.createSchema(NameIdentifier.of(topicNs.levels()), "comment", props);
+
+    OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(new RuntimeException("Set owner failed"))
+        .when(mockOwnerDispatcher)
+        .setOwner(any(), any(), any(), any());
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
+
+    try {
+      NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_owner_fail");
+      RuntimeException thrown =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> topicHookDispatcher.createTopic(topicIdent, "comment", null, props));
+      Assertions.assertEquals("Set owner failed", thrown.getMessage());
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
+    }
+  }
+
+  @Test
+  public void testDropKeepsPrivilegesWhenExternalDropReturnsFalse() {
+    TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
+    TopicHookDispatcher hook = new TopicHookDispatcher(dispatcher);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema", "topic");
+    Mockito.when(dispatcher.dropTopic(ident)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authz = Mockito.mockStatic(AuthorizationUtils.class)) {
+      authz
+          .when(() -> AuthorizationUtils.getMetadataObjectLocation(any(), any()))
+          .thenReturn(ImmutableList.of("/test"));
+
+      Assertions.assertFalse(hook.dropTopic(ident));
+
+      authz.verify(
+          () -> AuthorizationUtils.authorizationPluginRemovePrivileges(any(), any(), any()),
+          Mockito.never());
+    }
   }
 
   @Test
@@ -76,5 +210,12 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         () -> {
           topicHookDispatcher.dropTopic(topicIdent);
         });
+  }
+
+  private static class CaseInsensitiveCapability implements Capability {
+    @Override
+    public CapabilityResult caseSensitiveOnName(Scope scope) {
+      return CapabilityResult.unsupported("case-insensitive");
+    }
   }
 }

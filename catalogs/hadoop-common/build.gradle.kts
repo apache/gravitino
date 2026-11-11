@@ -29,6 +29,9 @@ dependencies {
   implementation(libs.cglib)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
   implementation(libs.guava)
   implementation(libs.hadoop3.client.api)
   implementation(libs.hadoop3.client.runtime)
@@ -38,6 +41,8 @@ dependencies {
   testImplementation(project(":common"))
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.junit.jupiter.params)
 
   testRuntimeOnly(libs.junit.jupiter.engine)

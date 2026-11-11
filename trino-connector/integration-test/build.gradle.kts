@@ -28,7 +28,13 @@ repositories {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    testImplementation(libs.thrift)
+  }
+
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))
@@ -41,13 +47,19 @@ dependencies {
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.log4j)
   testImplementation(libs.commons.cli)
-  testImplementation(libs.hadoop2.common) {
+  testImplementation(libs.hadoop3.common) {
     exclude("*")
   }
-  testImplementation(libs.hadoop2.hdfs)
-  testImplementation(libs.hadoop2.mapreduce.client.core) {
+  testImplementation(libs.hadoop3.hdfs)
+  testImplementation(libs.hadoop3.hdfs.client)
+  testImplementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  // Hadoop 3.x runtime requirements (stripped by exclude("*") above)
+  testImplementation(libs.hadoop3.shaded.guava)
+  testImplementation(libs.hadoop3.shaded.protobuf)
+  testImplementation(libs.commons.configuration2)
+  testImplementation(libs.re2j)
   testImplementation(libs.hive2.common) {
     exclude("org.eclipse.jetty.aggregate", "jetty-all")
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
@@ -55,6 +67,7 @@ dependencies {
   testImplementation(libs.httpclient5)
   testImplementation(libs.jline.terminal)
   testImplementation(libs.jodd.core)
+  testImplementation(libs.bundles.jwt)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
@@ -66,17 +79,19 @@ dependencies {
   testImplementation(libs.trino.client) {
     exclude("jakarta.annotation")
   }
+  testImplementation(libs.trino.jdbc)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.register("setupDependencies") {
-  dependsOn(":trino-connector:trino-connector-435-439:copyLibs")
-  dependsOn(":trino-connector:trino-connector-440-445:copyLibs")
-  dependsOn(":trino-connector:trino-connector-446-451:copyLibs")
-  dependsOn(":trino-connector:trino-connector-452-468:copyLibs")
+  dependsOn(":bundles:aws-bundle:jar", ":bundles:iceberg-aws-bundle:jar")
   dependsOn(":trino-connector:trino-connector-469-472:copyLibs")
-  dependsOn(":trino-connector:trino-connector-473-478:copyLibs")
+  dependsOn(":trino-connector:trino-connector-473-477:copyLibs")
+  dependsOn(":trino-connector:trino-connector-478-479:copyLibs")
+  dependsOn(":trino-connector:trino-connector-480:copyLibs")
+  dependsOn(":trino-connector:trino-connector-481:copyLibs")
+  dependsOn(":trino-connector:trino-connector-482-483:copyLibs")
   dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-mysql:jar", ":catalogs:catalog-jdbc-mysql:runtimeJars")
   dependsOn(":catalogs:catalog-jdbc-postgresql:jar", ":catalogs:catalog-jdbc-postgresql:runtimeJars")
@@ -88,6 +103,10 @@ tasks.build {
 }
 
 tasks.test {
+  // Trino version for ITs that start their own upstream Trino image; keep the default in sync with
+  // the TRINO_VERSION default in integration-test-common/docker-script/docker-compose.yaml.
+  environment("TRINO_VERSION", System.getenv("TRINO_VERSION") ?: "483")
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
@@ -104,17 +123,15 @@ tasks.test {
       val version = project.version.toString()
       println("Current project version: $version")
 
-      // Check whether this module has already built
-      val trinoConnectorBuildDir = project(":trino-connector:trino-connector").buildDir
-      if (trinoConnectorBuildDir.exists()) {
-        // Check the version Gravitino related jars in build equal to the current project version
-        val invalidGravitinoJars = trinoConnectorBuildDir.resolve("libs").listFiles { _, name -> name.startsWith("gravitino") }?.filter {
-          val name = it.name
-          !name.endsWith(version + ".jar")
-        }
+      // Check the Gravitino jars of every built version-segment module match the project version
+      project(":trino-connector").subprojects.filter { it.name.startsWith("trino-connector-") }.forEach { module ->
+        val libsDir = module.buildDir.resolve("libs")
+        val invalidGravitinoJars = libsDir.listFiles { _, name -> name.startsWith("gravitino") }?.filter {
+          !it.name.endsWith(version + ".jar")
+        }.orEmpty()
 
-        if (invalidGravitinoJars!!.isNotEmpty()) {
-          val message = "Mismatched Gravitino JAR versions found in trino-connector/build/libs:\n" +
+        if (invalidGravitinoJars.isNotEmpty()) {
+          val message = "Mismatched Gravitino JAR versions found in ${module.name}/build/libs:\n" +
             "${invalidGravitinoJars.joinToString(", ") { it.name }}\n" +
             "The expected project version is $version. Please clean and rebuild the project."
           throw GradleException(message)

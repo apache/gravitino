@@ -25,9 +25,9 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /opt/gravitino-lance-rest-server
 
-COPY packages/gravitino-lance-rest-server /opt/gravitino-lance-rest-server
+COPY --chmod=775 packages/gravitino-lance-rest-server /opt/gravitino-lance-rest-server
 
-RUN chmod -R g+rwX /opt/gravitino-lance-rest-server \
+RUN chmod 775 /opt/gravitino-lance-rest-server \
     && chmod +x /opt/gravitino-lance-rest-server/bin/start-lance-rest-server.sh
 
 EXPOSE 9101

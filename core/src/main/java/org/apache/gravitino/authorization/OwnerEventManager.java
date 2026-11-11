@@ -20,6 +20,9 @@
 package org.apache.gravitino.authorization;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import lombok.Getter;
 import org.apache.gravitino.MetadataObject;
@@ -63,6 +66,43 @@ public class OwnerEventManager implements OwnerDispatcher {
       eventBus.dispatchEvent(new SetOwnerEvent(user, identifier, ownerInfo, type));
     } catch (Exception e) {
       eventBus.dispatchEvent(new SetOwnerFailureEvent(user, identifier, e, ownerInfo, type));
+      throw e;
+    }
+  }
+
+  @Override
+  public void setOwners(
+      String metalake,
+      List<MetadataObject> metadataObjects,
+      String ownerName,
+      Owner.Type ownerType) {
+    Preconditions.checkArgument(metadataObjects != null, "metadataObjects must not be null");
+    if (metadataObjects.isEmpty()) {
+      return;
+    }
+    String user = PrincipalUtils.getCurrentUserName();
+    OwnerInfo ownerInfo = new OwnerInfo(ownerName, ownerType);
+    List<NameIdentifier> identifiers = new ArrayList<>(metadataObjects.size());
+    for (MetadataObject metadataObject : metadataObjects) {
+      NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
+      identifiers.add(identifier);
+      eventBus.dispatchEvent(
+          new SetOwnerPreEvent(user, identifier, ownerInfo, metadataObject.type()));
+    }
+    try {
+      ownerDispatcher.setOwners(metalake, metadataObjects, ownerName, ownerType);
+      for (int i = 0; i < metadataObjects.size(); i++) {
+        MetadataObject metadataObject = metadataObjects.get(i);
+        eventBus.dispatchEvent(
+            new SetOwnerEvent(user, identifiers.get(i), ownerInfo, metadataObject.type()));
+      }
+    } catch (Exception e) {
+      for (int i = 0; i < metadataObjects.size(); i++) {
+        MetadataObject metadataObject = metadataObjects.get(i);
+        eventBus.dispatchEvent(
+            new SetOwnerFailureEvent(
+                user, identifiers.get(i), e, ownerInfo, metadataObject.type()));
+      }
       throw e;
     }
   }

@@ -26,23 +26,39 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -60,6 +76,8 @@ public class TagIT extends BaseIT {
   private static Catalog relationalCatalog;
   private static Schema schema;
   private static Table table;
+  private static View view;
+  private static Function function;
 
   private static Catalog modelCatalog;
   private static Schema modelSchema;
@@ -114,6 +132,51 @@ public class TagIT extends BaseIT {
                 Collections.emptyMap());
     column = Arrays.stream(table.columns()).filter(c -> c.name().equals("col1")).findFirst().get();
 
+    // Create view
+    String viewName = GravitinoITUtils.genRandomName("tag_it_view");
+    Assertions.assertFalse(
+        relationalCatalog.asViewCatalog().viewExists(NameIdentifier.of(schemaName, viewName)));
+    view =
+        relationalCatalog
+            .asViewCatalog()
+            .createView(
+                NameIdentifier.of(schemaName, viewName),
+                "comment",
+                new Column[] {
+                  Column.of("col1", Types.IntegerType.get()),
+                  Column.of("col2", Types.StringType.get())
+                },
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder()
+                      .withDialect(Dialects.HIVE)
+                      .withSql("SELECT col1, col2 FROM " + table.name())
+                      .build()
+                },
+                null,
+                null,
+                Collections.emptyMap());
+
+    // Create function
+    String functionName = GravitinoITUtils.genRandomName("tag_it_function");
+    Assertions.assertFalse(
+        relationalCatalog
+            .asFunctionCatalog()
+            .functionExists(NameIdentifier.of(schemaName, functionName)));
+    FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    function =
+        relationalCatalog
+            .asFunctionCatalog()
+            .registerFunction(
+                NameIdentifier.of(schemaName, functionName),
+                "comment",
+                FunctionType.SCALAR,
+                true,
+                new FunctionDefinition[] {definition});
+
     // Create model catalog
     String modelCatalogName = GravitinoITUtils.genRandomName("tag_it_model_catalog");
     Assertions.assertFalse(metalake.catalogExists(modelCatalogName));
@@ -140,7 +203,11 @@ public class TagIT extends BaseIT {
 
   @AfterAll
   public void tearDown() {
+    relationalCatalog.asViewCatalog().dropView(NameIdentifier.of(schema.name(), view.name()));
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
+    relationalCatalog
+        .asFunctionCatalog()
+        .dropFunction(NameIdentifier.of(schema.name(), function.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
     metalake.dropCatalog(relationalCatalog.name(), true);
 
@@ -164,6 +231,12 @@ public class TagIT extends BaseIT {
 
   @AfterEach
   public void cleanUp() {
+    String[] viewTags = view.supportsTags().listTags();
+    view.supportsTags().associateTags(null, viewTags);
+
+    String[] functionTags = function.supportsTags().listTags();
+    function.supportsTags().associateTags(null, functionTags);
+
     String[] tableTags = table.supportsTags().listTags();
     table.supportsTags().associateTags(null, tableTags);
 
@@ -228,6 +301,53 @@ public class TagIT extends BaseIT {
 
     Tag tag3 = metalake.getTag(tagName2);
     Assertions.assertEquals(tag2, tag3);
+  }
+
+  @Test
+  public void testAssignmentValues() {
+    String tagName = GravitinoITUtils.genRandomName("tag_it_assignment_value");
+    TagValueConstraint constraint = TagValueConstraint.ofAllowedValues("finance", "risk");
+    Tag tag = metalake.createTag(tagName, "comment", Collections.emptyMap(), constraint);
+    Assertions.assertEquals(constraint, tag.valueConstraint());
+
+    TagValue[] values =
+        new TagValue[] {TagValue.of(tagName, "finance"), TagValue.of(tagName, "risk")};
+    Assertions.assertArrayEquals(
+        new String[] {tagName}, table.supportsTags().associateTags(values, null));
+
+    Tag assignedTag = table.supportsTags().getTag(tagName);
+    Assertions.assertEquals(constraint, assignedTag.valueConstraint());
+    Assertions.assertTrue(assignedTag.assignment().isPresent());
+    Assertions.assertArrayEquals(valuesToStrings(values), assignedTag.assignment().get().values());
+    Assertions.assertFalse(assignedTag.inherited().get());
+
+    MetadataObject expectedTable =
+        MetadataObjects.of(
+            relationalCatalog.name() + "." + schema.name(),
+            table.name(),
+            MetadataObject.Type.TABLE);
+    MetadataObject[] financeObjects = tag.associatedObjects().objects("finance");
+    Assertions.assertEquals(1, financeObjects.length);
+    Assertions.assertEquals(expectedTable.fullName(), financeObjects[0].fullName());
+    Assertions.assertEquals(expectedTable.type(), financeObjects[0].type());
+    Assertions.assertEquals(0, tag.associatedObjects().objects("unknown").length);
+
+    String noValueTagName = GravitinoITUtils.genRandomName("tag_it_no_value_assignment");
+    metalake.createTag(noValueTagName, "comment", Collections.emptyMap());
+    TagValue[] noValueValues = new TagValue[] {TagValue.noValue(noValueTagName)};
+    Assertions.assertDoesNotThrow(() -> table.supportsTags().associateTags(noValueValues, null));
+    Assertions.assertDoesNotThrow(() -> table.supportsTags().associateTags(noValueValues, null));
+
+    Tag noValueAssignedTag = table.supportsTags().getTag(noValueTagName);
+    Assertions.assertTrue(noValueAssignedTag.assignment().isPresent());
+    Assertions.assertEquals(0, noValueAssignedTag.assignment().get().values().length);
+    table.supportsTags().associateTags(null, noValueValues);
+
+    Assertions.assertEquals(0, table.supportsTags().associateTags(null, values).length);
+  }
+
+  private static String[] valuesToStrings(TagValue[] values) {
+    return Arrays.stream(values).map(value -> value.value().get()).toArray(String[]::new);
   }
 
   @Test
@@ -553,6 +673,82 @@ public class TagIT extends BaseIT {
   }
 
   @Test
+  public void testAssociateTagsToView() {
+    Tag tag1 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_view_tag1"), "comment1", Collections.emptyMap());
+    Tag tag2 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_view_tag2"), "comment2", Collections.emptyMap());
+    Tag tag3 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_view_tag3"), "comment3", Collections.emptyMap());
+
+    // Associate tags to catalog
+    relationalCatalog.supportsTags().associateTags(new String[] {tag1.name()}, null);
+
+    // Associate tags to schema
+    schema.supportsTags().associateTags(new String[] {tag2.name()}, null);
+
+    // Associate tags to view
+    String[] tags = view.supportsTags().associateTags(new String[] {tag3.name()}, null);
+
+    Assertions.assertEquals(1, tags.length);
+    Assertions.assertEquals(tag3.name(), tags[0]);
+
+    // Test list associated tags for view
+    String[] tags1 = view.supportsTags().listTags();
+    Assertions.assertEquals(3, tags1.length);
+    Set<String> tagNames = Sets.newHashSet(tags1);
+    Assertions.assertTrue(tagNames.contains(tag1.name()));
+    Assertions.assertTrue(tagNames.contains(tag2.name()));
+    Assertions.assertTrue(tagNames.contains(tag3.name()));
+
+    // Test list associated tags with details for view
+    Tag[] tags2 = view.supportsTags().listTagsInfo();
+    Assertions.assertEquals(3, tags2.length);
+
+    Set<Tag> nonInheritedTags =
+        Arrays.stream(tags2).filter(tag -> !tag.inherited().get()).collect(Collectors.toSet());
+    Set<Tag> inheritedTags =
+        Arrays.stream(tags2).filter(tag -> tag.inherited().get()).collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedTags.size());
+    Assertions.assertEquals(2, inheritedTags.size());
+    Assertions.assertTrue(nonInheritedTags.contains(tag3));
+    Assertions.assertTrue(inheritedTags.contains(tag1));
+    Assertions.assertTrue(inheritedTags.contains(tag2));
+
+    // Test get associated tag for view
+    Tag resultTag1 = view.supportsTags().getTag(tag1.name());
+    Assertions.assertEquals(tag1, resultTag1);
+    Assertions.assertTrue(resultTag1.inherited().get());
+
+    Tag resultTag2 = view.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2, resultTag2);
+    Assertions.assertTrue(resultTag2.inherited().get());
+
+    Tag resultTag3 = view.supportsTags().getTag(tag3.name());
+    Assertions.assertEquals(tag3, resultTag3);
+    Assertions.assertFalse(resultTag3.inherited().get());
+
+    // Test get objects associated with tag
+    Assertions.assertEquals(1, tag1.associatedObjects().count());
+    Assertions.assertEquals(relationalCatalog.name(), tag1.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG, tag1.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag2.associatedObjects().count());
+    Assertions.assertEquals(schema.name(), tag2.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.SCHEMA, tag2.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag3.associatedObjects().count());
+    Assertions.assertEquals(view.name(), tag3.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(MetadataObject.Type.VIEW, tag3.associatedObjects().objects()[0].type());
+  }
+
+  @Test
   public void testAssociateTagsToColumn() {
     Tag tag1 =
         metalake.createTag(
@@ -645,6 +841,145 @@ public class TagIT extends BaseIT {
 
     Assertions.assertEquals(1, tag4.associatedObjects().count());
     Assertions.assertEquals(column.name(), tag4.associatedObjects().objects()[0].name());
+  }
+
+  @Test
+  public void testDroppedColumnIsRemovedFromTagObjects() {
+    NameIdentifier tableIdent = createColumnTestTable("tag_it_drop_column_table");
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_drop_column_tag"),
+              "comment",
+              Collections.emptyMap());
+      Column c1 = loadColumn(tableIdent, "c1");
+      c1.supportsTags().associateTags(new String[] {tag.name()}, null);
+      Assertions.assertArrayEquals(new String[] {tag.name()}, c1.supportsTags().listTags());
+
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(tableIdent, TableChange.deleteColumn(new String[] {"c1"}, true));
+
+      // The dropped column no longer resolves, and the tag no longer lists it. The server reports
+      // NoSuchMetadataObjectException; the client's tag error handler surfaces it as
+      // NotFoundException.
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
+      Assertions.assertEquals(0, metalake.getTag(tag.name()).associatedObjects().count());
+
+      // A new column with the same name does not inherit the dropped column's tag.
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(
+              tableIdent, TableChange.addColumn(new String[] {"c1"}, Types.IntegerType.get()));
+      Assertions.assertEquals(0, loadColumn(tableIdent, "c1").supportsTags().listTags().length);
+      Assertions.assertEquals(0, metalake.getTag(tag.name()).associatedObjects().count());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(tableIdent);
+    }
+  }
+
+  @Test
+  public void testRenamedColumnKeepsItsTags() {
+    NameIdentifier tableIdent = createColumnTestTable("tag_it_rename_column_table");
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_rename_column_tag"),
+              "comment",
+              Collections.emptyMap());
+      Column c1 = loadColumn(tableIdent, "c1");
+      c1.supportsTags().associateTags(new String[] {tag.name()}, null);
+
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(tableIdent, TableChange.renameColumn(new String[] {"c1"}, "c1_new"));
+
+      // The tag follows the column to its new name.
+      Column renamed = loadColumn(tableIdent, "c1_new");
+      Assertions.assertArrayEquals(new String[] {tag.name()}, renamed.supportsTags().listTags());
+      Assertions.assertFalse(renamed.supportsTags().getTag(tag.name()).inherited().get());
+
+      // The tag lists the column under its new name only, and the old name no longer resolves.
+      MetadataObject[] objects = metalake.getTag(tag.name()).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(MetadataObject.Type.COLUMN, objects[0].type());
+      Assertions.assertEquals(
+          String.join(".", relationalCatalog.name(), schema.name(), tableIdent.name(), "c1_new"),
+          objects[0].fullName());
+      Assertions.assertThrows(NotFoundException.class, () -> c1.supportsTags().listTags());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(tableIdent);
+    }
+  }
+
+  @Test
+  public void testMovedTableKeepsColumnTagsAfterOldSchemaIsDropped() {
+    String sourceSchema = GravitinoITUtils.genRandomName("tag_it_move_source_schema");
+    relationalCatalog.asSchemas().createSchema(sourceSchema, "comment", Collections.emptyMap());
+    NameIdentifier sourceIdent =
+        NameIdentifier.of(sourceSchema, GravitinoITUtils.genRandomName("tag_it_move_table"));
+    relationalCatalog
+        .asTableCatalog()
+        .createTable(
+            sourceIdent,
+            new Column[] {
+              Column.of("c1", Types.IntegerType.get()), Column.of("c2", Types.StringType.get())
+            },
+            "comment",
+            Collections.emptyMap());
+    NameIdentifier movedIdent = NameIdentifier.of(schema.name(), sourceIdent.name());
+    try {
+      Tag tag =
+          metalake.createTag(
+              GravitinoITUtils.genRandomName("tag_it_move_table_tag"),
+              "comment",
+              Collections.emptyMap());
+      loadColumn(sourceIdent, "c1").supportsTags().associateTags(new String[] {tag.name()}, null);
+
+      // Move the table to another schema and change another column in the same request.
+      relationalCatalog
+          .asTableCatalog()
+          .alterTable(
+              sourceIdent,
+              TableChange.rename(sourceIdent.name(), schema.name()),
+              TableChange.updateColumnComment(new String[] {"c2"}, "new comment"));
+
+      // Dropping the old schema must not take the moved table's unchanged column with it.
+      Assertions.assertTrue(relationalCatalog.asSchemas().dropSchema(sourceSchema, true));
+
+      Column c1 = loadColumn(movedIdent, "c1");
+      Assertions.assertArrayEquals(new String[] {tag.name()}, c1.supportsTags().listTags());
+      MetadataObject[] objects = metalake.getTag(tag.name()).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", relationalCatalog.name(), schema.name(), movedIdent.name(), "c1"),
+          objects[0].fullName());
+    } finally {
+      relationalCatalog.asTableCatalog().dropTable(movedIdent);
+      relationalCatalog.asSchemas().dropSchema(sourceSchema, true);
+    }
+  }
+
+  private NameIdentifier createColumnTestTable(String prefix) {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(schema.name(), GravitinoITUtils.genRandomName(prefix));
+    relationalCatalog
+        .asTableCatalog()
+        .createTable(
+            tableIdent,
+            new Column[] {
+              Column.of("c1", Types.IntegerType.get()), Column.of("c2", Types.StringType.get())
+            },
+            "comment",
+            Collections.emptyMap());
+    return tableIdent;
+  }
+
+  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
+    return Arrays.stream(relationalCatalog.asTableCatalog().loadTable(tableIdent).columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
   }
 
   @Test
@@ -764,5 +1099,88 @@ public class TagIT extends BaseIT {
     Assertions.assertEquals(model.name(), tag3.associatedObjects().objects()[0].name());
     Assertions.assertEquals(
         MetadataObject.Type.MODEL, tag3.associatedObjects().objects()[0].type());
+  }
+
+  @Test
+  public void testAssociateTagsToFunction() {
+    Tag tag1 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_function_tag1"),
+            "comment1",
+            Collections.emptyMap());
+    Tag tag2 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_function_tag2"),
+            "comment2",
+            Collections.emptyMap());
+    Tag tag3 =
+        metalake.createTag(
+            GravitinoITUtils.genRandomName("tag_it_function_tag3"),
+            "comment3",
+            Collections.emptyMap());
+
+    // Associate tags to catalog
+    relationalCatalog.supportsTags().associateTags(new String[] {tag1.name()}, null);
+
+    // Associate tags to schema
+    schema.supportsTags().associateTags(new String[] {tag2.name()}, null);
+
+    // Associate tags to function
+    String[] tags = function.supportsTags().associateTags(new String[] {tag3.name()}, null);
+
+    Assertions.assertEquals(1, tags.length);
+    Assertions.assertEquals(tag3.name(), tags[0]);
+
+    // Test list associated tags for function
+    String[] tags1 = function.supportsTags().listTags();
+    Assertions.assertEquals(3, tags1.length);
+    Set<String> tagNames = Sets.newHashSet(tags1);
+    Assertions.assertTrue(tagNames.contains(tag1.name()));
+    Assertions.assertTrue(tagNames.contains(tag2.name()));
+    Assertions.assertTrue(tagNames.contains(tag3.name()));
+
+    // Test list associated tags with details for function
+    Tag[] tags2 = function.supportsTags().listTagsInfo();
+    Assertions.assertEquals(3, tags2.length);
+
+    Set<Tag> nonInheritedTags =
+        Arrays.stream(tags2).filter(tag -> !tag.inherited().get()).collect(Collectors.toSet());
+    Set<Tag> inheritedTags =
+        Arrays.stream(tags2).filter(tag -> tag.inherited().get()).collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedTags.size());
+    Assertions.assertEquals(2, inheritedTags.size());
+    Assertions.assertTrue(nonInheritedTags.contains(tag3));
+    Assertions.assertTrue(inheritedTags.contains(tag1));
+    Assertions.assertTrue(inheritedTags.contains(tag2));
+
+    // Test get associated tag for function
+    Tag resultTag1 = function.supportsTags().getTag(tag1.name());
+    Assertions.assertEquals(tag1, resultTag1);
+    Assertions.assertTrue(resultTag1.inherited().get());
+
+    Tag resultTag2 = function.supportsTags().getTag(tag2.name());
+    Assertions.assertEquals(tag2, resultTag2);
+    Assertions.assertTrue(resultTag2.inherited().get());
+
+    Tag resultTag3 = function.supportsTags().getTag(tag3.name());
+    Assertions.assertEquals(tag3, resultTag3);
+    Assertions.assertFalse(resultTag3.inherited().get());
+
+    // Test get objects associated with tag
+    Assertions.assertEquals(1, tag1.associatedObjects().count());
+    Assertions.assertEquals(relationalCatalog.name(), tag1.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG, tag1.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag2.associatedObjects().count());
+    Assertions.assertEquals(schema.name(), tag2.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.SCHEMA, tag2.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, tag3.associatedObjects().count());
+    Assertions.assertEquals(function.name(), tag3.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.FUNCTION, tag3.associatedObjects().objects()[0].type());
   }
 }

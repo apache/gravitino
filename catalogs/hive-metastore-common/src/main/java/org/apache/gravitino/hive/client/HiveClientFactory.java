@@ -27,11 +27,14 @@ import static org.apache.gravitino.hive.client.Util.updateConfigurationFromPrope
 import com.google.common.base.Preconditions;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.security.PrivilegedExceptionAction;
 import java.util.Properties;
 import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hive.kerberos.AuthenticationConfig;
-import org.apache.gravitino.hive.kerberos.KerberosClient;
+import org.apache.gravitino.hive.kerberos.HmsKerberosClient;
+import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -49,7 +52,7 @@ public final class HiveClientFactory {
 
   private boolean enableKerberos;
   private boolean enableImpersonation = false;
-  private KerberosClient kerberosClient;
+  private HmsKerberosClient kerberosClient;
 
   private final Configuration hadoopConf;
   private final Properties properties;
@@ -108,17 +111,20 @@ public final class HiveClientFactory {
           "Failed to connect to Hive Metastore using cached Hive version {}",
           classLoader.getHiveVersion(),
           e);
-      throw new RuntimeException("Failed to connect to Hive Metastore", e);
+      throw ExceptionMessages.wrap("Failed to connect to Hive Metastore", e);
     }
   }
 
   public HiveClient createHiveClientWithBackend() {
     HiveClient client = null;
     HiveClientClassLoader classloader = null;
+    // Use HiveClientFactory's own ClassLoader as baseLoader so that shared classes
+    // (e.g. HiveClient interface, UserGroupInformation) are resolved consistently
+    // regardless of which thread calls this method (TCCL is not stable across threads).
+    ClassLoader factoryCl = HiveClientFactory.class.getClassLoader();
     try {
       // Try using Hive3 first
-      classloader =
-          HiveClientClassLoader.createLoader(HIVE3, Thread.currentThread().getContextClassLoader());
+      classloader = HiveClientClassLoader.createLoader(HIVE3, factoryCl);
       client = createHiveClientInternal(classloader);
       client.getCatalogs();
       LOG.info("Connected to Hive Metastore using Hive version HIVE3");
@@ -137,10 +143,9 @@ public final class HiveClientFactory {
         // Fallback to Hive2 if we can list databases
         if (e.getMessage().contains("Invalid method name: 'get_catalogs'")
             || e.getMessage().contains("class not found") // caused by MiniHiveMetastoreService
+            || e.getMessage().contains("Cannot find Hive jar directory") // HIVE3 libs dir absent
         ) {
-          classloader =
-              HiveClientClassLoader.createLoader(
-                  HIVE2, Thread.currentThread().getContextClassLoader());
+          classloader = HiveClientClassLoader.createLoader(HIVE2, factoryCl);
           client = createHiveClientInternal(classloader);
           LOG.info("Connected to Hive Metastore using Hive version HIVE2");
           backendClassLoader = classloader;
@@ -162,6 +167,9 @@ public final class HiveClientFactory {
       HiveClientClassLoader.HiveVersion version, Properties properties, ClassLoader classloader)
       throws Exception {
     Class<?> hiveClientImplClass = classloader.loadClass(HiveClientImpl.class.getName());
+    // HiveVersion is a shared class (isSharedClass covers all org.apache.gravitino.* classes),
+    // so the isolated classloader delegates to the base classloader and both sides hold the
+    // same Class object. We can pass HiveVersion.class directly to getConstructor().
     Constructor<?> hiveClientImplCtor =
         hiveClientImplClass.getConstructor(
             HiveClientClassLoader.HiveVersion.class, Properties.class);
@@ -202,6 +210,17 @@ public final class HiveClientFactory {
         return createProxyHiveClientImpl(
             classloader.getHiveVersion(), properties, ugi, classloader);
 
+      } else if (enableKerberos) {
+        // UGI is a shared class (org.apache.hadoop.* delegated to baseLoader), so the system CL
+        // and HiveClientClassLoader share the same UGI static state. The TGT is already stored in
+        // realLoginUgi.subject by kerberosClient.login(). The only thing needed is to bind that
+        // Subject to the current thread so GSSAPI can find the TGT during the HMS Thrift handshake.
+        // UGI.doAs() wraps Subject.doAs() internally — same pattern as ImpalaEngineAdapter.
+        UserGroupInformation realUgi = kerberosClient.getRealLoginUgi();
+        final HiveClientClassLoader.HiveVersion hiveVersion = classloader.getHiveVersion();
+        return realUgi.doAs(
+            (PrivilegedExceptionAction<HiveClient>)
+                () -> createHiveClientImpl(hiveVersion, properties, classloader));
       } else {
         return createHiveClientImpl(classloader.getHiveVersion(), properties, classloader);
       }
@@ -225,11 +244,11 @@ public final class HiveClientFactory {
         return;
       }
 
-      kerberosClient = new KerberosClient(properties, hadoopConf, true, keytabPath);
+      kerberosClient = new HmsKerberosClient(properties, hadoopConf, true, keytabPath);
       kerberosClient.login();
 
     } catch (Exception e) {
-      throw new RuntimeException("Failed to initialize kerberos client", e);
+      throw ExceptionMessages.wrap("Failed to initialize kerberos client", e);
     }
   }
 
@@ -243,6 +262,12 @@ public final class HiveClientFactory {
 
       synchronized (classLoaderLock) {
         if (backendClassLoader != null) {
+          // The backend ClassLoader is a second, nested isolation layer that holds the catalog's
+          // own ClassLoader as its base. Closing it releases its jars but not the references other
+          // threads still hold to it: Hadoop's Shell runs sub-processes, and the JDK's pooled
+          // "process reaper" threads inherit the spawning thread's context ClassLoader, which is a
+          // GC root. Cleaning the nested loader clears those, so both layers become collectable.
+          ClassLoaderResourceCleanerUtils.closeClassLoaderResource(backendClassLoader);
           backendClassLoader.close();
           backendClassLoader = null;
         }

@@ -232,30 +232,41 @@ public class GravitinoPaimonTable extends BaseTable {
     if (properties == null) {
       return Distributions.NONE;
     }
-    String bucketKeys = properties.get(BUCKET_KEY);
-    if (StringUtils.isBlank(bucketKeys)) {
+
+    String bucketKeyStr = properties.get(BUCKET_KEY);
+    String bucketNumStr = properties.get(BUCKET_NUM);
+
+    boolean hasBucketKey = StringUtils.isNotBlank(bucketKeyStr);
+    boolean hasBucket = StringUtils.isNotBlank(bucketNumStr);
+
+    if (!hasBucketKey && !hasBucket) {
       return Distributions.NONE;
     }
-    List<String> bucketKeyList =
-        Arrays.stream(bucketKeys.split(","))
-            .map(String::trim)
-            .filter(StringUtils::isNotBlank)
-            .collect(Collectors.toList());
-    if (bucketKeyList.isEmpty()) {
-      return Distributions.NONE;
+
+    Expression[] expressions = new Expression[0];
+    if (hasBucketKey) {
+      expressions =
+          Arrays.stream(bucketKeyStr.split(","))
+              .map(String::trim)
+              .filter(StringUtils::isNotBlank)
+              .map(NamedReference::field)
+              .toArray(Expression[]::new);
     }
-    Expression[] expressions =
-        bucketKeyList.stream().map(NamedReference::field).toArray(Expression[]::new);
-    String bucketValue = properties.get(BUCKET_NUM);
-    if (StringUtils.isBlank(bucketValue)) {
+
+    if (!hasBucket) {
       return Distributions.auto(Strategy.HASH, expressions);
     }
-    String trimmedBucketValue = bucketValue.trim();
+
     try {
-      return Distributions.hash(Integer.parseInt(trimmedBucketValue), expressions);
+      int parsedBucket = Integer.parseInt(bucketNumStr.trim());
+      if (parsedBucket == -1) {
+        return Distributions.auto(Strategy.HASH, expressions);
+      }
+      return Distributions.hash(parsedBucket, expressions);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          String.format("Paimon bucket number must be a valid integer, but was '%s'.", bucketValue),
+          String.format(
+              "Paimon bucket number must be a valid integer, but was '%s'.", bucketNumStr),
           e);
     }
   }

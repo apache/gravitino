@@ -29,6 +29,13 @@ import org.apache.gravitino.credential.S3TokenCredential;
 public class S3TokenProvider extends CredentialProviderDelegator<S3TokenCredential> {
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "s3".equalsIgnoreCase(scheme)
+        || "s3a".equalsIgnoreCase(scheme)
+        || "s3n".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return S3TokenCredential.S3_TOKEN_CREDENTIAL_TYPE;
   }

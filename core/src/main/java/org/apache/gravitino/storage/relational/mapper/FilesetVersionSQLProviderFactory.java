@@ -69,8 +69,9 @@ public class FilesetVersionSQLProviderFactory {
     return getProvider().softDeleteFilesetVersionsByCatalogId(catalogId);
   }
 
-  public static String softDeleteFilesetVersionsBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteFilesetVersionsBySchemaId(schemaId);
+  public static String softDeleteFilesetVersionsBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteFilesetVersionsBySchemaIds(schemaIds);
   }
 
   public static String softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId) {
@@ -80,6 +81,16 @@ public class FilesetVersionSQLProviderFactory {
   public static String deleteFilesetVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  /**
+   * Returns SQL that finds the highest active snapshot version for a fileset.
+   *
+   * @param filesetId the fileset ID
+   * @return the maximum-version query for the configured database
+   */
+  public static String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
+    return getProvider().selectMaxFilesetVersion(filesetId);
   }
 
   public static String selectFilesetVersionsByRetentionCount(

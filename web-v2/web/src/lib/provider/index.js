@@ -23,13 +23,16 @@ import ClientOnly from './client'
 import AuthProvider from './session'
 import StoreProvider from './store'
 import ThemeProvider from './ThemeProvider'
+import IdleSessionProvider from './IdleSessionProvider'
 
 const ProviderNew = ({ children }) => {
   return (
     <ClientOnly>
       <StoreProvider>
         <AuthProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <IdleSessionProvider>
+            <ThemeProvider>{children}</ThemeProvider>
+          </IdleSessionProvider>
         </AuthProvider>
       </StoreProvider>
     </ClientOnly>

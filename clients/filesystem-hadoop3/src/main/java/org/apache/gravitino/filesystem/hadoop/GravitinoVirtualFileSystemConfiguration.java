@@ -48,14 +48,29 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The authentication type for simple authentication. */
   public static final String SIMPLE_AUTH_TYPE = "simple";
 
+  /** The authentication type for basic authentication. */
+  public static final String BASIC_AUTH_TYPE = "basic";
+
   /** The authentication type for oauth2 authentication. */
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
 
   /** The authentication type for kerberos authentication. */
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
 
+  // basic
+  /** The configuration key prefix for basic authentication. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PREFIX = "fs.gravitino.client.basic.";
+
+  /** The configuration key for the basic authentication username. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_USERNAME_KEY =
+      "fs.gravitino.client.basic.username";
+
+  /** The configuration key for the basic authentication password. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PASSWORD_KEY =
+      "fs.gravitino.client.basic.password";
+
   // oauth2
-  /** The configuration key prefix for oauth2 */
+  /** The configuration key prefix for oauth2. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_PREFIX = "fs.gravitino.client.oauth2.";
 
   /** The configuration key for the URI of the default OAuth server. */
@@ -98,6 +113,10 @@ public class GravitinoVirtualFileSystemConfiguration {
   /**
    * The configuration key for the eviction time of the Gravitino fileset cache, measured in mills
    * after access.
+   *
+   * <p>Note: an evicted {@code FileSystem} is not closed at eviction time; it is closed when the
+   * owning GVFS instance is closed. See <a
+   * href="https://github.com/apache/gravitino/issues/11303">#11303</a>.
    */
   public static final String FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_KEY =
       "fs.gravitino.fileset.cache.evictionMillsAfterAccess";
@@ -108,6 +127,32 @@ public class GravitinoVirtualFileSystemConfiguration {
    */
   public static final long FS_GRAVITINO_FILESET_CACHE_EVICTION_MILLS_AFTER_ACCESS_DEFAULT =
       1000L * 60 * 60;
+
+  /**
+   * Whether to close the underlying {@code FileSystem} immediately on cache eviction. Default is
+   * {@code false}: close is deferred to GVFS shutdown to avoid breaking long-lived streams (see <a
+   * href="https://github.com/apache/gravitino/issues/11303">#11303</a>). Set to {@code true} to
+   * fall back to the legacy behaviour.
+   */
+  public static final String FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_KEY =
+      "fs.gravitino.fileset.cache.closeOnEviction";
+
+  /**
+   * The default value for {@link #FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_KEY}.
+   *
+   * <p><b>Default behavior ({@code false})</b>: FileSystem instances are not closed immediately
+   * when evicted from the cache. Instead, they remain open until the Gravitino Virtual File System
+   * (GVFS) instance is closed. This prevents breaking long-lived streams and connections that might
+   * still be active after cache eviction.
+   *
+   * <p><b>Legacy behavior ({@code true})</b>: FileSystem instances are closed immediately upon
+   * cache eviction. This was the original behavior but can cause issues with active streams.
+   *
+   * <p><b>Recommendation</b>: Keep the default value ({@code false}) unless you have specific
+   * requirements for immediate resource cleanup and are certain that no active streams will be
+   * affected.
+   */
+  public static final boolean FS_GRAVITINO_FILESET_CACHE_CLOSE_ON_EVICTION_DEFAULT = false;
 
   /**
    * The configuration key for the fileset with multiple locations, on which the file system will

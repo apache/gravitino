@@ -22,19 +22,74 @@ from unittest.mock import patch
 
 from gravitino import GravitinoClient
 from gravitino.api.tag import Tag
+from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag_change import TagChange
+from gravitino.client.generic_tag import GenericTag
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
     TagNamesListResponse,
     TagResponse,
 )
+from gravitino.exceptions.base import (
+    IllegalArgumentException,
+    UnsupportedOperationException,
+)
+from gravitino.name_identifier import NameIdentifier
 from tests.unittests import mock_base
 
 
 @mock_base.mock_data
 class TestTagAPI(unittest.TestCase):
     _metalake_name: str = "metalake_demo"
+
+    def test_new_tag_api_compatibility_defaults(self, *mock_method) -> None:
+        class LegacyTag(Tag):
+            def name(self) -> str:
+                return "tagA"
+
+            def comment(self) -> str:
+                return "comment"
+
+            def properties(self) -> dict[str, str]:
+                return {}
+
+            def audit_info(self):
+                return None
+
+            def inherited(self):
+                return None
+
+        class LegacySupportsTags(SupportsTags):
+            def list_tags(self) -> list[str]:
+                return []
+
+            def list_tags_info(self) -> list[Tag]:
+                return []
+
+            def get_tag(self, name: str) -> Tag:
+                return LegacyTag()
+
+            def associate_tags(
+                self, tags_to_add: list[str], tags_to_remove: list[str]
+            ) -> list[str]:
+                return []
+
+        tag = LegacyTag()
+        self.assertIsNone(tag.allowed_values())
+        self.assertIsNone(tag.assignment_values())
+
+        supports_tags = LegacySupportsTags()
+        self.assertEqual([], supports_tags.list_tags_with_visibility().tags())
+        self.assertFalse(
+            supports_tags.list_tags_with_visibility().has_inaccessible_tags()
+        )
+        self.assertEqual([], supports_tags.list_tags_info_with_visibility().tags())
+        self.assertFalse(
+            supports_tags.list_tags_info_with_visibility().has_inaccessible_tags()
+        )
+        with self.assertRaises(UnsupportedOperationException):
+            supports_tags.assign_tags([], [])
 
     def test_client_get_tag(self, *mock_method) -> None:
         with mock_base.mock_tag_methods():
@@ -105,6 +160,25 @@ class TestTagAPI(unittest.TestCase):
             self.assertEqual(1, len(retrieved_tags))
             self.assertTrue("tagA" not in retrieved_tags)
             self.assertTrue("tagB" in retrieved_tags)
+
+    def test_client_create_tag_with_allowed_values(self, *mock_method) -> None:
+        with mock_base.mock_tag_methods():
+            client = GravitinoClient(
+                uri="http://localhost:8090",
+                metalake_name=self._metalake_name,
+                check_version=False,
+            )
+
+            tag = client.create_tag(
+                "data_domain",
+                "Business data domain",
+                None,
+                ["finance", "risk"],
+            )
+
+            self.assertEqual("data_domain", tag.name())
+            self.assertEqual(["finance", "risk"], tag.allowed_values())
+            self.assertIsNone(tag.assignment_values())
 
     def test_client_create_tag(self, *mock_method) -> None:
         with mock_base.mock_tag_methods():
@@ -480,3 +554,157 @@ class TestTagAPI(unittest.TestCase):
         self.assertEqual(left.name(), right.name())
         self.assertEqual(left.comment(), right.comment())
         self.assertEqual(left.properties(), right.properties())
+
+
+@mock_base.mock_data
+class TestObjectTagAPI(unittest.TestCase):
+    """Tests for object-level tag operations on GenericFileset."""  # pylint: disable=protected-access
+
+    _metalake_name: str = "metalake_demo"
+
+    def _load_fileset(self, client):
+        """Helper to load a test fileset."""
+        catalog = client.load_catalog("fileset_catalog")
+        return catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of("tmp", "fileset")
+        )
+
+    def test_fileset_supports_tags(self, *mock_method) -> None:
+        """Test that GenericFileset is an instance of SupportsTags."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+        self.assertIsInstance(fileset, SupportsTags)
+
+    def test_fileset_list_tags(self, *mock_method) -> None:
+        """Test listing tags on a fileset via REST API."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+
+        with patch.object(
+            fileset._object_tag_operations,
+            "list_tags",
+            return_value=["tagA", "tagB"],
+        ):
+            tags = fileset.list_tags()
+            self.assertEqual(2, len(tags))
+            self.assertIn("tagA", tags)
+            self.assertIn("tagB", tags)
+
+    def test_fileset_list_tags_with_visibility(self, *mock_method) -> None:
+        """Test listing visible tag names and authorization-filtering status."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+        response = TagNamesListResponse(0, ["tagA"], True)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_base.mock_http_response(response.to_json()),
+        ):
+            tag_list = fileset.list_tags_with_visibility()
+            self.assertEqual(["tagA"], tag_list.tags())
+            self.assertTrue(tag_list.has_inaccessible_tags())
+
+    def test_fileset_list_tags_info(self, *mock_method) -> None:
+        """Test listing tags with details on a fileset via REST API."""
+        tag_dto = mock_base.build_tag_dto("tagA", "comment A")
+        mock_tag = GenericTag("metalake_demo", tag_dto, None)
+
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+
+        with patch.object(
+            fileset._object_tag_operations,
+            "list_tags_info",
+            return_value=[mock_tag],
+        ):
+            tags = fileset.list_tags_info()
+            self.assertEqual(1, len(tags))
+            self.assertEqual("tagA", tags[0].name())
+            self.assertEqual("comment A", tags[0].comment())
+
+    def test_fileset_list_tags_info_with_visibility(self, *mock_method) -> None:
+        """Test listing visible tag details and authorization-filtering status."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+        response = TagListResponse(0, [mock_base.build_tag_dto("tagA")], True)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_base.mock_http_response(response.to_json()),
+        ):
+            tag_list = fileset.list_tags_info_with_visibility()
+            self.assertEqual(["tagA"], [tag.name() for tag in tag_list.tags()])
+            self.assertTrue(tag_list.has_inaccessible_tags())
+
+    def test_fileset_get_tag(self, *mock_method) -> None:
+        """Test getting a specific tag on a fileset via REST API."""
+        tag_dto = mock_base.build_tag_dto("tagA", "comment A")
+        mock_tag = GenericTag("metalake_demo", tag_dto, None)
+
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+
+        with patch.object(
+            fileset._object_tag_operations,
+            "get_tag",
+            return_value=mock_tag,
+        ):
+            tag = fileset.get_tag("tagA")
+            self.assertEqual("tagA", tag.name())
+            self.assertEqual("comment A", tag.comment())
+
+    def test_fileset_get_tag_with_empty_name(self, *mock_method) -> None:
+        """Test that get_tag raises ValueError for empty tag name."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+
+        with self.assertRaises(IllegalArgumentException):
+            fileset.get_tag(" ")
+
+    def test_fileset_associate_tags(self, *mock_method) -> None:
+        """Test associating and removing tags on a fileset via REST API."""
+        client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+            check_version=False,
+        )
+        fileset = self._load_fileset(client)
+
+        with patch.object(
+            fileset._object_tag_operations,
+            "associate_tags",
+            return_value=["tagA", "tagB"],
+        ) as mock_assoc:
+            result = fileset.associate_tags(["tagA", "tagB"], [])
+            self.assertEqual(2, len(result))
+            self.assertIn("tagA", result)
+            self.assertIn("tagB", result)
+            mock_assoc.assert_called_once_with(["tagA", "tagB"], [])

@@ -1,8 +1,10 @@
 ---
-title: "Installing Apache Hive"
-slug: /getting-started/hive
+title: "Install Apache Hive"
+slug: "/getting-started/hive"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 To install Apache Hive and Hadoop on Google Cloud Platform manually,
 follow [Apache Hive](https://cwiki.apache.org/confluence/display/Hive/) and

@@ -25,9 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.AddColumn;
+import org.apache.gravitino.rel.TableChange.AddIndex;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.TableChange.DeleteColumn;
 import org.apache.gravitino.rel.TableChange.RemoveProperty;
@@ -41,12 +45,47 @@ import org.apache.gravitino.rel.TableChange.UpdateColumnType;
 import org.apache.gravitino.rel.TableChange.UpdateComment;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.indexes.Index.IndexType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTableChange {
+
+  @Test
+  public void testReadableChangeDescriptions() {
+    String[] field = {"nested", "c"};
+    TableChange[] changes = {
+      TableChange.addColumn(field, Types.StringType.get()),
+      TableChange.renameColumn(field, "new_name"),
+      TableChange.updateColumnDefaultValue(field, Literals.stringLiteral("value")),
+      TableChange.updateColumnType(field, Types.LongType.get()),
+      TableChange.updateColumnComment(field, "comment"),
+      TableChange.updateColumnPosition(field, ColumnPosition.first()),
+      TableChange.deleteColumn(field, true),
+      TableChange.updateColumnNullability(field, false),
+      TableChange.updateColumnAutoIncrement(field, true),
+      TableChange.addIndex(IndexType.UNIQUE_KEY, "idx", new String[][] {field}),
+      TableChange.deleteIndex("idx", true)
+    };
+    String[] descriptions = {
+      "ADDCOLUMN nested.c string",
+      "RENAMECOLUMN nested.c TO new_name",
+      "UPDATECOLUMNDEFAULTVALUE nested.c",
+      "UPDATECOLUMNTYPE nested.c TO long",
+      "UPDATECOLUMNCOMMENT nested.c TO comment",
+      "UPDATECOLUMNPOSITION nested.c TO FIRST",
+      "DELETECOLUMN nested.c",
+      "UPDATECOLUMNNULLABILITY nested.c TO false",
+      "UPDATECOLUMNAUTOINCREMENT nested.c TO true",
+      "ADDINDEX idx",
+      "DELETEINDEX idx"
+    };
+    for (int i = 0; i < changes.length; i++) {
+      assertEquals(descriptions[i], changes[i].toString());
+    }
+  }
 
   @Test
   public void testRenameTable() {
@@ -625,5 +664,101 @@ public class TestTableChange {
     assertFalse(columnA.equals(columnB));
     assertFalse(columnB.equals(columnA));
     assertNotEquals(columnA.hashCode(), columnB.hashCode());
+  }
+
+  @Test
+  void testAddIndexWithoutProperties() {
+    IndexType type = IndexType.PRIMARY_KEY;
+    String name = "pk_index";
+    String[][] fieldNames = new String[][] {{"col1"}};
+    AddIndex addIndex = (AddIndex) TableChange.addIndex(type, name, fieldNames);
+
+    assertEquals(type, addIndex.getType());
+    assertEquals(name, addIndex.getName());
+    assertArrayEquals(fieldNames, addIndex.getFieldNames());
+    assertEquals(Collections.emptyMap(), addIndex.getProperties());
+  }
+
+  @Test
+  void testAddIndexWithProperties() {
+    IndexType type = IndexType.DATA_SKIPPING_BLOOM_FILTER;
+    String name = "bf_idx";
+    String[][] fieldNames = new String[][] {{"col_a"}};
+    Map<String, String> properties = new HashMap<>();
+    properties.put("granularity", "5");
+    properties.put("bloom_filter_bytes", "64");
+
+    AddIndex addIndex = (AddIndex) TableChange.addIndex(type, name, fieldNames, properties);
+
+    assertEquals(type, addIndex.getType());
+    assertEquals(name, addIndex.getName());
+    assertArrayEquals(fieldNames, addIndex.getFieldNames());
+    assertEquals(properties, addIndex.getProperties());
+  }
+
+  @Test
+  void testAddIndexWithNullProperties() {
+    AddIndex addIndex =
+        (AddIndex)
+            TableChange.addIndex(
+                IndexType.DATA_SKIPPING_MINMAX, "mm_idx", new String[][] {{"col1"}}, null);
+
+    assertEquals(Collections.emptyMap(), addIndex.getProperties());
+    // null safety: calling getProperties() should never throw
+    assertEquals(0, addIndex.getProperties().size());
+  }
+
+  @Test
+  void testAddIndexWithEmptyProperties() {
+    AddIndex addIndex =
+        (AddIndex)
+            TableChange.addIndex(
+                IndexType.DATA_SKIPPING_SET,
+                "set_idx",
+                new String[][] {{"col1"}},
+                Collections.emptyMap());
+
+    assertEquals(Collections.emptyMap(), addIndex.getProperties());
+  }
+
+  @Test
+  void testAddIndexEqualsHashCode() {
+    String[][] fields = new String[][] {{"col1"}};
+    Map<String, String> props1 = Collections.singletonMap("granularity", "1");
+    Map<String, String> props5 = Collections.singletonMap("granularity", "5");
+
+    AddIndex a1 = (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "a", fields);
+    AddIndex a2 = (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "a", fields);
+    AddIndex a3 =
+        (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "a", fields, props1);
+    AddIndex a4 =
+        (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "a", fields, props1);
+    AddIndex a5 =
+        (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "a", fields, props5);
+    AddIndex b = (AddIndex) TableChange.addIndex(IndexType.DATA_SKIPPING_MINMAX, "b", fields);
+
+    // Reflexivity
+    assertEquals(a1, a1);
+    assertEquals(a1.hashCode(), a1.hashCode());
+
+    // Equality: same params (no props) → equal
+    assertEquals(a1, a2);
+    assertEquals(a1.hashCode(), a2.hashCode());
+
+    // Equality: same params + same props → equal
+    assertEquals(a3, a4);
+    assertEquals(a3.hashCode(), a4.hashCode());
+
+    // Inequality: same params, different props → not equal
+    assertNotEquals(a3, a5);
+
+    // Inequality: no props vs with props → not equal
+    assertNotEquals(a1, a3);
+
+    // Inequality: different name → not equal
+    assertNotEquals(a1, b);
+
+    // Null safety
+    assertFalse(a1.equals(null));
   }
 }

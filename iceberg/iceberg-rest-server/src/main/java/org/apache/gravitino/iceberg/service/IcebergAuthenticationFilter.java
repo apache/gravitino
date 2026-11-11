@@ -40,6 +40,10 @@ public class IcebergAuthenticationFilter extends AuthenticationFilter {
 
   private static final ObjectMapper MAPPER = IcebergObjectMapper.getInstance();
 
+  public IcebergAuthenticationFilter() {
+    healthCheckMatcher = new IcebergHealthCheckPathMatcher();
+  }
+
   @Override
   protected void sendAuthErrorResponse(HttpServletResponse response, Exception exception)
       throws IOException {

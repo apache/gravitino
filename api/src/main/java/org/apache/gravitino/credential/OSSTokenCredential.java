@@ -133,6 +133,6 @@ public class OSSTokenCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(sessionToken), "OSS session token should not be empty");
     Preconditions.checkArgument(
-        expireTimeInMs > 0, "The expire time of OSSTokenCredential should great than 0");
+        expireTimeInMs > 0, "The expiration time of OSSTokenCredential should be greater than 0");
   }
 }

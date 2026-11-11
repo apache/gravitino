@@ -33,23 +33,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
+import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockserver.integration.ClientAndServer;
+import org.mockserver.model.HttpError;
 import org.mockserver.model.HttpRequest;
 import org.mockserver.model.HttpResponse;
 
@@ -96,6 +101,34 @@ public class TestHTTPClient {
     testHttpMethodOnSuccess(Method.PUT, true, true);
   }
 
+  /** Verifies ambiguous PUT connection failures can be surfaced without an automatic resend. */
+  @Test
+  public void testPutRetryTimes() throws Exception {
+    for (int retryTimes : new int[] {0, 1, 2}) {
+      String path = "put-dropped-connection-" + retryTimes;
+      HttpRequest expected = request("/" + path).withMethod("PUT");
+      mockServer.when(expected).error(HttpError.error().withDropConnection(true));
+      try (RESTClient client =
+          HTTPClient.builder(
+                  ImmutableMap.of(
+                      GravitinoClientConfiguration.CLIENT_RETRY_TIMES,
+                      Integer.toString(retryTimes)))
+              .uri("http://127.0.0.1:" + mockServer.getPort())
+              .build()) {
+        Assertions.assertThrows(
+            RESTException.class,
+            () ->
+                client.put(
+                    path,
+                    new Item(1L, "stats"),
+                    Item.class,
+                    ImmutableMap.of(),
+                    mock(ErrorHandler.class)));
+      }
+      Assertions.assertEquals(retryTimes + 1, mockServer.retrieveRecordedRequests(expected).length);
+    }
+  }
+
   @Test
   public void testPutFailure() throws Exception {
     testHttpMethodOnFailure(Method.PUT, true, true);
@@ -109,6 +142,71 @@ public class TestHTTPClient {
   @Test
   public void testGetFailure() throws Exception {
     testHttpMethodOnFailure(Method.GET, false, true);
+  }
+
+  @Test
+  public void testRawRequestAndResponseBodies() throws Exception {
+    String importPath = "raw_import";
+    String yaml = "version: 0.2.0.dev0\nname: sales\n";
+    Item responseBody = new Item(1L, "imported");
+    ErrorHandler onError = mock(ErrorHandler.class);
+    doThrow(new RuntimeException("Failure response")).when(onError).accept(any());
+
+    mockServer
+        .when(
+            request("/" + importPath)
+                .withMethod(Method.POST.name())
+                .withHeader(HttpHeaders.CONTENT_TYPE, "application/yaml")
+                .withBody(yaml.getBytes(StandardCharsets.UTF_8)))
+        .respond(response().withStatusCode(200).withBody(MAPPER.writeValueAsString(responseBody)));
+
+    Item imported =
+        restClient.postRaw(
+            importPath, yaml, "application/yaml", Item.class, Collections.emptyMap(), onError);
+    Assertions.assertEquals(responseBody, imported);
+
+    String exportPath = "raw_export";
+    String exported = "version: 0.2.0.dev0\nname: exported\n";
+    mockServer
+        .when(
+            request("/" + exportPath)
+                .withMethod(Method.GET.name())
+                .withQueryStringParameter("format", "yaml")
+                .withHeader(HttpHeaders.ACCEPT, "application/yaml"))
+        .respond(
+            response()
+                .withStatusCode(200)
+                .withHeader(HttpHeaders.CONTENT_TYPE, "application/yaml")
+                .withBody(exported));
+
+    String actual =
+        restClient.getRaw(
+            exportPath,
+            Collections.singletonMap("format", "yaml"),
+            Collections.singletonMap(HttpHeaders.ACCEPT, "application/yaml"),
+            onError);
+    Assertions.assertEquals(exported, actual);
+    verify(onError, never()).accept(any());
+  }
+
+  @Test
+  public void testRawPostRejectsInvalidBodyMetadata() {
+    ErrorHandler onError = mock(ErrorHandler.class);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            restClient.postRaw(
+                "raw_import",
+                null,
+                "application/yaml",
+                Item.class,
+                Collections.emptyMap(),
+                onError));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            restClient.postRaw(
+                "raw_import", "document", " ", Item.class, Collections.emptyMap(), onError));
   }
 
   @Test
@@ -351,6 +449,57 @@ public class TestHTTPClient {
       Assertions.assertInstanceOf(SocketTimeoutException.class, throwable.getCause());
       Assertions.assertEquals("Read timed out", throwable.getCause().getMessage());
     }
+  }
+
+  @Test
+  public void testConnectionRefusedThrowsMeaningfulException() {
+    GravitinoAdminClient client = GravitinoAdminClient.builder("http://localhost:1").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to connect to Gravitino server"),
+        exception.getMessage());
+
+    Assertions.assertTrue(exception.getMessage().contains("localhost"), exception.getMessage());
+  }
+
+  @Test
+  public void testUnresolvableHostThrowsMeaningfulException() {
+    GravitinoAdminClient client =
+        GravitinoAdminClient.builder("http://bad-host-that-does-not-exist.invalid:9090").build();
+
+    RESTException exception =
+        Assertions.assertThrows(RESTException.class, () -> client.listMetalakes());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Cannot resolve Gravitino server host"),
+        exception.getMessage());
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("bad-host-that-does-not-exist.invalid"),
+        exception.getMessage());
+  }
+
+  @Test
+  public void testInvalidBaseUriFailsBeforeHttpClientExecute() {
+    HTTPClient client = HTTPClient.builder(Collections.emptyMap()).uri("http://").build();
+
+    RESTException exception =
+        Assertions.assertThrows(
+            RESTException.class,
+            () ->
+                client.get(
+                    "api/metalakes/test",
+                    MetalakeResponse.class,
+                    Collections.emptyMap(),
+                    ErrorHandlers.metalakeErrorHandler()));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("Failed to create request URI")
+            || exception.getMessage().contains("Invalid Gravitino server URI"),
+        "Unexpected exception message: " + exception.getMessage());
   }
 
   public static void testHttpMethodOnSuccess(

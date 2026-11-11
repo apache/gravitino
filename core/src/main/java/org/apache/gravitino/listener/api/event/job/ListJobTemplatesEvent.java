@@ -21,20 +21,44 @@ package org.apache.gravitino.listener.api.event.job;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /** Represents an event that is triggered upon the successful listing of job templates. */
 @DeveloperApi
-public final class ListJobTemplatesEvent extends JobTemplateEvent {
+public final class ListJobTemplatesEvent extends JobTemplateEvent implements ListEvent {
+
+  private final int count;
 
   /**
    * Constructs an instance of {@code ListJobTemplatesEvent}.
    *
    * @param user The username of the individual who initiated the job template listing.
    * @param metalake The namespace from which job templates were listed.
+   * @param count The number of job templates returned by the list operation.
    */
-  public ListJobTemplatesEvent(String user, String metalake) {
+  public ListJobTemplatesEvent(String user, String metalake, int count) {
     super(user, NameIdentifier.of(metalake));
+    this.count = count;
+  }
+
+  /**
+   * Constructs an instance of {@code ListJobTemplatesEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the job template listing.
+   * @param metalake The namespace from which job templates were listed.
+   * @deprecated Use {@link #ListJobTemplatesEvent(String, String, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListJobTemplatesEvent(String user, String metalake) {
+    this(user, metalake, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

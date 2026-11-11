@@ -74,6 +74,21 @@ public interface Type {
     /** The binary type with variable length. The length is specified in the type itself. */
     BINARY,
     /**
+     * The variant type. A variant holds semi-structured data whose shape is not fixed by the
+     * schema.
+     */
+    VARIANT,
+    /**
+     * The geometry type. A geometry holds a geospatial shape (WKB-encoded) on a planar coordinate
+     * reference system.
+     */
+    GEOMETRY,
+    /**
+     * The geography type. A geography holds a geospatial shape (WKB-encoded) on a spheroidal
+     * coordinate reference system, with an edge-interpolation algorithm.
+     */
+    GEOGRAPHY,
+    /**
      * The struct type. A struct type is a complex type that contains a set of named fields, each
      * with a type, and optionally a comment.
      */

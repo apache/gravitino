@@ -107,6 +107,6 @@ public class S3SecretKeyCredential implements Credential {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(secretAccessKey), "S3 secret access key should not empty");
     Preconditions.checkArgument(
-        expireTimeInMs == 0, "The expire time of S3SecretKeyCredential is not 0");
+        expireTimeInMs == 0, "The expiration time of S3SecretKeyCredential is not 0");
   }
 }

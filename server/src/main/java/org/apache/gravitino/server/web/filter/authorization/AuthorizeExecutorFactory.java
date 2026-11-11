@@ -23,6 +23,7 @@ import java.util.Optional;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
+import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 
 public class AuthorizeExecutorFactory {
 
@@ -35,17 +36,31 @@ public class AuthorizeExecutorFactory {
       Parameter[] parameters,
       Object[] args,
       String secondaryExpression,
-      String secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      String allowCheckExistenceExpression) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
       case ASSOCIATE_TAG -> new AssociateTagAuthorizationExecutor(
           expression, parameters, args, metadataContext, pathParams, entityType);
-      case ASSOCIATE_POLICY -> new AssociatePolicyAuthorizationExecutor(
-          expression, parameters, args, metadataContext, pathParams, entityType);
       case RUN_JOB -> new RunJobAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
+      case LINEAGE -> new LineageAuthorizationExecutor(parameters, args, expression);
       case LOAD_TABLE -> new LoadTableAuthorizationExecutor(
+          parameters,
+          args,
+          expression,
+          metadataContext,
+          pathParams,
+          entityType,
+          secondaryExpression,
+          secondaryExpressionCondition,
+          allowCheckExistenceExpression);
+      case LOAD_VIEW -> new LoadViewAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, allowCheckExistenceExpression);
+      case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
+          parameters, args, expression, metadataContext, pathParams, entityType);
+      case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(
           parameters,
           args,
           expression,

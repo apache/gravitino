@@ -24,7 +24,10 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.iceberg.MetastoreRegisterTableUtils;
+import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.inmemory.InMemoryCatalog;
 
 public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
@@ -38,9 +41,34 @@ public class MemoryCatalogWithMetadataLocationSupport extends InMemoryCatalog
     loadFields();
   }
 
+  /**
+   * Registers a table from an existing metadata file, optionally overwriting an existing
+   * registration.
+   *
+   * @param identifier table identifier to register
+   * @param metadataFileLocation location of the metadata file to register
+   * @param overwrite whether to overwrite an existing table registration
+   * @return the registered table
+   */
+  @Override
+  public Table registerTable(
+      TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
+  }
+
   @Override
   public String metadataLocation(TableIdentifier tableIdentifier) {
     return tableStore.get(tableIdentifier);
+  }
+
+  private void overwriteMetadataLocation(
+      TableIdentifier tableIdentifier, String oldMetadataLocation, String newMetadataLocation) {
+    if (!tableStore.replace(tableIdentifier, oldMetadataLocation, newMetadataLocation)) {
+      throw new CommitFailedException(
+          "Cannot overwrite table %s metadata location from %s to %s",
+          tableIdentifier, oldMetadataLocation, newMetadataLocation);
+    }
   }
 
   private void loadFields() {

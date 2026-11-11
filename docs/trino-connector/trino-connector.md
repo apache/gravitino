@@ -1,9 +1,11 @@
 ---
-title: "Apache Gravitino Trino connector"
-slug: /trino-connector/trino-connector
-keyword: gravitino connector trino
+title: "Trino Connector"
+slug: "/trino-connector/trino-connector"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
+
+## Introduction
 
 Trino can manage and access data using the Trino connector provided by `Apache Gravitino`, commonly referred to as the `Gravitino Trino connector`.
 After configuring the Gravitino Trino connector in Trino, Trino can automatically load catalog metadata from Gravitino, allowing users to directly access these catalogs in Trino.

@@ -29,12 +29,38 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
-  implementation(libs.hadoop2.common) {
+  // Only needed to compile HiveShimV3 against the shared HiveShim base class, Gravitino's own
+  // Column/HiveTable types (HiveTable extends core's BaseTable) and RandomNameUtils; compileOnly
+  // keeps these classes out of the shaded runtime jar produced by copyDepends.
+  compileOnly(project(":catalogs:hive-metastore-common"))
+  compileOnly(project(":api"))
+  compileOnly(project(":common"))
+  compileOnly(project(":core"))
+  compileOnly(libs.slf4j.api)
+
+  // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
+  constraints {
+    implementation(libs.thrift)
+    implementation(libs.snappy.java)
+    implementation(libs.commons.beanutils)
+    implementation(libs.woodstox.core)
+    // Not a new dependency: hadoop-common, hadoop-auth, Curator and the Hive shims already bring
+    // ZooKeeper transitively, resolved to 3.6.3 (end of life). Gravitino does not use ZooKeeper; only
+    // Hadoop/Hive code paths that Gravitino does not call (HA failover, ZooKeeper token stores and
+    // discovery) reference it. This constraint only upgrades the version that is shipped.
+    implementation(libs.zookeeper)
+    implementation(libs.zookeeper.jute)
+  }
+
+  implementation(libs.hadoop3.common) {
     exclude(group = "ch.qos.logback")
+    exclude(group = "ch.qos.reload4j")
     exclude(group = "com.fasterxml.jackson.core")
+    exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")
     exclude(group = "com.google.code.findbugs")
     exclude(group = "com.google.guava")
+    exclude(group = "com.sun.jersey")
     exclude(group = "log4j")
     exclude(group = "net.java.dev.jets3t")
     exclude(group = "org.apache.avro")
@@ -58,7 +84,9 @@ dependencies {
     exclude(group = "javax.transaction", module = "transaction-api")
     exclude(group = "junit")
     exclude(group = "org.apache.ant")
+    exclude(group = "org.apache.arrow")
     exclude(group = "org.apache.avro")
+    exclude(group = "org.apache.derby")
     exclude(group = "org.apache.hadoop", module = "hadoop-yarn-server-resourcemanager")
     exclude(group = "org.apache.hbase")
     exclude(group = "org.apache.logging.log4j")
@@ -68,6 +96,22 @@ dependencies {
     exclude(group = "org.openjdk.jol")
     exclude(group = "org.slf4j")
   }
+
+  // compileOnly is not inherited by the test compile classpath, so the same set of Gravitino
+  // modules used to compile HiveShimV3 needs to be redeclared for the test sources.
+  testImplementation(project(":catalogs:hive-metastore-common"))
+  testImplementation(project(":catalogs:catalog-common"))
+  testImplementation(project(":api"))
+  testImplementation(project(":common"))
+  testImplementation(project(":core"))
+  testImplementation(libs.slf4j.api)
+  testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
+  testRuntimeOnly(libs.junit.jupiter.engine)
+}
+
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform()
 }
 
 tasks {

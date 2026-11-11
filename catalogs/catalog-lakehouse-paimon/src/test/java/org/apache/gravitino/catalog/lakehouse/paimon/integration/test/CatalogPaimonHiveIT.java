@@ -19,6 +19,8 @@
 package org.apache.gravitino.catalog.lakehouse.paimon.integration.test;
 
 import com.google.common.collect.Maps;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -26,7 +28,16 @@ import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.paimon.catalog.Catalog;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -59,6 +70,86 @@ public class CatalogPaimonHiveIT extends CatalogPaimonBaseIT {
     catalogProperties.put(PaimonCatalogPropertiesMetadata.URI, URI);
 
     return catalogProperties;
+  }
+
+  @Override
+  protected void initSparkEnv() {
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("Paimon Catalog integration test")
+            .config("spark.sql.catalog.paimon", "org.apache.paimon.spark.SparkCatalog")
+            .config("spark.sql.catalog.paimon.metastore", "hive")
+            .config("spark.sql.catalog.paimon.uri", URI)
+            .config("spark.sql.catalog.paimon.warehouse", WAREHOUSE)
+            .config("spark.sql.catalog.paimon.cache-enabled", "false")
+            .config(
+                "spark.sql.extensions",
+                "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions")
+            .enableHiveSupport()
+            .getOrCreate();
+  }
+
+  @Test
+  @Override
+  void testSparkCreateViewAndLoadByGravitino() {
+    NameIdentifier baseTableIdentifier =
+        createSimplePaimonTableForViewInterop("spark_create_view_source_table");
+    String viewName = GravitinoITUtils.genRandomName("spark_create_view");
+    String viewIdentifier = String.join(".", schemaName, viewName);
+    String tableIdentifier = String.join(".", schemaName, baseTableIdentifier.name());
+
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+    spark.sql(
+        String.format(
+            "CREATE VIEW paimon.%s AS SELECT id, name FROM paimon.%s",
+            viewIdentifier, tableIdentifier));
+
+    View loadedView = viewCatalog.loadView(NameIdentifier.of(schemaName, viewName));
+    Assertions.assertEquals(viewName, loadedView.name());
+    Assertions.assertEquals(2, loadedView.columns().length);
+    Assertions.assertEquals("id", loadedView.columns()[0].name());
+    Assertions.assertEquals("name", loadedView.columns()[1].name());
+    Assertions.assertTrue(loadedView.representations().length > 0);
+  }
+
+  @Test
+  @Override
+  void testGravitinoCreateViewAndReadBySpark() {
+    NameIdentifier baseTableIdentifier =
+        createSimplePaimonTableForViewInterop("gravitino_create_view_source_table");
+    String viewName = GravitinoITUtils.genRandomName("gravitino_create_view");
+    NameIdentifier viewIdentifier = NameIdentifier.of(schemaName, viewName);
+
+    String query =
+        String.format("SELECT id, name FROM paimon.%s.%s", schemaName, baseTableIdentifier.name());
+    Representation[] representations =
+        new Representation[] {
+          SQLRepresentation.builder().withDialect("query").withSql(query).build(),
+          SQLRepresentation.builder().withDialect("spark").withSql(query).build()
+        };
+    ViewCatalog viewCatalog = catalog.asViewCatalog();
+
+    viewCatalog.createView(
+        viewIdentifier,
+        "view_for_spark_read",
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id column"),
+          Column.of("name", Types.StringType.get(), "name column")
+        },
+        representations,
+        "paimon",
+        schemaName,
+        Collections.emptyMap());
+
+    Dataset<Row> rows =
+        spark.sql(String.format("SELECT * FROM paimon.%s.%s ORDER BY id", schemaName, viewName));
+    List<Row> results = rows.collectAsList();
+    Assertions.assertEquals(2, results.size());
+    Assertions.assertEquals(1, results.get(0).getInt(0));
+    Assertions.assertEquals("name_1", results.get(0).getString(1));
+    Assertions.assertEquals(2, results.get(1).getInt(0));
+    Assertions.assertEquals("name_2", results.get(1).getString(1));
   }
 
   @Test

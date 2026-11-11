@@ -50,3 +50,66 @@ class PlainRESTClientTableOperation(TableOperation):
             f"/tables/{encode_path_segment(table_name)}"
         )
         return extract_content_from_response(response, "table", {})
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        properties: dict,
+        partitioning: list = None,
+        distribution: dict = None,
+        sort_orders: list = None,
+        indexes: list = None,
+    ) -> str:
+        request = {
+            "name": name,
+            "comment": comment,
+            "columns": columns,
+            "properties": properties,
+        }
+        optional_fields = {
+            "partitioning": partitioning,
+            "distribution": distribution,
+            "sortOrders": sort_orders,
+            "indexes": indexes,
+        }
+        request.update({k: v for k, v in optional_fields.items() if v})
+        response = await self.rest_client.post(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}/tables",
+            json=request,
+        )
+        return extract_content_from_response(response, "table", {})
+
+    async def alter_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        updates: list,
+    ) -> str:
+        response = await self.rest_client.put(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}",
+            json={"updates": updates},
+        )
+        return extract_content_from_response(response, "table", {})
+
+    async def drop_table(
+        self, catalog_name: str, schema_name: str, table_name: str, purge: bool
+    ) -> str:
+        response = await self.rest_client.delete(
+            f"/api/metalakes/{encode_path_segment(self.metalake_name)}"
+            f"/catalogs/{encode_path_segment(catalog_name)}"
+            f"/schemas/{encode_path_segment(schema_name)}"
+            f"/tables/{encode_path_segment(table_name)}",
+            params={"purge": purge},
+        )
+        return extract_content_from_response(response, "dropped", False)

@@ -18,15 +18,25 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
 
 /** This class use Apache Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
+
+  @Override
+  protected Map<String, String> getExtraSparkConfigs() {
+    // This class deliberately exercises the legacy Hive backend without a discoverable Iceberg
+    // REST endpoint (useDynamicIcebergRestConfigProvider() is false), so routing must be disabled
+    // explicitly.
+    return ImmutableMap.of(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED, "false");
+  }
 
   @Override
   protected Map<String, String> getCatalogConfigs() {
@@ -41,6 +51,7 @@ public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatal
     catalogProperties.put(
         IcebergConstants.TABLE_METADATA_CACHE_IMPL,
         "org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache");
+    catalogProperties.put(IcebergConstants.IO_IMPL, "org.apache.iceberg.hadoop.HadoopFileIO");
 
     return catalogProperties;
   }

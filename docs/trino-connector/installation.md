@@ -1,28 +1,30 @@
 ---
-title: "Apache Gravitino Trino connector installation"
-slug: /trino-connector/installation
-keyword: gravitino connector trino
+title: "Install the Trino Connector"
+slug: "/trino-connector/installation"
+keyword: "gravitino connector trino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
+## Introduction
+
 To install the Apache Gravitino Trino connector, you should first deploy the Trino environment, and then install the Gravitino Trino connector plugin into Trino.
-Please refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
+Refer to the [Deploying Trino documentation](https://trino.io/docs/current/installation/deployment.html) and do the following steps:
 
 The examples in this document use Trino `469` by default.
 
-## Get the connector package
+## Get the Connector Package
 
 Gravitino provides different Trino connector packages for different Trino version segments.
-You need to choose the package by your Trino server version first.
+Choose the package by your Trino server version first.
 
 | Trino server version | Connector package segment |
 |----------------------|---------------------------|
-| 435-439              | `trino-connector-435-439` |
-| 440-445              | `trino-connector-440-445` |
-| 446-451              | `trino-connector-446-451` |
-| 452-468              | `trino-connector-452-468` |
 | 469-472              | `trino-connector-469-472` |
-| 473-478              | `trino-connector-473-478` |
+| 473-477              | `trino-connector-473-477` |
+| 478-479              | `trino-connector-478-479` |
+| 480                  | `trino-connector-480`     |
+| 481                  | `trino-connector-481`     |
+| 482-483              | `trino-connector-482-483` |
 
 For Trino `469`, choose the `trino-connector-469-472` package.
 
@@ -34,7 +36,7 @@ For example:
 
 `gravitino-trino-connector-469-472-<version>.tar.gz`
 
-You can get the package in the following ways:
+Get the package in the following ways:
 
 1. Download a released package from [GitHub Releases](https://github.com/apache/gravitino/releases). For Trino `469`, download the `469-472` package:
 
@@ -57,13 +59,12 @@ After unpacking, you can see the connector directory:
 
 `gravitino-trino-connector-469-472-<version>`
 
-## Install the connector package
+## Install the Connector Package
 
 1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
 2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
-3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino Trino connector.
-4. Update Trino coordinator configuration. 
+3. Update Trino coordinator configuration.
    You need to set `catalog.management=dynamic`, The config location is `Trino-server-<version>/etc/config.properties`,  and the contents like:
 
 ```text
@@ -76,11 +77,11 @@ discovery.uri=http://0.0.0.0:8080
 
 ## Example
 
-You can install the Gravitino Trino connector in Trino office docker images step by step.
+Install the Gravitino Trino connector into the official Trino Docker image.
 
-### Running the container
+### Run the Container
 
-Use the docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
+Use the Docker command to create a container from the `trinodb/trino` image. Assign it the trino-gravitino name.
 Run it in the background, and map the default Trino port, which is 8080, from inside the container to port 8080 on your machine.
 
 ```shell
@@ -90,7 +91,7 @@ docker run --name trino-gravitino -d -p 8080:8080 trinodb/trino:469
 Run `docker ps` to check whether the container is running.
 
 
-### Installing the Apache Gravitino Trino connector
+### Install the Trino Connector
 
 Download the Gravitino Trino connector tarball for Trino `469` and unpack it.
 
@@ -100,7 +101,7 @@ wget https://github.com/apache/gravitino/releases/download/<version>/gravitino-t
 tar -zxvf gravitino-trino-connector-469-472-<version>.tar.gz
 ```
 
-You can see the connector directory `gravitino-trino-connector-469-472-<version>` after unpacking.
+See the connector directory `gravitino-trino-connector-469-472-<version>` after unpacking.
 
 Rename the connector directory to `gravitino`, then copy it to the Trino container's plugin directory.
 
@@ -118,9 +119,9 @@ cd /lib/trino/plugin
 
 Now you can see the Gravitino Trino connector directory in the plugin directory.
 
-### Configuring the Trino
+### Configure Trino
 
-You can find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
+Find the Trino configuration file `config.properties` in the directory `/etc/trino`. You need changed the file like this:
 
 ```text
 #single node install config
@@ -131,9 +132,9 @@ discovery.uri=http://localhost:8080
 catalog.management=dynamic
 ```
 
-### Configuring the Apache Gravitino Trino connector
+### Configure the Trino Connector
 
-Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, please refer to the [Gravitino getting started](../getting-started/index.md).
+Assuming you have now started the Gravitino server on the host `gravitino-server-host` and already created a metalake named `test`, if those have not been prepared, refer to the [Gravitino getting started](../getting-started/index.md).
 
 To configure Gravitino Trino connector correctly, you need to put the following configurations to the Trino configuration file `/etc/trino/catalog/gravitino.properties`.
 
@@ -144,10 +145,15 @@ gravitino.metalake=test
 ```
 
 - The `gravitino.name` defines which Gravitino Trino connector is used. It must be `gravitino`.
-- The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
+- The `gravitino.metalake` defines which metalake is used. It should exist in the Gravitino server. It is optional: when omitted, the catalogs of every metalake are loaded, see [configuration](./configuration.md).
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 
 Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
+
+If the Gravitino server requires authentication, Iceberg catalogs routed through the Iceberg REST
+server need OAuth2, because Trino's Iceberg REST client does not support Basic or Kerberos. Set
+`gravitino.iceberg.rest-catalog.security=OAUTH2` and its `oauth2.*` properties; see
+[Authenticating to the Iceberg REST Server](./catalog-iceberg.md#authenticating-to-the-iceberg-rest-server).
 
 If you haven't created the metalake named `test`, you can use the following command to create it.
 
@@ -161,7 +167,7 @@ And then restart the Trino container to load the Gravitino Trino connector.
 docker restart trino-gravitino
 ```
 
-### Verifying the Apache Gravitino Trino connector
+### Verify the Trino Connector
 
 Use the Trino CLI to connect to the Trino container and run a query.
 
@@ -178,9 +184,9 @@ tpch
 system
 ```
 
-You can see the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
+See the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or please refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or refer to [Create a Catalog](../manage-catalogs-and-schemas.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
 docker exec -it trino-gravitino trino

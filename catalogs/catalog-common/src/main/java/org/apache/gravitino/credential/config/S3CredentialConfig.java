@@ -83,6 +83,20 @@ public class S3CredentialConfig extends Config {
           .stringConf()
           .create();
 
+  /**
+   * Internal flag, determined by the catalog type rather than configured by users. When set, the
+   * vended {@code s3:ListBucket} statement also allows the bare location prefix, so a
+   * directory-root {@code getFileStatus} returns 404 instead of 403, at the cost of allowing
+   * enumeration of sibling keys sharing the location prefix.
+   */
+  public static final ConfigEntry<Boolean> S3_LIST_LOCATION_PREFIX =
+      new ConfigBuilder(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX)
+          .doc("Whether the vended s3:ListBucket statement also allows the bare location prefix")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .internal()
+          .booleanConf()
+          .createWithDefault(false);
+
   public S3CredentialConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, k -> true);
@@ -117,5 +131,9 @@ public class S3CredentialConfig extends Config {
 
   public String stsEndpoint() {
     return this.get(S3_STS_ENDPOINT);
+  }
+
+  public boolean listLocationPrefix() {
+    return this.get(S3_LIST_LOCATION_PREFIX);
   }
 }

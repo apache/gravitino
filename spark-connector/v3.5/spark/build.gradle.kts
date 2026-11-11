@@ -16,6 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import com.diffplug.gradle.spotless.SpotlessExtension
+
 plugins {
   `maven-publish`
   id("java")
@@ -27,15 +29,56 @@ repositories {
   mavenCentral()
 }
 
+val glueHiveJarsDir: String? = project(":spark-connector").extra["glueHiveJarsDir"] as String?
+
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
-val icebergVersion: String = libs.versions.iceberg4connector.get()
+val icebergVersion: String = libs.versions.iceberg4spark35.get()
 val paimonVersion: String = libs.versions.paimon.get()
 val kyuubiVersion: String = libs.versions.kyuubi4spark.get()
 val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
+
+// The connector's shared sources are compiled here rather than consumed as a jar, so that every
+// supported Spark version builds them against its own API. `spark35` holds the one thing a Spark 4
+// build cannot compile: the Paimon package, which has no paimon-spark-4.x artifact at the Paimon
+// version this repository pins.
+val sparkCommonDir = project(":spark-connector").projectDir.resolve("spark-common")
+
+sourceSets {
+  named("main") {
+    java {
+      setSrcDirs(
+        listOf(
+          "$sparkCommonDir/src/main/java",
+          "$sparkCommonDir/src/main/spark35",
+          "src/main/java"
+        )
+      )
+    }
+    resources {
+      setSrcDirs(listOf("src/main/resources"))
+    }
+  }
+  named("test") {
+    java {
+      setSrcDirs(
+        listOf(
+          "$sparkCommonDir/src/test/java",
+          "src/test/java"
+        )
+      )
+    }
+    resources {
+      // Only this module's test resources. spark-common's test resources were never packaged
+      // either: the golden-file suites read spark-test.conf, test-sqls and data from the source
+      // tree via GRAVITINO_ROOT_DIR, and its log4j2.properties would collide with this one.
+      setSrcDirs(listOf("src/test/resources"))
+    }
+  }
+}
 
 if (hasProperty("excludePackagesForSparkConnector")) {
   @Suppress("UNCHECKED_CAST")
@@ -43,22 +86,54 @@ if (hasProperty("excludePackagesForSparkConnector")) {
   configureFunc?.invoke(project)
 }
 
+// The source dirs above reach outside this project, and Spotless rejects cross-project targets.
+// The shared tree is formatted by the :spark-connector project that owns it, so scope Spotless here
+// to this module's own sources. Same approach as the trino-connector version modules.
+plugins.withId("com.diffplug.spotless") {
+  configure<SpotlessExtension> {
+    java {
+      target(project.fileTree("src") { include("**/*.java") })
+    }
+  }
+}
+
 dependencies {
-  implementation(project(":spark-connector:spark-3.4"))
-  implementation(project(":spark-connector:spark-common"))
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(project(":bundles:aws")) {
+    exclude("*")
+  }
+  implementation(libs.guava)
+  implementation(libs.caffeine)
+
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
+  compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
+  compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly(libs.lance.namespace.apache.client)
+  compileOnly(libs.aws.glue)
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
   }
 
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
+
   testImplementation(project(":api")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(project(":catalogs:catalog-jdbc-common")) {
@@ -91,13 +166,21 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
   }
-  testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
-    exclude("com.fasterxml.jackson")
-    exclude("org.apache.logging.log4j")
-    exclude("org.slf4j")
-  }
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.nimbus.jose.jwt)
+  // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
+  testImplementation(libs.aws.dynamodb)
+  testImplementation(libs.aws.glue)
+  testImplementation(libs.aws.kms)
+  testImplementation(libs.aws.s3)
+  testImplementation(libs.aws.sts)
+  testImplementation(libs.hadoop3.aws)
+  // hadoop-aws declares hadoop-client-api as provided; add it explicitly so S3AFileSystem can load
+  // org.apache.hadoop.fs.impl.prefetch.PrefetchingStatistics (added in 3.3.5) at runtime.
+  testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hive2.common) {
     exclude("com.sun.jersey")
     exclude("org.apache.curator")
@@ -133,9 +216,12 @@ dependencies {
   }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.lance.namespace.apache.client)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.testcontainers)
+  testImplementation(libs.aws.policy)
+  testImplementation(project(":iceberg:iceberg-common"))
 
   // org.apache.iceberg.rest.RESTSerializers#registerAll(ObjectMapper) has different method signature for iceberg-core and iceberg-spark-runtime package, we must make sure iceberg-core is in front to start up MiniGravitino server.
   testImplementation("org.apache.iceberg:iceberg-core:$icebergVersion")
@@ -175,6 +261,10 @@ tasks.test {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
+    if (glueHiveJarsDir != null) {
+      dependsOn(":spark-connector:downloadGlueHiveJars")
+      jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
+    }
     dependsOn(tasks.jar)
     dependsOn(":catalogs:catalog-lakehouse-iceberg:jar")
     dependsOn(":catalogs:catalog-hive:jar")

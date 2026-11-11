@@ -19,10 +19,16 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
+import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.SelectProvider;
@@ -39,6 +45,20 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface OwnerMetaMapper {
 
   String OWNER_TABLE_NAME = "owner_meta";
+
+  /**
+   * Locks an active metadata object before owner assignment.
+   *
+   * @return the object ID, or null if the object is no longer active
+   */
+  @Nullable
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectMetadataObjectIdForUpdate")
+  Long selectMetadataObjectIdForUpdate(
+      @Param("entityId") Long entityId,
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityType") Entity.EntityType entityType);
 
   @SelectProvider(
       type = OwnerMetaSQLProviderFactory.class,
@@ -61,8 +81,31 @@ public interface OwnerMetaMapper {
       @Param("metadataObjectId") Long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType);
 
+  /**
+   * Selects group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return group owners with their owned metadata object IDs
+   */
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "batchSelectGroupOwnerMetaByMetadataObjectIdAndType")
+  List<GroupOwnerRelPO> batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType);
+
   @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")
   void insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO);
+
+  @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "batchInsertOwnerRels")
+  void batchInsertOwnerRels(@Param("ownerRelPOs") List<OwnerRelPO> ownerRelPOs);
+
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "batchSoftDeleteOwnerRelByMetadataObjects")
+  void batchSoftDeleteOwnerRelByMetadataObjects(
+      @Param("deletions") List<OwnerRelForDeletion> deletions);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
@@ -87,12 +130,34 @@ public interface OwnerMetaMapper {
       method = "softDeleteOwnerRelByCatalogId")
   void softDeleteOwnerRelByCatalogId(@Param("catalogId") Long catalogId);
 
-  @UpdateProvider(type = OwnerMetaSQLProviderFactory.class, method = "softDeleteOwnerRelBySchemaId")
-  void softDeleteOwnerRelBySchemaId(@Param("schemaId") Long schemaId);
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelBySchemaIds")
+  void softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @UpdateProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "softDeleteOwnerRelOfJobsByTemplateId")
+  void softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId);
 
   @UpdateProvider(
       type = OwnerMetaSQLProviderFactory.class,
       method = "deleteOwnerMetasByLegacyTimeline")
   Integer deleteOwnerMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "selectOwnerByMetadataObjectIdAndType")
+  OwnerInfo selectOwnerByMetadataObjectIdAndType(
+      @Param("metadataObjectId") long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectChangedOwners")
+  List<ChangedOwnerInfo> selectChangedOwners(
+      @Param("lastConsumedUpdatedAt") long lastConsumedUpdatedAt,
+      @Param("lastConsumedUpdatedAtId") long lastConsumedUpdatedAtId);
+
+  @SelectProvider(type = OwnerMetaSQLProviderFactory.class, method = "selectMaxChangedOwner")
+  ChangedOwnerInfo selectMaxChangedOwner();
 }

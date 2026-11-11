@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -63,36 +62,49 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Hive catalog in Apache Gravitino. */
-public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class HiveCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
 
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
   @VisibleForTesting CachedClientPool clientPool;
+
+  private volatile HiveVersion hiveVersion;
 
   @SuppressWarnings("UnusedVariable")
   private CatalogInfo info;
@@ -100,11 +112,13 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   private HasPropertyMetadata propertiesMetadata;
 
   private String catalogName;
+  private HiveViewCatalogOperations viewCatalogOperations;
 
   private boolean listAllTables = true;
   // The maximum number of tables that can be returned by the listTableNamesByFilter function.
   // The default value is -1, which means that all tables are returned.
   private static final short MAX_TABLES = -1;
+  static final String ALL_TABLE_PATTERN = "*";
 
   // Map that maintains the mapping of keys in Gravitino to that in Hive, for example, users
   // will only need to set the configuration 'METASTORE_URL' in Gravitino and Gravitino will change
@@ -144,6 +158,8 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
                 .catalogPropertiesMetadata()
                 .getOrDefault(conf, HiveCatalogPropertiesMetadata.DEFAULT_CATALOG);
     this.catalogName = defaultCatalog;
+    this.viewCatalogOperations =
+        new HiveViewCatalogOperations(() -> clientPool, () -> catalogName, this::schemaExists);
   }
 
   @VisibleForTesting
@@ -376,28 +392,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       // then based on
       // those names we can obtain metadata for each individual table and get the type we needed.
       List<String> allTables = clientPool.run(c -> c.getAllTables(catalogName, schemaIdent.name()));
-      if (!listAllTables) {
-        // The reason for using the listTableNamesByFilter function is that the
-        // getTableObjectiesByName function has poor performance. Currently, we focus on the
-        // Iceberg, Paimon and Hudi table. In the future, if necessary, we will need to filter out
-        // other tables. In addition, the current return also includes tables of type VIRTUAL-VIEW.
-        String icebergAndPaimonFilter = getIcebergAndPaimonFilter();
-        List<String> icebergAndPaimonTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), icebergAndPaimonFilter, MAX_TABLES));
-        allTables.removeAll(icebergAndPaimonTables);
+      // Always filter out VIRTUAL_VIEW entries so they don't appear in table listings
+      List<String> views =
+          clientPool.run(
+              c ->
+                  c.listTablesByType(
+                      catalogName,
+                      schemaIdent.name(),
+                      ALL_TABLE_PATTERN,
+                      TableType.VIRTUAL_VIEW.name()));
+      allTables.removeAll(views);
 
-        // filter out the Hudi tables
-        String hudiFilter = String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
-        List<String> hudiTables =
-            clientPool.run(
-                c ->
-                    c.listTableNamesByFilter(
-                        catalogName, schemaIdent.name(), hudiFilter, MAX_TABLES));
-        removeHudiTables(allTables, hudiTables);
+      if (!listAllTables) {
+        filterOutNonHiveTables(schemaIdent.name(), allTables);
       }
+
       return allTables.stream()
           .map(tbName -> NameIdentifier.of(namespace, tbName))
           .toArray(NameIdentifier[]::new);
@@ -407,20 +416,59 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
-  private static String getIcebergAndPaimonFilter() {
+  /**
+   * Best-effort removal of non-Hive tables (Iceberg, Paimon, Hudi) from {@code allTables} via HMS
+   * server-side {@code listTableNamesByFilter}. HMS only supports exact lookups on dot-free
+   * property keys, so Spark-managed Hudi tables that only expose {@code
+   * spark.sql.sources.provider=hudi} cannot be filtered here. We keep this strategy because {@code
+   * getTableObjectsByName} materializes every table and is slow on large databases.
+   *
+   * @param database the database name
+   * @param allTables all table names fetched from HMS before non-Hive filtering
+   * @throws InterruptedException if the HMS client call is interrupted
+   */
+  private void filterOutNonHiveTables(String database, List<String> allTables)
+      throws InterruptedException {
+    List<String> icebergAndPaimonTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildIcebergAndPaimonFilter(), MAX_TABLES));
+    allTables.removeAll(icebergAndPaimonTables);
+
+    // HoodieHiveSyncTool sets `provider=hudi` only on the base table; derived `_ro` / `_rt`
+    // tables carry only dotted keys, so we strip them by exact name match against the base list.
+    List<String> hudiBaseTables =
+        clientPool.run(
+            c ->
+                c.listTableNamesByFilter(
+                    catalogName, database, buildHudiBaseTableFilter(), MAX_TABLES));
+    removeHudiDerivedTables(allTables, hudiBaseTables);
+  }
+
+  private static String buildIcebergAndPaimonFilter() {
     String icebergFilter = String.format("%stable_type like \"ICEBERG\"", HIVE_FILTER_FIELD_PARAMS);
     String paimonFilter = String.format("%stable_type like \"PAIMON\"", HIVE_FILTER_FIELD_PARAMS);
     return String.format("%s or %s", icebergFilter, paimonFilter);
   }
 
-  private void removeHudiTables(List<String> allTables, List<String> hudiTables) {
-    for (String hudiTable : hudiTables) {
-      allTables.removeIf(
-          t ->
-              t.equals(hudiTable)
-                  || t.startsWith(hudiTable + "_ro")
-                  || t.startsWith(hudiTable + "_rt"));
+  private static String buildHudiBaseTableFilter() {
+    return String.format("%sprovider like \"hudi\"", HIVE_FILTER_FIELD_PARAMS);
+  }
+
+  /**
+   * Removes Hudi base tables together with their derived read-optimized ({@code _ro}) and real-time
+   * ({@code _rt}) tables. Exact name match is used because {@code startsWith} would incorrectly
+   * drop unrelated tables such as {@code <base>_root}.
+   */
+  private void removeHudiDerivedTables(List<String> allTables, List<String> hudiBaseTables) {
+    Set<String> hudiTablesToRemove = new HashSet<>();
+    for (String hudiBase : hudiBaseTables) {
+      hudiTablesToRemove.add(hudiBase);
+      hudiTablesToRemove.add(hudiBase + "_ro");
+      hudiTablesToRemove.add(hudiBase + "_rt");
     }
+    allTables.removeIf(hudiTablesToRemove::contains);
   }
 
   /**
@@ -433,7 +481,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
   @Override
   public Table loadTable(NameIdentifier tableIdent) throws NoSuchTableException {
     HiveTableHandle hiveTable = loadHiveTable(tableIdent);
-
+    if (TableType.VIRTUAL_VIEW.name().equalsIgnoreCase(hiveTable.getTableType())) {
+      throw new NoSuchTableException("Table %s is a view, not a table", tableIdent);
+    }
     LOG.info("Loaded Hive table {} from Hive Metastore ", tableIdent.name());
     return hiveTable;
   }
@@ -447,7 +497,7 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
-      throw new RuntimeException(
+      throw ExceptionMessages.wrap(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
   }
@@ -533,6 +583,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distributions.NONE) {
+      // NONE can also arrive as a DTO rather than the singleton used by the Java API.
+      boolean unbucketed =
+          distribution.strategy() == Strategy.NONE
+              && distribution.number() == 0
+              && distribution.expressions().length == 0;
+      Preconditions.checkArgument(
+          distribution.strategy() == Strategy.HASH || unbucketed,
+          "Hive only supports HASH distribution, or NONE with zero buckets and no expressions");
       boolean allNameReference =
           Arrays.stream(distribution.expressions())
               .allMatch(t -> t instanceof NamedReference.FieldReference);
@@ -652,12 +710,21 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
       String newComment = currentTable.comment();
       Map<String, String> updatedProperties = new HashMap<>(currentTable.properties());
       List<Column> updatedColumns = new ArrayList<>(Arrays.asList(currentTable.columns()));
+      // Use the loaded table's database name as the default.
+      // If a new schema is explicitly requested during a rename, this will be overwritten below.
+      String targetDatabaseName = currentTable.databaseName();
 
       for (TableChange change : changes) {
         if (change instanceof TableChange.RenameTable) {
           TableChange.RenameTable rename = (TableChange.RenameTable) change;
-          Preconditions.checkArgument(
-              rename.getNewSchemaName().isEmpty(), "Does not support rename schema yet");
+          if (rename.getNewSchemaName().isPresent()) {
+            String newSchemaName = rename.getNewSchemaName().get();
+            if (!schemaExists(NameIdentifier.of(schemaIdent.namespace(), newSchemaName))) {
+              throw new NoSuchSchemaException("Schema %s does not exist", newSchemaName);
+            }
+            // Move table to the new schema
+            targetDatabaseName = newSchemaName;
+          }
           newTableName = rename.getNewName();
         } else if (change instanceof TableChange.UpdateComment) {
           newComment = ((TableChange.UpdateComment) change).getNewComment();
@@ -668,6 +735,11 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
           TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
           updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
+          if (!currentTable.originalStorageColumns().isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot alter columns of a SerDe-derived table through Gravitino. "
+                    + "Update the schema through the table SerDe or its external schema definition.");
+          }
           applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
@@ -678,12 +750,26 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
       HiveTable updatedTable =
           buildAlteredHiveTable(
-              currentTable, newTableName, newComment, updatedProperties, updatedColumns);
+              currentTable,
+              newTableName,
+              newComment,
+              updatedProperties,
+              updatedColumns,
+              targetDatabaseName);
 
       HiveTable finalUpdatedTable = updatedTable;
+      // For property-only or comment-only changes, skip the metastore statistics recomputation so
+      // it does not access the table's storage location. This keeps such lightweight alters from
+      // hanging when the underlying filesystem (e.g. HDFS NameNode) is slow or unavailable.
+      boolean skipStatsUpdate = canSkipStatsUpdate(changes);
       clientPool.run(
           c -> {
-            c.alterTable(catalogName, schemaIdent.name(), tableIdent.name(), finalUpdatedTable);
+            c.alterTable(
+                catalogName,
+                schemaIdent.name(),
+                tableIdent.name(),
+                finalUpdatedTable,
+                skipStatsUpdate);
             return null;
           });
 
@@ -707,12 +793,36 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Determines whether the metastore statistics recomputation can be skipped for the given table
+   * changes. Statistics are tied to the table data, so recomputation is only meaningful when the
+   * data layout may change. Property-only and comment-only alters never touch the data, so they can
+   * safely skip the recomputation (and the storage-location access it triggers). Any column change
+   * or rename falls back to the default behavior.
+   *
+   * @param changes The table changes to be applied.
+   * @return {@code true} if every change is a property or comment change; {@code false} otherwise.
+   */
+  @VisibleForTesting
+  static boolean canSkipStatsUpdate(TableChange[] changes) {
+    if (changes == null || changes.length == 0) {
+      return false;
+    }
+    return Arrays.stream(changes)
+        .allMatch(
+            change ->
+                change instanceof TableChange.SetProperty
+                    || change instanceof TableChange.RemoveProperty
+                    || change instanceof TableChange.UpdateComment);
+  }
+
   private HiveTable buildAlteredHiveTable(
       HiveTable original,
       String tableName,
       String comment,
       Map<String, String> properties,
-      List<Column> columns) {
+      List<Column> columns,
+      String databaseName) {
     HiveTable.Builder builder =
         HiveTable.builder()
             .withName(tableName)
@@ -723,12 +833,14 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
             .withSortOrders(original.sortOrder())
             .withPartitioning(original.partitioning())
             .withCatalogName(original.catalogName())
-            .withDatabaseName(original.databaseName());
+            .withDatabaseName(databaseName);
 
     if (comment != null) {
       builder.withComment(comment);
     }
-    return builder.build();
+    HiveTable altered = builder.build();
+    altered.setOriginalStorageColumns(original.originalStorageColumns());
+    return altered;
   }
 
   private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {
@@ -955,18 +1067,9 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
    * Performs `getAllDatabases` operation in Hive Metastore to test the connection.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       clientPool.run(c -> c.getAllDatabases(catalogName));
     } catch (ConnectionFailedException e) {
@@ -1007,6 +1110,150 @@ public class HiveCatalogOperations implements CatalogOperations, SupportsSchemas
 
   CachedClientPool getClientPool() {
     return clientPool;
+  }
+
+  /**
+   * Returns the version of the connected Hive Metastore. The version is resolved once from the
+   * client pool and cached, since it cannot change for the lifetime of the catalog.
+   *
+   * @return The connected Hive Metastore version.
+   */
+  HiveVersion hiveVersion() {
+    if (hiveVersion == null) {
+      synchronized (this) {
+        if (hiveVersion == null) {
+          Preconditions.checkState(
+              clientPool != null, "Hive catalog operations are not initialized");
+          try {
+            hiveVersion =
+                Preconditions.checkNotNull(
+                    clientPool.run(HiveClient::hiveVersion),
+                    "Hive client returned a null metastore version");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw ExceptionMessages.wrap("Failed to resolve Hive Metastore version", e);
+          }
+        }
+      }
+    }
+    return hiveVersion;
+  }
+
+  @VisibleForTesting
+  void setViewCatalogOperations(HiveViewCatalogOperations viewCatalogOperations) {
+    this.viewCatalogOperations = viewCatalogOperations;
+  }
+
+  // ==================== ViewCatalog implementation ====================
+
+  /**
+   * Lists all views in the given schema namespace.
+   *
+   * @param namespace The namespace of the schema.
+   * @return An array of view identifiers.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  @Override
+  public NameIdentifier[] listViews(Namespace namespace) throws NoSuchSchemaException {
+    return getViewCatalogOperations().listViews(namespace);
+  }
+
+  /**
+   * Loads a view from the Hive Metastore.
+   *
+   * @param ident The view identifier.
+   * @return The loaded view.
+   * @throws NoSuchViewException If the view does not exist.
+   */
+  @Override
+  public View loadView(NameIdentifier ident) throws NoSuchViewException {
+    return getViewCatalogOperations().loadView(ident);
+  }
+
+  /**
+   * Creates a view in the Hive Metastore.
+   *
+   * <p>Hive Metastore stores exactly one engine-native SQL dialect for each view. This
+   * implementation currently supports only {@code hive}.
+   *
+   * <p>TODO(design-docs/gravitino-logical-view-management.md): support {@code trino} and {@code
+   * spark} HMS view formats.
+   *
+   * @param ident The view identifier.
+   * @param comment An optional comment.
+   * @param columns The output columns of the view.
+   * @param representations The SQL representations (must contain exactly one {@code hive} dialect).
+   * @param defaultCatalog The default catalog used to resolve unqualified identifiers referenced by
+   *     the view definition. For {@code hive} dialect this must be {@code null}; non-null values
+   *     are rejected.
+   * @param defaultSchema The default schema used to resolve unqualified identifiers referenced by
+   *     the view definition. For {@code hive} dialect this must be {@code null}; non-null values
+   *     are rejected.
+   * @param properties Additional properties stored in HMS.
+   * @return The created view.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws ViewAlreadyExistsException If the view already exists.
+   */
+  @Override
+  public View createView(
+      NameIdentifier ident,
+      String comment,
+      Column[] columns,
+      Representation[] representations,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, ViewAlreadyExistsException {
+    return getViewCatalogOperations()
+        .createView(
+            ident, comment, columns, representations, defaultCatalog, defaultSchema, properties);
+  }
+
+  /**
+   * Alters a view in the Hive Metastore.
+   *
+   * <p>Supported changes: rename, set/remove property, and replace the view definition.
+   *
+   * @param ident The view identifier.
+   * @param changes The changes to apply.
+   * @return The updated view.
+   * @throws NoSuchViewException If the view does not exist.
+   * @throws ViewAlreadyExistsException If a rename target already exists.
+   */
+  @Override
+  public View alterView(NameIdentifier ident, ViewChange... changes)
+      throws NoSuchViewException, ViewAlreadyExistsException {
+    return getViewCatalogOperations().alterView(ident, changes);
+  }
+
+  /**
+   * Drops a view from the Hive Metastore.
+   *
+   * @param ident The view identifier.
+   * @return {@code true} if the view was dropped, {@code false} if it did not exist.
+   */
+  @Override
+  public boolean dropView(NameIdentifier ident) {
+    return getViewCatalogOperations().dropView(ident);
+  }
+
+  /**
+   * Checks whether a view with the given identifier exists.
+   *
+   * @param ident The view identifier.
+   * @return {@code true} if the view exists, {@code false} otherwise.
+   */
+  @Override
+  public boolean viewExists(NameIdentifier ident) {
+    return getViewCatalogOperations().viewExists(ident);
+  }
+
+  private HiveViewCatalogOperations getViewCatalogOperations() {
+    if (viewCatalogOperations == null) {
+      viewCatalogOperations =
+          new HiveViewCatalogOperations(() -> clientPool, () -> catalogName, this::schemaExists);
+    }
+    return viewCatalogOperations;
   }
 
   private boolean isExternalTable(NameIdentifier tableIdent) {

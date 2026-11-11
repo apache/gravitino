@@ -514,8 +514,8 @@ public class TestStaticSignKeyValidator {
     // Check if principal is UserPrincipal and has groups
     UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
     assertEquals(2, userPrincipal.getGroups().size());
-    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group1")));
-    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("group2")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("group1")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("group2")));
   }
 
   @Test
@@ -584,7 +584,7 @@ public class TestStaticSignKeyValidator {
     // Check if principal is UserPrincipal and has groups
     UserPrincipal userPrincipal = assertInstanceOf(UserPrincipal.class, principal);
     assertEquals(2, userPrincipal.getGroups().size());
-    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("groupa")));
-    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupname().equals("groupb")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("groupa")));
+    assertTrue(userPrincipal.getGroups().stream().anyMatch(g -> g.getGroupName().equals("groupb")));
   }
 }

@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -187,6 +188,7 @@ public class TestFilesetEvent {
     Assertions.assertEquals(subPath, ((ListFilesEvent) event).subPath());
     Assertions.assertEquals(OperationType.LIST_FILESET_FILES, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(-1, ((ListFilesEvent) event).resultCount());
 
     PreEvent preEvent = dummyEventListener.popPreEvent();
     Assertions.assertEquals(ListFilesPreEvent.class, preEvent.getClass());
@@ -390,12 +392,14 @@ public class TestFilesetEvent {
             any(NameIdentifier.class),
             any(String.class),
             any(Fileset.Type.class),
-            any(Map.class),
-            any(Map.class)))
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class)))
         .thenReturn(fileset);
     when(dispatcher.loadFileset(any(NameIdentifier.class))).thenReturn(fileset);
     when(dispatcher.dropFileset(any(NameIdentifier.class))).thenReturn(true);
-    when(dispatcher.listFilesets(any(Namespace.class))).thenReturn(null);
+    when(dispatcher.listFilesets(any(Namespace.class))).thenReturn(new NameIdentifier[0]);
     when(dispatcher.alterFileset(any(NameIdentifier.class), any(FilesetChange.class)))
         .thenReturn(fileset);
     when(dispatcher.getFileLocation(any(NameIdentifier.class), any()))

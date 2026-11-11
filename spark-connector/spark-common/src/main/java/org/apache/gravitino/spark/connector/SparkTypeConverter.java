@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.rel.types.Types.UUIDType;
 import org.apache.spark.sql.types.ArrayType;
 import org.apache.spark.sql.types.BinaryType;
 import org.apache.spark.sql.types.BooleanType;
@@ -44,6 +45,7 @@ import org.apache.spark.sql.types.ShortType;
 import org.apache.spark.sql.types.StringType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
+import org.apache.spark.sql.types.TimestampNTZType;
 import org.apache.spark.sql.types.TimestampType;
 import org.apache.spark.sql.types.VarcharType;
 
@@ -65,14 +67,17 @@ public class SparkTypeConverter {
     } else if (sparkType instanceof DecimalType) {
       DecimalType decimalType = (DecimalType) sparkType;
       return Types.DecimalType.of(decimalType.precision(), decimalType.scale());
-    } else if (sparkType instanceof StringType) {
-      return Types.StringType.get();
     } else if (sparkType instanceof VarcharType) {
+      // Varchar and Char are checked before StringType because Spark 4 made both extend it; on 3.5
+      // they extend AtomicType, so this order is correct for every supported version. Checking
+      // StringType first would swallow both and silently drop the length.
       VarcharType varcharType = (VarcharType) sparkType;
       return Types.VarCharType.of(varcharType.length());
     } else if (sparkType instanceof CharType) {
       CharType charType = (CharType) sparkType;
       return Types.FixedCharType.of(charType.length());
+    } else if (sparkType instanceof StringType) {
+      return Types.StringType.get();
     } else if (sparkType instanceof BinaryType) {
       return Types.BinaryType.get();
     } else if (sparkType instanceof BooleanType) {
@@ -81,6 +86,8 @@ public class SparkTypeConverter {
       return Types.DateType.get();
     } else if (sparkType instanceof TimestampType) {
       return Types.TimestampType.withTimeZone();
+    } else if (sparkType instanceof TimestampNTZType) {
+      return Types.TimestampType.withoutTimeZone();
     } else if (sparkType instanceof ArrayType) {
       ArrayType arrayType = (ArrayType) sparkType;
       return Types.ListType.of(toGravitinoType(arrayType.elementType()), arrayType.containsNull());
@@ -149,15 +156,20 @@ public class SparkTypeConverter {
     } else if (gravitinoType instanceof Types.FixedCharType) {
       Types.FixedCharType charType = (Types.FixedCharType) gravitinoType;
       return CharType.apply((charType.length()));
+    } else if (gravitinoType instanceof UUIDType) {
+      // Spark has no native UUID type. Represent UUID as StringType to align with
+      // Spark built-in PostgreSQL JDBC mapping (uuid -> StringType).
+      return DataTypes.StringType;
     } else if (gravitinoType instanceof Types.BinaryType) {
       return DataTypes.BinaryType;
     } else if (gravitinoType instanceof Types.BooleanType) {
       return DataTypes.BooleanType;
     } else if (gravitinoType instanceof Types.DateType) {
       return DataTypes.DateType;
-    } else if (gravitinoType instanceof Types.TimestampType
-        && ((Types.TimestampType) gravitinoType).hasTimeZone()) {
-      return DataTypes.TimestampType;
+    } else if (gravitinoType instanceof Types.TimestampType) {
+      return ((Types.TimestampType) gravitinoType).hasTimeZone()
+          ? DataTypes.TimestampType
+          : DataTypes.TimestampNTZType;
     } else if (gravitinoType instanceof Types.ListType) {
       Types.ListType listType = (Types.ListType) gravitinoType;
       return DataTypes.createArrayType(

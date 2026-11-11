@@ -20,11 +20,15 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import static org.apache.gravitino.storage.relational.mapper.TableMetaMapper.TABLE_NAME;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -178,6 +182,29 @@ public class TableMetaBaseSQLProvider {
         + " WHERE tm.table_id = #{tableId} AND tm.deleted_at = 0";
   }
 
+  /**
+   * Returns the active table metadata row and holds it exclusively for the current transaction.
+   *
+   * <p>Unlike the metalake, catalog and schema providers, this cannot be written as {@code
+   * selectTableMetaById(id) + " FOR UPDATE"}: that select LEFT JOINs {@code table_version_info},
+   * and locking the nullable side of an outer join is rejected by PostgreSQL and locks the wrong
+   * rows on MySQL. The projection is therefore spelled out for {@code table_meta} alone, and the
+   * returned row carries only the identity and version columns its callers read.
+   *
+   * @param tableId the table ID
+   * @return the locking select SQL
+   */
+  public String selectTableMetaByIdForUpdate(@Param("tableId") Long tableId) {
+    return "SELECT table_id as tableId, table_name as tableName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -220,11 +247,26 @@ public class TableMetaBaseSQLProvider {
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
         + " audit_info = #{tableMeta.auditInfo},"
-        + " current_version = #{tableMeta.currentVersion},"
-        + " last_version = #{tableMeta.lastVersion},"
+        // Keep the OCC token monotonic on overwrite. Resetting it to the incoming initial version
+        // would let a writer that read the same old version pass its CAS after this statement.
+        // last_version is assigned first, so both columns advance from the stored current version.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
+  /**
+   * Returns SQL that updates a table only while its OCC version is unchanged.
+   *
+   * <p>The WHERE clause intentionally compares only the stable ID, the version seen by the caller,
+   * and the active flag. Comparing serialized payload or audit fields would make harmless encoding
+   * differences look like conflicts; the version is the single source of truth for concurrency.
+   *
+   * @param newTablePO the table values to write
+   * @param oldTablePO the table values and OCC version read by the caller
+   * @param newSchemaId the target schema ID
+   * @return the version-checked update SQL
+   */
   public String updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO,
       @Param("oldTableMeta") TablePO oldTablePO,
@@ -240,46 +282,57 @@ public class TableMetaBaseSQLProvider {
         + " last_version = #{newTableMeta.lastVersion},"
         + " deleted_at = #{newTableMeta.deletedAt}"
         + " WHERE table_id = #{oldTableMeta.tableId}"
-        + " AND table_name = #{oldTableMeta.tableName}"
-        + " AND metalake_id = #{oldTableMeta.metalakeId}"
-        + " AND catalog_id = #{oldTableMeta.catalogId}"
-        + " AND schema_id = #{oldTableMeta.schemaId}"
-        + " AND audit_info = #{oldTableMeta.auditInfo}"
         + " AND current_version = #{oldTableMeta.currentVersion}"
-        + " AND last_version = #{oldTableMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  /**
+   * Returns SQL that deletes only the table version observed by the caller.
+   *
+   * <p>For example, a drop that read version 3 must not delete version 4 after a concurrent alter.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE table_id = #{tableId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteTableMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String deleteTableMetasByLegacyTimeline(
@@ -375,5 +428,84 @@ public class TableMetaBaseSQLProvider {
              </script>
             """
         .formatted(TABLE_NAME, TableVersionMapper.TABLE_NAME);
+  }
+  /**
+   * Builds a single-statement table and column snapshot by schema ID and name.
+   *
+   * @param schemaId the schema ID
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public String selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName) {
+    return withColumns(selectTableMetaBySchemaIdAndName(schemaId, tableName));
+  }
+
+  /**
+   * Builds a single-statement table and column snapshot by full name.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public String selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return withColumns(
+        selectTableByFullQualifiedName(metalakeName, catalogName, schemaName, tableName));
+  }
+
+  private String withColumns(String tableSql) {
+    // One statement gives the root, version and columns a common snapshot. Overwrite retires old
+    // columns, so a second SELECT cannot reconstruct them. Aggregate history once and join by the
+    // existing (table_id, table_version, column_id, deleted_at) unique key. Correlated scans for
+    // each column would be quadratic for long histories. Root subqueries have independent bound
+    // parameters on all supported backends. Exclude DELETE markers only after resolving history,
+    // otherwise a dropped column would reappear through its earlier CREATE/UPDATE row.
+    // Derived tables accept static SELECTs only. MyBatis handles <script> only at the start of
+    // the complete statement, so a dynamic provider cannot be embedded here.
+    Preconditions.checkArgument(
+        !tableSql.stripLeading().startsWith("<script>"),
+        "Aggregate table reads require static root SQL, not a MyBatis <script>");
+    String rootSql = tableSql.strip().replaceFirst(";\\s*$", "");
+    return "SELECT t.*, "
+        + "c.column_id AS col_columnId, "
+        + "c.column_name AS col_columnName, "
+        + "c.column_position AS col_columnPosition, "
+        + "c.metalake_id AS col_metalakeId, "
+        + "c.catalog_id AS col_catalogId, "
+        + "c.schema_id AS col_schemaId, "
+        + "c.table_id AS col_tableId, "
+        + "c.table_version AS col_tableVersion, "
+        + "c.column_type AS col_columnType, "
+        + "c.column_comment AS col_columnComment, "
+        + "c.column_nullable AS col_nullable, "
+        + "c.column_auto_increment AS col_autoIncrement, "
+        + "c.column_default_value AS col_defaultValue, "
+        + "c.column_op_type AS col_columnOpType, "
+        + "c.deleted_at AS col_deletedAt, "
+        + "c.audit_info AS col_auditInfo "
+        + "FROM ("
+        + rootSql
+        + ") t LEFT JOIN ("
+        + " SELECT history.table_id, history.column_id, MAX(history.table_version) AS max_version"
+        + " FROM "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " history JOIN ("
+        + rootSql
+        + ") observed"
+        + " ON history.table_id = observed.tableId AND history.table_version <= observed.currentVersion"
+        + " WHERE history.deleted_at = 0 GROUP BY history.table_id, history.column_id"
+        + ") latest ON latest.table_id = t.tableId LEFT JOIN "
+        + TableColumnMapper.COLUMN_TABLE_NAME
+        + " c"
+        + " ON c.table_id = latest.table_id AND c.column_id = latest.column_id"
+        + " AND c.table_version = latest.max_version AND c.deleted_at = 0"
+        + " AND c.column_op_type != "
+        + ColumnPO.ColumnOpType.DELETE.value();
   }
 }

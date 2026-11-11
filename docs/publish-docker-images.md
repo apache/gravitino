@@ -1,7 +1,7 @@
 ---
-title: "Publish Docker images"
-slug: /publish-docker-images
-keyword: docker
+title: "Publish Docker Images"
+slug: "/publish-docker-images"
+keyword: "docker"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -11,9 +11,9 @@ license: "This software is licensed under the Apache License version 2."
 The Apache Gravitino project provides a set of Docker images to facilitate the publishing, development, and testing of the Gravitino project.
 [Apache Docker Hub](https://hub.docker.com/u/apache) repository publishes the official Gravitino Docker images.
 
-## Publish Docker images to Docker Hub
+## Publish Docker Images to Docker Hub
 
-You can use GitHub actions to publish Docker images to the Docker Hub repository.
+Use GitHub actions to publish Docker images to the Docker Hub repository.
 
 1. Open the [Docker publish link](https://github.com/apache/gravitino/actions/workflows/docker-image.yml)
 2. Click the `Run workflow` button.
@@ -24,17 +24,17 @@ You can use GitHub actions to publish Docker images to the Docker Hub repository
    + `apache/gravitino-ci:hive`.
    + `apache/gravitino-ci:trino`.
    + Future plans include support for other data sources.
-5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name. Currently, the Docker image name is in the format:
+5. Input the `tag name`, for example: `0.1.0`, Then build and push the Docker image name. The Docker image name is in the format:
    1. `apache/gravitino-ci:{image-type}-0.1.0` if this is a trino CI image, image-type is `trino`, `hive`, `kerberos-hive`, `doris`, `ranger`.
    2. `apache/gravitino-playground:{image-type}-0.1.0` if this is a playground image, image-type is `trino`, `hive`, `ranger`.
    3. `apache/gravitino:0.1.0` if this is a gravitino server image.
    4. `apache/gravitino-iceberg-rest:0.1.0` if this is an iceberg-rest server image.
 6. You must enter the correct `docker user name`and `publish docker token` before you can execute run `Publish Docker Image` workflow.
 7. If you want to update the latest tag, select the box for `Whether to update the latest tag`.
-8. Wait for the workflow to complete. You can see a new Docker image shown in the [Apache Docker Hub](https://hub.docker.com/u/apache) repository.
+8. Wait for the workflow to complete. A new Docker image appears in the [Apache Docker Hub](https://hub.docker.com/u/apache) repository.
 
 ![Publish Docker image](assets/publish-docker-image.png)
 
-## More details of Apache Gravitino Docker images
+## More Details of Docker Images
 
 + [Gravitino Docker images](docker-image-details.md)

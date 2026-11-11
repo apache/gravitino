@@ -42,6 +42,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEva
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StatisticsUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.TableMetadataTriggerExpressionUtils;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +66,12 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics;
   private Table tableMetadata;
   private NameIdentifier nameIdentifier;
+  /**
+   * Expression inputs from table metadata and numeric policy rules. Table-level statistics are
+   * intentionally excluded so partition-aware strategies cannot be driven by stale {@code
+   * statistic_meta} values after partition stats are refreshed.
+   */
+  private Map<String, Object> metadataAndRulesContext;
 
   /** Create a handler that evaluates expressions with the default QL evaluator. */
   protected BaseExpressionStrategyHandler() {
@@ -79,6 +86,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     this.strategy = context.strategy();
     this.tableStatistics = context.tableStatistics();
     this.partitionStatistics = context.partitionStatistics();
+    this.metadataAndRulesContext = buildMetadataAndRulesContext();
   }
 
   @Override
@@ -122,12 +130,20 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean isPartitionTable() {
-    return tableMetadata.partitioning().length > 0;
+    // Table-level handlers must also work on partitioned tables without requesting partition
+    // statistics. Only handlers declaring PARTITION_STATISTICS use per-partition evaluation.
+    return dataRequirements().contains(DataRequirement.PARTITION_STATISTICS)
+        && tableMetadata.partitioning().length > 0;
   }
 
   private boolean shouldTriggerForPartitionTable() {
     if (partitionStatistics.isEmpty()) {
-      LOG.info("No partition statistics available for table {}", nameIdentifier);
+      // Partition-aware strategies require partition statistics; table-level stats are not a
+      // fallback (see #14674 / #14677).
+      LOG.info(
+          "Skip strategy {} for partitioned table {}: no partition statistics available",
+          strategy.name(),
+          nameIdentifier);
       return false;
     }
     String triggerExpression = triggerExpression(strategy);
@@ -136,11 +152,11 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean shouldTriggerForNonPartitionTable() {
-    return evaluateBool(triggerExpression(strategy), tableStatistics);
+    return evaluateBool(triggerExpression(strategy), List.of());
   }
 
   private StrategyEvaluation evaluateForNonPartitionTable() {
-    long score = evaluateLong(scoreExpression(strategy), tableStatistics);
+    long score = evaluateLong(scoreExpression(strategy), List.of());
     if (score <= 0) {
       return StrategyEvaluation.NO_EXECUTION;
     }
@@ -200,7 +216,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private long evaluateLong(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateLong(expression, context);
     } catch (RuntimeException e) {
@@ -210,7 +226,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean evaluateBool(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateBool(expression, context);
     } catch (RuntimeException e) {
@@ -219,10 +235,39 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     }
   }
 
-  private static Map<String, Object> buildExpressionContext(
-      Strategy strategy, List<StatisticEntry<?>> statistics) {
+  /**
+   * Builds the expression context for one evaluation unit.
+   *
+   * <p>Partition-aware handlers on partitioned tables receive only {@link #metadataAndRulesContext}
+   * plus the partition's statistics. Non-partitioned evaluation also includes table-level
+   * statistics, applied before metadata/rules so duplicate keys keep the historical precedence
+   * (table statistics → table metadata → numeric policy rules → unit statistics).
+   *
+   * @param statistics statistics of the unit being evaluated (a single partition, or empty for
+   *     non-partitioned table-level evaluation)
+   * @return combined context
+   */
+  private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
     Map<String, Object> context = new HashMap<>();
+    if (!isPartitionTable()) {
+      // Apply before metadata/rules so same-named properties/rules still win (#14675 review).
+      context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
+    }
+    context.putAll(metadataAndRulesContext);
     context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
+    return context;
+  }
+
+  /** Precomputes table-metadata and rule inputs for expression evaluation. */
+  private Map<String, Object> buildMetadataAndRulesContext() {
+    Map<String, Object> context = new HashMap<>();
+    context.putAll(TableMetadataTriggerExpressionUtils.buildTableMetadataContext(tableMetadata));
+    context.putAll(getRulesExpressionContext(strategy));
+    return context;
+  }
+
+  private static Map<String, Object> getRulesExpressionContext(Strategy strategy) {
+    Map<String, Object> context = new HashMap<>();
     strategy
         .rules()
         .forEach(

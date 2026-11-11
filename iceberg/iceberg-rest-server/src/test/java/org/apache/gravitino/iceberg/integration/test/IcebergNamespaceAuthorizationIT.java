@@ -32,6 +32,10 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.iceberg.HasTableOperations;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ForbiddenException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,8 +107,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Should fail without proper authorization
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
-        () -> sql("CREATE DATABASE %s", namespace));
+        ForbiddenException.class, () -> sql("CREATE DATABASE %s", namespace));
 
     // Grant CREATE_SCHEMA and USE_CATALOG privileges and verify creation succeeds
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
@@ -120,6 +123,26 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
                 Arrays.asList(GRAVITINO_CATALOG_NAME, namespace), MetadataObject.Type.SCHEMA));
     Assertions.assertTrue(schemaOwner.isPresent());
     Assertions.assertEquals(NORMAL_USER, schemaOwner.get().name());
+  }
+
+  @Test
+  void testCreateSchemaPrivilegeOnChildDoesNotAllowUnrelatedTopLevel() {
+    String parentNamespace = "ns_child_priv_parent";
+    String childNamespaceInGravitino = parentNamespace + ":child";
+    String unrelatedTopLevel = "ns_child_priv_unrelated";
+
+    // Create the parent/child branch as admin so the child schema exists to grant on.
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+
+    // Grant USE_CATALOG plus CREATE_SCHEMA scoped only to the child schema (A:B).
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantCreateSchemaOnSchemaRole(childNamespaceInGravitino);
+
+    // CREATE_SCHEMA on a child schema must not allow creating an unrelated top-level schema: the
+    // top-level path injects no SCHEMA context, so the expression falls back to catalog-level
+    // checks, which the normal user does not satisfy.
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("CREATE DATABASE %s", unrelatedTopLevel));
   }
 
   @Test
@@ -145,8 +168,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     // Without any roles, even SHOW DATABASES should fail
     revokeUserRoles();
     resetMetalakeAndCatalogOwner();
-    Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("SHOW DATABASES"));
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("SHOW DATABASES"));
   }
 
   @Test
@@ -185,13 +207,101 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
         .createSchema(namespace, "test schema", new HashMap<>());
 
     // Access should fail without proper privileges
-    Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("USE %s", namespace));
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("USE %s", namespace));
 
     // Grant schema access and verify success
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
     grantUseSchemaRole(namespace);
     Assertions.assertDoesNotThrow(() -> sql("USE %s", namespace));
+  }
+
+  @Test
+  void testUseNestedNamespace() {
+    String parentNamespace = "ns_nested_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("USE %s", nestedNamespaceInIceberg));
+
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(() -> sql("USE %s", nestedNamespaceInIceberg));
+  }
+
+  @Test
+  void testUseNestedNamespaceWithInheritedParentPrivilege() {
+    String parentNamespace = "ns_nested_inherit_parent";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("USE %s", nestedNamespaceInIceberg));
+
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    grantUseSchemaRole(parentNamespace);
+    Assertions.assertDoesNotThrow(
+        () -> sql("USE %s", nestedNamespaceInIceberg),
+        "USE_SCHEMA on parent namespace should be inherited by child namespace");
+  }
+
+  @Test
+  void testUpdateNestedNamespace() {
+    String parentNamespace = "ns_nested_update_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "ALTER DATABASE %s SET DBPROPERTIES ('nestedKey'='nestedValue')",
+                nestedNamespaceInIceberg));
+
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedNamespaceInGravitino),
+            MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql(
+                "ALTER DATABASE %s SET DBPROPERTIES ('nestedKey'='nestedValue')",
+                nestedNamespaceInIceberg));
+  }
+
+  @Test
+  void testDropNestedNamespace() {
+    String parentNamespace = "ns_nested_drop_parent";
+    String nestedNamespaceInGravitino = parentNamespace + ":child";
+    String nestedNamespaceInIceberg = parentNamespace + ".child";
+
+    createNestedNamespaceViaIRC(parentNamespace, "child");
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class, () -> sql("DROP DATABASE %s", nestedNamespaceInIceberg));
+
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, nestedNamespaceInGravitino),
+            MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(nestedNamespaceInGravitino);
+    Assertions.assertDoesNotThrow(() -> sql("DROP DATABASE %s", nestedNamespaceInIceberg));
+
+    boolean exists =
+        catalogClientWithAllPrivilege.asSchemas().schemaExists(nestedNamespaceInGravitino);
+    Assertions.assertFalse(exists, "Nested schema should be deleted");
   }
 
   @Test
@@ -205,7 +315,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Non-owners cannot modify schemas even with USE_CATALOG privilege
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key'='value')", namespace));
 
     // Schema ownership enables modification
@@ -236,8 +346,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Non-owner cannot delete schema
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
-        () -> sql("DROP DATABASE %s", namespace));
+        ForbiddenException.class, () -> sql("DROP DATABASE %s", namespace));
 
     // Transfer ownership to normal user
     metalakeClientWithAllPrivilege.setOwner(
@@ -265,8 +374,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
         .createSchema(namespace, "test schema", new HashMap<>());
 
     // Schema access requires proper authorization
-    Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class, () -> sql("USE %s", namespace));
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("USE %s", namespace));
 
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
     grantUseSchemaRole(namespace);
@@ -317,7 +425,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Registration should fail without destination schema ownership
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () ->
             sql(
                 "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
@@ -351,6 +459,58 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
   }
 
   @Test
+  void testRegisterTableCannotAdoptUnreadableSource() {
+    String sourceNamespace = "ns_register_secret";
+    String destNamespace = "ns_register_mine";
+    String sourceTable = "secret";
+    String copyTable = "copy";
+
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(sourceNamespace, "secret schema", new HashMap<>());
+    catalogClientWithAllPrivilege
+        .asSchemas()
+        .createSchema(destNamespace, "caller schema", new HashMap<>());
+
+    // The super user owns the secret table; the normal user never receives privileges on it.
+    String[] sourceLevels = new String[] {sourceNamespace};
+    createTableViaIRC(sourceLevels, sourceTable);
+    String metadataLocation =
+        ((HasTableOperations)
+                adminIcebergCatalog.loadTable(
+                    TableIdentifier.of(Namespace.of(sourceLevels), sourceTable)))
+            .operations()
+            .current()
+            .metadataFileLocation();
+
+    revokeUserRoles();
+    resetMetalakeAndCatalogOwner();
+    grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
+    metalakeClientWithAllPrivilege.setOwner(
+        MetadataObjects.of(
+            Arrays.asList(GRAVITINO_CATALOG_NAME, destNamespace), MetadataObject.Type.SCHEMA),
+        NORMAL_USER,
+        Owner.Type.USER);
+    grantUseSchemaRole(destNamespace);
+
+    Assertions.assertThrowsExactly(ForbiddenException.class, () -> sql("USE %s", sourceNamespace));
+    Assertions.assertThrowsExactly(
+        ForbiddenException.class,
+        () ->
+            sql(
+                "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
+                destNamespace, copyTable, metadataLocation));
+
+    grantUseSchemaRole(sourceNamespace);
+    grantSelectTableRole(sourceNamespace, sourceTable);
+    Assertions.assertDoesNotThrow(
+        () ->
+            sql(
+                "CALL rest.system.register_table(table => '%s.%s', metadata_file=> '%s')",
+                destNamespace, copyTable, metadataLocation));
+  }
+
+  @Test
   void testComplexAuthorizations() {
     String namespace = "ns_complex_auth";
 
@@ -363,13 +523,13 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     // Verify operations fail without authorization
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key1'='value1')", namespace));
 
     // USE_CATALOG alone is insufficient for schema modification
     grantUseCatalogRole(GRAVITINO_CATALOG_NAME);
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
+        ForbiddenException.class,
         () -> sql("ALTER DATABASE %s SET DBPROPERTIES ('key2'='value2')", namespace));
 
     // Schema ownership with USE_CATALOG enables modification
@@ -388,8 +548,7 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     // Authorization is checked before existence - security best practice
     String nonExistentSchema = "non_existent_schema";
     Assertions.assertThrowsExactly(
-        org.apache.iceberg.exceptions.ForbiddenException.class,
-        () -> sql("USE %s", nonExistentSchema));
+        ForbiddenException.class, () -> sql("USE %s", nonExistentSchema));
 
     // Special characters in schema names should work with authorization
     String specialSchema = "schema_with_123_special";
@@ -427,6 +586,22 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
   }
 
+  /** Grants SELECT_TABLE privilege to the normal user for the specified table. */
+  private void grantSelectTableRole(String schemaName, String tableName) {
+    String roleName = "selectTable_" + UUID.randomUUID();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(GRAVITINO_CATALOG_NAME, ImmutableList.of());
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(catalogObject, schemaName, ImmutableList.of());
+    SecurableObject tableObject =
+        SecurableObjects.ofTable(
+            schemaObject, tableName, ImmutableList.of(Privileges.SelectTable.allow()));
+
+    metalakeClientWithAllPrivilege.createRole(
+        roleName, new HashMap<>(), ImmutableList.of(tableObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+  }
+
   /** Grants CREATE_SCHEMA privilege to the normal user for the specified catalog. */
   private void grantCreateSchemaRole(String catalogName) {
     String roleName = "createSchema_" + UUID.randomUUID();
@@ -435,6 +610,20 @@ public class IcebergNamespaceAuthorizationIT extends IcebergAuthorizationIT {
 
     metalakeClientWithAllPrivilege.createRole(
         roleName, new HashMap<>(), ImmutableList.of(catalogObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
+  }
+
+  /** Grants CREATE_SCHEMA privilege to the normal user scoped to the specified schema. */
+  private void grantCreateSchemaOnSchemaRole(String schemaName) {
+    String roleName = "createSchemaOnSchema_" + UUID.randomUUID();
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(GRAVITINO_CATALOG_NAME, ImmutableList.of());
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject, schemaName, ImmutableList.of(Privileges.CreateSchema.allow()));
+
+    metalakeClientWithAllPrivilege.createRole(
+        roleName, new HashMap<>(), ImmutableList.of(schemaObject));
     metalakeClientWithAllPrivilege.grantRolesToUser(ImmutableList.of(roleName), NORMAL_USER);
   }
 

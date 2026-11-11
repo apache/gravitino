@@ -19,17 +19,29 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
+import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Maps;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.catalog.lakehouse.lance.LanceTableOperations;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+
+  /**
+   * The name of the {@link TableLocationProvider} that provisions and unprovisions the locations of
+   * this catalog's tables. Defaults to {@link DefaultTableLocationProvider#NAME} and is immutable
+   * once the catalog is created.
+   */
+  public static final String TABLE_LOCATION_PROVIDER = "table-location-provider";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -41,7 +53,32 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "The root directory of the generic catalog.",
                 false /* immutable */,
                 null, /* defaultValue */
-                false /* hidden */));
+                false /* hidden */),
+            stringOptionalPropertyPrefixEntry(
+                LANCE_STORAGE_OPTIONS_PREFIX,
+                "The Lance storage options managed by the catalog.",
+                false /* immutable */,
+                null, /* defaultValue */
+                false /* hidden */,
+                false /* reserved */),
+            stringOptionalPropertyEntry(
+                TABLE_LOCATION_PROVIDER,
+                "The name of the table location provider that provisions and unprovisions the"
+                    + " locations of this catalog's tables. It is fixed when the catalog is"
+                    + " created, because switching it would leave the tables of a single catalog"
+                    + " spread over two different location schemes.",
+                true /* immutable */,
+                DefaultTableLocationProvider.NAME, /* defaultValue */
+                false /* hidden */),
+            enumPropertyEntry(
+                LANCE_SCHEMA_REFRESH_MODE,
+                "Controls when Lance table schemas are refreshed from the underlying dataset.",
+                false /* required */,
+                false /* immutable */,
+                LanceTableOperations.SchemaRefreshMode.class,
+                LanceTableOperations.SchemaRefreshMode.DECLARED_AND_EMPTY,
+                false /* hidden */,
+                false /* reserved */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
   }

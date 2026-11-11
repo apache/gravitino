@@ -21,6 +21,7 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -38,11 +39,16 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeSetRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
@@ -94,8 +100,32 @@ public class MetalakeOperations {
                 MetadataAuthzHelper.filterMetalakes(
                     metalakes,
                     AuthorizationExpressionConstants.LOAD_METALAKE_AUTHORIZATION_EXPRESSION);
+            OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
             MetalakeDTO[] metalakeDTOs =
-                Arrays.stream(metalakes).map(DTOConverters::toDTO).toArray(MetalakeDTO[]::new);
+                Arrays.stream(metalakes)
+                    .map(
+                        metalake -> {
+                          @Nullable
+                          OwnerDTO owner =
+                              ownerDispatcher == null
+                                  ? null
+                                  : ownerDispatcher
+                                      .getOwner(
+                                          metalake.name(),
+                                          MetadataObjects.of(
+                                              null, metalake.name(), MetadataObject.Type.METALAKE))
+                                      .map(DTOConverters::toDTO)
+                                      .orElse(null);
+
+                          return MetalakeDTO.builder()
+                              .withName(metalake.name())
+                              .withComment(metalake.comment())
+                              .withProperties(metalake.properties())
+                              .withAudit(DTOConverters.toDTO(metalake.auditInfo()))
+                              .withOwner(owner)
+                              .build();
+                        })
+                    .toArray(MetalakeDTO[]::new);
             Response response = Utils.ok(new MetalakeListResponse(metalakeDTOs));
             LOG.info("List {} metalakes in Gravitino", metalakeDTOs.length);
             return response;
@@ -123,7 +153,8 @@ public class MetalakeOperations {
           OperationType.CREATE, "", new IllegalArgumentException("Request body cannot be null"));
     }
 
-    LOG.info("Received create metalake request for {}", request.getName());
+    String metalakeName = request.getName();
+    LOG.info("Received create metalake request for {}", metalakeName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -139,7 +170,6 @@ public class MetalakeOperations {
           });
 
     } catch (Exception e) {
-      String metalakeName = request != null ? request.getName() : "";
       return ExceptionHandlers.handleMetalakeException(OperationType.CREATE, metalakeName, e);
     }
   }
@@ -181,13 +211,28 @@ public class MetalakeOperations {
       @PathParam("name") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       MetalakeSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.SET,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info("Received set request for metalake: {}", metalakeName);
+    try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleMetalakeException(OperationType.SET, metalakeName, e);
+    }
+
+    OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
+
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
-            if (request.isInUse()) {
+            if (op == OperationType.ENABLE) {
               metalakeDispatcher.enableMetalake(identifier);
             } else {
               metalakeDispatcher.disableMetalake(identifier);
@@ -195,15 +240,17 @@ public class MetalakeOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} metalake: {}",
-                request.isInUse() ? "enable" : "disable",
+                op == OperationType.ENABLE ? "enable" : "disable",
                 metalakeName);
             return response;
           });
 
     } catch (Exception e) {
-      LOG.info("Failed to {} metalake: {}", request.isInUse() ? "enable" : "disable", metalakeName);
-      return ExceptionHandlers.handleMetalakeException(
-          request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE, metalakeName, e);
+      LOG.info(
+          "Failed to {} metalake: {}",
+          op == OperationType.ENABLE ? "enable" : "disable",
+          metalakeName);
+      return ExceptionHandlers.handleMetalakeException(op, metalakeName, e);
     }
   }
 
@@ -218,6 +265,13 @@ public class MetalakeOperations {
           String metalakeName,
       MetalakeUpdatesRequest updatesRequest) {
     LOG.info("Received alter metalake request for metalake: {}", metalakeName);
+    if (updatesRequest == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.ALTER,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -257,13 +311,13 @@ public class MetalakeOperations {
           () -> {
             NameIdentifier identifier = NameIdentifierUtil.ofMetalake(metalakeName);
             boolean dropped = metalakeDispatcher.dropMetalake(identifier, force);
-            if (!dropped) {
+            if (dropped) {
+              LOG.info("Metalake dropped: {}", metalakeName);
+            } else {
               LOG.warn("Failed to drop metalake by name {}", metalakeName);
             }
 
-            Response response = Utils.ok(new DropResponse(dropped));
-            LOG.info("Metalake dropped: {}", metalakeName);
-            return response;
+            return Utils.ok(new DropResponse(dropped));
           });
 
     } catch (Exception e) {

@@ -22,6 +22,7 @@ package org.apache.gravitino.listener.api.event.function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 
 /**
@@ -29,18 +30,34 @@ import org.apache.gravitino.listener.api.event.OperationType;
  * namespace.
  */
 @DeveloperApi
-public final class ListFunctionEvent extends FunctionEvent {
+public final class ListFunctionEvent extends FunctionEvent implements ListEvent {
   private final Namespace namespace;
+  private final int functionCount;
 
   /**
    * Constructs an instance of {@code ListFunctionEvent}.
    *
    * @param user The username of the individual who initiated the function listing.
    * @param namespace The namespace from which functions were listed.
+   * @param functionCount The number of functions returned by the list operation.
    */
-  public ListFunctionEvent(String user, Namespace namespace) {
+  public ListFunctionEvent(String user, Namespace namespace, int functionCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.functionCount = functionCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListFunctionEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the function listing.
+   * @param namespace The namespace from which functions were listed.
+   * @deprecated Use {@link #ListFunctionEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListFunctionEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -50,6 +67,12 @@ public final class ListFunctionEvent extends FunctionEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return functionCount;
   }
 
   @Override

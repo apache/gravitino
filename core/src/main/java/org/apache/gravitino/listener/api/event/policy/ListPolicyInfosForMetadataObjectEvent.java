@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event.policy;
 
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.listener.api.event.ListEvent;
 import org.apache.gravitino.listener.api.event.OperationType;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -29,8 +30,9 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
  * metadata object.
  */
 @DeveloperApi
-public final class ListPolicyInfosForMetadataObjectEvent extends PolicyEvent {
+public final class ListPolicyInfosForMetadataObjectEvent extends PolicyEvent implements ListEvent {
   private final MetadataObject metadataObject;
+  private final int count;
 
   /**
    * Constructs an instance of {@code ListPolicyInfosForMetadataObjectEvent}.
@@ -38,11 +40,35 @@ public final class ListPolicyInfosForMetadataObjectEvent extends PolicyEvent {
    * @param user The username of the individual who initiated the list policy infos operation.
    * @param metalake The metalake from which the policy infos were listed.
    * @param metadataObject The metadata object for which policy infos were listed.
+   * @param count The number of policy infos returned by the list operation.
    */
   public ListPolicyInfosForMetadataObjectEvent(
-      String user, String metalake, MetadataObject metadataObject) {
+      String user, String metalake, MetadataObject metadataObject, int count) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.metadataObject = metadataObject;
+    this.count = count;
+  }
+
+  /**
+   * Constructs an instance of {@code ListPolicyInfosForMetadataObjectEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the list policy infos operation.
+   * @param metalake The metalake from which the policy infos were listed.
+   * @param metadataObject The metadata object for which policy infos were listed.
+   * @deprecated Use {@link #ListPolicyInfosForMetadataObjectEvent(String, String, MetadataObject,
+   *     int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListPolicyInfosForMetadataObjectEvent(
+      String user, String metalake, MetadataObject metadataObject) {
+    this(user, metalake, metadataObject, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return count;
   }
 
   /**

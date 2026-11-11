@@ -150,6 +150,7 @@ public class TestMetalakeEvent {
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertNull(event.identifier());
     Assertions.assertEquals(ListMetalakeEvent.class, event.getClass());
+    Assertions.assertEquals(2, ((ListMetalakeEvent) event).resultCount());
     Assertions.assertEquals(OperationType.LIST_METALAKE, event.operationType());
     Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
 
@@ -292,6 +293,27 @@ public class TestMetalakeEvent {
   }
 
   @Test
+  @SuppressWarnings("deprecation")
+  void testListMetalakeEventDeprecatedConstructorReturnsNegativeCount() {
+    ListMetalakeEvent event = new ListMetalakeEvent("user");
+    Assertions.assertEquals(-1, event.resultCount());
+  }
+
+  @Test
+  void testListMetalakeEventEmptyList() {
+    MetalakeDispatcher emptyDispatcher = mock(MetalakeDispatcher.class);
+    when(emptyDispatcher.listMetalakes()).thenReturn(new Metalake[] {});
+    MetalakeEventDispatcher emptyEventDispatcher =
+        new MetalakeEventDispatcher(
+            new EventBus(Arrays.asList(dummyEventListener)), emptyDispatcher);
+
+    emptyEventDispatcher.listMetalakes();
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListMetalakeEvent.class, event.getClass());
+    Assertions.assertEquals(0, ((ListMetalakeEvent) event).resultCount());
+  }
+
+  @Test
   void testListMetalakeFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class, () -> failureDispatcher.listMetalakes());
@@ -326,7 +348,7 @@ public class TestMetalakeEvent {
         .thenReturn(metalake);
     when(dispatcher.loadMetalake(any(NameIdentifier.class))).thenReturn(metalake);
     when(dispatcher.dropMetalake(any(NameIdentifier.class), anyBoolean())).thenReturn(true);
-    when(dispatcher.listMetalakes()).thenReturn(null);
+    when(dispatcher.listMetalakes()).thenReturn(new Metalake[] {metalake, metalake});
     when(dispatcher.alterMetalake(any(NameIdentifier.class), any(MetalakeChange.class)))
         .thenReturn(metalake);
     return dispatcher;

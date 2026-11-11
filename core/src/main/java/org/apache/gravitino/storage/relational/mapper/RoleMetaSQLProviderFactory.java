@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
@@ -47,11 +48,27 @@ public class RoleMetaSQLProviderFactory {
 
   static class RoleMetaMySQLProvider extends RoleMetaBaseSQLProvider {}
 
-  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {}
+  static class RoleMetaH2Provider extends RoleMetaBaseSQLProvider {
+    @Override
+    public String selectRoleMetaByIdForShare(Long roleId) {
+      // H2 has no shared row-lock syntax, matching the other parent-fencing providers.
+      return selectRoleMetaByIdForUpdate(roleId);
+    }
+  }
 
   public static String selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
     return getProvider().selectRoleMetaByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public static String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForShare(roleId);
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public static String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForUpdate(roleId);
   }
 
   public static String selectRoleIdByMetalakeIdAndName(
@@ -89,8 +106,9 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().updateRoleMeta(newRolePO, oldRolePO);
   }
 
-  public static String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
-    return getProvider().softDeleteRoleMetaByRoleId(roleId);
+  public static String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteRoleMetaByRoleId(roleId, currentVersion);
   }
 
   public static String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -100,5 +118,38 @@ public class RoleMetaSQLProviderFactory {
   public static String deleteRoleMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteRoleMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+
+  public static String touchRoleUpdatedAt(@Param("roleId") long roleId) {
+    return getProvider().touchRoleUpdatedAt(roleId);
+  }
+
+  public static String batchGetRoleUpdatedAt(@Param("roleIds") List<Long> roleIds) {
+    return getProvider().batchGetRoleUpdatedAt(roleIds);
+  }
+  /**
+   * Returns SQL for a role and privilege snapshot by name.
+   *
+   * @param metalakeId the metalake ID
+   * @param roleName the role name
+   * @return the aggregate select SQL
+   */
+  public static String selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    return getProvider().selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName);
+  }
+
+  /**
+   * Returns SQL for matching roles and all their privileges.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the aggregate select SQL
+   */
+  public static String listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .listRolesWithPrivilegesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType);
   }
 }

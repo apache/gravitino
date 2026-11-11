@@ -25,8 +25,20 @@ plugins {
 }
 
 dependencies {
+  // Force upgrade for outdated transitive libthrift pulled by Hive Metastore
+  constraints {
+    implementation(libs.thrift)
+  }
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
+  constraints {
+    implementation(libs.xnio.api)
+  }
+
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
+  implementation(project(":catalogs:hadoop-auth")) {
+    exclude("*")
+  }
   implementation(project(":catalogs:hadoop-common")) {
     exclude("*")
   }
@@ -47,6 +59,8 @@ dependencies {
     exclude("org.ow2.asm")
   }
   implementation(libs.asm)
+  // Create cglib proxies without running the wrapped class constructors
+  implementation(libs.objenesis)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)
@@ -54,6 +68,8 @@ dependencies {
   implementation(libs.iceberg.azure)
   implementation(libs.iceberg.hive.metastore)
   implementation(libs.iceberg.gcp)
+  // Load gcs-service-account-file into Iceberg GCSFileIO properties (gcs.oauth2.token).
+  implementation(libs.google.auth.http)
   // Upgrade to Hadoop 3.3+ for Iceberg 1.10 compatibility
   // Iceberg 1.10 requires Hadoop 3.3+ APIs like FileSystem.openFile() and FsTracer.get()
   implementation(libs.hadoop3.client.api)
@@ -100,8 +116,10 @@ dependencies {
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)
+  compileOnly(libs.azure.identity)
 
   testImplementation(project(":server-common"))
+  testImplementation(libs.azure.identity)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)

@@ -54,7 +54,9 @@ function check_process_status() {
 
 function found_iceberg_rest_server_pid() {
   process_name='GravitinoIcebergRESTServer';
-  RUNNING_PIDS=$(ps x | grep ${process_name} | grep -v grep | awk '{print $1}');
+  RUNNING_PIDS=$(
+    ps xww | grep -F "${process_name}" | grep -F "${GRAVITINO_HOME}" | grep -v grep | awk '{print $1}'
+  );
 
   if [[ -z "${RUNNING_PIDS}" ]]; then
     return
@@ -111,6 +113,8 @@ function start() {
     mkdir -p "${GRAVITINO_LOG_DIR}"
   fi
 
+  rotate_out_file "${GRAVITINO_OUTFILE}"
+
   nohup ${JAVA_RUNNER} ${JAVA_OPTS} ${GRAVITINO_DEBUG_OPTS} -cp ${GRAVITINO_CLASSPATH} ${GRAVITINO_SERVER_NAME} >> "${GRAVITINO_OUTFILE}" 2>&1 &
 
   pid=$!
@@ -150,7 +154,7 @@ JAVA_OPTS+=" -Dlog4j2.configurationFile=file://${GRAVITINO_CONF_DIR}/gravitino-i
 JAVA_OPTS+=" -Dgravitino.iceberg-rest-server.log.path=${GRAVITINO_LOG_DIR}"
 JAVA_OPTS+=" -Dgravitino.iceberg-rest-server.name=${GRAVITINO_SIMPLE_SERVER_NAME}"
 JAVA_OPTS+=" ${GRAVITINO_MEM}"
-if [ "$JVM_VERSION" -eq 17 ]; then
+if [[ "$JVM_VERSION" -eq 17 ]]; then
   JAVA_OPTS+=" -XX:+IgnoreUnrecognizedVMOptions"
   JAVA_OPTS+=" --add-opens java.base/java.io=ALL-UNNAMED"
   JAVA_OPTS+=" --add-opens java.base/java.lang.invoke=ALL-UNNAMED"

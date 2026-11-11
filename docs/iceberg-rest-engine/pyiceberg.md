@@ -1,9 +1,9 @@
 ---
-title: Connect PyIceberg via Iceberg REST
-sidebar_label: PyIceberg
+title: "Connect PyIceberg to Iceberg REST"
+sidebar_label: "PyIceberg"
 ---
 
-# Connecting PyIceberg via Iceberg REST
+## Introduction
 
 Apache Gravitino exposes an [Iceberg REST catalog](../iceberg-rest-service.md) endpoint that any
 Iceberg-compatible client can connect to directly. This page describes how to use PyIceberg with
@@ -30,7 +30,7 @@ catalog = load_catalog(
 )
 ```
 
-### With credential vending
+### Credential Vending
 
 ```python
 catalog = load_catalog(
@@ -43,7 +43,7 @@ catalog = load_catalog(
 )
 ```
 
-### With OAuth2 authentication
+### OAuth2 Authentication
 
 ```python
 catalog = load_catalog(
@@ -59,29 +59,29 @@ catalog = load_catalog(
 See [How to authenticate](../security/how-to-authenticate.md) for Gravitino authentication
 configuration options.
 
-## Usage examples
+## Examples
 
-### List namespaces
+### List Namespaces
 
 ```python
 catalog.list_namespaces()
 ```
 
-### Load a table
+### Load a Table
 
 ```python
 table = catalog.load_table("db.table")
 print(table.schema())
 ```
 
-### Scan a table
+### Scan a Table
 
 ```python
 df = table.scan().to_arrow()
 print(df)
 ```
 
-### Create a namespace and table
+### Create a Namespace and Table
 
 ```python
 catalog.create_namespace("db")
@@ -96,7 +96,7 @@ schema = Schema(
 catalog.create_table("db.new_table", schema=schema)
 ```
 
-## Gravitino connector vs Iceberg REST
+## Gravitino Connector vs. Iceberg REST
 
 | Feature                  | Gravitino Engine Connector  | Iceberg REST                  |
 |:-------------------------|:----------------------------|:------------------------------|

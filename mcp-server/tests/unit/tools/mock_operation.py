@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Optional
+
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
@@ -27,11 +29,17 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.metalake_operation import MetalakeOperation
+from mcp_server.client.partition_operation import PartitionOperation
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.statistic_operation import StatisticOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
-    def __init__(self, metalake, uri):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         pass
 
     def as_table_operation(self) -> TableOperation:
@@ -64,15 +72,61 @@ class MockOperation(GravitinoOperation):
     def as_policy_operation(self) -> PolicyOperation:
         return MockPolicyOperation()
 
+    def as_partition_operation(self) -> PartitionOperation:
+        return MockPartitionOperation()
+
+    def as_view_operation(self) -> ViewOperation:
+        return MockViewOperation()
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return MockSemanticModelOperation()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return MockMetalakeOperation()
+
+
+class MockMetalakeOperation(MetalakeOperation):
+    async def get_list_of_metalakes(self) -> str:
+        return "mock_metalakes"
+
 
 class MockCatalogOperation(CatalogOperation):
     async def get_list_of_catalogs(self) -> str:
         return "mock_catalogs"
 
+    # pylint: disable=too-many-positional-arguments
+    async def create_catalog(
+        self, name, catalog_type, provider, comment, properties
+    ) -> str:
+        return f"mock_catalog_created: {name}, {catalog_type}, {provider}"
+
+    async def alter_catalog(self, catalog_name, updates) -> str:
+        return f"mock_catalog_altered: {catalog_name} with updates {updates}"
+
+    async def drop_catalog(self, catalog_name, force) -> str:
+        return f"mock_catalog_dropped: {catalog_name}, force={force}"
+
+    async def set_catalog_in_use(self, catalog_name, in_use) -> str:
+        return f"mock_catalog_set_in_use: {catalog_name}, in_use={in_use}"
+
 
 class MockSchemaOperation(SchemaOperation):
     async def get_list_of_schemas(self, catalog_name: str) -> str:
         return "mock_schemas"
+
+    async def create_schema(
+        self, catalog_name, name, comment, properties
+    ) -> str:
+        return f"mock_schema_created: {catalog_name}.{name}"
+
+    async def alter_schema(self, catalog_name, schema_name, updates) -> str:
+        return f"mock_schema_altered: {catalog_name}.{schema_name} with updates {updates}"
+
+    async def drop_schema(self, catalog_name, schema_name, cascade) -> str:
+        return (
+            f"mock_schema_dropped: {catalog_name}.{schema_name}, "
+            f"cascade={cascade}"
+        )
 
 
 class MockTableOperation(TableOperation):
@@ -85,6 +139,41 @@ class MockTableOperation(TableOperation):
         self, catalog_name: str, schema_name: str, table_name: str
     ) -> str:
         return "mock_table"
+
+    # pylint: disable=R0917
+    async def create_table(
+        self,
+        catalog_name,
+        schema_name,
+        name,
+        comment,
+        columns,
+        properties,
+        partitioning=None,
+        distribution=None,
+        sort_orders=None,
+        indexes=None,
+    ) -> str:
+        return (
+            f"mock_table_created: {catalog_name}.{schema_name}.{name}, "
+            f"partitioning={partitioning}"
+        )
+
+    async def alter_table(
+        self, catalog_name, schema_name, table_name, updates
+    ) -> str:
+        return (
+            f"mock_table_altered: {catalog_name}.{schema_name}.{table_name} "
+            f"with updates {updates}"
+        )
+
+    async def drop_table(
+        self, catalog_name, schema_name, table_name, purge
+    ) -> str:
+        return (
+            f"mock_table_dropped: {catalog_name}.{schema_name}.{table_name}, "
+            f"purge={purge}"
+        )
 
 
 class MockFilesetOperation(FilesetOperation):
@@ -110,34 +199,57 @@ class MockFilesetOperation(FilesetOperation):
     ) -> str:
         return "mock_files_in_fileset"
 
+    # pylint: disable=R0917
+    async def create_fileset(
+        self,
+        catalog_name,
+        schema_name,
+        name,
+        fileset_type,
+        storage_location,
+        comment,
+        properties,
+        storage_locations=None,
+    ) -> str:
+        return (
+            f"mock_fileset_created: {catalog_name}.{schema_name}.{name}, "
+            f"storage_locations={storage_locations}"
+        )
+
+    async def alter_fileset(
+        self, catalog_name, schema_name, fileset_name, updates
+    ) -> str:
+        return (
+            f"mock_fileset_altered: {catalog_name}.{schema_name}.{fileset_name} "
+            f"with updates {updates}"
+        )
+
+    async def drop_fileset(
+        self, catalog_name, schema_name, fileset_name
+    ) -> str:
+        return (
+            f"mock_fileset_dropped: {catalog_name}.{schema_name}.{fileset_name}"
+        )
+
 
 class MockPolicyOperation(PolicyOperation):
-    async def associate_policy_with_metadata(
-        self,
-        metadata_full_name: str,
-        metadata_type: str,
-        policies_to_add: list,
-        policies_to_remove: list,
+    async def list_policies_for_tag(self, tag_name: str) -> str:
+        return f"list_policies_for_tag: {tag_name}"
+
+    async def associate_policy_with_tag(
+        self, tag_name: str, policy_name: str, selector: dict
     ) -> str:
         return (
-            f"associate_policy_with_metadata: {metadata_full_name}, {metadata_type}, "
-            f"{policies_to_add}, {policies_to_remove}"
+            f"associate_policy_with_tag: {tag_name}, {policy_name}, {selector}"
         )
 
-    async def get_policy_for_metadata(
-        self, metadata_full_name: str, metadata_type: str, policy_name: str
+    async def disassociate_policy_from_tag(
+        self, tag_name: str, policy_name: str
     ) -> str:
-        return f"get_policy_for_metadata: {metadata_full_name}, {metadata_type}, {policy_name}"
+        return f"disassociate_policy_from_tag: {tag_name}, {policy_name}"
 
-    async def list_policies_for_metadata(
-        self, metadata_full_name: str, metadata_type: str
-    ) -> str:
-        return (
-            f"list_policies_for_metadata: {metadata_full_name}, {metadata_type}"
-        )
-
-    async def list_metadata_by_policy(self, policy_name: str) -> str:
-        return f"list_metadata_by_policy: {policy_name}"
+    async def list_tags_for_policy(self, policy_name: str) -> str:
+        return f"list_tags_for_policy: {policy_name}"
 
     async def get_list_of_policies(self) -> str:
         return "mock_policies"
@@ -170,6 +282,75 @@ class MockModelOperation(ModelOperation):
     ) -> str:
         return "mock_model_version_by_alias"
 
+    # pylint: disable=too-many-positional-arguments
+    async def register_model(
+        self, catalog_name, schema_name, name, comment, properties
+    ) -> str:
+        return f"mock_model_registered: {catalog_name}.{schema_name}.{name}"
+
+    async def delete_model(self, catalog_name, schema_name, model_name) -> str:
+        return f"mock_model_deleted: {catalog_name}.{schema_name}.{model_name}"
+
+    # pylint: disable=R0917
+    async def link_model_version(
+        self,
+        catalog_name,
+        schema_name,
+        model_name,
+        uri,
+        aliases,
+        comment,
+        properties,
+    ) -> str:
+        return (
+            f"mock_model_version_linked: {catalog_name}.{schema_name}.{model_name} "
+            f"uri={uri} aliases={aliases}"
+        )
+
+    async def delete_model_version(
+        self, catalog_name, schema_name, model_name, version
+    ) -> str:
+        return (
+            f"mock_model_version_deleted: {catalog_name}.{schema_name}.{model_name} "
+            f"version={version}"
+        )
+
+    async def delete_model_version_by_alias(
+        self, catalog_name, schema_name, model_name, alias
+    ) -> str:
+        return (
+            f"mock_model_version_deleted_by_alias: "
+            f"{catalog_name}.{schema_name}.{model_name} alias={alias}"
+        )
+
+    async def alter_model(
+        self, catalog_name, schema_name, model_name, updates
+    ) -> str:
+        return (
+            f"mock_model_altered: {catalog_name}.{schema_name}.{model_name} "
+            f"with updates {updates}"
+        )
+
+    # pylint: disable=R0917
+    async def alter_model_version(
+        self, catalog_name, schema_name, model_name, version, updates
+    ) -> str:
+        return (
+            f"mock_model_version_altered: "
+            f"{catalog_name}.{schema_name}.{model_name} version={version} "
+            f"with updates {updates}"
+        )
+
+    # pylint: disable=R0917
+    async def alter_model_version_by_alias(
+        self, catalog_name, schema_name, model_name, alias, updates
+    ) -> str:
+        return (
+            f"mock_model_version_altered_by_alias: "
+            f"{catalog_name}.{schema_name}.{model_name} alias={alias} "
+            f"with updates {updates}"
+        )
+
 
 class MockTopicOperation(TopicOperation):
     async def list_of_topics(self, catalog_name: str, schema_name: str) -> str:
@@ -179,6 +360,23 @@ class MockTopicOperation(TopicOperation):
         self, catalog_name: str, schema_name: str, topic_name: str
     ) -> str:
         return "mock_topic"
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_topic(
+        self, catalog_name, schema_name, name, comment, properties
+    ) -> str:
+        return f"mock_topic_created: {catalog_name}.{schema_name}.{name}"
+
+    async def alter_topic(
+        self, catalog_name, schema_name, topic_name, updates
+    ) -> str:
+        return (
+            f"mock_topic_altered: {catalog_name}.{schema_name}.{topic_name} "
+            f"with updates {updates}"
+        )
+
+    async def delete_topic(self, catalog_name, schema_name, topic_name) -> str:
+        return f"mock_topic_deleted: {catalog_name}.{schema_name}.{topic_name}"
 
 
 class MockTagOperation(TagOperation):
@@ -239,14 +437,13 @@ class MockJobOperation(JobOperation):
 
 class MockStatisticOperation(StatisticOperation):
     async def list_of_statistics(
-        self, metalake_name: str, metadata_type: str, metadata_fullname: str
+        self, metadata_type: str, metadata_fullname: str
     ) -> str:
-        return f"mock_statistics: {metalake_name}, {metadata_type}, {metadata_fullname}"
+        return f"mock_statistics: {metadata_type}, {metadata_fullname}"
 
     # pylint: disable=R0917
     async def list_statistic_for_partition(
         self,
-        metalake_name: str,
         metadata_type: str,
         metadata_fullname: str,
         from_partition_name: str,
@@ -255,6 +452,97 @@ class MockStatisticOperation(StatisticOperation):
         to_inclusive: bool = False,
     ) -> str:
         return (
-            f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
+            f"mock_statistics_for_partition: {metadata_type}, {metadata_fullname},"
             f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
         )
+
+
+class MockPartitionOperation(PartitionOperation):
+    async def list_of_partitions(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        details: bool = False,
+    ) -> str:
+        return (
+            f"mock_partitions: {catalog_name}, {schema_name}, {table_name}, "
+            f"{details}"
+        )
+
+    async def get_partition(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        partition_name: str,
+    ) -> str:
+        return (
+            f"mock_partition: {catalog_name}, {schema_name}, {table_name}, "
+            f"{partition_name}"
+        )
+
+
+class MockViewOperation(ViewOperation):
+    async def list_of_views(self, catalog_name: str, schema_name: str) -> str:
+        return f"mock_views: {catalog_name}, {schema_name}"
+
+    async def load_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        return f"mock_view: {catalog_name}, {schema_name}, {view_name}"
+
+
+class MockSemanticModelOperation(SemanticModelOperation):
+    async def list_semantic_model_datasets(
+        self,
+        source_type: str,
+        catalog_name: str,
+        schema_name: str,
+        source_name: str,
+    ) -> str:
+        return "[]"
+
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        return "[]"
+
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        return "[]"
+
+    async def list_of_semantic_models(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        return "[]"
+
+    async def load_semantic_model(
+        self, catalog_name: str, schema_name: str, semantic_model_name: str
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_semantic_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        definition: dict,
+        comment: Optional[str] = None,
+        properties: Optional[dict[str, str]] = None,
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    async def alter_semantic_model(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        updates: list[dict],
+    ) -> str:
+        return '{"name": "mock_semantic_model"}'
+
+    async def drop_semantic_model(
+        self, catalog_name: str, schema_name: str, semantic_model_name: str
+    ) -> str:
+        return "true"

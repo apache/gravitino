@@ -29,6 +29,14 @@ import org.apache.gravitino.credential.CredentialProviderDelegator;
 public class ADLSTokenProvider extends CredentialProviderDelegator<ADLSTokenCredential> {
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "abfs".equalsIgnoreCase(scheme)
+        || "abfss".equalsIgnoreCase(scheme)
+        || "wasb".equalsIgnoreCase(scheme)
+        || "wasbs".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return ADLSTokenCredential.ADLS_TOKEN_CREDENTIAL_TYPE;
   }

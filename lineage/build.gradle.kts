@@ -22,6 +22,7 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":server-common"))
@@ -37,6 +38,10 @@ dependencies {
   implementation(libs.httpcore5)
   implementation(libs.jackson.dataformat.yaml)
   implementation(libs.micrometer.core)
+
+  constraints {
+    implementation(libs.snakeyaml)
+  }
 
   annotationProcessor(libs.lombok)
   compileOnly(libs.lombok)

@@ -25,12 +25,34 @@ import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Represents an event that is triggered upon the successful list of schemas. */
 @DeveloperApi
-public final class ListSchemaEvent extends SchemaEvent {
+public final class ListSchemaEvent extends SchemaEvent implements ListEvent {
   private final Namespace namespace;
+  private final int schemaCount;
 
-  public ListSchemaEvent(String user, Namespace namespace) {
+  /**
+   * Constructs an instance of {@code ListSchemaEvent}.
+   *
+   * @param user The username of the individual who initiated the schema listing.
+   * @param namespace The namespace from which schemas were listed.
+   * @param schemaCount The number of schemas returned by the list operation.
+   */
+  public ListSchemaEvent(String user, Namespace namespace, int schemaCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.schemaCount = schemaCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListSchemaEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the schema listing.
+   * @param namespace The namespace from which schemas were listed.
+   * @deprecated Use {@link #ListSchemaEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListSchemaEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -40,6 +62,12 @@ public final class ListSchemaEvent extends SchemaEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return schemaCount;
   }
 
   /**

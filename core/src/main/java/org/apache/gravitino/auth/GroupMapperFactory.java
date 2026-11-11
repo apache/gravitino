@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.auth;
 
+import org.apache.gravitino.Config;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,30 +35,34 @@ public class GroupMapperFactory {
    *
    * @param mapperType the type of the mapper (e.g., "regex" or fully qualified class name)
    * @param regexPattern the regex pattern to use (only for "regex" mapper type)
+   * @param config the server configuration passed to {@link GroupMapper#initialize(Config)}
    * @return a configured GroupMapper instance
    * @throws IllegalArgumentException if the mapper type is invalid or initialization fails
    */
-  public static GroupMapper create(String mapperType, String regexPattern) {
+  public static GroupMapper create(String mapperType, String regexPattern, Config config) {
+    GroupMapper mapper;
     if ("regex".equalsIgnoreCase(mapperType)) {
       if (regexPattern == null) {
         throw new IllegalArgumentException("Regex pattern cannot be null for regex mapper");
       }
-      return new RegexGroupMapper(regexPattern);
-    }
-
-    try {
-      Class<?> clazz = Class.forName(mapperType);
-      if (!GroupMapper.class.isAssignableFrom(clazz)) {
-        throw new IllegalArgumentException(
-            "Class " + mapperType + " does not implement GroupMapper");
+      mapper = new RegexGroupMapper(regexPattern);
+    } else {
+      try {
+        Class<?> clazz = Class.forName(mapperType);
+        if (!GroupMapper.class.isAssignableFrom(clazz)) {
+          throw new IllegalArgumentException(
+              "Class " + mapperType + " does not implement GroupMapper");
+        }
+        mapper = (GroupMapper) clazz.getDeclaredConstructor().newInstance();
+      } catch (ClassNotFoundException e) {
+        LOG.error("Failed to load GroupMapper class: {}", mapperType, e);
+        throw new IllegalArgumentException("Failed to load GroupMapper class: " + mapperType, e);
+      } catch (Exception e) {
+        LOG.error("Failed to create GroupMapper: {}", mapperType, e);
+        throw new IllegalArgumentException("Failed to create GroupMapper: " + mapperType, e);
       }
-      return (GroupMapper) clazz.getDeclaredConstructor().newInstance();
-    } catch (ClassNotFoundException e) {
-      LOG.error("Failed to load GroupMapper class: {}", mapperType, e);
-      throw new IllegalArgumentException("Failed to load GroupMapper class: " + mapperType, e);
-    } catch (Exception e) {
-      LOG.error("Failed to create GroupMapper: {}", mapperType, e);
-      throw new IllegalArgumentException("Failed to create GroupMapper: " + mapperType, e);
     }
+    mapper.initialize(config);
+    return mapper;
   }
 }

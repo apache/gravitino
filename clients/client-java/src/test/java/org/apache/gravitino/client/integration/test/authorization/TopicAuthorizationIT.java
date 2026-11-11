@@ -28,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -44,6 +45,7 @@ import org.apache.gravitino.integration.test.container.KafkaContainer;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
@@ -149,24 +151,31 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
   @Order(2)
   public void testListTopic() {
     TopicCatalog topicCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
-    NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(
-        new NameIdentifier[] {
-          NameIdentifier.of(SCHEMA, "topic1"),
-          NameIdentifier.of(SCHEMA, "topic2"),
-          NameIdentifier.of(SCHEMA, "topic3")
-        },
-        topicsList);
     // normal user can only see topics they have privilege for
     TopicCatalog topicCatalogNormalUser =
         normalUserClient.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
 
-    NameIdentifier[] topicsListNormalUser = topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(
-        new NameIdentifier[] {
-          NameIdentifier.of(SCHEMA, "topic2"), NameIdentifier.of(SCHEMA, "topic3")
-        },
-        topicsListNormalUser);
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(
+                  new NameIdentifier[] {
+                    NameIdentifier.of(SCHEMA, "topic1"),
+                    NameIdentifier.of(SCHEMA, "topic2"),
+                    NameIdentifier.of(SCHEMA, "topic3")
+                  },
+                  topicsList);
+
+              NameIdentifier[] topicsListNormalUser =
+                  topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(
+                  new NameIdentifier[] {
+                    NameIdentifier.of(SCHEMA, "topic2"), NameIdentifier.of(SCHEMA, "topic3")
+                  },
+                  topicsListNormalUser);
+            });
   }
 
   @Test
@@ -245,9 +254,15 @@ public class TopicAuthorizationIT extends BaseRestApiAuthorizationIT {
     TopicCatalog topicCatalog = client.loadMetalake(METALAKE).loadCatalog(CATALOG).asTopicCatalog();
     topicCatalog.dropTopic(NameIdentifier.of(SCHEMA, "topic1"));
     // check topics are dropped
-    NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(new NameIdentifier[] {}, topicsList);
-    NameIdentifier[] topicsListNormalUser = topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
-    assertArrayEquals(new NameIdentifier[] {}, topicsListNormalUser);
+    Awaitility.await()
+        .atMost(30, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              NameIdentifier[] topicsList = topicCatalog.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(new NameIdentifier[] {}, topicsList);
+              NameIdentifier[] topicsListNormalUser =
+                  topicCatalogNormalUser.listTopics(Namespace.of(SCHEMA));
+              assertArrayEquals(new NameIdentifier[] {}, topicsListNormalUser);
+            });
   }
 }

@@ -33,6 +33,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 
@@ -43,6 +44,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
+
+  /** Whether to expose metrics endpoints when the Iceberg REST service runs standalone. */
+  public static final ConfigEntry<Boolean> METRICS_ENABLED =
+      new ConfigBuilder("metrics.enabled")
+          .doc(
+              "Whether to expose /metrics and /prometheus/metrics in standalone mode. "
+                  + "This setting is ignored when running as an auxiliary service.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND)
@@ -220,6 +231,84 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(IcebergConstants.STATIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
 
+  public static final ConfigEntry<Boolean> ICEBERG_REST_DISABLE_REST_AUTHZ =
+      new ConfigBuilder(IcebergConstants.ICEBERG_REST_DISABLE_REST_AUTHZ)
+          .doc(
+              "Whether to disable authorization in IRC1 when backend catalog is a REST catalog. "
+                  + "Set to false to enforce authorization in IRC1 before proxying to IRC2.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  /**
+   * How a REST catalog backend authenticates to the remote catalog. {@code user-token} forwards the
+   * calling user's access token; {@code service-account} connects with the configured service
+   * account credential and makes Gravitino authorize every request locally.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_AUTH_TYPE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_AUTH_TYPE)
+          .doc(
+              "How the REST catalog backend authenticates to the remote catalog. `user-token`"
+                  + " forwards the calling user's access token, and the remote catalog authorizes"
+                  + " the user. `service-account` connects with the credential in"
+                  + " `rest-backend-token` or `rest-backend-credential`, and Gravitino authorizes"
+                  + " every request before proxying it.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN.equals(value)
+                      || IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(value),
+              "The value must be `user-token` or `service-account`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN);
+
+  /**
+   * Who issues storage credentials for tables of a federated REST catalog. {@code remote} passes
+   * through what the remote catalog vends; {@code local} issues credentials through this catalog's
+   * credential providers, scoped to the table and to the caller's privilege. Service-account
+   * connections always use local credentials.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_STORAGE_CREDENTIAL_SOURCE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE)
+          .doc(
+              "Who issues storage credentials for tables of a federated REST catalog. `remote`"
+                  + " passes through the credentials the remote catalog vends. `local` does not"
+                  + " request credentials from the remote catalog and issues them through this"
+                  + " catalog's `credential-providers`, scoped to the table location and to the"
+                  + " caller's privilege on the table. Service-account connections always use local"
+                  + " credentials.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE.equals(value)
+                      || IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                          value),
+              "The value must be `local` or `remote`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE);
+
+  /** HTTP connection timeout in milliseconds for the REST catalog backend. */
+  public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
+      new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)
+          .alternatives(
+              Collections.singletonList(IcebergConstants.ICEBERG_REST_CLIENT_CONNECTION_TIMEOUT_MS))
+          .doc("HTTP connection timeout in milliseconds for the REST catalog backend.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10000);
+
+  /** HTTP socket timeout in milliseconds for the REST catalog backend. */
+  public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS =
+      new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_SOCKET_TIMEOUT_MS)
+          .alternatives(
+              Collections.singletonList(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS))
+          .doc("HTTP socket timeout in milliseconds for the REST catalog backend.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(60000);
+
   public static final ConfigEntry<String> GRAVITINO_URI =
       new ConfigBuilder(IcebergConstants.GRAVITINO_URI)
           .doc(
@@ -264,17 +353,19 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> TABLE_METADATA_CACHE_IMPL =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_IMPL)
-          .doc("Table metadata cache implementation")
+          .doc(
+              "Table metadata cache implementation. Set to empty string(\"\") if catalog-backend "
+                  + "is rest catalog, or custom catalog without the SupportsMetadataLocation interface.")
           .version(ConfigConstants.VERSION_1_1_0)
           .stringConf()
-          .create();
+          .createWithDefault(LocalTableMetadataCache.class.getName());
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_CAPACITY)
           .doc("Table metadata cache capacity")
           .version(ConfigConstants.VERSION_1_1_0)
           .intConf()
-          .createWithDefault(200);
+          .createWithDefault(1000);
 
   public static final ConfigEntry<Integer> TABLE_METADATA_CACHE_EXPIRE_MINUTES =
       new ConfigBuilder(IcebergConstants.TABLE_METADATA_CACHE_EXPIRE_MINUTES)
@@ -307,6 +398,62 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_WORKER_THREADS =
+      new ConfigBuilder("async-cleanup.worker-threads")
+          .doc("Worker pool size per server (concurrent async cleanup jobs).")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(2);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_DELETE_THREADS =
+      new ConfigBuilder("async-cleanup.delete-threads")
+          .doc("Server-wide file-delete pool size, shared across all cleanup jobs.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(4);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_DELETE_BATCH_SIZE =
+      new ConfigBuilder("async-cleanup.delete-batch-size")
+          .doc("Files per bulk-delete batch handed to the delete executor.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(1000);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_POLL_INTERVAL_SECS =
+      new ConfigBuilder("async-cleanup.poll-interval-secs")
+          .doc("Worker poll interval in seconds; also the retry interval.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_HEARTBEAT_TIMEOUT_SECS =
+      new ConfigBuilder("async-cleanup.heartbeat-timeout-secs")
+          .doc("Age in seconds after which a stale-heartbeat job can be taken over by a worker.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(300);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_MAX_ATTEMPTS =
+      new ConfigBuilder("async-cleanup.max-attempts")
+          .doc("Number of attempts before a cleanup job is marked FAILED.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(5);
+
+  public static final ConfigEntry<Integer> ASYNC_CLEANUP_RETENTION_HOURS =
+      new ConfigBuilder("async-cleanup.retention-hours")
+          .doc("How long finished (SUCCEEDED/FAILED) cleanup rows are retained before pruning.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(720);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
@@ -330,6 +477,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         IcebergPropertiesUtils.toIcebergCatalogProperties(config);
     transformedConfig.putAll(config);
     return transformedConfig;
+  }
+
+  /**
+   * Returns whether a REST catalog backend connects to the remote catalog as a service account.
+   *
+   * @return {@code true} if {@code rest-backend-auth-type} is {@code service-account}
+   */
+  public boolean isRestBackendServiceAccount() {
+    return IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(
+        get(REST_BACKEND_AUTH_TYPE));
   }
 
   @Override

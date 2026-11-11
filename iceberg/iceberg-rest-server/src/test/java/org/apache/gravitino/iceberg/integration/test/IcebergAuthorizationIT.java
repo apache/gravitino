@@ -37,6 +37,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -47,13 +48,19 @@ import org.apache.gravitino.integration.test.util.TestDatabaseName;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.authorization.jcasbin.JcasbinAuthorizer;
+import org.apache.hadoop.conf.Configuration;
 import org.apache.iceberg.CatalogProperties;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,6 +71,7 @@ import org.slf4j.LoggerFactory;
  * user for Spark SQL, doesn't have privileges by default. You could use Spark SQL to try to do the
  * operation and use Gravitino client to grant privilege or check the test result.
  */
+@Tag("gravitino-docker-test")
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergAuthorizationIT.class);
@@ -71,6 +79,7 @@ public class IcebergAuthorizationIT extends BaseIT {
   protected static final String METALAKE_NAME = "test_metalake";
   protected static final String GRAVITINO_CATALOG_NAME = "iceberg";
   protected static final String SPARK_CATALOG_NAME = "rest";
+  protected static final String NARROWED_SPARK_CATALOG_NAME = "narrowed";
 
   protected static final String SUPER_USER = "super";
   protected static final String NORMAL_USER = "normal";
@@ -80,19 +89,31 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   private static ContainerSuite containerSuite = ContainerSuite.getInstance();
   private SparkSession sparkSession;
+  // IRC REST catalog authenticated as SUPER_USER, used for setup operations that the Gravitino
+  // REST API cannot perform — e.g. creating hierarchical schemas whose names contain the
+  // configured schema separator (Gravitino rejects those names at the REST boundary).
+  protected RESTCatalog adminIcebergCatalog;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
-    containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
+    containerSuite.startPostgreSQLContainer(getTestDatabaseName());
     startGravitinoServerWithIcebergREST();
     initMetalakeAndCatalog();
     initSparkEnv();
+    initAdminIcebergCatalog();
   }
 
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
+    if (adminIcebergCatalog != null) {
+      try {
+        adminIcebergCatalog.close();
+      } catch (Exception e) {
+        LOG.warn("Failed to close admin Iceberg REST catalog", e);
+      }
+    }
     sparkSession.close();
     client.dropMetalake(METALAKE_NAME, true);
 
@@ -159,7 +180,7 @@ public class IcebergAuthorizationIT extends BaseIT {
             "gravitino.authorization.serviceAdmins",
             SUPER_USER,
             "gravitino.authenticators",
-            "simple",
+            authenticator(),
             // BaseIT will use SimpleAuthUserName to create Gravitino client
             "SimpleAuthUserName",
             SUPER_USER,
@@ -188,8 +209,26 @@ public class IcebergAuthorizationIT extends BaseIT {
     return Maps.newHashMap();
   }
 
+  /** Returns the authenticator used by the Gravitino server in this test suite. */
+  protected String authenticator() {
+    return "simple";
+  }
+
   protected boolean supportsCredentialVending() {
     return false;
+  }
+
+  /**
+   * Roles sent as {@code X-Gravitino-Active-Roles} by the {@link #NARROWED_SPARK_CATALOG_NAME}
+   * catalog. Returning null registers no such catalog.
+   */
+  protected String narrowedCatalogActiveRoles() {
+    return null;
+  }
+
+  /** Returns the PostgreSQL database used by this authorization test suite. */
+  protected TestDatabaseName getTestDatabaseName() {
+    return TestDatabaseName.PG_ICEBERG_AUTHZ_IT;
   }
 
   void revokeUserRoles() {
@@ -228,6 +267,45 @@ public class IcebergAuthorizationIT extends BaseIT {
     Assertions.assertTrue(exists);
   }
 
+  /**
+   * Initialize a REST catalog client authenticated as {@link #SUPER_USER}. Tests use it to perform
+   * admin setup operations such as creating hierarchical schemas.
+   */
+  private void initAdminIcebergCatalog() {
+    Map<String, String> props = Maps.newHashMap();
+    props.put(CatalogProperties.URI, getIcebergRestServiceUri());
+    props.put(CatalogProperties.CACHE_ENABLED, "false");
+    props.put("rest.auth.type", "basic");
+    props.put("rest.auth.basic.username", SUPER_USER);
+    props.put("rest.auth.basic.password", "mock");
+    RESTCatalog catalog = new RESTCatalog();
+    catalog.setConf(new Configuration());
+    catalog.initialize("admin", props);
+    adminIcebergCatalog = catalog;
+  }
+
+  /**
+   * Creates a nested Iceberg namespace via the IRC API as {@link #SUPER_USER}. The hook dispatcher
+   * auto-creates any missing parent namespaces and imports every newly-created namespace into
+   * Gravitino as a schema entity, so the test only needs to issue a single call for the deepest
+   * level.
+   */
+  protected void createNestedNamespaceViaIRC(String... levels) {
+    adminIcebergCatalog.createNamespace(Namespace.of(levels));
+  }
+
+  /** Creates a 2-column Iceberg table via the IRC API as {@link #SUPER_USER}. */
+  protected void createTableViaIRC(String[] namespaceLevels, String tableName) {
+    Schema schema =
+        new Schema(
+            org.apache.iceberg.types.Types.NestedField.required(
+                1, "col_1", org.apache.iceberg.types.Types.IntegerType.get(), "col_1_comment"),
+            org.apache.iceberg.types.Types.NestedField.required(
+                2, "col_2", org.apache.iceberg.types.Types.IntegerType.get(), "col_2_comment"));
+    adminIcebergCatalog.createTable(
+        TableIdentifier.of(Namespace.of(namespaceLevels), tableName), schema);
+  }
+
   private void initSparkEnv() {
     String icebergRESTUri = getIcebergRestServiceUri();
     LOG.info("Iceberg REST uri: {}", icebergRESTUri);
@@ -236,26 +314,46 @@ public class IcebergAuthorizationIT extends BaseIT {
             .set(
                 "spark.sql.extensions",
                 "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .set("spark.sql.catalog.rest", "org.apache.iceberg.spark.SparkCatalog")
-            .set("spark.sql.catalog.rest.type", "rest")
-            .set("spark.sql.catalog.rest.uri", icebergRESTUri)
-            // disable spark side table cache to check the privilege in each operation
-            .set("spark.sql.catalog.rest." + CatalogProperties.CACHE_ENABLED, "false")
-            .set("spark.sql.catalog.rest.rest.auth.type", "basic")
-            .set("spark.sql.catalog.rest.rest.auth.basic.username", NORMAL_USER)
-            .set("spark.sql.catalog.rest.rest.auth.basic.password", "mock")
             // drop Iceberg table purge may hang in spark local mode
             .set("spark.locality.wait.node", "0");
-    if (supportsCredentialVending()) {
+    configureRestCatalog(sparkConf, SPARK_CATALOG_NAME, icebergRESTUri);
+
+    String activeRoles = narrowedCatalogActiveRoles();
+    if (activeRoles != null) {
+      configureRestCatalog(sparkConf, NARROWED_SPARK_CATALOG_NAME, icebergRESTUri);
       sparkConf.set(
-          "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
+          sparkCatalogPrefix(NARROWED_SPARK_CATALOG_NAME)
+              + ".header."
+              + AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER,
+          activeRoles);
     }
 
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
 
+  private static String sparkCatalogPrefix(String catalogName) {
+    return "spark.sql.catalog." + catalogName;
+  }
+
+  private void configureRestCatalog(
+      SparkConf sparkConf, String catalogName, String icebergRESTUri) {
+    String prefix = sparkCatalogPrefix(catalogName);
+    sparkConf
+        .set(prefix, "org.apache.iceberg.spark.SparkCatalog")
+        .set(prefix + ".type", "rest")
+        .set(prefix + ".uri", icebergRESTUri)
+        // disable spark side table cache to check the privilege in each operation
+        .set(prefix + "." + CatalogProperties.CACHE_ENABLED, "false")
+        .set(prefix + ".rest.auth.type", "basic")
+        .set(prefix + ".rest.auth.basic.username", NORMAL_USER)
+        .set(prefix + ".rest.auth.basic.password", "mock");
+    if (supportsCredentialVending()) {
+      sparkConf.set(prefix + ".header.X-Iceberg-Access-Delegation", "vended-credentials");
+    }
+  }
+
   private String getPGUri() {
-    return containerSuite.getPostgreSQLContainer().getJdbcUrl(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
+    return containerSuite.getPostgreSQLContainer().getJdbcUrl(getTestDatabaseName());
   }
 
   private String getPGUser() {

@@ -30,9 +30,9 @@ configurations.shadow {
 }
 
 dependencies {
-  // The iceberg-azure-bundle already includes the dependencies
-  // required by Gravitino for credential vending.
   implementation(libs.iceberg.azure.bundle)
+  // Include Gravitino Azure credential providers (AzureAccountKeyProvider, etc.) for credential vending
+  implementation(project(":bundles:azure"))
 }
 
 tasks.withType(ShadowJar::class.java) {
@@ -42,6 +42,11 @@ tasks.withType(ShadowJar::class.java) {
 
   dependencies {
     exclude(dependency("org.slf4j:slf4j-api"))
+    // Exclude Gravitino modules to prevent class duplication with server classpath
+    exclude(project(":api"))
+    exclude(project(":common"))
+    exclude(project(":catalogs:catalog-common"))
+    exclude(project(":catalogs:hadoop-common"))
   }
 
   mergeServiceFiles()

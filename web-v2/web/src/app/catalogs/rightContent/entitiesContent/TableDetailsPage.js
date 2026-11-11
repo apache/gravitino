@@ -36,6 +36,7 @@ import { getCatalogDetails, getCurrentEntityOwner } from '@/lib/store/metalakes'
 import CreateTableDialog from '../CreateTableDialog'
 import Loading from '@/components/Loading'
 import PropertiesContent from '@/components/PropertiesContent'
+import { formatColumnType } from '@/lib/utils/columnType'
 
 const SetOwnerDialog = dynamic(() => import('@/components/SetOwnerDialog'), {
   loading: () => <Loading />,
@@ -389,14 +390,22 @@ export default function TableDetailsPage({ ...props }) {
         filters: columnTypeFitlers,
         onFilter: (value, record) =>
           typeof record.type === 'string' ? record.type.indexOf(value) === 0 : record.type.type.indexOf(value) === 0,
-        render: type => <Tag color={columnTypeColor(type)}>{typeof type === 'string' ? type : type.type}</Tag>
+        render: type => {
+          const formattedType = formatColumnType(type)
+
+          return (
+            <Tag color={columnTypeColor(type)} title={formattedType}>
+              {formattedType}
+            </Tag>
+          )
+        }
       },
       {
         title: 'Tags',
         dataIndex: 'tags',
         key: 'tags',
         render: (_, record) =>
-          !record?.node ? (
+          record?.node === 'tableColumn' ? (
             <Tags
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}
@@ -408,7 +417,7 @@ export default function TableDetailsPage({ ...props }) {
         dataIndex: 'policies',
         key: 'policies',
         render: (_, record) =>
-          !record?.node ? (
+          record?.node === 'tableColumn' ? (
             <Policies
               metadataObjectType={'column'}
               metadataObjectFullName={`${catalog}.${schema}.${table}.${record.name}`}

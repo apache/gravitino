@@ -118,6 +118,15 @@ class OAuthProviderFactory {
 
     return provider.getType()
   }
+
+  /**
+   * Reset the factory state to force re-initialization on next getProvider() call.
+   * This should be called during logout to ensure clean state for next login.
+   */
+  reset() {
+    this.currentProvider = null
+    this.configPromise = null
+  }
 }
 
 // Export singleton instance

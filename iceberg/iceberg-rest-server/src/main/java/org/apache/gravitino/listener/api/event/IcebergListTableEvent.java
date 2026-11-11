@@ -25,15 +25,48 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represent an event after listing Iceberg table successfully.
  *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of tables directly within the ListTableEvent, the actual tables listed are not maintained
- * in this event.
+ * <p>Only the result count is stored rather than the full list of identifiers to avoid excessive
+ * memory usage in environments with large table listings.
  */
 @DeveloperApi
-public class IcebergListTableEvent extends IcebergTableEvent {
+public class IcebergListTableEvent extends IcebergTableEvent implements ListEvent {
+
+  private final int tableCount;
+
+  /**
+   * Constructs an instance of {@code IcebergListTableEvent}.
+   *
+   * @param icebergRequestContext the request context.
+   * @param resourceIdentifier the namespace identifier from which tables were listed.
+   * @param tableCount the number of tables returned by the list operation.
+   */
+  public IcebergListTableEvent(
+      IcebergRequestContext icebergRequestContext,
+      NameIdentifier resourceIdentifier,
+      int tableCount) {
+    super(icebergRequestContext, resourceIdentifier);
+    this.tableCount = tableCount;
+  }
+
+  /**
+   * Constructs an instance of {@code IcebergListTableEvent} without a count.
+   *
+   * @param icebergRequestContext the request context.
+   * @param resourceIdentifier the namespace identifier from which tables were listed.
+   * @deprecated Use {@link #IcebergListTableEvent(IcebergRequestContext, NameIdentifier, int)}
+   *     instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
   public IcebergListTableEvent(
       IcebergRequestContext icebergRequestContext, NameIdentifier resourceIdentifier) {
-    super(icebergRequestContext, resourceIdentifier);
+    this(icebergRequestContext, resourceIdentifier, -1);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return tableCount;
   }
 
   @Override

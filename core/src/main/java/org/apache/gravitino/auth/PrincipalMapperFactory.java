@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.auth;
 
+import org.apache.gravitino.Config;
+
 /** Factory class for creating {@link PrincipalMapper} instances. */
 public class PrincipalMapperFactory {
 
@@ -30,27 +32,31 @@ public class PrincipalMapperFactory {
    * @param mapperType "regex" for built-in regex mapper, or fully qualified class name for custom
    *     mapper
    * @param regexPattern the regex pattern (only used when mapperType is "regex")
+   * @param config the server configuration passed to {@link PrincipalMapper#initialize(Config)}
    * @return a configured PrincipalMapper instance
    * @throws IllegalArgumentException if the mapper cannot be created
    */
-  public static PrincipalMapper create(String mapperType, String regexPattern) {
+  public static PrincipalMapper create(String mapperType, String regexPattern, Config config) {
+    PrincipalMapper mapper;
     if ("regex".equalsIgnoreCase(mapperType)) {
-      return new RegexPrincipalMapper(regexPattern);
-    }
-
-    // Load custom mapper class
-    try {
-      Class<?> clazz = Class.forName(mapperType);
-      if (!PrincipalMapper.class.isAssignableFrom(clazz)) {
+      mapper = new RegexPrincipalMapper(regexPattern);
+    } else {
+      // Load custom mapper class
+      try {
+        Class<?> clazz = Class.forName(mapperType);
+        if (!PrincipalMapper.class.isAssignableFrom(clazz)) {
+          throw new IllegalArgumentException(
+              "Class " + mapperType + " does not implement PrincipalMapper");
+        }
+        mapper = (PrincipalMapper) clazz.getDeclaredConstructor().newInstance();
+      } catch (ClassNotFoundException e) {
+        throw new IllegalArgumentException("Unknown principal mapper type: " + mapperType, e);
+      } catch (Exception e) {
         throw new IllegalArgumentException(
-            "Class " + mapperType + " does not implement PrincipalMapper");
+            "Failed to instantiate principal mapper: " + mapperType, e);
       }
-      return (PrincipalMapper) clazz.getDeclaredConstructor().newInstance();
-    } catch (ClassNotFoundException e) {
-      throw new IllegalArgumentException("Unknown principal mapper type: " + mapperType, e);
-    } catch (Exception e) {
-      throw new IllegalArgumentException(
-          "Failed to instantiate principal mapper: " + mapperType, e);
     }
+    mapper.initialize(config);
+    return mapper;
   }
 }

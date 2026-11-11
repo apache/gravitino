@@ -20,24 +20,24 @@ package org.apache.gravitino.s3.credential;
 
 import java.io.IOException;
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.AwsIrsaCredential;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.RoleSessionNameUtils;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
-import software.amazon.awssdk.auth.credentials.AwsCredentials;
-import software.amazon.awssdk.auth.credentials.AwsSessionCredentials;
-import software.amazon.awssdk.auth.credentials.WebIdentityTokenFileCredentialsProvider;
+import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSource;
+import org.apache.gravitino.s3.credential.webidentity.WebIdentityTokenSources;
 import software.amazon.awssdk.policybuilder.iam.IamConditionOperator;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
@@ -53,46 +53,42 @@ import software.amazon.awssdk.services.sts.model.Credentials;
 /** Generate AWS IRSA credentials according to the read and write paths. */
 public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCredential> {
 
-  private WebIdentityTokenFileCredentialsProvider baseCredentialsProvider;
+  private final Supplier<String> environmentRoleArnSupplier;
+  private WebIdentityTokenSource tokenSource;
   private String roleArn;
   private int tokenExpireSecs;
   private String region;
   private String stsEndpoint;
+  private boolean listLocationPrefix;
+
+  /** Creates an AWS IRSA credential generator. */
+  public AwsIrsaCredentialGenerator() {
+    this(() -> System.getenv("AWS_ROLE_ARN"));
+  }
+
+  AwsIrsaCredentialGenerator(Supplier<String> environmentRoleArnSupplier) {
+    this.environmentRoleArnSupplier = Objects.requireNonNull(environmentRoleArnSupplier);
+  }
 
   @Override
   public void initialize(Map<String, String> properties) {
-    // Use WebIdentityTokenFileCredentialsProvider for base IRSA configuration
-    this.baseCredentialsProvider = WebIdentityTokenFileCredentialsProvider.create();
+    this.tokenSource = WebIdentityTokenSources.create(properties);
 
     S3CredentialConfig s3CredentialConfig = new S3CredentialConfig(properties);
-    this.roleArn = s3CredentialConfig.s3RoleArn();
+    this.roleArn =
+        StringUtils.isNotBlank(properties.get(S3CredentialConfig.S3_ROLE_ARN.getKey()))
+            ? s3CredentialConfig.s3RoleArn()
+            : null;
     this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
     this.region = s3CredentialConfig.region();
     this.stsEndpoint = s3CredentialConfig.stsEndpoint();
+    this.listLocationPrefix = s3CredentialConfig.listLocationPrefix();
   }
 
   @Override
   public AwsIrsaCredential generate(CredentialContext context) {
     if (!(context instanceof PathBasedCredentialContext)) {
-      // Fallback to original behavior for non-path-based contexts
-      AwsCredentials creds = baseCredentialsProvider.resolveCredentials();
-      if (creds instanceof AwsSessionCredentials) {
-        AwsSessionCredentials sessionCreds = (AwsSessionCredentials) creds;
-        long expiration =
-            sessionCreds.expirationTime().isPresent()
-                ? sessionCreds.expirationTime().get().toEpochMilli()
-                : 0L;
-        return new AwsIrsaCredential(
-            sessionCreds.accessKeyId(),
-            sessionCreds.secretAccessKey(),
-            sessionCreds.sessionToken(),
-            expiration);
-      } else {
-        throw new IllegalStateException(
-            "AWS IRSA credentials must be of type AwsSessionCredentials. "
-                + "Check your EKS/IRSA configuration. Got: "
-                + creds.getClass().getName());
-      }
+      return null;
     }
 
     PathBasedCredentialContext pathBasedCredentialContext = (PathBasedCredentialContext) context;
@@ -102,11 +98,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
             pathBasedCredentialContext.getReadPaths(),
             pathBasedCredentialContext.getWritePaths(),
             pathBasedCredentialContext.getUserName());
-    return new AwsIrsaCredential(
-        s3Token.accessKeyId(),
-        s3Token.secretAccessKey(),
-        s3Token.sessionToken(),
-        s3Token.expiration().toEpochMilli());
+    return toAwsIrsaCredential(s3Token);
   }
 
   private Credentials createCredentialsWithSessionPolicy(
@@ -114,22 +106,21 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     validateInputParameters(readLocations, writeLocations, userName);
 
     IamPolicy sessionPolicy = createSessionPolicy(readLocations, writeLocations, region);
-    String webIdentityTokenFile = getValidatedWebIdentityTokenFile();
+    return createCredentials(userName, Optional.of(sessionPolicy));
+  }
+
+  private Credentials createCredentials(String userName, Optional<IamPolicy> sessionPolicy) {
     String effectiveRoleArn = getValidatedRoleArn(roleArn);
+    String tokenContent = tokenSource.getToken();
+    return assumeRoleWithWebIdentity(effectiveRoleArn, userName, tokenContent, sessionPolicy);
+  }
 
-    try {
-      String tokenContent =
-          new String(Files.readAllBytes(Paths.get(webIdentityTokenFile)), StandardCharsets.UTF_8);
-      if (StringUtils.isBlank(tokenContent)) {
-        throw new IllegalStateException(
-            "Web identity token file is empty: " + webIdentityTokenFile);
-      }
-
-      return assumeRoleWithSessionPolicy(effectiveRoleArn, userName, tokenContent, sessionPolicy);
-    } catch (Exception e) {
-      throw new RuntimeException(
-          "Failed to create credentials with session policy for user: " + userName, e);
-    }
+  private AwsIrsaCredential toAwsIrsaCredential(Credentials credentials) {
+    return new AwsIrsaCredential(
+        credentials.accessKeyId(),
+        credentials.secretAccessKey(),
+        credentials.sessionToken(),
+        credentials.expiration().toEpochMilli());
   }
 
   private IamPolicy createSessionPolicy(
@@ -214,7 +205,7 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
                   .addConditions(
                       IamConditionOperator.STRING_LIKE,
                       "s3:prefix",
-                      Arrays.asList(rawPath, addWildcardToPath(rawPath)));
+                      listPrefixes(rawPath, listLocationPrefix));
 
               bucketGetLocationStatementBuilder.computeIfAbsent(
                   bucketArn,
@@ -253,6 +244,31 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     return path.endsWith("/") ? path + "*" : path + "/*";
   }
 
+  /**
+   * Builds the {@code s3:prefix} condition values for a {@code ListBucket} statement. By default
+   * the prefixes are restricted to the location and its descendants by requiring a trailing slash,
+   * so a vended credential cannot enumerate keys in adjacent locations (e.g. {@code
+   * path/to/table_new}) that merely share the location's string prefix. The empty path (bucket
+   * root) is preserved so listing the whole bucket still works.
+   *
+   * <p>When {@code includeLocationPrefix} is {@code true}, the bare location prefix is also
+   * allowed. This is required for the Hadoop FileSystem API, whose {@code getFileStatus} issues a
+   * HEAD on the bare location key: that HEAD returns 404 (instead of 403) only if {@code
+   * ListBucket} permits the bare prefix. The trade-off is that the credential can then enumerate
+   * sibling key names sharing the prefix.
+   *
+   * @param rawPath the object key prefix of the location, without a leading slash
+   * @param includeLocationPrefix whether to also allow the bare location prefix
+   * @return the allowed {@code s3:prefix} values
+   */
+  static List<String> listPrefixes(String rawPath, boolean includeLocationPrefix) {
+    String dirPrefix = rawPath.isEmpty() || rawPath.endsWith("/") ? rawPath : rawPath + "/";
+    if (includeLocationPrefix && !rawPath.equals(dirPrefix)) {
+      return Arrays.asList(rawPath, dirPrefix, addWildcardToPath(rawPath));
+    }
+    return Arrays.asList(dirPrefix, addWildcardToPath(rawPath));
+  }
+
   private static String removeSchemaFromS3Uri(URI uri) {
     String bucket = uri.getHost();
     String path = trimLeadingSlash(uri.getPath());
@@ -279,35 +295,38 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     }
   }
 
-  private String getValidatedWebIdentityTokenFile() {
-    String webIdentityTokenFile = System.getenv("AWS_WEB_IDENTITY_TOKEN_FILE");
-    if (StringUtils.isBlank(webIdentityTokenFile)) {
-      throw new IllegalStateException(
-          "AWS_WEB_IDENTITY_TOKEN_FILE environment variable is not set. "
-              + "Ensure IRSA is properly configured in your EKS cluster.");
-    }
-    if (!Files.exists(Paths.get(webIdentityTokenFile))) {
-      throw new IllegalStateException(
-          "Web identity token file does not exist: " + webIdentityTokenFile);
-    }
-    return webIdentityTokenFile;
-  }
-
   private String getValidatedRoleArn(String configRoleArn) {
     String effectiveRoleArn =
-        StringUtils.isNotBlank(configRoleArn) ? configRoleArn : System.getenv("AWS_ROLE_ARN");
+        StringUtils.isNotBlank(configRoleArn) ? configRoleArn : environmentRoleArnSupplier.get();
     if (StringUtils.isBlank(effectiveRoleArn)) {
       throw new IllegalStateException(
           "No role ARN available. Either configure s3-role-arn or ensure AWS_ROLE_ARN environment variable is set.");
     }
-    if (!effectiveRoleArn.startsWith("arn:aws")) {
+    if (!isSupportedRoleArn(effectiveRoleArn)) {
       throw new IllegalArgumentException("Invalid role ARN format: " + effectiveRoleArn);
     }
     return effectiveRoleArn;
   }
 
-  private Credentials assumeRoleWithSessionPolicy(
-      String roleArn, String userName, String webIdentityToken, IamPolicy sessionPolicy) {
+  private boolean isSupportedRoleArn(String effectiveRoleArn) {
+    // Support both AWS and MinIO role ARNs. MinIO role ARNs start with "arn:minio:" and require a
+    // custom STS endpoint.
+    return effectiveRoleArn.startsWith("arn:aws")
+        || (StringUtils.isNotBlank(stsEndpoint) && effectiveRoleArn.startsWith("arn:minio:"));
+  }
+
+  private Credentials assumeRoleWithWebIdentity(
+      String roleArn, String userName, String webIdentityToken, Optional<IamPolicy> sessionPolicy) {
+    try (StsClient stsClient = createStsClient()) {
+      AssumeRoleWithWebIdentityResponse response =
+          stsClient.assumeRoleWithWebIdentity(
+              createAssumeRoleWithWebIdentityRequest(
+                  roleArn, userName, webIdentityToken, sessionPolicy));
+      return response.credentials();
+    }
+  }
+
+  private StsClient createStsClient() {
     StsClientBuilder stsBuilder = StsClient.builder();
     if (StringUtils.isNotBlank(region)) {
       stsBuilder.region(Region.of(region));
@@ -315,22 +334,25 @@ public class AwsIrsaCredentialGenerator implements CredentialGenerator<AwsIrsaCr
     if (StringUtils.isNotBlank(stsEndpoint)) {
       stsBuilder.endpointOverride(URI.create(stsEndpoint));
     }
+    return stsBuilder.build();
+  }
 
-    try (StsClient stsClient = stsBuilder.build()) {
-      AssumeRoleWithWebIdentityRequest request =
-          AssumeRoleWithWebIdentityRequest.builder()
-              .roleArn(roleArn)
-              .roleSessionName("gravitino_irsa_session_" + userName)
-              .durationSeconds(tokenExpireSecs)
-              .webIdentityToken(webIdentityToken)
-              .policy(sessionPolicy.toJson())
-              .build();
-
-      AssumeRoleWithWebIdentityResponse response = stsClient.assumeRoleWithWebIdentity(request);
-      return response.credentials();
-    }
+  private AssumeRoleWithWebIdentityRequest createAssumeRoleWithWebIdentityRequest(
+      String roleArn, String userName, String webIdentityToken, Optional<IamPolicy> sessionPolicy) {
+    AssumeRoleWithWebIdentityRequest.Builder requestBuilder =
+        AssumeRoleWithWebIdentityRequest.builder()
+            .roleArn(roleArn)
+            .roleSessionName(RoleSessionNameUtils.create("gravitino_irsa_session_", userName))
+            .durationSeconds(tokenExpireSecs)
+            .webIdentityToken(webIdentityToken);
+    sessionPolicy.ifPresent(policy -> requestBuilder.policy(policy.toJson()));
+    return requestBuilder.build();
   }
 
   @Override
-  public void close() throws IOException {}
+  public void close() throws IOException {
+    if (tokenSource != null) {
+      tokenSource.close();
+    }
+  }
 }

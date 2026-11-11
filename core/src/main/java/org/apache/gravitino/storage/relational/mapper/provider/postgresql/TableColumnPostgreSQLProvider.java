@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TableColumnBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -28,7 +30,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE table_id = #{tableId} AND deleted_at = 0";
   }
 
@@ -36,7 +39,8 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -44,16 +48,24 @@ public class TableColumnPostgreSQLProvider extends TableColumnBaseSQLProvider {
   public String softDeleteColumnsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
   @Override
-  public String softDeleteColumnsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteColumnsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + TableColumnMapper.COLUMN_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   @Override

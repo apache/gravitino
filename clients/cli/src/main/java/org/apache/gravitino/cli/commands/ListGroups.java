@@ -69,6 +69,11 @@ public class ListGroups extends Command {
   private Group getGroup(String name) {
     return new Group() {
       @Override
+      public Long id() {
+        return null;
+      }
+
+      @Override
       public String name() {
         return name;
       }

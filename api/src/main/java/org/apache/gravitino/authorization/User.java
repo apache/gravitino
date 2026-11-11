@@ -35,6 +35,13 @@ public interface User extends Auditable {
   String name();
 
   /**
+   * The unique id assigned by Gravitino.
+   *
+   * @return The unique id of the user.
+   */
+  Long id();
+
+  /**
    * The roles of the user. A user can have multiple roles. Every role binds several privileges.
    *
    * @return The roles of the user.

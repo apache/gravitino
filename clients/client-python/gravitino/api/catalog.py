@@ -20,7 +20,11 @@ from enum import Enum
 from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.supports_schemas import SupportsSchemas
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Catalog(Auditable):
@@ -157,6 +161,31 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support table operations")
 
+    def as_view_catalog(self) -> "ViewCatalog":  # noqa: F821
+        """
+        Raises:
+            UnsupportedOperationException if the catalog does not support view operations.
+
+        Returns:
+            the {@link ViewCatalog} if the catalog supports view operations.
+        """
+        raise UnsupportedOperationException("Catalog does not support view operations")
+
+    def as_semantic_model_catalog(self) -> "SemanticModelCatalog":  # noqa: F821
+        """
+        Raises:
+            UnsupportedOperationException if the catalog does not support Semantic
+            Model operations.
+
+        Returns:
+            the :class:`~gravitino.api.semantic.semantic_model_catalog.SemanticModelCatalog`
+            if the catalog supports Semantic Model
+            operations.
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support semantic model operations"
+        )
+
     def as_fileset_catalog(self) -> "FilesetCatalog":  # noqa: F821
         """
         Raises:
@@ -179,17 +208,17 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support topic operations")
 
-    def as_model_catalog(self) -> "ModelCatalog":  # noqa: F821
+    def as_model_catalog(self) -> "GenericModelCatalog":
         """
         Returns:
-            the {@link ModelCatalog} if the catalog supports model operations.
+            the {@link GenericModelCatalog} if the catalog supports model operations.
 
         Raises:
             UnsupportedOperationException if the catalog does not support model operations.
         """
         raise UnsupportedOperationException("Catalog does not support model operations")
 
-    def as_function_catalog(self) -> "FunctionCatalog":  # noqa: F821
+    def as_function_catalog(self) -> "FunctionCatalog":
         """
         Returns:
             the {@link FunctionCatalog} if the catalog supports function operations.
@@ -201,6 +230,39 @@ class Catalog(Auditable):
             "Catalog does not support function operations"
         )
 
+    def supports_tags(self) -> SupportsTags:
+        """
+        Return the {@link SupportsTags} if the catalog supports tag operations.
 
-class UnsupportedOperationException(Exception):
-    pass
+        Raises:
+            UnsupportedOperationException: if the catalog does not support tag operations.
+
+        Returns:
+            SupportsTags: the {@link SupportsTags} instance
+        """
+        raise UnsupportedOperationException("Catalog does not support tag operations")
+
+    def supports_policies(self) -> SupportsPolicies:
+        """
+        Return the {@link SupportsPolicies} if the catalog supports policy operations.
+
+        Raises:
+            UnsupportedOperationException: if the catalog does not support policy operations.
+
+        Returns:
+            SupportsPolicies: the {@link SupportsPolicies} instance
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support policy operations"
+        )
+
+    def supports_roles(self) -> SupportsRoles:
+        """Return role operations supported by this catalog.
+
+        Returns:
+            SupportsRoles: The role operations supported by this catalog.
+
+        Raises:
+            UnsupportedOperationException: If this catalog does not support role operations.
+        """
+        raise UnsupportedOperationException("Catalog does not support role operations")

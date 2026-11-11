@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.hive.TableType;
 import org.apache.gravitino.connector.BaseTable;
 import org.apache.gravitino.connector.ProxyPlugin;
 import org.apache.gravitino.connector.TableOperations;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -48,8 +49,38 @@ public class HiveTable extends BaseTable {
   public static final String TABLE_TYPE_PROP = "table_type";
   private String catalogName;
   private String databaseName;
+  private String viewOriginalText;
+  private List<Column> originalStorageColumns = Collections.emptyList();
 
   protected HiveTable() {}
+
+  /**
+   * Returns the original SQL text for this Hive VIRTUAL_VIEW, or {@code null} if this is not a
+   * view.
+   *
+   * @return The view SQL, or {@code null}.
+   */
+  public String viewOriginalText() {
+    return viewOriginalText;
+  }
+
+  /**
+   * Returns a copy of the original storage columns for a SerDe-derived schema.
+   *
+   * @return Original columns, or an empty list for an ordinary table.
+   */
+  public List<Column> originalStorageColumns() {
+    return List.copyOf(originalStorageColumns);
+  }
+
+  /**
+   * Records original storage columns so metadata-only alters preserve the SerDe schema marker.
+   *
+   * @param columns The original storage columns, or an empty list for an ordinary table.
+   */
+  public void setOriginalStorageColumns(List<Column> columns) {
+    originalStorageColumns = List.copyOf(columns);
+  }
 
   public String catalogName() {
     return catalogName;
@@ -73,6 +104,7 @@ public class HiveTable extends BaseTable {
 
     private String catalogName;
     private String databaseName;
+    private String viewOriginalText;
 
     /** Creates a new instance of {@link Builder}. */
     private Builder() {}
@@ -100,6 +132,17 @@ public class HiveTable extends BaseTable {
     }
 
     /**
+     * Sets the original SQL text for views (VIRTUAL_VIEW table type).
+     *
+     * @param viewOriginalText The view SQL.
+     * @return This Builder instance.
+     */
+    public Builder withViewOriginalText(String viewOriginalText) {
+      this.viewOriginalText = viewOriginalText;
+      return this;
+    }
+
+    /**
      * Internal method to build a HiveTable instance using the provided values.
      *
      * @return A new HiveTable instance with the configured values.
@@ -118,6 +161,7 @@ public class HiveTable extends BaseTable {
       hiveTable.catalogName = catalogName;
       hiveTable.databaseName = databaseName;
       hiveTable.proxyPlugin = proxyPlugin;
+      hiveTable.viewOriginalText = viewOriginalText;
 
       // HMS put table comment in parameters
       if (comment != null) {

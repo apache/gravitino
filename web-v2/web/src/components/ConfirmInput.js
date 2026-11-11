@@ -93,7 +93,7 @@ const ConfirmInput = forwardRef(function ConfirmInput(props, ref) {
         status={getStatus()}
         onChange={e => {
           setValue(e.target.value)
-          setConfirmInput(e.target.value)
+          setConfirmInput?.(e.target.value)
           if (showError) setShowError(false)
         }}
       />

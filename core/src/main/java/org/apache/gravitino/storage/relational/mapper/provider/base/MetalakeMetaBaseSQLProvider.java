@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -57,6 +58,16 @@ public class MetalakeMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active metalake by ID. */
+  public String selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " FOR UPDATE";
+  }
+
+  /** Builds SQL that returns an active metalake by ID and locks it for shared access. */
+  public String selectMetalakeMetaByIdForShare(@Param("metalakeId") Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " LOCK IN SHARE MODE";
   }
 
   public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
@@ -143,23 +154,18 @@ public class MetalakeMetaBaseSQLProvider {
         + " current_version = #{newMetalakeMeta.currentVersion},"
         + " last_version = #{newMetalakeMeta.lastVersion}"
         + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
-        + " AND metalake_name = #{oldMetalakeMeta.metalakeName}"
-        + " AND (metalake_comment = #{oldMetalakeMeta.metalakeComment} "
-        + "  OR (metalake_comment IS NULL and #{oldMetalakeMeta.metalakeComment} IS NULL))"
-        + " AND properties = #{oldMetalakeMeta.properties}"
-        + " AND audit_info = #{oldMetalakeMeta.auditInfo}"
-        + " AND schema_version = #{oldMetalakeMeta.schemaVersion}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
-        + " AND last_version = #{oldMetalakeMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE metalake_id = #{metalakeId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String deleteMetalakeMetasByLegacyTimeline(

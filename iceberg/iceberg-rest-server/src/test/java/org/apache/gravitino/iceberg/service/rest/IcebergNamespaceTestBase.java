@@ -28,6 +28,7 @@ import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -59,10 +60,26 @@ public class IcebergNamespaceTestBase extends IcebergTestBase {
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  protected Response doRegisterTableWithCredentialVending(
+      String tableName, Namespace ns, String metadataLocation) {
+    RegisterTableRequest request =
+        ImmutableRegisterTableRequest.builder()
+            .name(tableName)
+            .metadataLocation(metadataLocation)
+            .build();
+    return getNamespaceClientBuilder(Optional.of(ns), Optional.of("register"), Optional.empty())
+        .header(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION, "vended-credentials")
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response doListNamespace(Optional<Namespace> parent) {
     Optional<Map<String, String>> queryParam =
         parent.isPresent()
-            ? Optional.of(ImmutableMap.of("parent", RESTUtil.encodeNamespace(parent.get())))
+            ? Optional.of(
+                ImmutableMap.of(
+                    "parent",
+                    RESTUtil.encodeNamespace(
+                        parent.get(), IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)))
             : Optional.empty();
     return getNamespaceClientBuilder(Optional.empty(), Optional.empty(), queryParam).get();
   }

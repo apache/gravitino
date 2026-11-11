@@ -28,6 +28,7 @@ from gravitino import (
 from gravitino.api.rel.expressions.literals.literals import Literals
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.types.types import Types
+from gravitino.api.stats.statistic_values import StatisticValues
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
     IdentityPartitioningDTO,
@@ -148,3 +149,40 @@ class TestRelationalTable(IntegrationTestEnv):
         self.assertTrue(result)
         partition_names = relational_table.list_partition_names()
         self.assertEqual(len(partition_names), 0)
+
+    def test_relational_table_statistics_ops(self):
+        table_stats_ops = self.relational_catalog.load_table(
+            self.TABLE_IDENT
+        ).supports_statistics()
+        stats = {
+            "custom-bool": StatisticValues.boolean_value(True),
+            "custom-long": StatisticValues.long_value(100),
+            "custom-double": StatisticValues.double_value(99.99),
+            "custom-string": StatisticValues.string_value("test_stat"),
+            "custom-list": StatisticValues.list_value(
+                [StatisticValues.string_value("a")]
+            ),
+            "custom-object": StatisticValues.object_value(
+                {"key": StatisticValues.long_value(1)}
+            ),
+        }
+
+        table_stats_ops.update_statistics(stats)
+        listed_stats = table_stats_ops.list_statistics()
+        self.assertEqual(len(listed_stats), len(stats))
+        stat_map = {stat.name(): stat for stat in listed_stats}
+        for expected_key, expected_val in stats.items():
+            self.assertIn(expected_key, stat_map)
+            actual_stat = stat_map[expected_key]
+            self.assertEqual(actual_stat.value().data_type(), expected_val.data_type())
+            self.assertEqual(actual_stat.value().value(), expected_val.value())
+
+        keys_to_drop = ["custom-bool", "custom-long"]
+        self.assertTrue(table_stats_ops.drop_statistics(keys_to_drop))
+        listed_stats_after_drop = table_stats_ops.list_statistics()
+        self.assertEqual(len(listed_stats_after_drop), len(stats) - len(keys_to_drop))
+        for key in keys_to_drop:
+            self.assertNotIn(key, [s.name() for s in listed_stats_after_drop])
+        remaining_keys = [k for k in stats if k not in keys_to_drop]
+        self.assertTrue(table_stats_ops.drop_statistics(remaining_keys))
+        self.assertEqual(len(table_stats_ops.list_statistics()), 0)

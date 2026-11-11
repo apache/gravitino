@@ -1,0 +1,89 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test gravitino lance rest server service
+templates:
+  - service.yaml
+tests:
+  - it: renders the default ClusterIP service
+    release:
+      name: lance-rest
+      namespace: lance-system
+    asserts:
+      - isKind:
+          of: Service
+      - equal:
+          path: metadata.name
+          value: gravitino-lance-rest-server
+      - equal:
+          path: metadata.namespace
+          value: lance-system
+      - equal:
+          path: spec.type
+          value: ClusterIP
+      - contains:
+          path: spec.ports
+          content:
+            name: http
+            port: 9101
+            protocol: TCP
+            targetPort: 9101
+          any: true
+      - equal:
+          path: spec.selector["app.kubernetes.io/instance"]
+          value: lance-rest
+
+  - it: renders NodePort when requested
+    set:
+      service:
+        type: NodePort
+        nodePort: 30101
+    asserts:
+      - equal:
+          path: spec.type
+          value: NodePort
+      - equal:
+          path: spec.ports[0].nodePort
+          value: 30101
+
+  - it: renders service customization
+    set:
+      service:
+        port: 19101
+        targetPort: 19102
+        portName: lance
+        labels:
+          exposure: public
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    asserts:
+      - contains:
+          path: spec.ports
+          content:
+            name: lance
+            port: 19101
+            protocol: TCP
+            targetPort: 19102
+          any: true
+      - equal:
+          path: metadata.labels.exposure
+          value: public
+      - equal:
+          path: metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-type"]
+          value: nlb

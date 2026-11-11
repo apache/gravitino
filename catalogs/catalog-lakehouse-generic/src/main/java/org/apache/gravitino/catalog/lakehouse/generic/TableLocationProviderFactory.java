@@ -1,0 +1,201 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.catalog.lakehouse.generic;
+
+import com.google.common.base.Preconditions;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.ServiceConfigurationError;
+import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * A factory that discovers {@link TableLocationProvider}s through {@link ServiceLoader}.
+ *
+ * <p>Selecting by name costs one instantiation of every registered provider, because {@link
+ * TableLocationProvider#name()} is an instance method and there is no way to learn the names
+ * without one. That is why the interface requires a constructor that acquires nothing: the
+ * candidates that are not selected are discarded on the spot, and the interface has no close
+ * callback with which to release anything they took. The scan is repeated per catalog rather than
+ * remembered, matching {@code LakehouseTableDelegatorFactory} in this module, and catalog creation
+ * is rare enough that the trivial constructions it costs do not justify a cache keyed by class
+ * loader.
+ */
+public class TableLocationProviderFactory {
+
+  private static final Logger LOG = LoggerFactory.getLogger(TableLocationProviderFactory.class);
+
+  private TableLocationProviderFactory() {}
+
+  /**
+   * Creates the {@link TableLocationProvider} registered under the given name.
+   *
+   * <p>A new instance is returned on every call. Nothing is initialized and nothing is closed, here
+   * or later: the interface has no lifecycle callbacks, so the instances made while scanning for
+   * the name are simply discarded, which is safe only because the interface requires a constructor
+   * that acquires nothing.
+   *
+   * @param name the provider name to look up, matched case-insensitively against {@link
+   *     TableLocationProvider#name()}
+   * @return the provider
+   * @throws IllegalArgumentException if no provider, or more than one provider, is registered under
+   *     the given name, or if the selected provider cannot be instantiated
+   * @throws ServiceConfigurationError if a {@code META-INF/services} file for this interface is
+   *     itself malformed, which fails the scan before any candidate is reached
+   */
+  public static TableLocationProvider create(String name) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name), "Table location provider name must not be blank");
+
+    ClassLoader cl =
+        Optional.ofNullable(Thread.currentThread().getContextClassLoader())
+            .orElse(TableLocationProvider.class.getClassLoader());
+    String key = name.toLowerCase(Locale.ROOT);
+
+    Index index = scan(cl);
+    Class<? extends TableLocationProvider> type = index.get(key);
+
+    Preconditions.checkArgument(
+        !index.isDuplicated(key),
+        "Multiple TableLocationProviders are registered under the name '%s'. Provider names must "
+            + "be unique across the classpath.",
+        name);
+    Preconditions.checkArgument(type != null, "No TableLocationProvider found for name '%s'", name);
+
+    TableLocationProvider provider = instantiate(type);
+
+    LOG.info("Loaded TableLocationProvider '{}': {}", name, type.getName());
+    return provider;
+  }
+
+  /**
+   * Instantiates every registered provider once to learn its name, and returns the resulting
+   * name-to-class mapping.
+   *
+   * <p>A candidate whose constructor or {@link TableLocationProvider#name()} throws is logged and
+   * skipped rather than allowed to fail the scan, so a provider that is merely broken at runtime
+   * does not stop catalogs that named a different one from starting.
+   *
+   * <p>That does not cover every broken jar. A services file naming a class that cannot be loaded
+   * at all fails the whole scan with a {@link ServiceConfigurationError}, raised while the loader
+   * is being iterated and before any candidate is reached, which is out of reach of the handling
+   * here. Catching it per candidate would mean driving the loader's iterator by hand and risking a
+   * loop that never terminates, which is the worse trade for a case an operator can see in the
+   * failure it produces.
+   *
+   * <p>A name claimed by more than one provider is recorded rather than thrown here, and fails only
+   * the catalogs that actually ask for that name. Throwing during the scan would let two unrelated
+   * third-party jars break every catalog, which is the same failure the paragraph above avoids.
+   *
+   * @param cl the class loader to scan
+   * @return the index for that class loader
+   */
+  private static Index scan(ClassLoader cl) {
+    Map<String, Class<? extends TableLocationProvider>> byName = new HashMap<>();
+    Set<String> duplicated = new HashSet<>();
+
+    List<ServiceLoader.Provider<TableLocationProvider>> candidates =
+        ServiceLoader.load(TableLocationProvider.class, cl).stream().collect(Collectors.toList());
+
+    for (ServiceLoader.Provider<TableLocationProvider> candidate : candidates) {
+      Class<? extends TableLocationProvider> type = candidate.type();
+      String name;
+      try {
+        name = candidate.get().name();
+      } catch (RuntimeException | Error e) {
+        // Error, not just ServiceConfigurationError: the loader wraps a failing constructor for
+        // us, but name() is called here rather than by the loader, so whatever it throws arrives
+        // unwrapped. A plugin loaded through its own class loader reaches a missing class with a
+        // NoClassDefFoundError, which is an Error, and letting it through would fail the whole
+        // scan.
+        LOG.warn(
+            "Skipping TableLocationProvider {}, which could not be instantiated or could not "
+                + "report its name. It cannot be selected by any catalog until this is fixed.",
+            type.getName(),
+            e);
+        continue;
+      }
+
+      if (StringUtils.isBlank(name)) {
+        LOG.warn(
+            "Skipping TableLocationProvider {}, which reported a null or blank name.",
+            type.getName());
+        continue;
+      }
+
+      String key = name.toLowerCase(Locale.ROOT);
+      Class<? extends TableLocationProvider> previous = byName.put(key, type);
+      if (previous != null && previous != type) {
+        duplicated.add(key);
+        LOG.warn(
+            "TableLocationProvider name '{}' is claimed by more than one implementation, including "
+                + "{} and {}. Catalogs selecting that name will fail to initialize.",
+            name,
+            previous.getName(),
+            type.getName());
+      }
+    }
+
+    LOG.info("Discovered TableLocationProviders: {}", byName.keySet());
+    return new Index(byName, duplicated);
+  }
+
+  private static TableLocationProvider instantiate(Class<? extends TableLocationProvider> type) {
+    try {
+      return type.getDeclaredConstructor().newInstance();
+    } catch (ReflectiveOperationException | RuntimeException | Error e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to instantiate TableLocationProvider %s. It must have a public no-argument "
+                  + "constructor that does not throw.",
+              type.getName()),
+          e);
+    }
+  }
+
+  /** The providers discovered under one class loader. */
+  private static final class Index {
+
+    private final Map<String, Class<? extends TableLocationProvider>> byName;
+
+    private final Set<String> duplicated;
+
+    private Index(
+        Map<String, Class<? extends TableLocationProvider>> byName, Set<String> duplicated) {
+      this.byName = byName;
+      this.duplicated = duplicated;
+    }
+
+    private Class<? extends TableLocationProvider> get(String key) {
+      return byName.get(key);
+    }
+
+    private boolean isDuplicated(String key) {
+      return duplicated.contains(key);
+    }
+  }
+}

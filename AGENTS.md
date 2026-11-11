@@ -22,6 +22,7 @@
 ## General Coding Standards
 - **Language**: Use English for all code, comments, and documentation.
 - **Style**: Follow rigid Google Java Style. Run `./gradlew spotlessApply` to format.
+- **Javadoc**: All new `public` and `protected` classes, methods, and fields must have Javadoc. Missing Javadoc fails the checkstyle CI step (runs with `-Werror`).
 - **Imports**: Always use normal `import` statements instead of Fully Qualified Class Names (FQN) in Java code whenever possible.
   - **Bad**: `org.apache.gravitino.rel.Table table = ...;`
   - **Good**: `Table table = ...;` (with `import org.apache.gravitino.rel.Table;`)
@@ -33,7 +34,7 @@
   - Write unit tests for ALL new logic. NO tests = NO merge.
   - Use `TestXxx` naming pattern (e.g., `TestCatalogService`).
   - Run tests: `./gradlew test -PskipITs`.
-  - Docker tests: Tag with `@Tag("gravitino-docker-test")`.
+  - Docker tests: Tag with `@Tag("gravitino-docker-test")`; run them with `-PskipDockerTests=false`.
 - **Class Member Ordering**: Follow the order:
   1. `static` constants (e.g., `LOG`).
   2. `static` fields.

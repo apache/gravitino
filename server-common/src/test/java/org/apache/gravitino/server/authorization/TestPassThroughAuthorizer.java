@@ -18,15 +18,22 @@
 package org.apache.gravitino.server.authorization;
 
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.security.Principal;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -60,14 +67,45 @@ public class TestPassThroughAuthorizer {
           passThroughAuthorizer.isOwner(
               principal, "metalake", metadataObject, new AuthorizationRequestContext()));
       Assertions.assertTrue(passThroughAuthorizer.isServiceAdmin());
-      Assertions.assertTrue(passThroughAuthorizer.isMetalakeUser("metalake"));
-      Assertions.assertTrue(passThroughAuthorizer.isSelf(Entity.EntityType.USER, null));
+      Assertions.assertTrue(
+          passThroughAuthorizer.isMetalakeUser("metalake", new AuthorizationRequestContext()));
+      Assertions.assertTrue(
+          passThroughAuthorizer.isSelf(
+              Entity.EntityType.USER, null, new AuthorizationRequestContext()));
       Assertions.assertTrue(
           passThroughAuthorizer.hasSetOwnerPermission(
               "metalake", "type", "fullName", new AuthorizationRequestContext()));
       Assertions.assertTrue(
           passThroughAuthorizer.hasMetadataPrivilegePermission(
               "metalake", "type", "fullName", new AuthorizationRequestContext()));
+    }
+  }
+
+  @Test
+  public void testIsMetalakeUserUsesInternalAccessControlDispatcher() throws Exception {
+    AccessControlDispatcher dispatcher = mock(AccessControlDispatcher.class);
+    User user = mock(User.class);
+    when(dispatcher.getUser("metalake", "testUser")).thenReturn(user);
+
+    AccessControlDispatcher previousDispatcher =
+        (AccessControlDispatcher)
+            FieldUtils.readField(
+                GravitinoEnv.getInstance(), "internalAccessControlDispatcher", true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalAccessControlDispatcher", dispatcher, true);
+    try (PassThroughAuthorizer passThroughAuthorizer = new PassThroughAuthorizer()) {
+      PrincipalUtils.doAs(
+          new UserPrincipal("testUser"),
+          () -> {
+            Assertions.assertTrue(
+                passThroughAuthorizer.isMetalakeUser(
+                    "metalake", new AuthorizationRequestContext()));
+            return null;
+          });
+      verify(dispatcher).getUser("metalake", "testUser");
+    } finally {
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "internalAccessControlDispatcher", previousDispatcher, true);
     }
   }
 }

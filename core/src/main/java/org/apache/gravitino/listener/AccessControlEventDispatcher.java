@@ -21,14 +21,21 @@ package org.apache.gravitino.listener;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -44,6 +51,12 @@ import org.apache.gravitino.listener.api.event.AddGroupPreEvent;
 import org.apache.gravitino.listener.api.event.AddUserEvent;
 import org.apache.gravitino.listener.api.event.AddUserFailureEvent;
 import org.apache.gravitino.listener.api.event.AddUserPreEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsFailureEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsPreEvent;
+import org.apache.gravitino.listener.api.event.CountUsersEvent;
+import org.apache.gravitino.listener.api.event.CountUsersFailureEvent;
+import org.apache.gravitino.listener.api.event.CountUsersPreEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -73,6 +86,9 @@ import org.apache.gravitino.listener.api.event.ListGroupNamesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListGroupNamesPreEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsFailureEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedFailureEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedPreEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsPreEvent;
 import org.apache.gravitino.listener.api.event.ListRoleNamesEvent;
 import org.apache.gravitino.listener.api.event.ListRoleNamesFailureEvent;
@@ -82,6 +98,9 @@ import org.apache.gravitino.listener.api.event.ListUserNamesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListUserNamesPreEvent;
 import org.apache.gravitino.listener.api.event.ListUsersEvent;
 import org.apache.gravitino.listener.api.event.ListUsersFailureEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedFailureEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedPreEvent;
 import org.apache.gravitino.listener.api.event.ListUsersPreEvent;
 import org.apache.gravitino.listener.api.event.OverridePrivilegesEvent;
 import org.apache.gravitino.listener.api.event.OverridePrivilegesFailureEvent;
@@ -147,6 +166,26 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new AddUserPreEvent(initiator, metalake, user.name())));
+
+    try {
+      List<BulkItemResult<User>> results = dispatcher.addUsers(metalake, users);
+      results.forEach(result -> dispatchAddUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user ->
+              eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -158,6 +197,26 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, metalake, user)));
+
+    try {
+      List<BulkItemResult<String>> results = dispatcher.removeUsers(metalake, users, metalakeOwner);
+      results.forEach(result -> dispatchRemoveUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user -> eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user)));
       throw e;
     }
   }
@@ -188,11 +247,49 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(new ListUsersPreEvent(initiator, metalake));
     try {
       User[] users = dispatcher.listUsers(metalake);
-      eventBus.dispatchEvent(new ListUsersEvent(initiator, metalake));
+      eventBus.dispatchEvent(
+          new ListUsersEvent(initiator, metalake, users != null ? users.length : -1));
 
       return users;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListUsersFailureEvent(initiator, metalake, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListUsersPagedPreEvent(initiator, metalake, offset, limit));
+    try {
+      PagedResult<User> users = dispatcher.listUsers(metalake, offset, limit);
+      eventBus.dispatchEvent(
+          new ListUsersPagedEvent(
+              initiator, metalake, offset, limit, users.items().size(), users.totalCount()));
+
+      return users;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListUsersPagedFailureEvent(initiator, metalake, e, offset, limit));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long countUsers(String metalake) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new CountUsersPreEvent(initiator, metalake));
+    try {
+      long count = dispatcher.countUsers(metalake);
+      eventBus.dispatchEvent(new CountUsersEvent(initiator, metalake, count));
+
+      return count;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new CountUsersFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -205,7 +302,8 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(new ListUserNamesPreEvent(initiator, metalake));
     try {
       String[] userNames = dispatcher.listUserNames(metalake);
-      eventBus.dispatchEvent(new ListUserNamesEvent(initiator, metalake));
+      eventBus.dispatchEvent(
+          new ListUserNamesEvent(initiator, metalake, userNames != null ? userNames.length : -1));
 
       return userNames;
     } catch (Exception e) {
@@ -234,6 +332,27 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new AddGroupPreEvent(initiator, metalake, group.name())));
+
+    try {
+      List<BulkItemResult<Group>> results = dispatcher.addGroups(metalake, groups);
+      results.forEach(result -> dispatchAddGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(
+                  new AddGroupFailureEvent(initiator, metalake, e, group.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -245,6 +364,28 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new RemoveGroupPreEvent(initiator, metalake, group)));
+
+    try {
+      List<BulkItemResult<String>> results =
+          dispatcher.removeGroups(metalake, groups, metalakeOwner);
+      results.forEach(result -> dispatchRemoveGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group)));
       throw e;
     }
   }
@@ -275,11 +416,49 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(new ListGroupsPreEvent(initiator, metalake));
     try {
       Group[] groups = dispatcher.listGroups(metalake);
-      eventBus.dispatchEvent(new ListGroupsEvent(initiator, metalake));
+      eventBus.dispatchEvent(
+          new ListGroupsEvent(initiator, metalake, groups != null ? groups.length : -1));
 
       return groups;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListGroupsFailureEvent(initiator, metalake, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListGroupsPagedPreEvent(initiator, metalake, offset, limit));
+    try {
+      PagedResult<Group> groups = dispatcher.listGroups(metalake, offset, limit);
+      eventBus.dispatchEvent(
+          new ListGroupsPagedEvent(
+              initiator, metalake, offset, limit, groups.items().size(), groups.totalCount()));
+
+      return groups;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListGroupsPagedFailureEvent(initiator, metalake, e, offset, limit));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long countGroups(String metalake) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new CountGroupsPreEvent(initiator, metalake));
+    try {
+      long count = dispatcher.countGroups(metalake);
+      eventBus.dispatchEvent(new CountGroupsEvent(initiator, metalake, count));
+
+      return count;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new CountGroupsFailureEvent(initiator, metalake, e));
       throw e;
     }
   }
@@ -292,7 +471,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(new ListGroupNamesPreEvent(initiator, metalake));
     try {
       String[] groupNames = dispatcher.listGroupNames(metalake);
-      eventBus.dispatchEvent(new ListGroupNamesEvent(initiator, metalake));
+      eventBus.dispatchEvent(
+          new ListGroupNamesEvent(
+              initiator, metalake, groupNames != null ? groupNames.length : -1));
 
       return groupNames;
     } catch (Exception e) {
@@ -411,6 +592,34 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    roles.forEach(
+        role ->
+            eventBus.dispatchEvent(
+                new CreateRolePreEvent(
+                    initiator, metalake, role.name(), role.properties(), role.securableObjects())));
+
+    try {
+      List<BulkItemResult<Role>> results = dispatcher.createRoles(metalake, roles);
+      results.forEach(result -> dispatchCreateRoleResultEvent(initiator, metalake, roles, result));
+      return results;
+    } catch (Exception e) {
+      roles.forEach(
+          role ->
+              eventBus.dispatchEvent(
+                  new CreateRoleFailureEvent(
+                      initiator,
+                      metalake,
+                      e,
+                      new RoleInfo(role.name(), role.properties(), role.securableObjects()))));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
@@ -446,13 +655,33 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<String>> deleteRoles(String metalake, List<String> roles)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    roles.forEach(
+        role -> eventBus.dispatchEvent(new DeleteRolePreEvent(initiator, metalake, role)));
+
+    try {
+      List<BulkItemResult<String>> results = dispatcher.deleteRoles(metalake, roles);
+      results.forEach(result -> dispatchDeleteRoleResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      roles.forEach(
+          role -> eventBus.dispatchEvent(new DeleteRoleFailureEvent(initiator, metalake, e, role)));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public String[] listRoleNames(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake));
     try {
       String[] roleNames = dispatcher.listRoleNames(metalake);
-      eventBus.dispatchEvent(new ListRoleNamesEvent(initiator, metalake));
+      eventBus.dispatchEvent(
+          new ListRoleNamesEvent(initiator, metalake, roleNames != null ? roleNames.length : -1));
 
       return roleNames;
     } catch (Exception e) {
@@ -470,7 +699,9 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     eventBus.dispatchEvent(new ListRoleNamesPreEvent(initiator, metalake, object));
     try {
       String[] roleNames = dispatcher.listRoleNamesByObject(metalake, object);
-      eventBus.dispatchEvent(new ListRoleNamesEvent(initiator, metalake, object));
+      eventBus.dispatchEvent(
+          new ListRoleNamesEvent(
+              initiator, metalake, object, roleNames != null ? roleNames.length : -1));
 
       return roleNames;
     } catch (Exception e) {
@@ -546,6 +777,76 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
           new OverridePrivilegesFailureEvent(
               initiator, metalake, e, role, securableObjectsToOverride));
       throw e;
+    }
+  }
+
+  private void dispatchAddUserResultEvent(
+      String initiator, String metalake, BulkItemResult<User> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new AddUserEvent(initiator, metalake, new UserInfo(result.value().get())));
+    } else {
+      eventBus.dispatchEvent(
+          new AddUserFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchRemoveUserResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new RemoveUserEvent(initiator, metalake, result.name(), true));
+    } else {
+      eventBus.dispatchEvent(
+          new RemoveUserFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchAddGroupResultEvent(
+      String initiator, String metalake, BulkItemResult<Group> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new AddGroupEvent(initiator, metalake, new GroupInfo(result.value().get())));
+    } else {
+      eventBus.dispatchEvent(
+          new AddGroupFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchRemoveGroupResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new RemoveGroupEvent(initiator, metalake, result.name(), true));
+    } else {
+      eventBus.dispatchEvent(
+          new RemoveGroupFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchCreateRoleResultEvent(
+      String initiator, String metalake, List<RoleAdd> roles, BulkItemResult<Role> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new CreateRoleEvent(initiator, metalake, new RoleInfo(result.value().get())));
+    } else {
+      RoleAdd role = roles.get(result.index());
+      eventBus.dispatchEvent(
+          new CreateRoleFailureEvent(
+              initiator,
+              metalake,
+              result.error().get(),
+              new RoleInfo(role.name(), role.properties(), role.securableObjects())));
+    }
+  }
+
+  private void dispatchDeleteRoleResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new DeleteRoleEvent(initiator, metalake, result.name(), true));
+    } else if (result.error().get() instanceof NoSuchRoleException) {
+      eventBus.dispatchEvent(new DeleteRoleEvent(initiator, metalake, result.name(), false));
+    } else {
+      eventBus.dispatchEvent(
+          new DeleteRoleFailureEvent(initiator, metalake, result.error().get(), result.name()));
     }
   }
 }

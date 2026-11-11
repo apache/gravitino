@@ -38,7 +38,11 @@ dependencies {
   compileOnly(libs.lombok)
 
   implementation(project(":catalogs:catalog-common"))
-  implementation(project(":iceberg:iceberg-common"))
+  implementation(project(":iceberg:iceberg-common")) {
+    exclude(module = "api")
+    exclude(module = "core")
+    exclude(module = "common")
+  }
 
   implementation(libs.asm)
   implementation(libs.bundles.iceberg)

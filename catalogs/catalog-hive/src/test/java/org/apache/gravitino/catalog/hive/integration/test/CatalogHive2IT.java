@@ -52,6 +52,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -112,6 +113,7 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.HiveMetaStoreClient;
 import org.apache.spark.sql.SparkSession;
 import org.apache.thrift.TException;
 import org.junit.jupiter.api.AfterAll;
@@ -159,6 +161,100 @@ public class CatalogHive2IT extends BaseIT {
     return String.format("INSERT INTO %s.%s VALUES (%s)", dbName, tableName, values);
   }
 
+  @Test
+  void testLoadAndAlterSerDeDerivedTable() throws Exception {
+    HiveConf conf = new HiveConf();
+    conf.set(HiveConf.ConfVars.METASTOREURIS.varname, hiveMetastoreUris);
+    // The test JVM uses the Hive 2 client even when the server is Hive 3.
+    HiveMetaStoreClient metastore = new HiveMetaStoreClient(conf);
+    try (AutoCloseable closeMetastore = metastore::close) {
+      String csvTableName = GravitinoITUtils.genRandomName("serde_csv");
+      NameIdentifier identifier = NameIdentifier.of(schemaName, csvTableName);
+      // Start with an ordinary external table, then create a separate SerDe-derived table
+      // directly through HMS so the test exercises the stored marker rather than a mock.
+      catalog
+          .asTableCatalog()
+          .createTable(
+              identifier,
+              new Column[] {Column.of("value", Types.StringType.get())},
+              null,
+              ImmutableMap.of(TABLE_TYPE, "EXTERNAL_TABLE"),
+              Transforms.EMPTY_TRANSFORM);
+      HiveTable csvTable =
+          hiveClientPool.run(client -> client.getTable(hmsCatalog, schemaName, csvTableName));
+      catalog.asTableCatalog().dropTable(identifier);
+      csvTable.setOriginalStorageColumns(
+          List.of(
+              Column.of(
+                  "value", Types.UnparsedType.of("<derived from deserializer>"), "CSV column")));
+      csvTable.properties().put(SERDE_LIB, "org.apache.hadoop.hive.serde2.OpenCSVSerde");
+      csvTable.properties().put(INPUT_FORMAT, "org.apache.hadoop.mapred.TextInputFormat");
+      csvTable
+          .properties()
+          .put(OUTPUT_FORMAT, "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat");
+      hiveClientPool.run(
+          client -> {
+            client.createTable(csvTable);
+            return null;
+          });
+      Assertions.assertEquals(
+          "<derived from deserializer>",
+          metastore
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName)
+              .getSd()
+              .getCols()
+              .get(0)
+              .getType());
+
+      Table loaded = catalog.asTableCatalog().loadTable(identifier);
+      Assertions.assertEquals(1, loaded.columns().length);
+      Assertions.assertEquals(Types.StringType.get(), loaded.columns()[0].dataType());
+      List<HiveTable> batch =
+          hiveClientPool.run(
+              client ->
+                  client.getTableObjectsByName(hmsCatalog, schemaName, List.of(csvTableName)));
+      Assertions.assertEquals(Types.StringType.get(), batch.get(0).columns()[0].dataType());
+
+      catalog
+          .asTableCatalog()
+          .alterTable(identifier, TableChange.setProperty("serde_test", "value"));
+      catalog.asTableCatalog().alterTable(identifier, TableChange.updateComment("updated"));
+      var stored = metastore.getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName);
+      Assertions.assertEquals(
+          "<derived from deserializer>", stored.getSd().getCols().get(0).getType());
+      Assertions.assertEquals("value", stored.getParameters().get("serde_test"));
+      Assertions.assertEquals("updated", stored.getParameters().get(COMMENT));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              catalog
+                  .asTableCatalog()
+                  .alterTable(
+                      identifier,
+                      TableChange.addColumn(
+                          new String[] {"added"},
+                          Types.StringType.get(),
+                          TableChange.ColumnPosition.defaultPos())));
+      Assertions.assertEquals(
+          1,
+          metastore
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), csvTableName)
+              .getSd()
+              .getColsSize());
+      String renamed = GravitinoITUtils.genRandomName("serde_renamed");
+      catalog.asTableCatalog().alterTable(identifier, TableChange.rename(renamed));
+      Assertions.assertEquals(
+          "<derived from deserializer>",
+          metastore
+              .getTable(metastoreDatabaseName(hmsCatalog, schemaName), renamed)
+              .getSd()
+              .getCols()
+              .get(0)
+              .getType());
+      catalog.asTableCatalog().dropTable(NameIdentifier.of(schemaName, renamed));
+    }
+  }
+
   private static String getInsertWithPartitionSql(
       String dbName, String tableName, String partitionExpressions, String values) {
     return String.format(
@@ -179,7 +275,11 @@ public class CatalogHive2IT extends BaseIT {
 
   protected void startNecessaryContainer() {
     containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE2));
+        ImmutableMap.of(
+            HiveContainer.HIVE_RUNTIME_VERSION,
+            HiveContainer.HIVE2,
+            HiveContainer.ENABLE_SERDE_SCHEMA_TESTS,
+            "true"));
 
     hiveMetastoreUris =
         String.format(
@@ -306,6 +406,11 @@ public class CatalogHive2IT extends BaseIT {
     catalog = metalake.loadCatalog(catalogName);
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema() throws TException, InterruptedException {
     Map<String, String> schemaProperties = createSchemaProperties();
     String comment = "comment";
@@ -402,8 +507,110 @@ public class CatalogHive2IT extends BaseIT {
         "Unsupported column type for sample value: " + column.dataType());
   }
 
-  private HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
+  protected HiveTable loadHiveTable(String schema, String table) throws InterruptedException {
     return hiveClientPool.run(client -> client.getTable(hmsCatalog, schema, table));
+  }
+
+  /**
+   * Verifies how NOT NULL and DEFAULT columns are handled on table creation. Hive 2.x metastores do
+   * not support column constraints, so both are rejected.
+   */
+  protected void checkColumnConstraintsOnCreate(
+      NameIdentifier nameIdentifier, Map<String, String> properties) {
+    // test column not null
+    Column illegalColumn =
+        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {illegalColumn},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"));
+
+    // test column default value
+    Column withDefault =
+        Column.of(
+            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        nameIdentifier,
+                        new Column[] {withDefault},
+                        TABLE_COMMENT,
+                        properties,
+                        Transforms.EMPTY_TRANSFORM));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
+  }
+
+  /**
+   * Verifies how NOT NULL and DEFAULT column changes are handled on table alteration. Hive 2.x
+   * metastores do not support column constraints, so all of them are rejected.
+   */
+  protected void checkColumnConstraintsOnAlter(TableCatalog tableCatalog, NameIdentifier id) {
+    // test add column with default value exception
+    TableChange withDefaultValue =
+        TableChange.addColumn(
+            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
+
+    // test alter column nullability exception
+    TableChange alterColumnNullability =
+        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tableCatalog.alterTable(id, alterColumnNullability));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The NOT NULL constraint for column is only supported since Hive 3.0,"
+                    + " but the connected Hive Metastore version is HIVE2. Illegal column: hive_col_name1"));
+
+    // test update column default value exception
+    TableChange updateDefaultValue =
+        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
+    exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "The DEFAULT constraint for column is only supported since Hive 3.0, "
+                    + "but the connected Hive Metastore version is HIVE2"),
+        "The exception message is: " + exception.getMessage());
   }
 
   private HivePartition loadHivePartition(String schema, String table, String partition)
@@ -447,13 +654,14 @@ public class CatalogHive2IT extends BaseIT {
   }
 
   private void compareDistributions(Distribution expected, Distribution actual) {
-    boolean expectedEmpty = expected == null || Distributions.NONE.equals(expected);
-    boolean actualEmpty = actual == null || Distributions.NONE.equals(actual);
+    boolean expectedEmpty = expected == null || Distributions.isNone(expected);
+    boolean actualEmpty = actual == null || Distributions.isNone(actual);
     Assertions.assertEquals(expectedEmpty, actualEmpty);
     if (expectedEmpty) {
       return;
     }
 
+    Assertions.assertEquals(expected.strategy(), actual.strategy());
     Assertions.assertEquals(expected.number(), actual.number());
     List<String> expectedFields =
         Arrays.stream(expected.expressions())
@@ -503,7 +711,7 @@ public class CatalogHive2IT extends BaseIT {
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
     Distribution distribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1));
+        Distributions.of(Strategy.HASH, 10, NamedReference.field(HIVE_COL_NAME1));
 
     final SortOrder[] sortOrders =
         new SortOrder[] {
@@ -511,6 +719,23 @@ public class CatalogHive2IT extends BaseIT {
         };
 
     Map<String, String> properties = createProperties();
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    for (Strategy unsupported : new Strategy[] {Strategy.RANGE, Strategy.EVEN}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tableCatalog.createTable(
+                      nameIdentifier,
+                      columns,
+                      TABLE_COMMENT,
+                      properties,
+                      Transforms.EMPTY_TRANSFORM,
+                      Distributions.of(unsupported, 10, NamedReference.field(HIVE_COL_NAME1)),
+                      sortOrders));
+      Assertions.assertTrue(error.getMessage().contains("HASH"));
+      Assertions.assertFalse(tableCatalog.tableExists(nameIdentifier));
+    }
     Table createdTable =
         catalog
             .asTableCatalog()
@@ -551,8 +776,7 @@ public class CatalogHive2IT extends BaseIT {
     // Test bad request
     // Bad name in distribution
     final Distribution badDistribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
-    TableCatalog tableCatalog = catalog.asTableCatalog();
+        Distributions.of(Strategy.HASH, 10, NamedReference.field(HIVE_COL_NAME1 + "bad_name"));
     Assertions.assertThrows(
         Exception.class,
         () -> {
@@ -636,51 +860,7 @@ public class CatalogHive2IT extends BaseIT {
     assertTableEquals(createdTable1, hiveTable1);
     checkTableReadWrite(hiveTable1);
 
-    // test column not null
-    Column illegalColumn =
-        Column.of("not_null_column", Types.StringType.get(), "not null column", false, false, null);
-    IllegalArgumentException exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        nameIdentifier,
-                        new Column[] {illegalColumn},
-                        TABLE_COMMENT,
-                        properties,
-                        Transforms.EMPTY_TRANSFORM));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"));
-
-    // test column default value
-    Column withDefault =
-        Column.of(
-            "default_column", Types.StringType.get(), "default column", true, false, Literals.NULL);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () ->
-                catalog
-                    .asTableCatalog()
-                    .createTable(
-                        nameIdentifier,
-                        new Column[] {withDefault},
-                        TABLE_COMMENT,
-                        properties,
-                        Transforms.EMPTY_TRANSFORM));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
+    checkColumnConstraintsOnCreate(nameIdentifier, properties);
   }
 
   @Test
@@ -769,6 +949,14 @@ public class CatalogHive2IT extends BaseIT {
         .createTable(hiveTable, createColumns(), null, ImmutableMap.of("provider", "hive"));
     NameIdentifier[] tables = catalog.asTableCatalog().listTables(Namespace.of(schemaName));
     Assertions.assertEquals(1, tables.length);
+  }
+
+  @Test
+  public void testListSchemasWithParentSchemaUnsupported() {
+    // Hive does not support hierarchical (nested) schemas, so listing schemas under a parent
+    // schema must be rejected instead of returning the catalog's flat schemas (see issue #11317).
+    SupportsSchemas schemas = catalog.asSchemas();
+    assertThrows(UnsupportedOperationException.class, () -> schemas.listSchemas(schemaName));
   }
 
   @Test
@@ -1312,50 +1500,10 @@ public class CatalogHive2IT extends BaseIT {
             });
     Assertions.assertTrue(exception.getMessage().contains("Cannot alter partition column"));
 
-    // test add column with default value exception
-    TableChange withDefaultValue =
-        TableChange.addColumn(
-            new String[] {"col_3"}, Types.ByteType.get(), "comment", Literals.NULL);
-    exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, withDefaultValue));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
+    checkColumnConstraintsOnAlter(tableCatalog, id);
 
-    // test alter column nullability exception
-    TableChange alterColumnNullability =
-        TableChange.updateColumnNullability(new String[] {HIVE_COL_NAME1}, false);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(id, alterColumnNullability));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The NOT NULL constraint for column is only supported since Hive 3.0,"
-                    + " but the current Gravitino Hive catalog only supports Hive 2.x. Illegal column: hive_col_name1"));
-
-    // test update column default value exception
-    TableChange updateDefaultValue =
-        TableChange.updateColumnDefaultValue(new String[] {HIVE_COL_NAME1}, Literals.NULL);
-    exception =
-        assertThrows(
-            IllegalArgumentException.class, () -> tableCatalog.alterTable(id, updateDefaultValue));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "The DEFAULT constraint for column is only supported since Hive 3.0, "
-                    + "but the current Gravitino Hive catalog only supports Hive 2.x"),
-        "The exception message is: " + exception.getMessage());
-
-    // test updateColumnPosition exception
+    // The SerDe fixtures disable HMS's incompatible column type check so metadata-only alters
+    // can preserve the stored marker. Ordinary tables therefore also allow this reorder.
     Column col1 = Column.of("name", Types.StringType.get(), "comment");
     Column col2 = Column.of("address", Types.StringType.get(), "comment");
     Column col3 = Column.of("date_of_birth", Types.DateType.get(), "comment");
@@ -1377,15 +1525,134 @@ public class CatalogHive2IT extends BaseIT {
     TableChange updatePos =
         TableChange.updateColumnPosition(
             new String[] {"date_of_birth"}, TableChange.ColumnPosition.first());
-    exception =
-        assertThrows(
-            IllegalArgumentException.class,
-            () -> tableCatalog.alterTable(tableIdentifier, updatePos));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains(
-                "please ensure that the type of the new column position is compatible with the old one"));
+    Table reordered = tableCatalog.alterTable(tableIdentifier, updatePos);
+    Column[] expectedColumns = new Column[] {col3, col1, col2};
+    Column[] storedColumns = loadHiveTable(schemaName, tableIdentifier.name()).columns();
+    Assertions.assertEquals(expectedColumns.length, reordered.columns().length);
+    Assertions.assertEquals(expectedColumns.length, storedColumns.length);
+    for (int index = 0; index < expectedColumns.length; index++) {
+      Column expected = expectedColumns[index];
+      Assertions.assertEquals(expected.name(), reordered.columns()[index].name());
+      Assertions.assertEquals(expected.dataType(), reordered.columns()[index].dataType());
+      Assertions.assertEquals(expected.comment(), reordered.columns()[index].comment());
+      Assertions.assertEquals(expected.name(), storedColumns[index].name());
+      Assertions.assertEquals(expected.dataType(), storedColumns[index].dataType());
+      Assertions.assertEquals(expected.comment(), storedColumns[index].comment());
+    }
+  }
+
+  @Test
+  public void testOutOfBandRenameKeepsColumnTags() throws InterruptedException {
+    // Hive stores names in lower case, and tag operations resolve a column by its stored name.
+    String schema = schemaName.toLowerCase(Locale.ROOT);
+    NameIdentifier ident =
+        NameIdentifier.of(schema, GravitinoITUtils.genRandomName("hive_oob_rename_table"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, createColumns(), TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+    String tagName = GravitinoITUtils.genRandomName("hive_oob_rename_tag");
+    metalake.createTag(tagName, "comment", Collections.emptyMap());
+    try {
+      loadColumn(ident, HIVE_COL_NAME1).supportsTags().associateTags(new String[] {tagName}, null);
+
+      // Rename the table directly in the Hive Metastore. It keeps its Gravitino id in its table
+      // parameters, so loading it under the new name imports it again over the same id.
+      String newName = GravitinoITUtils.genRandomName("hive_oob_renamed_table");
+      HiveTable hiveTable = loadHiveTable(schema, ident.name());
+      HiveTable.Builder renamed =
+          HiveTable.builder()
+              .withName(newName)
+              .withColumns(hiveTable.columns())
+              .withProperties(hiveTable.properties())
+              .withAuditInfo(hiveTable.auditInfo())
+              .withDistribution(hiveTable.distribution())
+              .withSortOrders(hiveTable.sortOrder())
+              .withPartitioning(hiveTable.partitioning())
+              .withCatalogName(hiveTable.catalogName())
+              .withDatabaseName(hiveTable.databaseName());
+      if (hiveTable.comment() != null) {
+        renamed.withComment(hiveTable.comment());
+      }
+      hiveClientPool.run(
+          client -> {
+            client.alterTable(hmsCatalog, schema, ident.name(), renamed.build());
+            return null;
+          });
+
+      // The column keeps its id, so the tag follows the table to its new name.
+      NameIdentifier newIdent = NameIdentifier.of(schema, newName);
+      Column column = loadColumn(newIdent, HIVE_COL_NAME1);
+      Assertions.assertArrayEquals(new String[] {tagName}, column.supportsTags().listTags());
+      MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
+      Assertions.assertEquals(1, objects.length);
+      Assertions.assertEquals(
+          String.join(".", catalogName, schema, newName, HIVE_COL_NAME1).toLowerCase(Locale.ROOT),
+          objects[0].fullName().toLowerCase(Locale.ROOT));
+    } finally {
+      metalake.deleteTag(tagName);
+    }
+  }
+
+  @Test
+  public void testCrossSchemaTableRename() throws TException, InterruptedException {
+    // Create a second schema to serve as the rename destination.
+    // No explicit location needed; HMS will use the default warehouse directory.
+    String targetSchemaName = GravitinoITUtils.genRandomName(SCHEMA_PREFIX + "_target");
+    Map<String, String> targetSchemaProperties = new HashMap<>();
+    targetSchemaProperties.put("key1", "val1");
+    targetSchemaProperties.put("key2", "val2");
+    catalog.asSchemas().createSchema(targetSchemaName, "target schema", targetSchemaProperties);
+
+    // Create a table in the original schema
+    Column[] columns = createColumns();
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            columns,
+            TABLE_COMMENT,
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM);
+
+    // Rename the table and move it to the target schema
+    String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX + "_renamed");
+    TableChange renameTableChange = TableChange.rename(newTableName, targetSchemaName);
+    catalog.asTableCatalog().alterTable(tableIdentifier, renameTableChange);
+
+    // Verify the table is loadable from the new schema via Gravitino API
+    NameIdentifier newTableIdentifier = NameIdentifier.of(targetSchemaName, newTableName);
+    Table loadedTable = catalog.asTableCatalog().loadTable(newTableIdentifier);
+    Assertions.assertNotNull(loadedTable);
+    Assertions.assertEquals(newTableName.toLowerCase(), loadedTable.name());
+
+    // Verify the table exists in the new schema directly from Hive Metastore
+    HiveTable hiveTable = loadHiveTable(targetSchemaName, newTableName);
+    Assertions.assertEquals(targetSchemaName.toLowerCase(), hiveTable.databaseName());
+    Assertions.assertEquals(newTableName.toLowerCase(), hiveTable.name());
+
+    // Verify the table no longer exists in the old schema
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(tableIdentifier));
+    Assertions.assertFalse(hiveTableExists(schemaName, tableName));
+    Assertions.assertFalse(hiveTableExists(schemaName, newTableName));
+
+    // Test error case: rename to a non-existent schema should fail
+    String anotherTable = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier anotherTableId = NameIdentifier.of(targetSchemaName, anotherTable);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            anotherTableId, columns, TABLE_COMMENT, createProperties(), Transforms.EMPTY_TRANSFORM);
+
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    TableChange renameChange = TableChange.rename(anotherTable + "_moved", "non_existent_schema");
+    Assertions.assertThrows(
+        NoSuchSchemaException.class, () -> tableCatalog.alterTable(anotherTableId, renameChange));
+
+    // Clean up the target schema
+    catalog.asSchemas().dropSchema(targetSchemaName, true);
   }
 
   private void assertDefaultTableProperties(Table gravitinoReturnTable, HiveTable actualTable) {
@@ -1871,5 +2138,18 @@ public class CatalogHive2IT extends BaseIT {
             HiveContainer.HDFS_DEFAULTFS_PORT,
             schemaName.toLowerCase()));
     return properties;
+  }
+
+  private Column loadColumn(NameIdentifier tableIdent, String columnName) {
+    return Arrays.stream(catalog.asTableCatalog().loadTable(tableIdent).columns())
+        .filter(c -> c.name().equals(columnName))
+        .findFirst()
+        .get();
+  }
+
+  static String metastoreDatabaseName(String hmsCatalog, String schemaName) {
+    return hmsCatalog == null || hmsCatalog.isEmpty() || "hive".equals(hmsCatalog)
+        ? schemaName
+        : "@" + hmsCatalog + "#" + schemaName;
   }
 }

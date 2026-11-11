@@ -37,8 +37,20 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.DlfSecretKeyCredential;
+import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -138,6 +150,64 @@ public class TestPaimonCatalog {
   }
 
   @Test
+  void testNonFilesystemBackendRequiresUriBeforeCreate() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    for (String backend : new String[] {"hive", "jdbc"}) {
+      IllegalArgumentException error =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalog.validateConfiguration(
+                      ImmutableMap.of(
+                          PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                          backend,
+                          PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                          "s3://bucket/paimon/")),
+              backend);
+      Assertions.assertTrue(error.getMessage().contains("URI"), error.getMessage());
+    }
+  }
+
+  @Test
+  void testValidBackendConfigurationsAreAccepted() {
+    PaimonCatalog catalog = new PaimonCatalog();
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "filesystem",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "/tmp/paimon")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalog.validateConfiguration(
+                ImmutableMap.of(
+                    PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND,
+                    "hive",
+                    PaimonCatalogPropertiesMetadata.WAREHOUSE,
+                    "s3://bucket/paimon/",
+                    PaimonCatalogPropertiesMetadata.URI,
+                    "thrift://127.0.0.1:9083")));
+  }
+
+  @Test
+  void testS3AFileSystemIsAvailable() throws IOException {
+    Class<? extends FileSystem> fileSystemClass =
+        FileSystem.getFileSystemClass("s3a", new Configuration());
+
+    Assertions.assertEquals("org.apache.hadoop.fs.s3a.S3AFileSystem", fileSystemClass.getName());
+  }
+
+  @Test
+  void testAsViewCatalog() {
+    PaimonCatalog paimonCatalog = newPaimonCatalog("catalog_view");
+    ViewCatalog viewCatalog = paimonCatalog.asViewCatalog();
+    Assertions.assertNotNull(viewCatalog);
+    Assertions.assertSame(paimonCatalog.ops(), viewCatalog);
+  }
+
+  @Test
   void testCatalogProperty() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
@@ -182,5 +252,367 @@ public class TestPaimonCatalog {
               .getMessage()
               .contains(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND));
     }
+  }
+
+  @Test
+  void testJdbcBackendDefaultCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user and jdbc-password
+    Map<String, String> jdbcProps = Maps.newHashMap();
+    jdbcProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+
+    CatalogEntity jdbcEntity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("jdbc-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcProps)
+            .build();
+
+    PaimonCatalog jdbcCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcProps).withCatalogEntity(jdbcEntity);
+    Map<String, String> properties = jdbcCatalog.propertiesWithCredentialProviders();
+
+    // Should have jdbc credential provider
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testJdbcBackendWithS3CredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and S3 credentials
+    Map<String, String> jdbcS3Props = Maps.newHashMap();
+    jdbcS3Props.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcS3Props.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcS3Props.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcS3Props.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcS3Props.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcS3Props.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "access-key");
+    jdbcS3Props.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "secret-key");
+
+    CatalogEntity jdbcS3Entity =
+        CatalogEntity.builder()
+            .withId(2L)
+            .withName("jdbc-s3-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcS3Props)
+            .build();
+
+    PaimonCatalog jdbcS3Catalog =
+        new PaimonCatalog().withCatalogConf(jdbcS3Props).withCatalogEntity(jdbcS3Entity);
+    Map<String, String> properties = jdbcS3Catalog.propertiesWithCredentialProviders();
+
+    // Should have both jdbc and s3-secret-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testNonJdbcBackendNoDefaultCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test non-JDBC backend (filesystem) - should not add default credential providers
+    Map<String, String> fsProps = Maps.newHashMap();
+    fsProps.put(PaimonConstants.CATALOG_BACKEND, "filesystem");
+    fsProps.put(PaimonConstants.WAREHOUSE, tempDir);
+
+    CatalogEntity fsEntity =
+        CatalogEntity.builder()
+            .withId(3L)
+            .withName("fs-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(fsProps)
+            .build();
+
+    PaimonCatalog fsCatalog =
+        new PaimonCatalog().withCatalogConf(fsProps).withCatalogEntity(fsEntity);
+    Map<String, String> properties = fsCatalog.propertiesWithCredentialProviders();
+
+    // Should not have credential providers for non-JDBC backend
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNull(credentialProviders);
+  }
+
+  @Test
+  void testDlfCredentialProviderAutoDetected() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> dlfProps = Maps.newHashMap();
+    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "rest");
+    dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
+    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
+
+    CatalogEntity dlfEntity =
+        CatalogEntity.builder()
+            .withId(4L)
+            .withName("dlf-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(dlfProps)
+            .build();
+
+    PaimonCatalog dlfCatalog =
+        new PaimonCatalog().withCatalogConf(dlfProps).withCatalogEntity(dlfEntity);
+    Map<String, String> properties = dlfCatalog.propertiesWithCredentialProviders();
+
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(
+        credentialProviders.contains(DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testJdbcBackendWithOSSCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and OSS credentials
+    Map<String, String> jdbcOssProps = Maps.newHashMap();
+    jdbcOssProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcOssProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcOssProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcOssProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcOssProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcOssProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, "oss-access-key");
+    jdbcOssProps.put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, "oss-secret-key");
+
+    CatalogEntity jdbcOssEntity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("jdbc-oss-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcOssProps)
+            .build();
+
+    PaimonCatalog jdbcOssCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcOssProps).withCatalogEntity(jdbcOssEntity);
+    Map<String, String> properties = jdbcOssCatalog.propertiesWithCredentialProviders();
+
+    // Should have both jdbc and oss-secret-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testJdbcBackendWithAzureCredentialProviders() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Test JDBC backend with jdbc-user, jdbc-password, and Azure credentials
+    Map<String, String> jdbcAzureProps = Maps.newHashMap();
+    jdbcAzureProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    jdbcAzureProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    jdbcAzureProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    jdbcAzureProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    jdbcAzureProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    jdbcAzureProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "azure-account-name");
+    jdbcAzureProps.put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, "azure-account-key");
+
+    CatalogEntity jdbcAzureEntity =
+        CatalogEntity.builder()
+            .withId(6L)
+            .withName("jdbc-azure-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(jdbcAzureProps)
+            .build();
+
+    PaimonCatalog jdbcAzureCatalog =
+        new PaimonCatalog().withCatalogConf(jdbcAzureProps).withCatalogEntity(jdbcAzureEntity);
+    Map<String, String> properties = jdbcAzureCatalog.propertiesWithCredentialProviders();
+
+    // Should have both jdbc and azure-account-key credential providers
+    String credentialProviders = properties.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    Assertions.assertNotNull(credentialProviders);
+    Assertions.assertTrue(credentialProviders.contains(JdbcCredential.JDBC_CREDENTIAL_TYPE));
+    Assertions.assertTrue(
+        credentialProviders.contains(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE));
+  }
+
+  @Test
+  void testExplicitCredentialProvidersWithoutJdbcOrDlfUnchanged() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> explicitProps = Maps.newHashMap();
+    explicitProps.put(PaimonConstants.CATALOG_BACKEND, "filesystem");
+    explicitProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    explicitProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
+
+    CatalogEntity explicitEntity =
+        CatalogEntity.builder()
+            .withId(4L)
+            .withName("explicit-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(explicitProps)
+            .build();
+
+    PaimonCatalog explicitCatalog =
+        new PaimonCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
+    Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
+
+    Assertions.assertEquals(
+        "custom-provider", properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
+  void testExplicitCredentialProvidersStillGetsJdbc() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    // Explicit credential-providers is kept, and JDBC is still appended when JDBC keys exist.
+    Map<String, String> explicitProps = Maps.newHashMap();
+    explicitProps.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    explicitProps.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    explicitProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    explicitProps.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    explicitProps.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    explicitProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
+
+    CatalogEntity explicitEntity =
+        CatalogEntity.builder()
+            .withId(5L)
+            .withName("explicit-jdbc-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(explicitProps)
+            .build();
+
+    PaimonCatalog explicitCatalog =
+        new PaimonCatalog().withCatalogConf(explicitProps).withCatalogEntity(explicitEntity);
+    Map<String, String> properties = explicitCatalog.propertiesWithCredentialProviders();
+
+    Assertions.assertEquals(
+        "custom-provider," + JdbcCredential.JDBC_CREDENTIAL_TYPE,
+        properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
+  void testExplicitCredentialProvidersStillGetsDlf() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> dlfProps = Maps.newHashMap();
+    dlfProps.put(PaimonConstants.CATALOG_BACKEND, "rest");
+    dlfProps.put(PaimonConstants.WAREHOUSE, tempDir);
+    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
+    dlfProps.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
+    dlfProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
+
+    CatalogEntity dlfEntity =
+        CatalogEntity.builder()
+            .withId(8L)
+            .withName("dlf-explicit-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(dlfProps)
+            .build();
+
+    PaimonCatalog dlfCatalog =
+        new PaimonCatalog().withCatalogConf(dlfProps).withCatalogEntity(dlfEntity);
+    Map<String, String> properties = dlfCatalog.propertiesWithCredentialProviders();
+
+    Assertions.assertEquals(
+        "custom-provider," + DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+        properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
+  void testExplicitCredentialProvidersStillGetsJdbcAndDlf() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    Map<String, String> props = Maps.newHashMap();
+    props.put(PaimonConstants.CATALOG_BACKEND, "jdbc");
+    props.put(PaimonConstants.URI, "jdbc:sqlite::memory:");
+    props.put(PaimonConstants.WAREHOUSE, tempDir);
+    props.put(PaimonConstants.GRAVITINO_JDBC_USER, "test-user");
+    props.put(PaimonConstants.GRAVITINO_JDBC_PASSWORD, "test-password");
+    props.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_ID, "dlf-ak");
+    props.put(PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET, "dlf-sk");
+    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, "custom-provider");
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(9L)
+            .withName("jdbc-dlf-explicit-catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .withProperties(props)
+            .build();
+
+    PaimonCatalog catalog = new PaimonCatalog().withCatalogConf(props).withCatalogEntity(entity);
+    Map<String, String> properties = catalog.propertiesWithCredentialProviders();
+
+    Assertions.assertEquals(
+        "custom-provider,"
+            + JdbcCredential.JDBC_CREDENTIAL_TYPE
+            + ","
+            + DlfSecretKeyCredential.DLF_SECRET_KEY_CREDENTIAL_TYPE,
+        properties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  private PaimonCatalog newPaimonCatalog(String catalogName) {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withNamespace(Namespace.of("metalake"))
+            .withType(PaimonCatalog.Type.RELATIONAL)
+            .withProvider("lakehouse-paimon")
+            .withAuditInfo(auditInfo)
+            .build();
+
+    Map<String, String> conf = Maps.newHashMap();
+    conf.put(PaimonCatalogPropertiesMetadata.GRAVITINO_CATALOG_BACKEND, "filesystem");
+    conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir + File.separator + catalogName);
+    return new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
   }
 }

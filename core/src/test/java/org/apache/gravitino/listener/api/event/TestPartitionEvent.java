@@ -344,8 +344,8 @@ public class TestPartitionEvent {
         .thenReturn(partition);
     when(dispatcher.getPartition(any(NameIdentifier.class), any(String.class)))
         .thenReturn(partition);
-    when(dispatcher.listPartitionNames(any(NameIdentifier.class))).thenReturn(null);
-    when(dispatcher.listPartitions(any(NameIdentifier.class))).thenReturn(null);
+    when(dispatcher.listPartitionNames(any(NameIdentifier.class))).thenReturn(new String[0]);
+    when(dispatcher.listPartitions(any(NameIdentifier.class))).thenReturn(new Partition[0]);
     return dispatcher;
   }
 

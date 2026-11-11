@@ -67,8 +67,8 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
+  // Keep in sync with the ranger-intg excludes in authorization-ranger/build.gradle.kts.
   testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
     exclude("org.apache.lucene")
     exclude("org.apache.solr")
@@ -76,13 +76,23 @@ dependencies {
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
+    exclude("org.apache.ranger", "ranger-audit-core")
     exclude("org.apache.ranger", "ranger-plugins-audit")
     exclude("org.apache.ranger", "ranger-plugins-cred")
     exclude("org.apache.ranger", "ranger-plugin-classloader")
+    exclude("org.apache.ranger", "ugsync-util")
+    exclude("org.graalvm.js")
+    exclude("com.nimbusds")
+    exclude("net.minidev")
     exclude("net.java.dev.jna")
+    exclude("javax.servlet")
     exclude("javax.ws.rs")
     exclude("org.eclipse.jetty")
-    exclude("org.apache.hadoop", "hadoop-common")
+    exclude("org.apache.hadoop")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.jaxrs")
+    exclude("com.fasterxml.jackson.module")
+    exclude("org.apache.commons", "commons-lang3")
   }
   testImplementation("org.apache.spark:spark-hive_$scalaVersion:$sparkVersion")
   testImplementation("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion") {
@@ -95,6 +105,11 @@ dependencies {
   testImplementation("org.apache.kyuubi:kyuubi-spark-authz-shaded_$scalaVersion:$kyuubiVersion") {
     exclude("com.sun.jersey")
   }
+  // The Kyuubi Spark authz plugin in the tests runs the Ranger policy engine, which needs
+  // ugsync-util since Ranger 2.8. Gravitino itself only uses the Ranger Admin client.
+  testRuntimeOnly(libs.ranger.ugsync.util) {
+    isTransitive = false
+  }
 
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
@@ -104,6 +119,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
 }
 
 tasks {

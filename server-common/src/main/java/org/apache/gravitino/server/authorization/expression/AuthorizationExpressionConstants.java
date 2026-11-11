@@ -20,11 +20,30 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_CATALOG_AUTHORIZATION_EXPRESSION =
       "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)";
 
+  /**
+   * Authorizes testing an existing catalog connection with proposed changes. The caller chooses the
+   * configuration the server connects to, so this matches the authorization for altering the
+   * catalog. Testing with the stored configuration uses {@link
+   * #LOAD_CATALOG_AUTHORIZATION_EXPRESSION} instead.
+   */
+  public static final String TEST_CATALOG_CONNECTION_WITH_CHANGES_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG)";
+
   public static final String LOAD_SCHEMA_AUTHORIZATION_EXPRESSION =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
           ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA)
            """;
+
+  /**
+   * Authorizes a schema existence probe. CREATE_SCHEMA is intentionally included because clients
+   * commonly check whether a schema exists before attempting to create it.
+   */
+  public static final String PROBE_SCHEMA_AUTHORIZATION_EXPRESSION =
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA || ANY_CREATE_SCHEMA)
+          """;
 
   public static final String LOAD_MODEL_AUTHORIZATION_EXPRESSION =
       """
@@ -40,6 +59,21 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
                   """;
 
+  public static final String PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
+                  """;
+
+  public static final String LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
+                  """;
+
   //  Adding ANY_CREATE_TABLE here as Spark calls tableExists before creating a table.
   public static final String ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION =
       """
@@ -48,11 +82,43 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
                   """;
 
+  /**
+   * Existence-check expression for Iceberg REST {@code loadTable}: used when the primary load-table
+   * expression is forbidden, to allow schema-level principals who can create/select views to
+   * resolve a table identifier (e.g. view backing table) without full table privileges.
+   */
+  public static final String ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (ANY_CREATE_TABLE || ANY_SELECT_VIEW || ANY_CREATE_VIEW || VIEW::OWNER)
+                  """;
+
+  /** Iceberg REST {@code HEAD .../tables/{table}} (table exists). */
+  public static final String ICEBERG_TABLE_EXISTS_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || VIEW::OWNER ||
+                  ANY_CREATE_VIEW || ANY_SELECT_VIEW || ANY_SELECT_TABLE ||
+                  ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  """;
+
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
+                  """;
+
+  /**
+   * Authorizes removing a table, whether the stored data is deleted with it or only the Gravitino
+   * metadata is. Removal requires ownership of the table or of one of its ancestors: MODIFY_TABLE
+   * alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER
                   """;
 
   public static final String LOAD_TOPICS_AUTHORIZATION_EXPRESSION =
@@ -75,23 +141,72 @@ public class AuthorizationExpressionConstants {
   public static final String FILTER_MODEL_AUTHORIZATION_EXPRESSION =
       "ANY(OWNER, METALAKE, CATALOG, SCHEMA, MODEL) || ANY_USE_MODEL";
 
+  public static final String LOAD_FUNCTION_AUTHORIZATION_EXPRESSION =
+      """
+            ANY(OWNER, METALAKE, CATALOG) ||
+             SCHEMA_OWNER_WITH_USE_CATALOG ||
+              ANY_USE_CATALOG && ANY_USE_SCHEMA
+              && (FUNCTION::OWNER || ANY_EXECUTE_FUNCTION || ANY_MODIFY_FUNCTION)
+                  """;
+
+  public static final String FILTER_FUNCTION_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, FUNCTION) ||
+                  ANY_EXECUTE_FUNCTION ||
+                  ANY_MODIFY_FUNCTION
+                  """;
+
   public static final String LOAD_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW)
                   """;
 
-  //  Adding ANY_SELECT_TABLE / ANY_MODIFY_TABLE / ANY_CREATE_TABLE here because Spark probes
-  //  viewExists(tableName) when resolving any relation. Without table privileges in the
-  //  expression, users who only hold table grants get a spurious 403 on the HEAD /views/{name}
-  //  probe, blocking legitimate table reads.
   public static final String ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION =
+      LOAD_VIEW_AUTHORIZATION_EXPRESSION;
+
+  /**
+   * Existence-check expression for Iceberg REST {@code loadView}: when the primary load-view
+   * expression is forbidden, allows schema-level principals with view or referenced-table paths
+   * (similar shape to {@link #ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION}, tuned for
+   * view metadata and backing relation resolution).
+   */
+  public static final String ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  &&
+                  (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  """;
+
+  /** Creates a view through the generic or Iceberg REST metadata API. */
+  public static final String CREATE_VIEW_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW
-                      || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && ANY_CREATE_VIEW
+                  """;
+
+  public static final String ICEBERG_CREATE_VIEW_AUTHORIZATION_EXPRESSION =
+      CREATE_VIEW_AUTHORIZATION_EXPRESSION;
+
+  /** View alter, drop, and rename operations use the {@code VIEW::OWNER} path. */
+  public static final String VIEW_OWNER_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && VIEW::OWNER
+                  """;
+
+  /** Iceberg REST replace view, drop view, and rename view (VIEW::OWNER path). */
+  public static final String ICEBERG_VIEW_OWNER_AUTHORIZATION_EXPRESSION =
+      VIEW_OWNER_AUTHORIZATION_EXPRESSION;
+
+  /** Iceberg REST {@code HEAD .../views/{view}} (view exists). */
+  public static final String ICEBERG_VIEW_EXISTS_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (VIEW::OWNER || ANY_SELECT_VIEW || ANY_CREATE_VIEW)
                   """;
 
   public static final String FILTER_TABLE_AUTHORIZATION_EXPRESSION =
@@ -100,6 +215,48 @@ public class AuthorizationExpressionConstants {
                   ANY_SELECT_TABLE ||
                   ANY_MODIFY_TABLE
                   """;
+
+  /**
+   * Parent-scope expression used to short-circuit table-list authorization. It is the ancestor-only
+   * portion of {@link #FILTER_TABLE_AUTHORIZATION_EXPRESSION}: ownership of, or a SELECT/MODIFY
+   * grant at, the metalake/catalog/schema scope means every table in the schema is visible.
+   * Evaluated once per list request instead of once per table.
+   *
+   * <p>This expression only checks the positive parent-scope grant; deny coverage (at any scope) is
+   * handled separately by {@link
+   * org.apache.gravitino.authorization.GravitinoAuthorizer#hasDenyPolicy} so the short-circuit
+   * falls back to per-object authorization whenever a relevant deny may exist.
+   */
+  public static final String TABLE_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              ANY(OWNER, METALAKE, CATALOG, SCHEMA) ||
+              ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA) ||
+              ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA)
+              """;
+
+  /**
+   * Parent-scope expression used to short-circuit schema-list authorization. Ancestor-only portion
+   * of {@link #FILTER_SCHEMA_AUTHORIZATION_EXPRESSION}: ownership of, or a USE_SCHEMA grant at, the
+   * metalake/catalog scope means every schema in the catalog is visible. Deny coverage is handled
+   * by {@link org.apache.gravitino.authorization.GravitinoAuthorizer#hasDenyPolicy}.
+   */
+  public static final String SCHEMA_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              ANY(OWNER, METALAKE, CATALOG) ||
+              ANY(USE_SCHEMA, METALAKE, CATALOG)
+              """;
+
+  /**
+   * Parent-scope expression used to short-circuit catalog-list authorization. Ancestor-only portion
+   * of {@link #LOAD_CATALOG_AUTHORIZATION_EXPRESSION}: metalake ownership, or a USE_CATALOG grant
+   * at the metalake scope, means every catalog is visible. Deny coverage is handled by {@link
+   * org.apache.gravitino.authorization.GravitinoAuthorizer#hasDenyPolicy}.
+   */
+  public static final String CATALOG_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION =
+      """
+              METALAKE::OWNER ||
+              ANY(USE_CATALOG, METALAKE)
+              """;
 
   public static final String FILTER_VIEW_AUTHORIZATION_EXPRESSION =
       """
@@ -119,6 +276,30 @@ public class AuthorizationExpressionConstants {
                   ANY_WRITE_FILESET
                   """;
 
+  /**
+   * Soft check required to call {@code getSecrets}. Only the metalake owner or a principal with
+   * {@code USE_SECRETS} may receive secrets; others get an empty response rather than a forbidden
+   * error. Whether cloud access-key pairs are included depends on {@link
+   * #FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION}.
+   */
+  public static final String FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_USE_SECRETS
+                  """;
+
+  /**
+   * Soft check that, together with {@link #FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION}, includes
+   * cloud access-key pairs in the {@code getSecrets} result. Alone it does not authorize {@code
+   * getSecrets}. Metalake owners and holders of {@code INCLUDE_CREDENTIAL_SECRETS} receive the
+   * unfiltered map when they also pass the {@code USE_SECRETS} check.
+   */
+  public static final String FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION =
+      """
+                  METALAKE::OWNER ||
+                  ANY_INCLUDE_CREDENTIAL_SECRETS
+                  """;
+
   public static final String FILTER_TOPICS_AUTHORIZATION_EXPRESSION =
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, TOPIC) ||
@@ -131,6 +312,53 @@ public class AuthorizationExpressionConstants {
               ANY(OWNER, METALAKE, CATALOG, SCHEMA, FILESET) ||
               ANY_READ_FILESET ||
               ANY_WRITE_FILESET
+                  """;
+
+  /**
+   * Semantic Model list and load. Only Semantic Models the caller can use, modify, or owns are
+   * returned; a metalake or catalog owner, or a schema owner holding USE_CATALOG, sees them all.
+   */
+  public static final String LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_USE_SEMANTIC_MODEL || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /** Semantic Model creation under a schema. */
+  public static final String CREATE_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_SEMANTIC_MODEL
+                  """;
+
+  /** Semantic Model rename and definition or metadata alteration. */
+  public static final String MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /**
+   * Semantic Model drop. Unlike alter, MODIFY_SEMANTIC_MODEL is not enough: a caller who is neither
+   * a metalake, catalog, nor schema owner must own the Semantic Model itself.
+   */
+  public static final String DROP_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && SEMANTIC_MODEL::OWNER
+                  """;
+
+  public static final String FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL) ||
+                  ANY_USE_SEMANTIC_MODEL ||
+                  ANY_MODIFY_SEMANTIC_MODEL
                   """;
 
   public static final String LOAD_ROLE_AUTHORIZATION_EXPRESSION =
@@ -147,22 +375,29 @@ public class AuthorizationExpressionConstants {
           ((CAN_ACCESS_METADATA) && (TAG::OWNER || ANY_APPLY_TAG))
           """;
 
+  public static final String LOAD_USER_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_USERS || USER::SELF";
+
+  public static final String LOAD_GROUP_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
+
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
-      "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
+      "METALAKE::OWNER || TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG";
 
   public static final String APPLY_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 
   public static final String LOAD_POLICY_AUTHORIZATION_EXPRESSION =
       """
-          METALAKE::OWNER || POLICY::OWNER || ANY_APPLY_POLICY
+          METALAKE::OWNER || POLICY::OWNER || ANY_VIEW_POLICY || ANY_APPLY_POLICY
           """;
 
   /**
    * Special case: "METALAKE_USER" is used here as a unique authorization token, not a logical
    * expression like other constants. This is intentional and required for metalake-level user
    * authorization checks {@link
-   * org.apache.gravitino.authorization.GravitinoAuthorizer#isMetalakeUser(String)}.
+   * org.apache.gravitino.authorization.GravitinoAuthorizer#isMetalakeUser(String,
+   * org.apache.gravitino.authorization.AuthorizationRequestContext)}.
    */
   public static final String LOAD_METALAKE_AUTHORIZATION_EXPRESSION = "METALAKE_USER";
 
@@ -170,7 +405,4 @@ public class AuthorizationExpressionConstants {
 
   public static final String LOAD_JOB_TEMPLATE_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || JOB_TEMPLATE::OWNER || ANY_USE_JOB_TEMPLATE";
-
-  public static final String REQUEST_REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE =
-      "REQUEST::REQUIRED_PRIVILEGES_CONTAINS_MODIFY_TABLE";
 }

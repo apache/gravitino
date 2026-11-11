@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.base.Preconditions;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +36,16 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
+import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
@@ -49,9 +56,9 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** This class is an utilization class to retrieve owner relation. */
 public class OwnerMetaService {
 
-  private OwnerMetaService() {}
-
   private static final OwnerMetaService INSTANCE = new OwnerMetaService();
+
+  private OwnerMetaService() {}
 
   public static OwnerMetaService getInstance() {
     return INSTANCE;
@@ -138,8 +145,28 @@ public class OwnerMetaService {
           });
     }
 
-    // TODO: Add batch support for group owners when GroupOwnerRelPO and batch method are available
-    // For now, we only handle user owners in batch mode
+    // Get group owners
+    List<GroupOwnerRelPO> groupPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectGroupOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(groupPOList)) {
+      groupPOList.forEach(
+          groupPO -> {
+            GroupEntity groupEntity =
+                POConverters.fromGroupPO(
+                    groupPO,
+                    Collections.emptyList(),
+                    AuthorizationUtils.ofGroupNamespace(metalake));
+            result.add(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    nameIdentifierMap.get(groupPO.getMetadataObjectId()),
+                    type,
+                    groupEntity));
+          });
+    }
 
     return result;
   }
@@ -150,9 +177,8 @@ public class OwnerMetaService {
       Entity.EntityType entityType,
       NameIdentifier owner,
       Entity.EntityType ownerType) {
-    long metalakeId =
-        MetalakeMetaService.getInstance()
-            .getMetalakeIdByName(NameIdentifierUtil.getMetalake(entity));
+    String metalake = NameIdentifierUtil.getMetalake(entity);
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
 
     Long entityId = EntityIdService.getEntityId(entity, entityType);
     Long ownerId = EntityIdService.getEntityId(owner, ownerType);
@@ -160,16 +186,173 @@ public class OwnerMetaService {
     OwnerRelPO ownerRelPO =
         POConverters.initializeOwnerRelPOsWithVersion(
             metalakeId, ownerType.name(), ownerId, entityType.name(), entityId);
-    SessionUtils.doMultipleWithCommit(
+    String metadataObjectType =
+        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name();
+    assignOwner(
+        metalake,
+        metalakeId,
+        owner,
+        ownerType,
+        ownerId,
+        List.of(entityId),
+        entityType,
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        entityId,
-                        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name())),
+                        entityId, metadataObjectType)),
         () ->
             SessionUtils.doWithoutCommit(
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchSetOwner")
+  public void batchSetOwners(
+      List<NameIdentifier> ownedObjects,
+      Entity.EntityType ownedObjectType,
+      NameIdentifier ownerIdent,
+      Entity.EntityType ownerType) {
+    if (CollectionUtils.isEmpty(ownedObjects)) {
+      return;
+    }
+
+    String metalake = NameIdentifierUtil.getMetalake(ownedObjects.get(0));
+    for (NameIdentifier entity : ownedObjects) {
+      Preconditions.checkArgument(
+          Objects.equals(NameIdentifierUtil.getMetalake(entity), metalake),
+          "All owned objects must be in the same metalake");
+    }
+
+    long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    Long ownerId = EntityIdService.getEntityId(ownerIdent, ownerType);
+
+    // Resolve every object first and write in stable id order, so two batches that overlap take
+    // the same row locks in the same order and cannot deadlock each other.
+    List<Long> entityIds = new ArrayList<>(ownedObjects.size());
+    for (NameIdentifier entity : ownedObjects) {
+      entityIds.add(EntityIdService.getEntityId(entity, ownedObjectType));
+    }
+    entityIds.sort(Comparator.naturalOrder());
+    String metadataObjectType =
+        NameIdentifierUtil.toMetadataObject(ownedObjects.get(0), ownedObjectType).type().name();
+
+    List<OwnerRelForDeletion> deletions = new ArrayList<>(entityIds.size());
+    List<OwnerRelPO> ownerRelPOs = new ArrayList<>(entityIds.size());
+    for (Long entityId : entityIds) {
+      deletions.add(new OwnerRelForDeletion(entityId, metadataObjectType));
+      ownerRelPOs.add(
+          POConverters.initializeOwnerRelPOsWithVersion(
+              metalakeId, ownerType.name(), ownerId, ownedObjectType.name(), entityId));
+    }
+
+    assignOwner(
+        metalake,
+        metalakeId,
+        ownerIdent,
+        ownerType,
+        ownerId,
+        entityIds,
+        ownedObjectType,
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper -> mapper.batchSoftDeleteOwnerRelByMetadataObjects(deletions)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class, mapper -> mapper.batchInsertOwnerRels(ownerRelPOs)));
+  }
+
+  /**
+   * Serializes assignments on the owned object's row, including the first assignment when no owner
+   * relation exists. The metalake is locked first to fence cascade deletion; object rows are locked
+   * in stable ID order; the principal is then fenced before owner relations change.
+   */
+  private void assignOwner(
+      String metalake,
+      long metalakeId,
+      NameIdentifier owner,
+      Entity.EntityType ownerType,
+      long ownerId,
+      List<Long> entityIds,
+      Entity.EntityType ownedObjectType,
+      Runnable retirePreviousOwners,
+      Runnable insertOwners) {
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            lockMetalakeForOwnerWrite(
+                metalake, metalakeId, ownedObjectType == Entity.EntityType.METALAKE),
+        () -> lockOwnedObjectsForOwnerWrite(entityIds, ownedObjectType, metalakeId),
+        () -> lockPrincipalForOwnerWrite(owner, ownerType, ownerId, metalakeId),
+        retirePreviousOwners,
+        insertOwners);
+  }
+
+  private void lockMetalakeForOwnerWrite(String metalake, long metalakeId, boolean exclusive) {
+    OccWriteSupport.lockParentForChildWrite(
+        metalake,
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    exclusive
+                        ? mapper.selectMetalakeMetaByIdForUpdate(metalakeId)
+                        : mapper.selectMetalakeMetaByIdForShare(metalakeId)),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), metalake));
+  }
+
+  private void lockOwnedObjectsForOwnerWrite(
+      List<Long> entityIds, Entity.EntityType entityType, long metalakeId) {
+    if (entityType == Entity.EntityType.METALAKE) {
+      return;
+    }
+    for (Long entityId : entityIds) {
+      OccWriteSupport.lockParentForChildWrite(
+          String.valueOf(entityId),
+          entityType,
+          () ->
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.selectMetadataObjectIdForUpdate(entityId, metalakeId, entityType)),
+          null,
+          current -> Objects.equals(current, entityId));
+    }
+  }
+
+  private void lockPrincipalForOwnerWrite(
+      NameIdentifier owner, Entity.EntityType ownerType, long ownerId, long metalakeId) {
+    switch (ownerType) {
+      case USER:
+        OccWriteSupport.lockParentForChildWrite(
+            owner.name(),
+            ownerType,
+            () ->
+                SessionUtils.getWithoutCommit(
+                    UserMetaMapper.class, mapper -> mapper.selectUserMetaByIdForShare(ownerId)),
+            null,
+            current ->
+                Objects.equals(current.getMetalakeId(), metalakeId)
+                    && Objects.equals(current.getUserName(), owner.name()));
+        return;
+      case GROUP:
+        OccWriteSupport.lockParentForChildWrite(
+            owner.name(),
+            ownerType,
+            () ->
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class, mapper -> mapper.selectGroupMetaByIdForShare(ownerId)),
+            null,
+            current ->
+                Objects.equals(current.getMetalakeId(), metalakeId)
+                    && Objects.equals(current.getGroupName(), owner.name()));
+        return;
+      default:
+        throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
+    }
   }
 }

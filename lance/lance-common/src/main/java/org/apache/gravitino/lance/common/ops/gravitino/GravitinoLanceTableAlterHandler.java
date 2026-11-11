@@ -20,11 +20,6 @@
 package org.apache.gravitino.lance.common.ops.gravitino;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableAlterColumnsResponse;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsRequest;
-import com.lancedb.lance.namespace.model.AlterTableDropColumnsResponse;
-import com.lancedb.lance.namespace.model.ColumnAlteration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -32,6 +27,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.lance.namespace.model.AlterColumnsEntry;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableAlterColumnsResponse;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsResponse;
 
 /**
  * Handler for altering a Gravitino table. It builds the Gravitino table changes based on the
@@ -97,6 +97,9 @@ public interface GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> {
       implements GravitinoLanceTableAlterHandler<
           AlterTableAlterColumnsRequest, AlterTableAlterColumnsResponse> {
 
+    private static final String RENAME_ONLY_ERROR =
+        "Only RENAME alteration is supported currently.";
+
     @Override
     public TableChange[] buildGravitinoTableChange(AlterTableAlterColumnsRequest request) {
       return buildAlterColumnChanges(request);
@@ -115,26 +118,28 @@ public interface GravitinoLanceTableAlterHandler<REQUEST, RESPONSE> {
     }
 
     private TableChange[] buildAlterColumnChanges(AlterTableAlterColumnsRequest request) {
-      List<ColumnAlteration> columns = request.getAlterations();
+      List<AlterColumnsEntry> columns = request.getAlterations();
 
       List<TableChange> changes = new ArrayList<>();
-      for (ColumnAlteration column : columns) {
+      for (AlterColumnsEntry column : columns) {
         // Column name will not be null according to LanceDB spec.
-        String columnName = column.getColumn();
+        String columnName = column.getPath();
         String newName = column.getRename();
         if (StringUtils.isNotBlank(newName)) {
           changes.add(TableChange.renameColumn(new String[] {columnName}, newName));
         }
 
-        // The format of ColumnAlteration#castTo is unclear, so we will skip it now
-        // for more, please refer to: https://shorturl.at/bYI0Z (short url for
-        // github.com/lance-format/lance-namespace)
-        if (StringUtils.isNotBlank(column.getCastTo())) {
-          throw new UnsupportedOperationException(
-              "Altering column data type is not supported yet.");
+        if (hasUnsupportedAlterColumnFields(column)) {
+          throw new UnsupportedOperationException(RENAME_ONLY_ERROR);
         }
       }
       return changes.stream().toArray(TableChange[]::new);
+    }
+
+    private boolean hasUnsupportedAlterColumnFields(AlterColumnsEntry column) {
+      return column.getDataType() != null
+          || column.getNullable() != null
+          || column.getVirtualColumn() != null;
     }
   }
 }

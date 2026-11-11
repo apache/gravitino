@@ -49,7 +49,15 @@ public class SchemaMetaSQLProviderFactory {
 
   static class SchemaMetaMySQLProvider extends SchemaMetaBaseSQLProvider {}
 
-  static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {}
+  static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {
+    @Override
+    public String selectSchemaMetaByIdForShare(Long schemaId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Writes of
+      // tables, views, filesets and the like under one schema therefore serialize on H2, and a slow
+      // write can make a concurrent one hit H2's lock timeout instead of a clean conflict.
+      return selectSchemaMetaByIdForUpdate(schemaId);
+    }
+  }
 
   public static String listSchemaPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
@@ -60,8 +68,21 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().listSchemaPOsBySchemaIds(schemaIds);
   }
 
+  public static String listSchemaPOsByCatalogIdAndNamePrefix(
+      @Param("catalogId") Long catalogId,
+      @Param("schemaName") String schemaName,
+      @Param("descendantPrefix") String descendantPrefix) {
+    return getProvider()
+        .listSchemaPOsByCatalogIdAndNamePrefix(catalogId, schemaName, descendantPrefix);
+  }
+
   public static String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return getProvider().listSchemaPOsByCatalogId(catalogId);
+  }
+
+  /** Returns SQL that lists all active schemas in a metalake. */
+  public static String listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listSchemaPOsByMetalakeId(metalakeId);
   }
 
   public static String selectSchemaIdByCatalogIdAndName(
@@ -85,6 +106,27 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaMetaById(schemaId);
   }
 
+  /** Returns SQL that selects and locks a schema by ID, including a retired row. */
+  public static String selectSchemaMetaByIdIncludingDeletedForUpdate(
+      @Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdIncludingDeletedForUpdate(schemaId);
+  }
+
+  /** Returns SQL that checks whether an active child exists in the schema. */
+  public static String selectActiveChildBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().selectActiveChildBySchemaId(schemaId);
+  }
+
+  /** Returns SQL that selects and locks an active schema by ID. */
+  public static String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdForUpdate(schemaId);
+  }
+
+  /** Returns SQL that selects and share-locks an active schema by ID. */
+  public static String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdForShare(schemaId);
+  }
+
   public static String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return getProvider().insertSchemaMeta(schemaPO);
   }
@@ -94,21 +136,33 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().insertSchemaMetaOnDuplicateKeyUpdate(schemaPO);
   }
 
+  public static String batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMeta(schemaMetas);
+  }
+
+  public static String batchInsertSchemaMetaOnDuplicateKeyUpdate(
+      @Param("schemaMetas") List<SchemaPO> schemaMetas) {
+    return getProvider().batchInsertSchemaMetaOnDuplicateKeyUpdate(schemaMetas);
+  }
+
   public static String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
   }
 
-  public static String softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteSchemaMetasBySchemaId(schemaId);
+  public static String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
-  public static String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteSchemaMetasByMetalakeId(metalakeId);
+  public static String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion);
   }
 
-  public static String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteSchemaMetasByCatalogId(catalogId);
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public static String softDeleteSchemaMetasWithVersion(
+      @Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return getProvider().softDeleteSchemaMetasWithVersion(schemaPOs);
   }
 
   public static String deleteSchemaMetasByLegacyTimeline(

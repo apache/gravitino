@@ -23,15 +23,16 @@ paths:
     get:
       tags:
         - authentication
-      summary: Get the authenticated principal
-      operationId: getAuthenticatedPrincipal
+      summary: Get the authenticated user
+      operationId: getAuthenticatedUser
       description: >
-        Returns the server-resolved principal name for the current authenticated user.
-        The principal is derived from the JWT token using the configured `principalFields`
-        and `principalMapper`, ensuring consistency between server-side identity and UI display.
+        Returns the server-resolved principal name and service-administrator status for the
+        current authenticated user.
+        The principal is derived from the configured authenticator and principal mapper, ensuring
+        consistency between server-side identity and UI display.
       responses:
         "200":
-          description: Returns the authenticated principal information
+          description: Returns the authenticated user information
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -62,10 +63,14 @@ components:
         principal:
           type: string
           description: The server-resolved principal name of the authenticated user
+        serviceAdmin:
+          type: boolean
+          description: Whether the authenticated user is a Gravitino service administrator
 
   examples:
     AuthMeResponse:
       value: {
         "code": 0,
-        "principal": "admin"
+        "principal": "admin",
+        "serviceAdmin": true
       }

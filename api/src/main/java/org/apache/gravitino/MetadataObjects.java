@@ -59,7 +59,9 @@ public class MetadataObjects {
           MetadataObject.Type.TABLE,
           MetadataObject.Type.VIEW,
           MetadataObject.Type.TOPIC,
-          MetadataObject.Type.MODEL);
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.FUNCTION,
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   private static final Set<MetadataObject.Type> VALID_FOUR_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.COLUMN);
@@ -151,6 +153,8 @@ public class MetadataObjects {
       case FILESET:
       case TOPIC:
       case MODEL:
+      case FUNCTION:
+      case SEMANTIC_MODEL:
         parentType = MetadataObject.Type.SCHEMA;
         break;
       case SCHEMA:

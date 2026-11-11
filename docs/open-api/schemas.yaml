@@ -29,6 +29,8 @@ paths:
         - schema
       summary: List schemas
       operationId: listSchemas
+      parameters:
+        - $ref: "#/components/parameters/parentSchema"
       responses:
         "200":
           $ref: "./openapi.yaml#/components/responses/EntityListResponse"
@@ -77,7 +79,7 @@ paths:
         - schema
       summary: Get schema
       operationId: loadSchema
-      description: Returns the specified schema in the specified catalog and metalake
+      description: Returns the specified schema in the specified catalog and metalake.
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
@@ -94,6 +96,14 @@ paths:
                   $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
                 NoSuchSchemaException:
                   $ref: "#/components/examples/NoSuchSchemaException"
+        "409":
+          description: >
+            Conflict - An external schema carries an identifier owned by another existing schema.
+            Remove the copied source marker before importing an independent copy.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -146,10 +156,34 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "409":
+          description: >
+            Conflict - The schema is not empty, or the catalog cannot safely support the requested
+            cascading deletion. PostgreSQL rejects non-empty schema deletion even with cascade.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 components:
+
+  parameters:
+    parentSchema:
+      name: parentSchema
+      in: query
+      description: >
+        The parent schema whose direct child schemas are listed. Only meaningful for catalogs that
+        support hierarchical (multi-level) schemas, such as an Iceberg catalog accessed through the
+        Gravitino REST server with a configured schema separator (`gravitino.schema.separator`,
+        default `:`). For example, when the schemas `a`, `a:b` and `a:b:c` exist, listing with
+        `parentSchema=a:b` returns `[a:b:c]`. When omitted, only the top-level schemas under the
+        catalog are returned (the direct children of the catalog root, e.g. `a`), not the nested
+        ones.
+      required: false
+      schema:
+        type: string
 
   schemas:
 
@@ -160,7 +194,11 @@ components:
       properties:
         name:
           type: string
-          description: The name of the schema
+          description: >
+            The name of the schema. For catalogs that support hierarchical (multi-level) schemas,
+            the name may encode a nested path joined by the configured schema separator
+            (`gravitino.schema.separator`, default `:`), e.g. `a:b:c` creates schema `c` under the
+            existing parent schema `a:b`.
         comment:
           type: string
           description: A comment describing the schema
@@ -172,6 +210,22 @@ components:
           default: { }
           additionalProperties:
             type: string
+        secretBindings:
+          type: object
+          description: >
+            Optional map of property key to write-through binding. Persisted value
+            becomes a URN.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretBinding"
+        secretReferences:
+          type: object
+          description: >
+            Optional map of property key to secret locator. Server builds and
+            persists the URN. Must not overlap with secretBindings.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretReference"
 
     Schema:
       type: object
@@ -211,11 +265,15 @@ components:
       oneOf:
         - $ref: "#/components/schemas/SetSchemaPropertyRequest"
         - $ref: "#/components/schemas/RemoveSchemaPropertyRequest"
+        - $ref: "#/components/schemas/SetSchemaSecretBindingRequest"
+        - $ref: "#/components/schemas/SetSchemaSecretReferenceRequest"
       discriminator:
         propertyName: "@type"
         mapping:
           setProperty: "#/components/schemas/SetSchemaPropertyRequest"
           removeProperty: "#/components/schemas/RemoveSchemaPropertyRequest"
+          setSecretBinding: "#/components/schemas/SetSchemaSecretBindingRequest"
+          setSecretReference: "#/components/schemas/SetSchemaSecretReferenceRequest"
 
     SetSchemaPropertyRequest:
       type: object
@@ -255,6 +313,67 @@ components:
       example: {
         "@type": "removeProperty",
         "property": "key2"
+      }
+
+    SetSchemaSecretBindingRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+        - plaintext
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretBinding
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        plaintext:
+          type: string
+          description: Plaintext secret to write through
+          format: password
+      example: {
+        "@type": "setSecretBinding",
+        "property": "password",
+        "provider": "env",
+        "plaintext": "secret-value"
+      }
+
+    SetSchemaSecretReferenceRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretReference
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        attributes:
+          type: object
+          description: Provider-specific locator keys (empty object if none)
+          additionalProperties:
+            type: string
+          default: {}
+      example: {
+        "@type": "setSecretReference",
+        "property": "password",
+        "provider": "vault",
+        "attributes": {
+          "path": "secret/data/my-password"
+        }
       }
 
   responses:

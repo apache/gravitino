@@ -1,36 +1,48 @@
 ---
-title: "How to use CORS"
-slug: /security/how-to-use-cors
-keyword: security cors
+title: "CORS"
+slug: "/security/how-to-use-cors"
+keywords:
+  - security
+  - cors
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Cross-origin resource filter
+## Overview
 
-### Server configuration
+Cross-Origin Resource Sharing is a browser mechanism that controls which web origins may call an HTTP API. A browser blocks a request from a page whose origin differs from the server's in host, port, or protocol unless the server says otherwise, so any browser-based client hosted separately from Gravitino needs the CORS filter enabled.
 
-| Configuration item                                 | Description                                                                                                                                                                                                                            | Default value                                 | Required | Since version |
-|----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
-| `gravitino.server.webserver.enableCorsFilter`      | Enable cross-origin resource share filter.                                                                                                                                                                                             | false                                         | No       | 0.4.0         |
-| `gravitino.server.webserver.allowedOrigins`        | A comma separated list of allowed origins to access the resources. The default value is *, which means all origins.                                                                                                                    | `*`                                           | No       | 0.4.0         |
-| `gravitino.server.webserver.allowedTimingOrigins`  | A comma separated list of allowed origins to time the resource. The default value is the empty string, which means no origins.                                                                                                         | ''(empty string)                              | No       | 0.4.0         |
-| `gravitino.server.webserver.allowedMethods`        | A comma separated list of allowed HTTP methods used when accessing the resources. The default values are GET, POST, HEAD, and DELETE.                                                                                                  | `GET,POST,HEAD,DELETE,PUT`                    | No       | 0.4.0         |
-| `gravitino.server.webserver.allowedHeaders`        | A comma separated list of allowed HTTP headers specified when accessing the resources. The default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *, it accepts all headers.                           | `X-Requested-With,Content-Type,Accept,Origin` | No       | 0.4.0         |
-| `gravitino.server.webserver.preflightMaxAgeInSecs` | The number of seconds to cache preflight requests by the client. The default value is 1800 seconds or 30 minutes.                                                                                                                      | `1800`                                        | No       | 0.4.0         |
-| `gravitino.server.webserver.allowCredentials`      | A boolean indicating if the resource allows requests with credentials. The default value is true.                                                                                                                                      | `true`                                        | No       | 0.4.0         |
-| `gravitino.server.webserver.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                                             | ''(empty string)                              | No       | 0.4.0         |
-| `gravitino.server.webserver.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                                                   | `true`                                        | No       | 0.4.0         |
+The filter is off by default and applies only to browsers. Requests from engines, the CLI, and other server-side clients are unaffected either way.
 
-### Apache Iceberg REST service's configuration
+## Configuration
 
-| Configuration item                             | Description                                                                                                                                                                                                  | Default value                                 | Required | Since version |
-|------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------|----------|---------------|
-| `gravitino.iceberg-rest.enableCorsFilter`      | Enable cross-origin resource share filter.                                                                                                                                                                   | false                                         | No       | 0.4.0         |
-| `gravitino.iceberg-rest.allowedOrigins`        | A comma separated list of allowed origins that access the resources. The default value is *, which means all origins.                                                                                        | `*`                                           | No       | 0.4.0         |
-| `gravitino.iceberg-rest.allowedTimingOrigins`  | A comma separated list of allowed origins that time the resource. The default value is the empty string, which means no origins.                                                                             | ''(empty string)                              | No       | 0.4.0         |
-| `gravitino.iceberg-rest.allowedMethods`        | A comma separated list of allowed HTTP methods used when accessing the resources. The default values are GET, POST, HEAD, and DELETE.                                                                        | `GET,POST,HEAD,DELETE,PUT`                    | No       | 0.4.0         |
-| `gravitino.iceberg-rest.allowedHeaders`        | A comma separated list of HTTP allowed headers specified when accessing the resources. The default value is X-Requested-With,Content-Type,Accept,Origin. If the value is a single *, it accepts all headers. | `X-Requested-With,Content-Type,Accept,Origin` | No       | 0.4.0         |
-| `gravitino.iceberg-rest.preflightMaxAgeInSecs` | The number of seconds to cache preflight requests by the client. The default value is 1800 seconds or 30 minutes.                                                                                            | `1800`                                        | No       | 0.4.0         |
-| `gravitino.iceberg-rest.allowCredentials`      | A boolean indicating if the resource allows requests with credentials. The default value is true.                                                                                                            | `true`                                        | No       | 0.4.0         |
-| `gravitino.iceberg-rest.exposedHeaders`        | A comma separated list of allowed HTTP headers exposed on the client. The default value is the empty list.                                                                                                   | ''(empty string)                              | No       | 0.4.0         |
-| `gravitino.iceberg-rest.chainPreflight`        | If true chained preflight requests for normal handling (as an OPTION request). Otherwise, the filter responds to the preflight. The default is true.                                                         | `true`                                        | No       | 0.4.0         |
+The Gravitino server and the Iceberg REST service each have their own CORS filter, configured with the same property names under different prefixes. Use `gravitino.server.webserver.` for the Gravitino server and `gravitino.iceberg-rest.` for the Iceberg REST service, and set each one only for the service that needs it.
+
+| Property Name           | Description                                                                                 | Default Value                                 |
+|-------------------------|---------------------------------------------------------------------------------------------|-----------------------------------------------|
+| `enableCorsFilter`      | Enables the CORS filter                                                                     | `false`                                       |
+| `allowedOrigins`        | Comma-separated origins allowed to access the resources, or `*` for all                     | `*`                                           |
+| `allowedTimingOrigins`  | Comma-separated origins allowed to time the resources. Empty means none                     | (empty)                                       |
+| `allowedMethods`        | Comma-separated HTTP methods allowed when accessing the resources                           | `GET,POST,HEAD,DELETE,PUT`                    |
+| `allowedHeaders`        | Comma-separated request headers allowed, or a single `*` to accept any header               | `X-Requested-With,Content-Type,Accept,Origin` |
+| `exposedHeaders`        | Comma-separated response headers made readable to the client. Empty means none              | (empty)                                       |
+| `preflightMaxAgeInSecs` | How long a client may cache a preflight response                                            | `1800`                                        |
+| `allowCredentials`      | Whether requests carrying credentials are allowed                                           | `true`                                        |
+| `chainPreflight`        | Passes preflight requests to the target resource as an `OPTIONS` request instead of answering them in the filter | `true`                    |
+
+### Origins and Credentials
+
+The two defaults do not work together. Browsers reject a response that allows credentials while allowing every origin, so leaving `allowedOrigins` at `*` with `allowCredentials` at `true` means any authenticated browser request fails even though the filter is enabled.
+
+List the origins your clients actually use instead. A wildcard origin is only usable when `allowCredentials` is `false`, which rules out any request carrying a token or a cookie.
+
+### Example
+
+A web UI served from `https://console.example.com` calling a Gravitino server elsewhere needs the following in `gravitino.conf`.
+
+```properties
+gravitino.server.webserver.enableCorsFilter = true
+gravitino.server.webserver.allowedOrigins = https://console.example.com
+gravitino.server.webserver.allowedHeaders = X-Requested-With,Content-Type,Accept,Origin,Authorization
+```
+
+`Authorization` is added because the default header list omits it, and a browser sending a bearer token names that header in its preflight request.

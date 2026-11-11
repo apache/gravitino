@@ -30,6 +30,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.gravitino.Entity;
@@ -164,10 +165,11 @@ public abstract class ManagedTableOperations implements TableCatalog {
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
-      throws NoSuchTableException, IllegalArgumentException {
+      throws NoSuchTableException, TableAlreadyExistsException, IllegalArgumentException {
     // The alterTable in ManagedTableOperations only updates the table metadata in the entity store.
     // It doesn't handle any additional operations like modifying physical data, etc. Those
     // operations should be handled in the specific catalog implementation.
+    AtomicReference<NameIdentifier> targetIdent = new AtomicReference<>(ident);
     try {
       TableEntity newTableEntity =
           store()
@@ -175,14 +177,17 @@ public abstract class ManagedTableOperations implements TableCatalog {
                   ident,
                   TableEntity.class,
                   Entity.EntityType.TABLE,
-                  oldEntity -> applyChanges(oldEntity, changes));
+                  oldEntity -> {
+                    TableEntity updatedEntity = applyChanges(oldEntity, changes);
+                    targetIdent.set(updatedEntity.nameIdentifier());
+                    return updatedEntity;
+                  });
 
       return toGenericTable(newTableEntity);
     } catch (NoSuchEntityException e) {
       throw new NoSuchTableException(e, "Table %s does not exist", ident);
     } catch (EntityAlreadyExistsException e) {
-      throw new IllegalArgumentException(
-          "Failed to rename table " + ident + " due to table already exists: ", e);
+      throw new TableAlreadyExistsException(e, "Table %s already exists", targetIdent.get());
     } catch (IOException e) {
       throw new RuntimeException("Failed to alter table " + ident, e);
     }
@@ -233,7 +238,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
             rename
                 .getNewSchemaName()
                 .map(s -> NamespaceUtil.ofTable(oldNs.level(0), oldNs.level(1), s))
-                .orElse(oldNs);
+                .orElse(newNs);
 
       } else if (change instanceof TableChange.UpdateComment updateComment) {
         newComment = updateComment.getNewComment();
@@ -250,6 +255,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 .withName(addIndex.getName())
                 .withFieldNames(addIndex.getFieldNames())
                 .withIndexType(addIndex.getType())
+                .withProperties(addIndex.getProperties())
                 .build();
         newIndexes.add(newIndex);
 
@@ -298,8 +304,15 @@ public abstract class ManagedTableOperations implements TableCatalog {
             .collect(Collectors.toList());
 
     for (TableChange.ColumnChange change : columnChanges) {
+      // Columns are stored by their top-level name only. A nested field name would otherwise be
+      // joined into a new top-level column such as "a.b", or not found at all.
+      Preconditions.checkArgument(
+          change.fieldName().length == 1,
+          "Managed tables only support changes to top-level columns: %s",
+          DOT.join(change.fieldName()));
       if (change instanceof TableChange.AddColumn addColumn) {
         String columnName = DOT.join(addColumn.getFieldName());
+        ColumnEntity.validateCommentForWrite(columnName, addColumn.getComment());
         boolean exists = newColumns.stream().anyMatch(col -> col.name().equals(columnName));
         if (exists) {
           throw new IllegalArgumentException(String.format("Column %s already exists", columnName));
@@ -334,10 +347,10 @@ public abstract class ManagedTableOperations implements TableCatalog {
           || change instanceof TableChange.UpdateColumnPosition
           || change instanceof TableChange.UpdateColumnNullability
           || change instanceof TableChange.UpdateColumnAutoIncrement) {
-        int i;
+        int removedIndex;
         ColumnEntity oldColumn = null;
-        for (i = 0; i < newColumns.size(); i++) {
-          ColumnEntity col = newColumns.get(i);
+        for (removedIndex = 0; removedIndex < newColumns.size(); removedIndex++) {
+          ColumnEntity col = newColumns.get(removedIndex);
           if (col.name().equals(DOT.join(change.fieldName()))) {
             oldColumn = col;
             break;
@@ -406,7 +419,14 @@ public abstract class ManagedTableOperations implements TableCatalog {
                 newPosition,
                 newNullable,
                 newAutoIncrement);
-        newColumns.add(newColumn.position(), newColumn);
+        if (newPosition.isPresent()) {
+          newColumns.add(newColumn.position(), newColumn);
+        } else {
+          // Stored positions go stale as sibling changes in the same alter add,
+          // remove or move columns, so without an explicit position change the
+          // column goes back to the list index it was removed from.
+          newColumns.add(removedIndex, newColumn);
+        }
 
       } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
         boolean removed =
@@ -437,6 +457,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
       Optional<Integer> newPosition,
       Optional<Boolean> newNullable,
       Optional<Boolean> newAutoIncrement) {
+    newComment.ifPresent(
+        comment -> ColumnEntity.validateCommentForWrite(oldColumn.name(), comment));
     return ColumnEntity.builder()
         .withId(oldColumn.id())
         .withName(newName.orElse(oldColumn.name()))
@@ -472,7 +494,12 @@ public abstract class ManagedTableOperations implements TableCatalog {
         .withName(tableEntity.name())
         .withComment(tableEntity.comment())
         .withColumns(
-            tableEntity.columns().stream().map(this::toGenericColumn).toArray(Column[]::new))
+            // Columns may be returned unordered from the store; sort by position
+            // so the table's column order matches what was declared.
+            tableEntity.columns().stream()
+                .sorted(Comparator.comparingInt(ColumnEntity::position))
+                .map(this::toGenericColumn)
+                .toArray(Column[]::new))
         .withProperties(tableEntity.properties())
         .withAuditInfo(tableEntity.auditInfo())
         .withSortOrders(tableEntity.sortOrders())
@@ -487,7 +514,11 @@ public abstract class ManagedTableOperations implements TableCatalog {
     return columns == null
         ? Collections.emptyList()
         : IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
+            .mapToObj(
+                i -> {
+                  ColumnEntity.validateCommentForWrite(columns[i].name(), columns[i].comment());
+                  return ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit);
+                })
             .collect(Collectors.toList());
   }
 

@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
@@ -42,6 +43,9 @@ import org.apache.gravitino.listener.api.event.IcebergNamespaceExistsPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergRegisterTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergRegisterViewPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceEvent;
 import org.apache.gravitino.listener.api.event.IcebergUpdateNamespaceFailureEvent;
@@ -50,11 +54,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 
 /**
@@ -191,16 +197,18 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
             metalakeName, context.catalogName(), parentNamespace);
     eventBus.dispatchEvent(new IcebergListNamespacesPreEvent(context, nameIdentifier));
 
-    ListNamespacesResponse listResponse;
     try {
-      listResponse = operationDispatcher.listNamespaces(context, parentNamespace);
+      ListNamespacesResponse listResponse =
+          operationDispatcher.listNamespaces(context, parentNamespace);
+      List<Namespace> namespaces = listResponse.namespaces();
+      eventBus.dispatchEvent(
+          new IcebergListNamespacesEvent(
+              context, nameIdentifier, namespaces != null ? namespaces.size() : -1));
+      return listResponse;
     } catch (Exception e) {
       eventBus.dispatchEvent(new IcebergListNamespacesFailureEvent(context, nameIdentifier, e));
       throw e;
     }
-
-    eventBus.dispatchEvent(new IcebergListNamespacesEvent(context, nameIdentifier));
-    return listResponse;
   }
 
   @Override
@@ -248,5 +256,31 @@ public class IcebergNamespaceEventDispatcher implements IcebergNamespaceOperatio
         new IcebergRegisterTableEvent(
             context, nameIdentifier, registerTableRequest, loadTableResponse));
     return loadTableResponse;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    TableIdentifier viewIdentifier = TableIdentifier.of(namespace, registerViewRequest.name());
+    NameIdentifier nameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), viewIdentifier);
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewPreEvent(context, nameIdentifier, registerViewRequest));
+
+    LoadViewResponse loadViewResponse;
+    try {
+      loadViewResponse = operationDispatcher.registerView(context, namespace, registerViewRequest);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergRegisterViewFailureEvent(context, nameIdentifier, registerViewRequest, e));
+      throw e;
+    }
+
+    eventBus.dispatchEvent(
+        new IcebergRegisterViewEvent(
+            context, nameIdentifier, registerViewRequest, loadViewResponse));
+    return loadViewResponse;
   }
 }

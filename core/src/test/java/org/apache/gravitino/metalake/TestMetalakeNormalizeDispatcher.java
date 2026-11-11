@@ -20,11 +20,15 @@ package org.apache.gravitino.metalake;
 
 import static org.apache.gravitino.Entity.SYSTEM_METALAKE_RESERVED_NAME;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.junit.jupiter.api.AfterAll;
@@ -113,5 +117,33 @@ public class TestMetalakeNormalizeDispatcher {
       Assertions.assertEquals(
           "The metalake name '" + illegalName + "' is illegal.", exception.getMessage());
     }
+  }
+
+  @Test
+  public void testCreateMetalakeRejectsMaskedPlaceholder() {
+    NameIdentifier ident = NameIdentifier.of("masked_metalake");
+    Map<String, String> props = ImmutableMap.of("custom", HiddenPropertyMaskUtils.MASKED_VALUE);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metalakeNormalizeDispatcher.createMetalake(ident, null, props));
+    Assertions.assertTrue(exception.getMessage().contains("custom"));
+    Assertions.assertTrue(exception.getMessage().contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+  }
+
+  @Test
+  public void testAlterMetalakeRejectsMaskedPlaceholder() {
+    NameIdentifier ident = NameIdentifier.of("masked_alter_metalake");
+    metalakeNormalizeDispatcher.createMetalake(ident, null, null);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalakeNormalizeDispatcher.alterMetalake(
+                    ident,
+                    MetalakeChange.setProperty("custom", HiddenPropertyMaskUtils.MASKED_VALUE)));
+    Assertions.assertTrue(exception.getMessage().contains("custom"));
   }
 }

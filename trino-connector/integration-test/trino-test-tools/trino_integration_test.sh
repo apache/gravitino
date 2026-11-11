@@ -26,11 +26,42 @@ export HADOOP_USER_NAME=anonymous
 echo $GRAVITINO_ROOT_DIR
 cd $GRAVITINO_ROOT_DIR
 
+PID_FILE="$GRAVITINO_ROOT_DIR/integration-test-common/build/trino-test-env.pid"
+
+if [ "$1" = "--stop" ]; then
+  if [ -f "$PID_FILE" ]; then
+    GRADLE_PID=$(cat "$PID_FILE")
+    if kill -0 "$GRADLE_PID" 2>/dev/null; then
+      PGID=$(ps -o pgid= -p "$GRADLE_PID" 2>/dev/null | tr -d ' ')
+      if [[ -n "$PGID" && "$PGID" =~ ^[0-9]+$ ]]; then
+        echo "Stopping environment (PGID: $PGID)..."
+        kill -TERM -- "-$PGID" 2>/dev/null
+        for i in $(seq 1 60); do
+          kill -0 "$GRADLE_PID" 2>/dev/null || break
+          sleep 1
+        done
+      else
+        echo "Could not determine process group for PID $GRADLE_PID, stopping containers directly..."
+      fi
+    else
+      echo "Environment process ($GRADLE_PID) is no longer running, stopping containers directly..."
+    fi
+    "$GRAVITINO_ROOT_DIR/integration-test-common/docker-script/shutdown.sh"
+    rm -f "$PID_FILE"
+  else
+    echo "No running environment found, stopping containers directly..."
+    "$GRAVITINO_ROOT_DIR/integration-test-common/docker-script/shutdown.sh"
+  fi
+  exit 0
+fi
+
 # Parse --auto_patch and --trino_version from arguments.
 # --auto_patch is consumed here and not forwarded to Gradle.
 # --trino_version is forwarded to Gradle and also used for patch selection.
 auto_patch=false
 trino_version=""
+test_set=""
+has_test_containers=false
 args=""
 for arg in "$@"; do
     case "$arg" in
@@ -41,6 +72,14 @@ for arg in "$@"; do
             trino_version="${arg#*=}"
             args="$args $arg"
             ;;
+        --test_set=*)
+            test_set="${arg#*=}"
+            args="$args $arg"
+            ;;
+        --test_containers=*)
+            has_test_containers=true
+            args="$args $arg"
+            ;;
         *)
             args="$args $arg"
             ;;
@@ -48,20 +87,31 @@ for arg in "$@"; do
 done
 args="${args# }"
 
+# Auto-map a testset to its dedicated docker compose container subset, unless
+# --test_containers was already given explicitly on the command line.
+declare -A TESTSET_CONTAINERS_MAP=(
+    ["jdbc-mysql"]="mysql"
+)
+if [ "$has_test_containers" = false ] && [ -n "${TESTSET_CONTAINERS_MAP[$test_set]:-}" ]; then
+    args="$args --test_containers=${TESTSET_CONTAINERS_MAP[$test_set]}"
+fi
+
 TESTSETS_DIR="$GRAVITINO_ROOT_DIR/trino-connector/integration-test/src/test/resources/trino-ci-testset/testsets"
 
 # Apply version-specific patches cumulatively based on the target Trino version.
 # Patches are applied in descending order (newest first):
-#   version <= 473: apply trino-478-473.patch
-#   version <= 452: also apply trino-473-452.patch
-#   version <= 446: also apply trino-452-446.patch
+#   version <= 481: apply trino-481-469.patch
+#   version <= 473: also apply trino-478-473.patch
 apply_version_patches() {
     local version=$1
     # Each entry is "max_version:patch_file"; patches are applied in order.
     local patches=(
+        # MySQL's CHAR columns still return space-padded values through Trino's jdbc-mysql
+        # connector up to 481; 482 changed to return them trimmed. The committed .txt fixtures
+        # follow 482 (the newest supported version), so this patch restores the padded form for
+        # everything at or below 481.
+        "481:trino-481-469.patch"
         "473:trino-478-473.patch"
-        "452:trino-473-452.patch"
-        "446:trino-452-446.patch"
     )
     for entry in "${patches[@]}"; do
         local max_ver="${entry%%:*}"
@@ -106,4 +156,34 @@ if [ "$auto_patch" = true ]; then
     fi
 fi
 
-./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="\"$args\""
+if echo "$args" | grep -q -- '--env_only'; then
+  LOG_FILE="$GRAVITINO_ROOT_DIR/integration-test-common/build/trino-test-env.log"
+  mkdir -p "$(dirname "$PID_FILE")" "$(dirname "$LOG_FILE")"
+
+  ./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="\"$args\"" > "$LOG_FILE" 2>&1 &
+  GRADLE_PID=$!
+  echo $GRADLE_PID > "$PID_FILE"
+
+  echo "Starting environment, please wait..."
+  while kill -0 "$GRADLE_PID" 2>/dev/null; do
+    if grep -q "Press Ctrl+C to shutdown" "$LOG_FILE" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+  done
+
+  if ! kill -0 "$GRADLE_PID" 2>/dev/null; then
+    echo "Environment failed to start. Check logs at: $LOG_FILE"
+    rm -f "$PID_FILE"
+    exit 1
+  fi
+
+  grep -A 6 "=======================================================" "$LOG_FILE" | head -8
+  echo ""
+  echo "Environment is running in background (PID: $GRADLE_PID)"
+  echo "Logs  : $LOG_FILE"
+  echo "Stop  : ./trino-connector/integration-test/trino-test-tools/trino_integration_test.sh --stop"
+  exit 0
+else
+  ./gradlew :trino-connector:integration-test:TrinoTest -PappArgs="\"$args\""
+fi

@@ -33,7 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -255,11 +255,9 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
 
             policy.setName(newResourcePath);
             // Update the policy resource name to new name
-            policy
-                .getResources()
-                .put(
-                    rangerHelper.policyResourceDefines.get(0),
-                    new RangerPolicy.RangerPolicyResource(newResourcePath));
+            policy.setResource(
+                rangerHelper.policyResourceDefines.get(0),
+                new RangerPolicy.RangerPolicyResource(newResourcePath));
 
             boolean alreadyExist =
                 existNewPolicies.stream()
@@ -354,7 +352,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
             getAuthorizationPath(pathBasedMetadataObject),
             false,
             pathBasedMetadataObject.recursive());
-    policy.getResources().put(RangerDefines.PolicyResource.PATH.getName(), policyResource);
+    policy.setResource(RangerDefines.PolicyResource.PATH.getName(), policyResource);
     return policy;
   }
 
@@ -550,7 +548,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (type == Entity.EntityType.METALAKE) {
       NameIdentifier[] catalogs =
           GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .listCatalogs(Namespace.of(identifier.name()));
       for (NameIdentifier catalog : catalogs) {
         locations.addAll(
@@ -592,7 +590,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
       boolean recursive) {
     NameIdentifier[] catalogs =
         GravitinoEnv.getInstance()
-            .catalogDispatcher()
+            .internalCatalogDispatcher()
             .listCatalogs(Namespace.of(identifier.name()));
     for (NameIdentifier catalog : catalogs) {
       AuthorizationUtils.getMetadataObjectLocation(catalog, Entity.EntityType.CATALOG)
@@ -668,7 +666,7 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
     if (metadataObject.type() == MetadataObject.Type.METALAKE) {
       NameIdentifier[] catalogs =
           GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .listCatalogs(Namespace.of(identifier.name()));
       for (NameIdentifier catalog : catalogs) {
         locations.addAll(
@@ -723,11 +721,11 @@ public class RangerAuthorizationHDFSPlugin extends RangerAuthorizationPlugin {
           NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, newMetadataObject);
           NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(ident);
           if (GravitinoEnv.getInstance()
-              .catalogDispatcher()
+              .internalCatalogDispatcher()
               .loadCatalog(catalogIdent)
               .provider()
               .equals("hive")) {
-            Table table = GravitinoEnv.getInstance().tableDispatcher().loadTable(ident);
+            Table table = GravitinoEnv.getInstance().internalTableDispatcher().loadTable(ident);
             if (table.properties().get("table-type").equals("EXTERNAL_TABLE")) {
               continue;
             }

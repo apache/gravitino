@@ -25,20 +25,27 @@ import java.util.Collections;
 import java.util.Locale;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.TagListResponse;
+import org.apache.gravitino.dto.responses.TagNameListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.hc.core5.http.HttpHeaders;
 
 /**
  * The implementation of {@link SupportsTags}. This interface will be composited into catalog,
  * schema, table, fileset and topic to provide tag operations for these metadata objects
  */
 class MetadataObjectTagOperations implements SupportsTags {
+
+  private static final String TAG_VALUES_MEDIA_TYPE = "application/vnd.gravitino.v2+json";
 
   private final String metalakeName;
 
@@ -60,31 +67,43 @@ class MetadataObjectTagOperations implements SupportsTags {
 
   @Override
   public String[] listTags() {
-    NameListResponse resp =
+    return listTagsWithVisibility().tags();
+  }
+
+  @Override
+  public TagList<String> listTagsWithVisibility() {
+    TagNameListResponse resp =
         restClient.get(
             tagRequestPath,
-            NameListResponse.class,
+            TagNameListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();
-    return resp.getNames();
+    return new TagList<>(resp.getNames(), resp.hasInaccessibleTags());
   }
 
   @Override
   public Tag[] listTagsInfo() {
-    TagListResponse resp =
+    return listTagsInfoWithVisibility().tags();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    MetadataObjectTagListResponse resp =
         restClient.get(
             tagRequestPath,
             ImmutableMap.of("details", "true"),
-            TagListResponse.class,
+            MetadataObjectTagListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();
-    return Arrays.stream(resp.getTags())
-        .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
-        .toArray(Tag[]::new);
+    Tag[] tags =
+        Arrays.stream(resp.getTags())
+            .map(tagDTO -> new GenericTag(tagDTO, restClient, metalakeName))
+            .toArray(Tag[]::new);
+    return new TagList<>(tags, resp.hasInaccessibleTags());
   }
 
   @Override
@@ -113,6 +132,27 @@ class MetadataObjectTagOperations implements SupportsTags {
             request,
             NameListResponse.class,
             Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+
+    resp.validate();
+    return resp.getNames();
+  }
+
+  @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
+    request.validate();
+
+    NameListResponse resp =
+        restClient.post(
+            tagRequestPath,
+            request,
+            NameListResponse.class,
+            ImmutableMap.of(
+                HttpHeaders.ACCEPT,
+                TAG_VALUES_MEDIA_TYPE,
+                HttpHeaders.CONTENT_TYPE,
+                TAG_VALUES_MEDIA_TYPE),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();

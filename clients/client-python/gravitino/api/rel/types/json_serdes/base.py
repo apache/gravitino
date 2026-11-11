@@ -25,13 +25,21 @@ from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.expressions.sorts.sort_order import SortOrder
 from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.types.types import Type
+from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.dto.rel.partitioning.partitioning import Partitioning
 from gravitino.dto.rel.partitions.partition_dto import PartitionDTO
 
 _GravitinoTypeT = TypeVar(
     "_GravitinoTypeT",
     bound=Union[
-        Expression, Type, Partitioning, PartitionDTO, Distribution, Index, SortOrder
+        Expression,
+        Type,
+        Partitioning,
+        PartitionDTO,
+        Distribution,
+        Index,
+        SortOrder,
+        StatisticValue,
     ],
 )
 

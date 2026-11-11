@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.PropertiesMetadataHelpers;
@@ -57,10 +56,13 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrders;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.iceberg.DistributionMode;
+import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIcebergTable {
 
@@ -491,6 +493,59 @@ public class TestIcebergTable {
     Assertions.assertArrayEquals(createdTable.partitioning(), alteredTable.partitioning());
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRenameTableToExistingNamePreservesBothTables(boolean acrossSchemas) {
+    NameIdentifier source =
+        NameIdentifier.of(
+            schemaIdent.namespace().level(0),
+            ICEBERG_CATALOG_NAME,
+            ICEBERG_SCHEMA_NAME,
+            "rename_source");
+    NameIdentifier targetSchema =
+        NameIdentifier.of(
+            META_LAKE_NAME,
+            ICEBERG_CATALOG_NAME,
+            acrossSchemas ? "rename_target_schema" : ICEBERG_SCHEMA_NAME);
+    NameIdentifier target =
+        NameIdentifier.of(
+            META_LAKE_NAME, ICEBERG_CATALOG_NAME, targetSchema.name(), "rename_target");
+    if (acrossSchemas) {
+      icebergCatalogOperations.createSchema(targetSchema, "target schema", Map.of());
+    }
+    try {
+      Column[] columns = {Column.of("id", Types.LongType.get())};
+      for (NameIdentifier ident : List.of(source, target)) {
+        icebergCatalogOperations.createTable(
+            ident,
+            columns,
+            ident.name(),
+            Map.of(),
+            new Transform[0],
+            Distributions.NONE,
+            new SortOrder[0]);
+      }
+      TableAlreadyExistsException error =
+          Assertions.assertThrows(
+              TableAlreadyExistsException.class,
+              () ->
+                  icebergCatalogOperations.alterTable(
+                      source,
+                      acrossSchemas
+                          ? TableChange.rename(target.name(), targetSchema.name())
+                          : TableChange.rename(target.name())));
+      Assertions.assertInstanceOf(AlreadyExistsException.class, error.getCause());
+      Assertions.assertEquals("Table already exists: " + target, error.getMessage());
+      Assertions.assertEquals(source.name(), icebergCatalogOperations.loadTable(source).comment());
+      Assertions.assertEquals(target.name(), icebergCatalogOperations.loadTable(target).comment());
+    } finally {
+      if (acrossSchemas) {
+        icebergCatalogOperations.dropTable(target);
+        icebergCatalogOperations.dropSchema(targetSchema, false);
+      }
+    }
+  }
+
   @Test
   public void testRenameTableAcrossSchema() {
     NameIdentifier tableIdentifier =
@@ -663,18 +718,20 @@ public class TestIcebergTable {
             IllegalArgumentException.class,
             () -> icebergTable.transformDistribution(Distributions.HASH));
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty"));
+        illegalArgumentException
+            .getMessage()
+            .contains(
+                "Iceberg's Distribution Mode.HASH is distributed based on partition, but the partition is empty"));
 
     illegalArgumentException =
         Assertions.assertThrows(
             IllegalArgumentException.class,
             () -> icebergTable.transformDistribution(Distributions.RANGE));
     Assertions.assertTrue(
-        StringUtils.contains(
-            illegalArgumentException.getMessage(),
-            "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
+        illegalArgumentException
+            .getMessage()
+            .contains(
+                "Iceberg's Distribution Mode.RANGE is distributed based on sortOrder or partition, but both are empty"));
 
     IcebergTable newTable =
         IcebergTable.builder()
@@ -702,6 +759,25 @@ public class TestIcebergTable {
     distributionName =
         Assertions.assertDoesNotThrow(() -> newTable.transformDistribution(Distributions.RANGE));
     Assertions.assertEquals(distributionName, DistributionMode.RANGE.modeName());
+  }
+
+  @Test
+  void testRebuildCreatePropertiesResolvesFormatVersion() {
+    // The format-version mapping Gravitino applies at create time:
+    //   absent -> 2, empty -> 2, "2" -> 2, "3" -> 3.
+    Assertions.assertEquals("2", rebuiltFormatVersion(null));
+    Assertions.assertEquals("2", rebuiltFormatVersion(""));
+    Assertions.assertEquals("2", rebuiltFormatVersion("2"));
+    Assertions.assertEquals("3", rebuiltFormatVersion("3"));
+  }
+
+  private static String rebuiltFormatVersion(String input) {
+    Map<String, String> properties = new HashMap<>();
+    if (input != null) {
+      properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, input);
+    }
+    return IcebergTable.rebuildCreateProperties(properties)
+        .get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
   }
 
   protected static String genRandomName() {

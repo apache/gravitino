@@ -106,7 +106,11 @@ public class TopicEventDispatcher implements TopicDispatcher {
     eventBus.dispatchEvent(new ListTopicPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listTopics(namespace);
-      eventBus.dispatchEvent(new ListTopicEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListTopicEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(

@@ -1,0 +1,20 @@
+name: Multi-Instance Consistency Test
+
+# Verifies that authorization state (owners, roles, role privileges, user-role
+# grants) propagates correctly between two Gravitino instances backed by the
+# same MySQL entity store. Both instances run with the entity cache disabled
+# and authorization enabled, so the only consistency contracts under test are
+# the JcasbinAuthorizer caches and the JcasbinChangePoller invalidation paths.
+#
+# The test plan and assertions live in dev/ci/test_multi_instance_consistency.sh.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  multi-instance-consistency:
+    uses: ./.github/workflows/multi-instance-consistency-test-action.yml

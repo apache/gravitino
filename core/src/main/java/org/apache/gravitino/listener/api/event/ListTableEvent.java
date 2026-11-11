@@ -26,24 +26,38 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Represents an event that is triggered upon the successful list of tables within a namespace.
  *
- * <p>To optimize memory usage and avoid the potential overhead associated with storing a large
- * number of tables directly within the ListTableEvent, the actual tables listed are not maintained
- * in this event. This design decision helps in managing resource efficiency, especially in
- * environments with extensive table listings.
+ * <p>Only the result count is stored rather than the full list of identifiers to avoid excessive
+ * memory usage in environments with large table listings.
  */
 @DeveloperApi
-public final class ListTableEvent extends TableEvent {
+public final class ListTableEvent extends TableEvent implements ListEvent {
   private final Namespace namespace;
+  private final int tableCount;
 
   /**
    * Constructs an instance of {@code ListTableEvent}.
    *
    * @param user The username of the individual who initiated the table listing.
    * @param namespace The namespace from which tables were listed.
+   * @param tableCount The number of tables returned by the list operation.
    */
-  public ListTableEvent(String user, Namespace namespace) {
+  public ListTableEvent(String user, Namespace namespace, int tableCount) {
     super(user, NameIdentifier.of(namespace.levels()));
     this.namespace = namespace;
+    this.tableCount = tableCount;
+  }
+
+  /**
+   * Constructs an instance of {@code ListTableEvent} without a count.
+   *
+   * @param user The username of the individual who initiated the table listing.
+   * @param namespace The namespace from which tables were listed.
+   * @deprecated Use {@link #ListTableEvent(String, Namespace, int)} instead.
+   */
+  @Deprecated
+  @SuppressWarnings("InlineMeSuggester")
+  public ListTableEvent(String user, Namespace namespace) {
+    this(user, namespace, -1);
   }
 
   /**
@@ -53,6 +67,12 @@ public final class ListTableEvent extends TableEvent {
    */
   public Namespace namespace() {
     return namespace;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public int resultCount() {
+    return tableCount;
   }
 
   /**

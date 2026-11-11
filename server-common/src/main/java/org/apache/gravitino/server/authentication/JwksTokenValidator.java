@@ -78,12 +78,12 @@ public class JwksTokenValidator implements OAuthTokenValidator {
     // Create principal mapper based on configuration
     String mapperType = config.get(OAuthConfig.PRINCIPAL_MAPPER);
     String regexPattern = config.get(OAuthConfig.PRINCIPAL_MAPPER_REGEX_PATTERN);
-    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern);
+    this.principalMapper = PrincipalMapperFactory.create(mapperType, regexPattern, config);
 
     // Create group mapper based on configuration
     String groupMapperType = config.get(OAuthConfig.GROUP_MAPPER);
     String groupRegexPattern = config.get(OAuthConfig.GROUP_MAPPER_REGEX_PATTERN);
-    this.groupMapper = GroupMapperFactory.create(groupMapperType, groupRegexPattern);
+    this.groupMapper = GroupMapperFactory.create(groupMapperType, groupRegexPattern, config);
 
     LOG.info("Initializing JWKS token validator");
 
@@ -170,6 +170,8 @@ public class JwksTokenValidator implements OAuthTokenValidator {
 
     } catch (ExpiredJWTException e) {
       throw new TokenExpiredException(e, "Authentication token is expired");
+    } catch (UnauthorizedException e) {
+      throw e;
     } catch (Exception e) {
       LOG.warn(
           "JWKS JWT validation failed for principal [{}]: {}",

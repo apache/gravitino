@@ -25,14 +25,17 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.security.Principal;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.UserPrincipal;
 import org.junit.jupiter.api.Test;
 
 public class TestPrincipalMapperFactory {
 
+  private final Config config = new Config(false) {};
+
   @Test
   public void testCreateRegexMapper() {
-    PrincipalMapper mapper = PrincipalMapperFactory.create("regex", "([^@]+)@.*");
+    PrincipalMapper mapper = PrincipalMapperFactory.create("regex", "([^@]+)@.*", config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexPrincipalMapper);
@@ -43,7 +46,7 @@ public class TestPrincipalMapperFactory {
 
   @Test
   public void testCreateRegexMapperWithDefaultPattern() {
-    PrincipalMapper mapper = PrincipalMapperFactory.create("regex", "^(.*)$");
+    PrincipalMapper mapper = PrincipalMapperFactory.create("regex", "^(.*)$", config);
 
     assertNotNull(mapper);
     assertTrue(mapper instanceof RegexPrincipalMapper);
@@ -59,25 +62,47 @@ public class TestPrincipalMapperFactory {
         assertThrows(
             IllegalArgumentException.class,
             () -> {
-              PrincipalMapperFactory.create("unknown.InvalidClass", null);
+              PrincipalMapperFactory.create("unknown.InvalidClass", null, config);
             });
     assertTrue(exception.getMessage().contains("Unknown principal mapper type"));
   }
 
   public static class TestCustomMapper implements PrincipalMapper {
+    private boolean initialized = false;
+    private Config receivedConfig;
+
+    @Override
+    public void initialize(Config config) {
+      this.initialized = true;
+      this.receivedConfig = config;
+    }
+
     @Override
     public Principal map(String principal) {
       return new UserPrincipal("custom:" + principal);
+    }
+
+    public boolean isInitialized() {
+      return initialized;
     }
   }
 
   @Test
   public void testCreateCustomMapperWithInlineClass() {
     String className = TestCustomMapper.class.getName();
-    PrincipalMapper mapper = PrincipalMapperFactory.create(className, null);
+    PrincipalMapper mapper = PrincipalMapperFactory.create(className, null, config);
     assertNotNull(mapper);
     assertTrue(mapper instanceof TestCustomMapper);
     Principal principal = mapper.map("foo");
     assertEquals("custom:foo", principal.getName());
+  }
+
+  @Test
+  public void testCustomMapperInitializeCalledWithConfig() {
+    String className = TestCustomMapper.class.getName();
+    PrincipalMapper mapper = PrincipalMapperFactory.create(className, null, config);
+    TestCustomMapper custom = (TestCustomMapper) mapper;
+    assertTrue(custom.isInitialized());
+    assertEquals(config, custom.receivedConfig);
   }
 }

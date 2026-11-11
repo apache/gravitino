@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -42,6 +43,10 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  /** Lists all active schemas in a metalake. */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByMetalakeId")
+  List<SchemaPO> listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "listSchemaPOsByFullQualifiedName")
@@ -50,6 +55,14 @@ public interface SchemaMetaMapper {
 
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsBySchemaIds")
   List<SchemaPO> listSchemaPOsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "listSchemaPOsByCatalogIdAndNamePrefix")
+  List<SchemaPO> listSchemaPOsByCatalogIdAndNamePrefix(
+      @Param("catalogId") Long catalogId,
+      @Param("schemaName") String schemaName,
+      @Param("descendantPrefix") String descendantPrefix);
 
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
@@ -74,6 +87,40 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
+  /**
+   * Returns one when an active table, view, fileset, function, model, or topic exists in the
+   * schema, and {@code null} otherwise.
+   *
+   * <p>Only a literal is selected because callers need an existence answer, not complete child
+   * metadata. The final limit also lets the database stop as soon as it finds the first child.
+   */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
+  Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
+
+  /**
+   * Locks a schema identity, whether active or retired, for an overwrite transaction.
+   *
+   * @param schemaId the schema identity to lock
+   * @return the locked row, or null if that identity has never been registered or was collected
+   */
+  @Nullable
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdIncludingDeletedForUpdate")
+  SchemaPO selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId);
+
+  /** Selects and locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForUpdate")
+  SchemaPO selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId);
+
+  /** Selects and share-locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForShare")
+  SchemaPO selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId);
+
   @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);
 
@@ -82,24 +129,45 @@ public interface SchemaMetaMapper {
       method = "insertSchemaMetaOnDuplicateKeyUpdate")
   void insertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMeta") SchemaPO schemaPO);
 
+  @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "batchInsertSchemaMeta")
+  void batchInsertSchemaMeta(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
+  @InsertProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "batchInsertSchemaMetaOnDuplicateKeyUpdate")
+  void batchInsertSchemaMetaOnDuplicateKeyUpdate(@Param("schemaMetas") List<SchemaPO> schemaMetas);
+
   @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "updateSchemaMeta")
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasBySchemaId")
-  Integer softDeleteSchemaMetasBySchemaId(@Param("schemaId") Long schemaId);
+      method = "softDeleteSchemaMetasBySchemaIds")
+  Integer softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  /**
+   * Soft-deletes a schema, but only while it still carries the given version.
+   *
+   * @param schemaId the ID of the schema to delete
+   * @param currentVersion the version the caller read before deciding to delete
+   * @return 1 when the schema was deleted, 0 when it changed or is already gone
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByMetalakeId")
-  Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteSchemaMetaBySchemaIdAndVersion")
+  Integer softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
 
+  /**
+   * Soft-deletes schemas whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByCatalogId")
-  Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
+      method = "softDeleteSchemaMetasWithVersion")
+  Integer softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs);
 
   @DeleteProvider(
       type = SchemaMetaSQLProviderFactory.class,

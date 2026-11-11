@@ -18,11 +18,26 @@
  */
 package org.apache.gravitino.hive.converter;
 
+import static org.apache.gravitino.catalog.hive.HiveConstants.TABLE_TYPE;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.literals.Literals;
+import org.apache.gravitino.rel.types.Types;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -153,5 +168,98 @@ public class TestHiveTableConverter {
     assertEquals(2, columns.length);
     assertEquals("id", columns[0].name());
     assertEquals("name", columns[1].name());
+  }
+
+  @Test
+  public void testToHiveTablePreservesVirtualViewColumnsInStorageDescriptor() {
+    Column[] columns = {
+      Column.of("id", Types.IntegerType.get(), "ID column"),
+      Column.of("name", Types.StringType.get(), "Name column")
+    };
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("v_orders")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>(Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .withViewOriginalText("SELECT id, name FROM t")
+            .build();
+
+    Table table = HiveTableConverter.toHiveTable(hiveTable);
+
+    assertNotNull(table.getSd());
+    assertEquals(2, table.getSd().getColsSize());
+    assertEquals("id", table.getSd().getCols().get(0).getName());
+    assertEquals("name", table.getSd().getCols().get(1).getName());
+    assertEquals("SELECT id, name FROM t", table.getViewOriginalText());
+    assertEquals("SELECT id, name FROM t", table.getViewExpandedText());
+  }
+
+  @Test
+  public void testToHiveTableMirrorsOriginalTextToExpandedText() {
+    Column[] columns = {Column.of("id", Types.IntegerType.get(), "ID column")};
+    HiveTable hiveTable =
+        HiveTable.builder()
+            .withName("v_orders")
+            .withDatabaseName("db")
+            .withColumns(columns)
+            .withProperties(new HashMap<>(Map.of(TABLE_TYPE, TableType.VIRTUAL_VIEW.name())))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .withViewOriginalText("SELECT `db`.`t`.`id` FROM `db`.`t`")
+            .build();
+
+    Table table = HiveTableConverter.toHiveTable(hiveTable);
+
+    assertEquals("SELECT `db`.`t`.`id` FROM `db`.`t`", table.getViewOriginalText());
+    assertEquals("SELECT `db`.`t`.`id` FROM `db`.`t`", table.getViewExpandedText());
+  }
+
+  @Test
+  public void testFromVirtualViewWithoutStorageDescriptorDoesNotThrow() {
+    Table table = new Table();
+    table.setTableName("v_orders");
+    table.setDbName("db");
+    table.setTableType(TableType.VIRTUAL_VIEW.name());
+    table.setParameters(new HashMap<>());
+    table.setPartitionKeys(null);
+    table.setSd(null);
+    table.setViewOriginalText(null);
+    table.setViewExpandedText("SELECT `1`");
+
+    HiveTable hiveTable = assertDoesNotThrow(() -> HiveTableConverter.fromHiveTable(table));
+
+    assertEquals("v_orders", hiveTable.name());
+    assertEquals(0, hiveTable.columns().length);
+    assertEquals("SELECT `1`", hiveTable.viewOriginalText());
+  }
+
+  @Test
+  public void testGetColumnsWithConstraints() {
+    Table table = new Table();
+    StorageDescriptor sd = new StorageDescriptor();
+    sd.setCols(
+        Arrays.asList(
+            new FieldSchema("id", "int", null),
+            new FieldSchema("name", "string", null),
+            new FieldSchema("age", "int", null)));
+    table.setSd(sd);
+    table.setPartitionKeys(Arrays.asList(new FieldSchema("dt", "string", null)));
+
+    Column[] columns =
+        HiveTableConverter.getColumns(
+            table, ImmutableSet.of("id", "dt"), ImmutableMap.of("name", "'n/a'", "age", "18"));
+
+    assertEquals(4, columns.length);
+    assertFalse(columns[0].nullable());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, columns[0].defaultValue());
+    assertTrue(columns[1].nullable());
+    assertEquals(Literals.stringLiteral("n/a"), columns[1].defaultValue());
+    assertTrue(columns[2].nullable());
+    assertEquals(Literals.integerLiteral(18), columns[2].defaultValue());
+    assertFalse(columns[3].nullable());
+    assertEquals(Column.DEFAULT_VALUE_NOT_SET, columns[3].defaultValue());
   }
 }

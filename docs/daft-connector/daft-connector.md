@@ -1,7 +1,7 @@
 ---
-title: "Daft connector"
-slug: /daft-connector
-keyword: daft connector
+title: "Daft Connector"
+slug: "/daft-connector"
+keyword: "daft connector"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -24,9 +24,7 @@ license: "This software is licensed under the Apache License version 2."
   under the License.
 -->
 
-# Daft Connector
-
-## What is Daft?
+## Overview
 
 [Daft](https://docs.daft.ai/) is a distributed dataframe library for Python, designed for complex data workflows on large datasets. It provides a familiar DataFrame API while offering powerful distributed computing capabilities for processing data at scale.
 
@@ -40,7 +38,7 @@ The Daft connector enables seamless integration between Daft and Apache Gravitin
 
 ## Documentation
 
-For complete documentation on installation, configuration, usage examples, and API reference, please visit:
+For complete documentation on installation, configuration, usage examples, and API reference, visit:
 
 **[Daft Gravitino Connector Documentation](https://docs.daft.ai/en/latest/connectors/gravitino/)**
 

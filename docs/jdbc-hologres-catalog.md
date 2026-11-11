@@ -1,6 +1,6 @@
 ---
-title: "Hologres catalog"
-slug: /jdbc-hologres-catalog
+title: "Hologres Catalog"
+slug: "/jdbc-hologres-catalog"
 keywords:
 - jdbc
 - Hologres
@@ -18,79 +18,88 @@ Apache Gravitino provides the ability to manage [Hologres](https://help.aliyun.c
 Hologres is a real-time data warehouse service provided by Alibaba Cloud, designed for high-concurrency and low-latency online analytical processing (OLAP). Hologres is fully compatible with the PostgreSQL protocol and uses the PostgreSQL JDBC Driver for connections.
 
 :::caution
-Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, please don't change or remove this message.
+Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
 :::
 
 ## Catalog
 
-### Catalog capabilities
+### Catalog Capabilities
 
 - Gravitino catalog corresponds to a Hologres database instance.
 - Supports metadata management of Hologres.
 - Supports DDL operation for Hologres schemas and tables.
 - Supports table index (PRIMARY KEY in CREATE TABLE).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports LIST partitioning (physical and logical partition tables).
 - Supports Hologres-specific table properties via `WITH` clause (orientation, clustering_key, distribution_key, etc.).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
-### Catalog properties
+### Catalog Properties
 
-You can pass to a Hologres data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
+See [JDBC catalog connection validation](./jdbc-catalog-connection-validation.md) for the default
+validation behavior and SQL validation configuration for drivers without `Connection.isValid()` support.
+
+Pass to a Hologres data source any property that isn't defined by Gravitino by adding `gravitino.bypass.` prefix as a catalog property. For example, catalog property `gravitino.bypass.maxWaitMillis` will pass `maxWaitMillis` to the data source property.
 
 Check the relevant data source configuration in [data source properties](https://commons.apache.org/proper/commons-dbcp/configuration.html)
 
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
-Besides the [common catalog properties](./gravitino-server-config.md#apache-gravitino-catalog-properties-configuration), the Hologres catalog has the following properties:
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Hologres catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                           | Default value | Required | Since Version    |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 1.3.0 |
-| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 1.3.0 |
-| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                    | (none)        | Yes      | 1.3.0 |
-| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                               | (none)        | Yes      | 1.3.0 |
-| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                            | (none)        | Yes      | 1.3.0 |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                        | `2`           | No       | 1.3.0 |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                       | `10`          | No       | 1.3.0 |
+| Configuration item      | Description                                                                                                                                                                              | Default value | Required |
+|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                                            | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                                      | (none)        | Yes      |
+| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                                       | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                                                  | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                                               | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                           | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                          | `10`          | No       |
+| `jdbc.pool.max-idle`    | Maximum idle connections retained per catalog per server; capped by `jdbc.pool.max-size`; takes precedence over `gravitino.bypass.maxIdle`. Idle connections are not evicted by default. | `8`           | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned; takes precedence over `gravitino.bypass.maxWaitMillis`.                                                    | `30000`       | No       |
 
 :::caution
 Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). You need to download the PostgreSQL JDBC Driver and place it in the `catalogs/jdbc-hologres/libs` directory under the Gravitino distribution (e.g., `distribution/package/catalogs/jdbc-hologres/libs` or `distribution/package-all/catalogs/jdbc-hologres/libs`).
 :::
 
-### Catalog operations
+### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
+
+:::note
+Sensitive catalog properties such as `jdbc-password` are hidden from the default load catalog response (`jdbc-user` is returned in plaintext). Recover `jdbc-user` / `jdbc-password` via the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`); `jdbc-user` also remains in `properties()` when not hidden. Other non-credential secrets (secret-manager URNs, declared `hidden` properties, undeclared sensitive-named keys) use `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
+:::
 
 ## Schema
 
-### Schema capabilities
+### Schema Capabilities
 
 - Gravitino's schema concept corresponds to the Hologres (PostgreSQL) schema.
 - Supports creating schema with comment.
 - Supports dropping schema.
 - System schemas are automatically filtered: `pg_toast`, `pg_catalog`, `information_schema`, `hologres`, `hg_internal`, `hg_recyclebin`, `hologres_object_table`, `hologres_sample`, `hologres_streaming_mv`, `hologres_statistic`.
 
-### Schema properties
+### Schema Properties
 
 - Doesn't support any schema property settings.
 
-### Schema operations
+### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
-### Table capabilities
+### Table Capabilities
 
 - Gravitino's table concept corresponds to the Hologres table.
 - Supports DDL operation for Hologres tables.
 - Supports PRIMARY KEY index in CREATE TABLE.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports expression columns via DEFAULT expressions (note: Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense).
 - Supports LIST partitioning (physical and logical).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
 
-### Table properties
+### Table Properties
 
 Hologres-specific table properties are set via the `WITH` clause during CREATE TABLE and read from the `hologres.hg_table_properties` system table. The following user-relevant properties are supported:
 
@@ -112,7 +121,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 - The properties `distribution_key`, `is_logical_partitioned_table`, and `primary_key` are managed via their dedicated parameters (Distribution, Partitioning, Indexes) and should not be set directly in table properties.
 :::
 
-### Table column types
+### Table Column Types
 
 | Gravitino Type              | Hologres Type              | Notes                                              |
 |-----------------------------|----------------------------|----------------------------------------------------|
@@ -141,15 +150,15 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 :::info
 - Hologres does not support precision syntax for `TIMESTAMP`/`TIMESTAMPTZ` (e.g., `timestamptz(6)` is invalid), so the type converter always emits the base type without precision.
 - Array element types must be non-nullable (Hologres limitation). Multidimensional arrays are not supported.
-- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** with the original type name preserved.
+- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** with the original type name preserved.
 :::
 
-### Table distribution
+### Table Distribution
 
 Hologres supports HASH distribution via the `distribution_key` property in the `WITH` clause.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -176,7 +185,7 @@ Distribution distribution = Distributions.hash(0, NamedReference.field("id"));
 </TabItem>
 </Tabs>
 
-### Table partitioning
+### Table Partitioning
 
 Hologres supports LIST partitioning with two variants:
 
@@ -184,7 +193,7 @@ Hologres supports LIST partitioning with two variants:
 - **Logical partition tables** (Hologres V3.1+): `LOGICAL PARTITION BY LIST(col1[, col2])` — supports 1–2 partition columns. Enabled by setting property `is_logical_partitioned_table` to `true`.
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -213,13 +222,13 @@ Transform[] partitioning = new Transform[] {
 Creating partition child tables (e.g., `CREATE TABLE child PARTITION OF parent FOR VALUES IN ('value')`) is not yet supported through Gravitino.
 :::
 
-### Table indexes
+### Table Indexes
 
 - Supports PRIMARY_KEY in CREATE TABLE.
 - Adding or deleting indexes via ALTER TABLE is not yet supported by Gravitino (Hologres natively supports index modification via rebuild commands, but this is not yet implemented in Gravitino).
 
 <Tabs groupId='language' queryString>
-<TabItem value="json" label="Json">
+<TabItem value="json" label="JSON">
 
 ```json
 {
@@ -245,11 +254,11 @@ Index[] indexes = new Index[] {
 </TabItem>
 </Tabs>
 
-### Table operations
+### Table Operations
 
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for more details.
 
-#### Alter table operations
+#### Alter Table Operations
 
 Gravitino supports these table alteration operations for Hologres:
 

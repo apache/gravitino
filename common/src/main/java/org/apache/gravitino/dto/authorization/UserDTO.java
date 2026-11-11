@@ -30,6 +30,9 @@ import org.apache.gravitino.dto.AuditDTO;
 /** Represents a User Data Transfer Object (DTO). */
 public class UserDTO implements User {
 
+  @JsonProperty("id")
+  private Long id;
+
   @JsonProperty("name")
   private String name;
 
@@ -45,14 +48,24 @@ public class UserDTO implements User {
   /**
    * Creates a new instance of UserDTO.
    *
+   * @param id The id of the User DTO.
    * @param name The name of the User DTO.
    * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
    */
-  protected UserDTO(String name, List<String> roles, AuditDTO audit) {
+  protected UserDTO(Long id, String name, List<String> roles, AuditDTO audit) {
+    this.id = id;
     this.name = name;
     this.audit = audit;
     this.roles = roles;
+  }
+
+  /**
+   * @return The id of the User DTO.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -97,6 +110,9 @@ public class UserDTO implements User {
    */
   public static class Builder<S extends Builder> {
 
+    /** The id of the user. */
+    protected Long id;
+
     /** The name of the user. */
     protected String name;
 
@@ -105,6 +121,17 @@ public class UserDTO implements User {
 
     /** The audit information of the user. */
     protected AuditDTO audit;
+
+    /**
+     * Sets the id of the user.
+     *
+     * @param id The id of the user.
+     * @return The builder instance.
+     */
+    public S withId(Long id) {
+      this.id = id;
+      return (S) this;
+    }
 
     /**
      * Sets the name of the user.
@@ -149,9 +176,10 @@ public class UserDTO implements User {
      * @throws IllegalArgumentException If the name or audit are not set.
      */
     public UserDTO build() {
+      Preconditions.checkArgument(id != null, "id cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new UserDTO(name, roles, audit);
+      return new UserDTO(id, name, roles, audit);
     }
   }
 }

@@ -31,6 +31,8 @@ import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.integration.test.container.MySQLContainer;
@@ -74,7 +76,14 @@ public class TestMultipleJDBCLoad extends BaseIT {
             + "?user="
             + mySQLContainer.getUsername()
             + "&password="
-            + mySQLContainer.getPassword();
+            + mySQLContainer.getPassword()
+            // Scope Iceberg's iceberg_tables existence check to the current database. Other tests
+            // in this module (e.g. IcebergClassLoaderPoolIT) create Iceberg JDBC catalogs in other
+            // databases of the SAME shared MySQL container. Under Connector/J's default
+            // (nullCatalogMeansCurrent=false), Iceberg's getTables(null, null, "iceberg_tables",
+            // null) check would see those other databases' control tables and skip creating this
+            // catalog's own, breaking later queries. See IcebergClassLoaderPoolIT for details.
+            + "&nullCatalogMeansCurrent=true";
 
     icebergMysqlConf.put(IcebergConfig.CATALOG_URI.getKey(), jdbcUrl);
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
@@ -119,7 +128,8 @@ public class TestMultipleJDBCLoad extends BaseIT {
     Map<String, String> icebergMysqlConf = Maps.newHashMap();
 
     icebergMysqlConf.put(
-        IcebergConfig.CATALOG_URI.getKey(), mySQLContainer.getJdbcUrl(TEST_DB_NAME));
+        IcebergConfig.CATALOG_URI.getKey(),
+        mySQLContainer.getJdbcUrl(TEST_DB_NAME) + "?nullCatalogMeansCurrent=true");
     icebergMysqlConf.put(IcebergConfig.CATALOG_BACKEND.getKey(), "jdbc");
     icebergMysqlConf.put(IcebergConfig.CATALOG_WAREHOUSE.getKey(), "file:///tmp/iceberg-jdbc");
     icebergMysqlConf.put(
@@ -180,6 +190,16 @@ public class TestMultipleJDBCLoad extends BaseIT {
             new Column[] {col1},
             comment,
             Collections.emptyMap());
+
+    Credential credential =
+        postgreSqlCatalog.supportsCredentials().getCredential(JdbcCredential.JDBC_CREDENTIAL_TYPE);
+
+    Assertions.assertNotNull(credential);
+    Assertions.assertInstanceOf(JdbcCredential.class, credential);
+
+    JdbcCredential jdbcCredential = (JdbcCredential) credential;
+    Assertions.assertEquals(postgreSQLContainer.getUsername(), jdbcCredential.jdbcUser());
+    Assertions.assertEquals(postgreSQLContainer.getPassword(), jdbcCredential.jdbcPassword());
 
     Assertions.assertTrue(
         mysqlCatalog.asTableCatalog().tableExists(NameIdentifier.of(schemaName, tableName)));

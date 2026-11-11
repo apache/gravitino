@@ -447,12 +447,16 @@ public class OwnerIT extends BaseIT {
       metalake.addGroup(groupName);
 
       // Now set the owner of catalog to the group
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> metalake.setOwner(catalogObject, groupName, Owner.Type.GROUP));
+      metalake.setOwner(catalogObject, groupName, Owner.Type.GROUP);
+      Owner groupOwner = metalake.getOwner(catalogObject).get();
+      Assertions.assertEquals(groupName, groupOwner.name());
+      Assertions.assertEquals(Owner.Type.GROUP, groupOwner.type());
 
       // Drop the group
       ordinaryClient.removeGroup(groupName);
+      // The owner should be removed as well
+      Owner ownerAfterGroupDrop = metalake.getOwner(catalogObject).orElse(null);
+      Assertions.assertNull(ownerAfterGroupDrop);
     }
     // Cleanup
     client.disableMetalake(metalakeNameE);

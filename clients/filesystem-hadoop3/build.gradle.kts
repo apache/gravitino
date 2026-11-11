@@ -54,6 +54,7 @@ dependencies {
   testImplementation(project(":bundles:gcp-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:aliyun-bundle", configuration = "shadow"))
   testImplementation(project(":bundles:azure-bundle", configuration = "shadow"))
+  testImplementation(project(":bundles:tencent-bundle", configuration = "shadow"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jetty)
@@ -68,6 +69,7 @@ dependencies {
     exclude("javax.servlet", "servlet-api")
     exclude("io.netty")
   }
+  testImplementation(libs.hadoop3.hdfs.client)
   testImplementation(libs.httpclient5)
   testImplementation(libs.javax.jaxb.api) {
     exclude("*")
@@ -108,6 +110,7 @@ tasks.test {
   dependsOn(":bundles:aliyun-bundle:jar")
   dependsOn(":bundles:gcp-bundle:jar")
   dependsOn(":bundles:azure-bundle:jar")
+  dependsOn(":bundles:tencent-bundle:jar")
 }
 
 tasks.javadoc {

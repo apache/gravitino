@@ -59,20 +59,29 @@ public interface TableCatalog {
    * @param ident A table identifier.
    * @return The table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
    */
   Table loadTable(NameIdentifier ident) throws NoSuchTableException;
 
   /**
    * Load table metadata by {@link NameIdentifier} from the catalog with required privileges.
    *
+   * <p>The default implementation throws {@link UnsupportedOperationException}: a catalog that
+   * cannot enforce the required privileges must fail closed instead of silently returning the table
+   * metadata. Catalogs that support privilege-aware loading must override this method.
+   *
    * @param ident A table identifier.
    * @param requiredPrivilegeNames The required privilege names to access the table.
    * @return The table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws NoSuchSchemaException If the containing schema does not exist.
+   * @throws UnsupportedOperationException If the catalog does not support loading a table with
+   *     required privileges.
    */
   default Table loadTable(NameIdentifier ident, Set<Privilege.Name> requiredPrivilegeNames)
       throws NoSuchTableException {
-    return loadTable(ident);
+    throw new UnsupportedOperationException(
+        "The catalog does not support loading a table with required privileges");
   }
 
   /**
@@ -84,7 +93,7 @@ public interface TableCatalog {
   default boolean tableExists(NameIdentifier ident) {
     try {
       return loadTable(ident) != null;
-    } catch (NoSuchTableException e) {
+    } catch (NoSuchTableException | NoSuchSchemaException e) {
       return false;
     }
   }
@@ -95,6 +104,11 @@ public interface TableCatalog {
    * <p>This method returns the table as defined by the user without applying all defaults. If you
    * need the table with default values applied, use the {@link #loadTable(NameIdentifier)} method
    * after creation.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -120,6 +134,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -142,6 +161,11 @@ public interface TableCatalog {
 
   /**
    * Create a table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -168,6 +192,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -191,6 +220,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -213,6 +247,11 @@ public interface TableCatalog {
 
   /**
    * Create a partitioned table in the catalog.
+   *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
    *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
@@ -248,6 +287,11 @@ public interface TableCatalog {
   /**
    * Create a table in the catalog.
    *
+   * <p>A failure does not guarantee that the underlying catalog object was not created. In
+   * particular, source table creation can succeed before Gravitino registration fails. Resolve the
+   * reported error, verify the source identity, and call {@link #loadTable(NameIdentifier)} to
+   * import it instead of repeating creation. Creation is not automatically replayed.
+   *
    * @param ident A table identifier.
    * @param columns The columns of the new table.
    * @param comment The table comment.
@@ -281,10 +325,11 @@ public interface TableCatalog {
    * @param changes Table changes to apply to the table.
    * @return The updated table metadata.
    * @throws NoSuchTableException If the table does not exist.
+   * @throws TableAlreadyExistsException If the new name is already used by another table.
    * @throws IllegalArgumentException If the change is rejected by the implementation.
    */
   Table alterTable(NameIdentifier ident, TableChange... changes)
-      throws NoSuchTableException, IllegalArgumentException;
+      throws NoSuchTableException, TableAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Removes both the metadata and the directory associated with the table from the file system if

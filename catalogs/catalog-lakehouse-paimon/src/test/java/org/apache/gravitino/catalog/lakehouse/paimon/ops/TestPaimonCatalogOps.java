@@ -38,6 +38,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -52,6 +53,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonCatalogPropertiesMetadata;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConfig;
+import org.apache.gravitino.catalog.lakehouse.paimon.utils.PaimonViewTestCatalogHelper;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.TableChange.ColumnPosition;
 import org.apache.gravitino.rel.TableChange.UpdateColumnComment;
@@ -63,6 +65,7 @@ import org.apache.paimon.catalog.Catalog.ColumnAlreadyExistException;
 import org.apache.paimon.catalog.Catalog.ColumnNotExistException;
 import org.apache.paimon.catalog.Catalog.DatabaseNotExistException;
 import org.apache.paimon.catalog.Catalog.TableAlreadyExistException;
+import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.schema.Schema;
 import org.apache.paimon.schema.SchemaChange;
 import org.apache.paimon.schema.SchemaChange.AddColumn;
@@ -76,6 +79,8 @@ import org.apache.paimon.types.MapType;
 import org.apache.paimon.types.RowType;
 import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.VarCharType;
+import org.apache.paimon.view.ViewChange;
+import org.apache.paimon.view.ViewImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -85,19 +90,22 @@ import org.junit.jupiter.api.io.TempDir;
 /** Tests for {@link org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps}. */
 public class TestPaimonCatalogOps {
 
-  private PaimonCatalogOps paimonCatalogOps;
+  private TestablePaimonCatalogOps paimonCatalogOps;
   @TempDir private File warehouse;
 
   private static final String DATABASE = "test_table_ops_database";
   private static final String TABLE = "test_table_ops_table";
+  private static final String VIEW = "test_table_ops_view";
   private static final String COMMENT = "table_ops_table_comment";
   private static final NameIdentifier IDENTIFIER = NameIdentifier.of(Namespace.of(DATABASE), TABLE);
+  private static final NameIdentifier VIEW_IDENTIFIER =
+      NameIdentifier.of(Namespace.of(DATABASE), VIEW);
   private static final Map<String, String> OPTIONS = ImmutableMap.of(BUCKET.key(), "10");
 
   @BeforeEach
   public void setUp() throws Exception {
     paimonCatalogOps =
-        new PaimonCatalogOps(
+        new TestablePaimonCatalogOps(
             new PaimonConfig(
                 ImmutableMap.of(PaimonCatalogPropertiesMetadata.WAREHOUSE, warehouse.getPath())));
     createDatabase();
@@ -165,6 +173,82 @@ public class TestPaimonCatalogOps {
     // create a new table to make database not empty to test drop database cascade
     createTable();
     Assertions.assertNotNull(paimonCatalogOps.loadTable(IDENTIFIER.toString()));
+  }
+
+  @Test
+  void testCreateLoadAlterRenameAndDropViewOperations() throws Exception {
+    paimonCatalogOps.setCatalog(
+        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog()));
+
+    org.apache.paimon.view.View createdView =
+        new ViewImpl(
+            Identifier.create(DATABASE, VIEW),
+            List.of(new DataField(0, "col_1", DataTypes.INT(), "col_1")),
+            "SELECT col_1 FROM " + TABLE,
+            ImmutableMap.of("spark", "SELECT col_1 FROM " + TABLE),
+            "test_view_comment",
+            Maps.newHashMap());
+    paimonCatalogOps.createView(VIEW_IDENTIFIER.toString(), createdView);
+
+    org.apache.paimon.view.View loadedView = paimonCatalogOps.loadView(VIEW_IDENTIFIER.toString());
+    assertEquals("test_view_comment", loadedView.comment().orElse(null));
+    assertEquals("SELECT col_1 FROM " + TABLE, loadedView.query());
+    assertTrue(paimonCatalogOps.listViews(DATABASE).contains(VIEW));
+
+    paimonCatalogOps.alterView(
+        VIEW_IDENTIFIER.toString(),
+        List.of(
+            ViewChange.setOption("k1", "v1"),
+            ViewChange.updateComment("updated_view_comment"),
+            ViewChange.updateDialect("spark", "SELECT col_1 FROM " + TABLE + " WHERE col_1 > 1")));
+
+    org.apache.paimon.view.View alteredView = paimonCatalogOps.loadView(VIEW_IDENTIFIER.toString());
+    assertEquals("updated_view_comment", alteredView.comment().orElse(null));
+    assertEquals("v1", alteredView.options().get("k1"));
+    assertEquals("SELECT col_1 FROM " + TABLE, alteredView.query());
+    assertEquals(
+        "SELECT col_1 FROM " + TABLE + " WHERE col_1 > 1", alteredView.dialects().get("spark"));
+
+    NameIdentifier renamedViewIdentifier =
+        NameIdentifier.of(VIEW_IDENTIFIER.namespace(), VIEW + "_renamed");
+    paimonCatalogOps.renameView(VIEW_IDENTIFIER.toString(), renamedViewIdentifier.toString());
+
+    assertThrowsExactly(
+        Catalog.ViewNotExistException.class,
+        () -> paimonCatalogOps.loadView(VIEW_IDENTIFIER.toString()));
+    assertNotNull(paimonCatalogOps.loadView(renamedViewIdentifier.toString()));
+
+    paimonCatalogOps.dropView(renamedViewIdentifier.toString());
+    assertThrowsExactly(
+        Catalog.ViewNotExistException.class,
+        () -> paimonCatalogOps.loadView(renamedViewIdentifier.toString()));
+  }
+
+  @Test
+  void testAlterViewExceptionMessageContainsContext() throws Exception {
+    paimonCatalogOps.setCatalog(
+        PaimonViewTestCatalogHelper.createViewSupportedCatalog(paimonCatalogOps.catalog()));
+
+    org.apache.paimon.view.View createdView =
+        new ViewImpl(
+            Identifier.create(DATABASE, VIEW),
+            List.of(new DataField(0, "col_1", DataTypes.INT(), "col_1")),
+            "SELECT col_1 FROM " + TABLE,
+            ImmutableMap.of("spark", "SELECT col_1 FROM " + TABLE),
+            "test_view_comment",
+            Maps.newHashMap());
+    paimonCatalogOps.createView(VIEW_IDENTIFIER.toString(), createdView);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                paimonCatalogOps.alterView(
+                    VIEW_IDENTIFIER.toString(),
+                    List.of(ViewChange.updateDialect("trino", "SELECT col_1 FROM " + TABLE))));
+
+    assertTrue(exception.getMessage().contains("Cannot alter view " + VIEW_IDENTIFIER + ": "));
+    assertTrue(exception.getCause() instanceof Catalog.DialectNotExistException);
   }
 
   @Test
@@ -432,5 +516,20 @@ public class TestPaimonCatalogOps {
     Assertions.assertEquals(1, paimonCatalogOps.listTables(DATABASE).size());
     paimonCatalogOps.dropDatabase(DATABASE, true);
     Assertions.assertTrue(paimonCatalogOps.listDatabases().isEmpty());
+  }
+
+  private static class TestablePaimonCatalogOps extends PaimonCatalogOps {
+
+    TestablePaimonCatalogOps(PaimonConfig paimonConfig) {
+      super(paimonConfig);
+    }
+
+    Catalog catalog() {
+      return catalog;
+    }
+
+    void setCatalog(Catalog catalog) {
+      this.catalog = catalog;
+    }
   }
 }

@@ -25,21 +25,15 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.rel.types.Types;
-import org.apache.gravitino.utils.NamespaceUtil;
 import org.openjdk.jcstress.annotations.Actor;
 import org.openjdk.jcstress.annotations.Arbiter;
 import org.openjdk.jcstress.annotations.Description;
@@ -55,11 +49,6 @@ public class TestCaffeineEntityCacheCoherence {
       getTestSchemaEntity(1L, "schema1", Namespace.of("metalake1", "catalog1"), "test_schema1");
   private static final TableEntity tableEntity =
       getTestTableEntity(3L, "table1", Namespace.of("metalake1", "catalog1", "schema1"));
-  private static final GroupEntity groupEntity =
-      getTestGroupEntity(4L, "group1", "metalake1", ImmutableList.of("role1"));
-  private static final UserEntity userEntity =
-      getTestUserEntity(5L, "user1", "metalake1", ImmutableList.of(6L));
-  private static final RoleEntity roleEntity = getTestRoleEntity(6L, "role1", "metalake1");
 
   private static SchemaEntity getTestSchemaEntity(
       long id, String name, Namespace namespace, String comment) {
@@ -80,38 +69,6 @@ public class TestCaffeineEntityCacheCoherence {
         .withAuditInfo(getTestAuditInfo())
         .withNamespace(namespace)
         .withColumns(ImmutableList.of(getMockColumnEntity()))
-        .build();
-  }
-
-  private static RoleEntity getTestRoleEntity(long id, String name, String metalake) {
-    return RoleEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofRole(metalake))
-        .withAuditInfo(getTestAuditInfo())
-        .withSecurableObjects(ImmutableList.of())
-        .build();
-  }
-
-  private static GroupEntity getTestGroupEntity(
-      long id, String name, String metalake, List<String> roles) {
-    return GroupEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofGroup(metalake))
-        .withAuditInfo(getTestAuditInfo())
-        .withRoleNames(roles)
-        .build();
-  }
-
-  private static UserEntity getTestUserEntity(
-      long id, String name, String metalake, List<Long> roles) {
-    return UserEntity.builder()
-        .withId(id)
-        .withName(name)
-        .withNamespace(NamespaceUtil.ofUser(metalake))
-        .withAuditInfo(getTestAuditInfo())
-        .withRoleIds(roles)
         .build();
   }
 
@@ -341,69 +298,6 @@ public class TestCaffeineEntityCacheCoherence {
   @JCStressTest
   @Outcome.Outcomes({
     @Outcome(
-        id = "2",
-        expect = Expect.ACCEPTABLE,
-        desc = "Both put() calls succeeded; both entries are visible in the cache."),
-    @Outcome(
-        id = "1",
-        expect = Expect.FORBIDDEN,
-        desc = "Only one entry is visible; potential visibility or atomicity issue."),
-    @Outcome(
-        id = "0",
-        expect = Expect.FORBIDDEN,
-        desc =
-            "Neither entry is visible; indicates a serious failure in write propagation or cache logic.")
-  })
-  @Description("Concurrent put() with different ROLE relation types; expect both visible (2).")
-  @State
-  public static class ConcurrentPutDifferentKeysWithRelationTest {
-    private final EntityCache cache;
-
-    public ConcurrentPutDifferentKeysWithRelationTest() {
-      this.cache = new CaffeineEntityCache(new Config() {});
-    }
-
-    @Actor
-    public void actor1() {
-      cache.put(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_GROUP_REL,
-          ImmutableList.of(groupEntity));
-    }
-
-    @Actor
-    public void actor2() {
-      cache.put(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_USER_REL,
-          ImmutableList.of(userEntity));
-    }
-
-    @Arbiter
-    public void arbiter(I_Result r) {
-      int count = 0;
-      if (cache.contains(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_USER_REL)) {
-        count++;
-      }
-      if (cache.contains(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_GROUP_REL)) {
-        count++;
-      }
-
-      r.r1 = count;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(
         id = "1",
         expect = Expect.ACCEPTABLE,
         desc = "Both put() calls succeeded on the same key; value is visible."),
@@ -435,58 +329,6 @@ public class TestCaffeineEntityCacheCoherence {
     @Arbiter
     public void arbiter(I_Result r) {
       r.r1 = cache.contains(schemaEntity.nameIdentifier(), Entity.EntityType.SCHEMA) ? 1 : 0;
-    }
-  }
-
-  @JCStressTest
-  @Outcome.Outcomes({
-    @Outcome(
-        id = "1",
-        expect = Expect.ACCEPTABLE,
-        desc = "Entry is visible; concurrent put() calls succeeded."),
-    @Outcome(
-        id = "0",
-        expect = Expect.FORBIDDEN,
-        desc = "Entry is missing; indicates visibility or atomicity issue.")
-  })
-  @Description(
-      "Tests concurrent put() on the same key with relation type. "
-          + "Entry must remain visible after concurrent writes; missing indicates a bug.")
-  @State
-  public static class ConcurrentPutSameKeyWithRelationTest {
-    private final EntityCache cache;
-
-    public ConcurrentPutSameKeyWithRelationTest() {
-      this.cache = new CaffeineEntityCache(new Config() {});
-    }
-
-    @Actor
-    public void actor1() {
-      cache.put(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_USER_REL,
-          ImmutableList.of(userEntity));
-    }
-
-    @Actor
-    public void actor2() {
-      cache.put(
-          roleEntity.nameIdentifier(),
-          Entity.EntityType.ROLE,
-          SupportsRelationOperations.Type.ROLE_USER_REL,
-          ImmutableList.of(userEntity));
-    }
-
-    @Arbiter
-    public void arbiter(I_Result r) {
-      r.r1 =
-          cache.contains(
-                  roleEntity.nameIdentifier(),
-                  Entity.EntityType.ROLE,
-                  SupportsRelationOperations.Type.ROLE_USER_REL)
-              ? 1
-              : 0;
     }
   }
 

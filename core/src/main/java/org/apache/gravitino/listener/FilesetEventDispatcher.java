@@ -55,6 +55,8 @@ import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetPreEvent;
 import org.apache.gravitino.listener.api.info.FilesetInfo;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -77,7 +79,11 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     eventBus.dispatchEvent(new ListFilesetPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listFilesets(namespace);
-      eventBus.dispatchEvent(new ListFilesetEvent(PrincipalUtils.getCurrentUserName(), namespace));
+      eventBus.dispatchEvent(
+          new ListFilesetEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -94,7 +100,12 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       FileInfo[] fileInfos = dispatcher.listFiles(ident, locationName, subPath);
       eventBus.dispatchEvent(
-          new ListFilesEvent(PrincipalUtils.getCurrentUserName(), ident, locationName, subPath));
+          new ListFilesEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              locationName,
+              subPath,
+              fileInfos != null ? fileInfos.length : -1));
       return fileInfos;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -126,7 +137,9 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       String comment,
       Fileset.Type type,
       Map<String, String> storageLocations,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     FilesetInfo createFileRequest =
         new FilesetInfo(ident.name(), comment, type, storageLocations, properties, null);
@@ -135,7 +148,7 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       Fileset fileset =
           dispatcher.createMultipleLocationFileset(
-              ident, comment, type, storageLocations, properties);
+              ident, comment, type, storageLocations, properties, secretBindings, secretReferences);
       eventBus.dispatchEvent(
           new CreateFilesetEvent(
               PrincipalUtils.getCurrentUserName(), ident, new FilesetInfo(fileset)));

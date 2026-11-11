@@ -25,9 +25,14 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.listener.api.event.FailureEvent;
 import org.apache.gravitino.listener.api.event.OperationStatus;
 import org.apache.gravitino.listener.api.event.PreEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
+import org.apache.gravitino.utils.RequestContext;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -92,6 +97,84 @@ public class TestEventBus {
 
     // RuntimeException should be propagated for regular events
     Assertions.assertThrows(RuntimeException.class, () -> eventBus.dispatchEvent(postEvent));
+  }
+
+  @AfterEach
+  void clearRequestContext() {
+    RequestContext.resetOperationFailureFired();
+    RequestContext.resetOperationSuccessFired();
+    RequestContext.clear();
+  }
+
+  // ─── operationFailureFired flag marking ──────────────────────────────────────
+
+  @Test
+  void testOperationLayerFailureEventSetsOperationFailureFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    // Any FailureEvent that is not an HttpRequestFailureEvent should set the flag
+    Event failureEvent =
+        new FailureEvent("user", NameIdentifier.of("test"), new Exception("op error")) {
+          @Override
+          public OperationStatus operationStatus() {
+            return OperationStatus.FAILURE;
+          }
+        };
+
+    Assertions.assertFalse(RequestContext.isOperationFailureFired(), "Flag must start as false");
+    eventBus.dispatchEvent(failureEvent);
+    Assertions.assertTrue(
+        RequestContext.isOperationFailureFired(),
+        "Flag must be set after dispatching an operation-layer failure event");
+  }
+
+  @Test
+  void testHttpRequestFailureEventDoesNotSetOperationFailureFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    HttpRequestFailureEvent httpEvent =
+        new HttpRequestFailureEvent(
+            "alice", "1.2.3.4", "GET", "/api/metalakes", 401, EventSource.GRAVITINO_SERVER);
+
+    eventBus.dispatchEvent(httpEvent);
+
+    Assertions.assertFalse(
+        RequestContext.isOperationFailureFired(),
+        "Flag must NOT be set when dispatching HttpRequestFailureEvent — "
+            + "it is the HTTP-layer event and must not suppress itself");
+  }
+
+  // ─── operationSuccessFired flag marking ──────────────────────────────────────
+
+  @Test
+  void testOperationLayerSuccessEventSetsOperationSuccessFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    Event successEvent =
+        new Event("user", NameIdentifier.of("test")) {
+          @Override
+          public OperationStatus operationStatus() {
+            return OperationStatus.SUCCESS;
+          }
+        };
+
+    Assertions.assertFalse(RequestContext.isOperationSuccessFired(), "Flag must start as false");
+    eventBus.dispatchEvent(successEvent);
+    Assertions.assertTrue(
+        RequestContext.isOperationSuccessFired(),
+        "Flag must be set after dispatching an operation-layer success event");
+  }
+
+  @Test
+  void testHttpRequestEventDoesNotSetOperationSuccessFiredFlag() {
+    EventBus eventBus = new EventBus(Collections.emptyList());
+    HttpRequestEvent httpEvent =
+        new HttpRequestEvent(
+            "alice", "1.2.3.4", "GET", "/api/metalakes", 200, EventSource.GRAVITINO_SERVER);
+
+    eventBus.dispatchEvent(httpEvent);
+
+    Assertions.assertFalse(
+        RequestContext.isOperationSuccessFired(),
+        "Flag must NOT be set when dispatching HttpRequestEvent — "
+            + "it is the HTTP-layer fallback event and must not suppress itself");
   }
 
   static class ThrowingEventListener implements EventListenerPlugin {

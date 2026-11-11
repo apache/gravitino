@@ -19,6 +19,7 @@
 package org.apache.gravitino.client;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
 import java.util.Collections;
 import org.apache.gravitino.MetadataObject;
@@ -31,6 +32,7 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
@@ -47,6 +49,8 @@ public class TestGenericTag extends TestBase {
           .withName("tag1")
           .withComment("comment1")
           .withProperties(Collections.emptyMap())
+          .withAllowedValues(new String[] {"finance", "risk"})
+          .withAssignmentValues(new String[] {"finance"})
           .withAudit(AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build())
           .build();
 
@@ -77,6 +81,16 @@ public class TestGenericTag extends TestBase {
   public static void tearDown() {
     TestBase.tearDown();
     gravitinoClient.close();
+  }
+
+  @Test
+  public void testValueConstraintAndAssignment() {
+    Tag tag = new GenericTag(tagDTO, gravitinoClient.restClient(), metalakeName);
+
+    Assertions.assertEquals(
+        TagValueConstraint.ofAllowedValues("finance", "risk"), tag.valueConstraint());
+    Assertions.assertTrue(tag.assignment().isPresent());
+    Assertions.assertArrayEquals(new String[] {"finance"}, tag.assignment().get().values());
   }
 
   @Test
@@ -120,6 +134,16 @@ public class TestGenericTag extends TestBase {
       Assertions.assertEquals(object.name(), actualObject.name());
       Assertions.assertEquals(object.type(), actualObject.type());
     }
+
+    buildMockResource(
+        Method.GET, path, ImmutableMap.of("value", "finance"), null, resp, HttpStatus.SC_OK);
+    MetadataObject[] valueObjects = tag.associatedObjects().objects("finance");
+    Assertions.assertEquals(objects.length, valueObjects.length);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> tag.associatedObjects().objects(""));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> tag.associatedObjects().objects(String.join("", Collections.nCopies(257, "a"))));
 
     // Test return empty array
     buildMockResource(

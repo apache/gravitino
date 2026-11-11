@@ -35,6 +35,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -48,13 +49,17 @@ import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
@@ -86,14 +91,24 @@ public class SchemaOperations {
   public Response listSchemas(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalog) {
-    LOG.info("Received list schema request for catalog: {}.{}", metalake, catalog);
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @DefaultValue("") @QueryParam("parentSchema") String parentSchema) {
+    LOG.info(
+        "Received list schema request for catalog: {}.{}, parentSchema: {}",
+        metalake,
+        catalog,
+        parentSchema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            Namespace schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            Namespace schemaNS;
+            if (StringUtils.isBlank(parentSchema)) {
+              schemaNS = NamespaceUtil.ofSchema(metalake, catalog);
+            } else {
+              validateParentSchema(parentSchema);
+              schemaNS = Namespace.of(metalake, catalog, parentSchema);
+            }
             NameIdentifier[] idents = dispatcher.listSchemas(schemaNS);
             idents =
                 MetadataAuthzHelper.filterByExpression(
@@ -102,7 +117,12 @@ public class SchemaOperations {
                     Entity.EntityType.SCHEMA,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
-            LOG.info("List {} schemas in catalog {}.{}", idents.length, metalake, catalog);
+            LOG.info(
+                "List {} schemas in catalog {}.{} (parentSchema='{}')",
+                idents.length,
+                metalake,
+                catalog,
+                parentSchema);
             return response;
           });
     } catch (Exception e) {
@@ -115,14 +135,25 @@ public class SchemaOperations {
   @Timed(name = "create-schema." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-schema", absolute = true)
   @AuthorizationExpression(
-      expression = "ANY(OWNER, METALAKE, CATALOG) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
-      accessMetadataType = MetadataObject.Type.CATALOG)
+      expression = "ANY(OWNER, METALAKE, CATALOG, SCHEMA) || ANY_USE_CATALOG && ANY_CREATE_SCHEMA",
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createSchema(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      SchemaCreateRequest request) {
-    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
+          SchemaCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create schema request with null request body");
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.CREATE,
+          "",
+          catalog,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String schemaName = request.getName();
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, schemaName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -131,15 +162,19 @@ public class SchemaOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSchema(metalake, catalog, request.getName());
             Schema schema =
-                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
+                dispatcher.createSchema(
+                    ident,
+                    request.getComment(),
+                    request.getProperties(),
+                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
+                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
             LOG.info("Schema created: {}.{}.{}", metalake, catalog, schema.name());
             return response;
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException(
-          OperationType.CREATE, request.getName(), catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.CREATE, schemaName, catalog, e);
     }
   }
 
@@ -188,6 +223,14 @@ public class SchemaOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       SchemaUpdatesRequest request) {
     LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
+    if (request == null) {
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.ALTER,
+          schema,
+          catalog,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -234,7 +277,7 @@ public class SchemaOperations {
             if (dropped) {
               LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
             } else {
-              LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
+              LOG.warn("Failed to drop schema {} under namespace {}", schema, ident.namespace());
             }
 
             Response response = Utils.ok(new DropResponse(dropped));
@@ -242,6 +285,26 @@ public class SchemaOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.DROP, schema, catalog, e);
+    }
+  }
+
+  /**
+   * Validates the {@code parentSchema} query parameter. The value is a logical (possibly
+   * hierarchical) schema name, so it must not contain empty segments (e.g. {@code "A::B"} or {@code
+   * "A:"}) before it is passed to {@link Namespace#of}.
+   *
+   * @param parentSchema the non-blank {@code parentSchema} query parameter
+   * @throws IllegalArgumentException if the value contains an empty segment
+   */
+  private static void validateParentSchema(String parentSchema) {
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    for (String segment : HierarchicalSchemaUtil.splitSchemaName(parentSchema, separator)) {
+      if (segment.isEmpty()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "The parentSchema '%s' contains an empty segment after splitting by '%s'.",
+                parentSchema, separator));
+      }
     }
   }
 }

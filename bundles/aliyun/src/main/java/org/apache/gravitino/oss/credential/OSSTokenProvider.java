@@ -29,6 +29,11 @@ import org.apache.gravitino.credential.OSSTokenCredential;
 public class OSSTokenProvider extends CredentialProviderDelegator<OSSTokenCredential> {
 
   @Override
+  public boolean supportsScheme(String scheme) {
+    return "oss".equalsIgnoreCase(scheme);
+  }
+
+  @Override
   public String credentialType() {
     return OSSTokenCredential.OSS_TOKEN_CREDENTIAL_TYPE;
   }

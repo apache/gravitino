@@ -19,10 +19,13 @@
 
 package org.apache.gravitino.s3.credential;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -31,10 +34,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.credential.CredentialContext;
 import org.apache.gravitino.credential.CredentialGenerator;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
+import org.apache.gravitino.credential.RoleSessionNameUtils;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.config.S3CredentialConfig;
+import org.apache.gravitino.storage.S3Properties;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.policybuilder.iam.IamConditionOperator;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
@@ -55,6 +61,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
   private String roleArn;
   private String externalID;
   private int tokenExpireSecs;
+  private boolean listLocationPrefix;
 
   @Override
   public void initialize(Map<String, String> properties) {
@@ -62,7 +69,8 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
     this.roleArn = s3CredentialConfig.s3RoleArn();
     this.externalID = s3CredentialConfig.externalID();
     this.tokenExpireSecs = s3CredentialConfig.tokenExpireInSecs();
-    this.stsClient = createStsClient(s3CredentialConfig);
+    this.listLocationPrefix = s3CredentialConfig.listLocationPrefix();
+    this.stsClient = createStsClient(s3CredentialConfig, stsCallerCredentials(properties));
   }
 
   @Override
@@ -84,11 +92,32 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
         s3Token.expiration().toEpochMilli());
   }
 
-  private StsClient createStsClient(S3CredentialConfig s3CredentialConfig) {
-    AwsCredentialsProvider credentialsProvider =
-        StaticCredentialsProvider.create(
-            AwsBasicCredentials.create(
-                s3CredentialConfig.accessKeyID(), s3CredentialConfig.secretAccessKey()));
+  /**
+   * Returns the credentials Gravitino uses to call STS. With a static access key pair configured,
+   * those keys are used. With neither key configured, the AWS default credential chain is used, so
+   * a server running with an instance profile, an EKS service account or environment credentials
+   * can assume the vending role without storing keys in the catalog.
+   */
+  @VisibleForTesting
+  static AwsCredentialsProvider stsCallerCredentials(Map<String, String> properties) {
+    String accessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
+    String secretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    boolean hasAccessKeyId = StringUtils.isNotBlank(accessKeyId);
+    boolean hasSecretAccessKey = StringUtils.isNotBlank(secretAccessKey);
+    if (!hasAccessKeyId && !hasSecretAccessKey) {
+      return DefaultCredentialsProvider.builder().build();
+    }
+    Preconditions.checkArgument(
+        hasAccessKeyId && hasSecretAccessKey,
+        "Set both %s and %s, or neither to use the AWS default credential chain",
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    return StaticCredentialsProvider.create(
+        AwsBasicCredentials.create(accessKeyId, secretAccessKey));
+  }
+
+  private StsClient createStsClient(
+      S3CredentialConfig s3CredentialConfig, AwsCredentialsProvider credentialsProvider) {
     StsClientBuilder builder = StsClient.builder().credentialsProvider(credentialsProvider);
 
     if (StringUtils.isNotBlank(s3CredentialConfig.region())) {
@@ -106,7 +135,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
     AssumeRoleRequest.Builder builder =
         AssumeRoleRequest.builder()
             .roleArn(roleArn)
-            .roleSessionName("gravitino_" + userName)
+            .roleSessionName(RoleSessionNameUtils.create("gravitino_", userName))
             .durationSeconds(tokenExpireSecs)
             .policy(policy.toJson());
 
@@ -149,7 +178,7 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
                   .addConditions(
                       IamConditionOperator.STRING_LIKE,
                       "s3:prefix",
-                      Arrays.asList(rawPath, addWildcardToPath(rawPath)));
+                      listPrefixes(rawPath, listLocationPrefix));
 
               bucketGetLocationStatementBuilder.computeIfAbsent(
                   bucketArn,
@@ -201,6 +230,31 @@ public class S3TokenGenerator implements CredentialGenerator<S3TokenCredential> 
 
   private static String addWildcardToPath(String path) {
     return path.endsWith("/") ? path + "*" : path + "/*";
+  }
+
+  /**
+   * Builds the {@code s3:prefix} condition values for a {@code ListBucket} statement. By default
+   * the prefixes are restricted to the location and its descendants by requiring a trailing slash,
+   * so a vended credential cannot enumerate keys in adjacent locations (e.g. {@code
+   * path/to/table_new}) that merely share the location's string prefix. The empty path (bucket
+   * root) is preserved so listing the whole bucket still works.
+   *
+   * <p>When {@code includeLocationPrefix} is {@code true}, the bare location prefix is also
+   * allowed. This is required for the Hadoop FileSystem API, whose {@code getFileStatus} issues a
+   * HEAD on the bare location key: that HEAD returns 404 (instead of 403) only if {@code
+   * ListBucket} permits the bare prefix. The trade-off is that the credential can then enumerate
+   * sibling key names sharing the prefix.
+   *
+   * @param rawPath the object key prefix of the location, without a leading slash
+   * @param includeLocationPrefix whether to also allow the bare location prefix
+   * @return the allowed {@code s3:prefix} values
+   */
+  static List<String> listPrefixes(String rawPath, boolean includeLocationPrefix) {
+    String dirPrefix = rawPath.isEmpty() || rawPath.endsWith("/") ? rawPath : rawPath + "/";
+    if (includeLocationPrefix && !rawPath.equals(dirPrefix)) {
+      return Arrays.asList(rawPath, dirPrefix, addWildcardToPath(rawPath));
+    }
+    return Arrays.asList(dirPrefix, addWildcardToPath(rawPath));
   }
 
   private static String removeSchemaFromS3Uri(URI uri) {

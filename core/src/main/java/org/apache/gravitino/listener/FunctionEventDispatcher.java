@@ -77,7 +77,9 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
     eventBus.dispatchEvent(new ListFunctionPreEvent(user, namespace));
     try {
       NameIdentifier[] nameIdentifiers = dispatcher.listFunctions(namespace);
-      eventBus.dispatchEvent(new ListFunctionEvent(user, namespace));
+      eventBus.dispatchEvent(
+          new ListFunctionEvent(
+              user, namespace, nameIdentifiers != null ? nameIdentifiers.length : -1));
       return nameIdentifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListFunctionFailureEvent(user, namespace, e));
@@ -92,7 +94,9 @@ public class FunctionEventDispatcher implements FunctionDispatcher {
     try {
       Function[] functions = dispatcher.listFunctionInfos(namespace);
       FunctionInfo[] functionInfos =
-          Arrays.stream(functions).map(FunctionInfo::new).toArray(FunctionInfo[]::new);
+          functions != null
+              ? Arrays.stream(functions).map(FunctionInfo::new).toArray(FunctionInfo[]::new)
+              : new FunctionInfo[0];
       eventBus.dispatchEvent(new ListFunctionInfosEvent(user, namespace, functionInfos));
       return functions;
     } catch (Exception e) {

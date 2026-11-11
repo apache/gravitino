@@ -89,6 +89,16 @@ public class TableMetaSQLProviderFactory {
     return getProvider().selectTableMetaById(tableId);
   }
 
+  /**
+   * Returns SQL that selects and exclusively locks an active table metadata row.
+   *
+   * @param tableId the table ID
+   * @return the locking select SQL
+   */
+  public static String selectTableMetaByIdForUpdate(@Param("tableId") Long tableId) {
+    return getProvider().selectTableMetaByIdForUpdate(tableId);
+  }
+
   public static String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return getProvider().insertTableMeta(tablePO);
   }
@@ -104,8 +114,16 @@ public class TableMetaSQLProviderFactory {
     return getProvider().updateTableMeta(newTablePO, oldTablePO, newSchemaId);
   }
 
-  public static String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
-    return getProvider().softDeleteTableMetasByTableId(tableId);
+  /**
+   * Returns SQL that soft-deletes a table with a version check.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion);
   }
 
   public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -116,8 +134,8 @@ public class TableMetaSQLProviderFactory {
     return getProvider().softDeleteTableMetasByCatalogId(catalogId);
   }
 
-  public static String softDeleteTableMetasBySchemaId(@Param("schemaId") Long schemaId) {
-    return getProvider().softDeleteTableMetasBySchemaId(schemaId);
+  public static String softDeleteTableMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteTableMetasBySchemaIds(schemaIds);
   }
 
   public static String deleteTableMetasByLegacyTimeline(
@@ -128,5 +146,35 @@ public class TableMetaSQLProviderFactory {
   public static String batchSelectTableByIdentifier(
       @Param("schemaId") Long schemaId, @Param("tableNames") List<String> tableNames) {
     return getProvider().batchSelectTableByIdentifier(schemaId, tableNames);
+  }
+  /**
+   * Returns the single-statement table snapshot SQL for a schema ID and name.
+   *
+   * @param schemaId the parent schema ID
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName) {
+    return getProvider().selectTableWithColumnsBySchemaIdAndName(schemaId, tableName);
+  }
+
+  /**
+   * Returns the single-statement table snapshot SQL for a full name.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate select SQL
+   */
+  public static String selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName) {
+    return getProvider()
+        .selectTableWithColumnsByFullQualifiedName(
+            metalakeName, catalogName, schemaName, tableName);
   }
 }

@@ -19,8 +19,10 @@
 package org.apache.gravitino.iceberg;
 
 import com.google.common.collect.Lists;
+import java.security.CodeSource;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import javax.inject.Singleton;
 import javax.servlet.Servlet;
 import org.apache.gravitino.Configs;
@@ -30,8 +32,13 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergAuthenticationFilter;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.iceberg.service.IcebergHealthCheckPathMatcher;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.IcebergRequestBodyReaderInterceptor;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJobStore;
+import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
@@ -47,13 +54,21 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecu
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.ClientAddressResolver;
+import org.apache.gravitino.server.web.HealthAliasServlet;
+import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
+import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
+import org.apache.iceberg.IcebergBuild;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
@@ -75,26 +90,44 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
+  private Optional<IcebergCleanupManager> cleanupManager;
   private IcebergConfigProvider configProvider;
   private boolean auxMode;
 
   private void initServer(IcebergConfig icebergConfig) {
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(icebergConfig);
+    boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    IcebergReadRestrictionLoader readRestrictionLoader = loadReadRestrictionLoader(enableAuth);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(icebergConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
+    IcebergRESTUtils.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
     server =
         new JettyServer() {
           @Override
-          protected javax.servlet.Filter createAuthenticationFilter() {
+          protected javax.servlet.Filter createAuthenticationFilter(
+              boolean includeErrorStackTrace) {
+            // Iceberg authentication errors never carry a stack trace (see
+            // TestIcebergAuthenticationFilter), so either setting is honored.
             return new IcebergAuthenticationFilter();
           }
         };
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     server.initialize(serverConfig, SERVICE_NAME, false /* shouldEnableUI */);
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, icebergConfig);
+    if (metricsEnabled) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     ResourceConfig config = new ResourceConfig();
     config.packages(getIcebergRESTPackages(icebergConfig));
 
-    config.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    config
+        .register(IcebergObjectMapperProvider.class)
+        // Without the bundled mappers, Jackson failures reach IcebergExceptionMapper and are
+        // answered with an Iceberg ErrorModel instead of a text/plain Jackson message.
+        .register(JacksonFeature.withoutExceptionMappers());
     config.register(IcebergExceptionMapper.class);
+    config.register(IcebergRequestBodyReaderInterceptor.class);
+    config.register(new OutOfMemoryErrorListener());
     HttpServerMetricsSource httpServerMetricsSource =
         new HttpServerMetricsSource(MetricsSource.ICEBERG_REST_SERVER_METRIC_NAME, config, server);
     metricsSystem.register(httpServerMetricsSource);
@@ -103,39 +136,70 @@ public class RESTService implements GravitinoAuxiliaryService {
     this.configProvider = IcebergConfigProviderFactory.create(configProperties);
     configProvider.initialize(configProperties);
     String metalakeName = configProvider.getMetalakeName();
+    boolean skipAuthorizationForRestBackend =
+        icebergConfig.get(IcebergConfig.ICEBERG_REST_DISABLE_REST_AUTHZ);
 
-    Boolean enableAuth = GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     this.icebergCatalogWrapperManager =
         new IcebergCatalogWrapperManager(configProperties, configProvider, auxMode, metalakeName);
     IcebergRESTServerContext authorizationContext =
         IcebergRESTServerContext.create(
-            configProvider, enableAuth, auxMode, icebergCatalogWrapperManager);
+            configProvider,
+            enableAuth,
+            auxMode,
+            skipAuthorizationForRestBackend,
+            icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    if (auxMode) {
+      // Async cleanup reuses the entity store's shared relational backend (connection pool +
+      // per-backend SQL), which is only available when running embedded in the Gravitino server
+      // (auxiliary mode). In standalone mode the cleanup manager stays empty and purge requests
+      // fall back to synchronous purge.
+      this.cleanupManager =
+          Optional.of(
+              new IcebergCleanupManager(
+                  new IcebergCleanupJobStore(GravitinoEnv.getInstance().idGenerator()),
+                  icebergConfig));
+    } else {
+      this.cleanupManager = Optional.empty();
+      LOG.info(
+          "Async Iceberg table cleanup is only available in auxiliary mode; "
+              + "purge requests with async mode will fall back to synchronous purge.");
+    }
+
+    // The raw namespace operation executor is shared with the table and view hook dispatchers so
+    // their orphan-schema cleanup can probe namespace existence without firing namespace events.
+    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
+        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
+
+    // Table: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergTableOperationDispatcher icebergTableOperationDispatcher =
-        new IcebergTableOperationExecutor(icebergCatalogWrapperManager);
+        new IcebergTableOperationExecutor(icebergCatalogWrapperManager, cleanupManager);
     if (authorizationContext.isAuthorizationEnabled()) {
       icebergTableOperationDispatcher =
-          new IcebergTableHookDispatcher(icebergTableOperationDispatcher);
+          new IcebergTableHookDispatcher(
+              icebergTableOperationDispatcher, namespaceOperationDispatcher);
     }
-    IcebergTableEventDispatcher icebergTableEventDispatcher =
+    IcebergTableOperationDispatcher icebergTableDispatcher =
         new IcebergTableEventDispatcher(icebergTableOperationDispatcher, eventBus, metalakeName);
+
+    // View: EventDispatcher -> HookDispatcher -> OperationExecutor
     IcebergViewOperationDispatcher icebergViewOperationDispatcher =
         new IcebergViewOperationExecutor(icebergCatalogWrapperManager);
     if (authorizationContext.isAuthorizationEnabled()) {
       icebergViewOperationDispatcher =
-          new IcebergViewHookDispatcher(icebergViewOperationDispatcher, metalakeName);
+          new IcebergViewHookDispatcher(
+              icebergViewOperationDispatcher, namespaceOperationDispatcher, metalakeName);
     }
-    IcebergViewEventDispatcher icebergViewEventDispatcher =
+    IcebergViewOperationDispatcher icebergViewDispatcher =
         new IcebergViewEventDispatcher(icebergViewOperationDispatcher, eventBus, metalakeName);
 
-    IcebergNamespaceOperationDispatcher namespaceOperationDispatcher =
-        new IcebergNamespaceOperationExecutor(icebergCatalogWrapperManager);
+    // Namespace: EventDispatcher -> HookDispatcher -> OperationExecutor
     if (authorizationContext.isAuthorizationEnabled()) {
       namespaceOperationDispatcher =
           new IcebergNamespaceHookDispatcher(namespaceOperationDispatcher);
     }
-    IcebergNamespaceEventDispatcher icebergNamespaceEventDispatcher =
+    IcebergNamespaceOperationDispatcher icebergNamespaceDispatcher =
         new IcebergNamespaceEventDispatcher(namespaceOperationDispatcher, eventBus, metalakeName);
 
     config.register(
@@ -149,9 +213,12 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
-            bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
-            bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
-            bind(icebergNamespaceEventDispatcher)
+            cleanupManager.ifPresent(
+                manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
+            bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
+            bind(readRestrictionLoader).to(IcebergReadRestrictionLoader.class).ranked(1);
+            bind(icebergViewDispatcher).to(IcebergViewOperationDispatcher.class).ranked(1);
+            bind(icebergNamespaceDispatcher)
                 .to(IcebergNamespaceOperationDispatcher.class)
                 .ranked(1);
           }
@@ -159,8 +226,48 @@ public class RESTService implements GravitinoAuxiliaryService {
 
     Servlet servlet = new ServletContainer(config);
     server.addServlet(servlet, ICEBERG_SPEC);
-    server.addCustomFilters(ICEBERG_SPEC);
+    // Registered before HttpAuditFilter so audit events dispatched during this request carry the
+    // request's query parameters and remote address, exactly as on the main server.
+    ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
+    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
+    server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), ICEBERG_SPEC);
+    if (metricsEnabled) {
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
+      }
+    }
     server.addSystemFilters(ICEBERG_SPEC);
+
+    // Root-level aliases for health checks to improve compatibility with various monitoring
+    // systems that expect a /health endpoint.
+    // HealthAliasServlet forwards every request into /iceberg/health*, which ICEBERG_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
+    server.addServlet(new HealthAliasServlet("/iceberg"), "/health/*");
+    server.addServlet(new HealthAliasServlet("/iceberg"), "/health.html");
+
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          ICEBERG_SPEC,
+          JettyServer.METRICS_PATH_SPECS.get(0),
+          JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(ICEBERG_SPEC);
+    }
+  }
+
+  static IcebergReadRestrictionLoader loadReadRestrictionLoader(boolean enableAuthorization) {
+    IcebergReadRestrictionLoader loader = IcebergReadRestrictionLoader.load();
+    if (loader.enabled() && !enableAuthorization) {
+      throw new IllegalStateException(
+          "Iceberg read restrictions require authorization; set gravitino.authorization.enable=true");
+    }
+    return loader;
+  }
+
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, IcebergConfig icebergConfig) {
+    return !auxiliaryMode && icebergConfig.get(IcebergConfig.METRICS_ENABLED);
   }
 
   @Override
@@ -171,6 +278,11 @@ public class RESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     this.auxMode = auxMode;
+    CodeSource icebergCodeSource = IcebergBuild.class.getProtectionDomain().getCodeSource();
+    LOG.info(
+        "Iceberg REST service runtime: {}, loaded from {}",
+        IcebergBuild.fullVersion(),
+        icebergCodeSource == null ? "unknown" : icebergCodeSource.getLocation());
     IcebergConfig icebergConfig = new IcebergConfig(properties);
     initServer(icebergConfig);
     LOG.info("Iceberg REST service init. Running in {} mode", auxMode ? "auxiliary" : "standalone");
@@ -179,11 +291,15 @@ public class RESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceStart() {
     icebergMetricsManager.start();
+    cleanupManager.ifPresent(IcebergCleanupManager::start);
     if (server != null) {
       try {
         server.start();
         LOG.info("Iceberg REST service started");
       } catch (Exception e) {
+        // Stop the components we already started so they don't outlive a failed startup.
+        cleanupManager.ifPresent(IcebergCleanupManager::close);
+        icebergMetricsManager.close();
         throw new RuntimeException(e);
       }
     }
@@ -204,6 +320,7 @@ public class RESTService implements GravitinoAuxiliaryService {
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
     }
+    cleanupManager.ifPresent(IcebergCleanupManager::close);
   }
 
   public void join() {
@@ -216,5 +333,14 @@ public class RESTService implements GravitinoAuxiliaryService {
     List<String> packages = Lists.newArrayList(ICEBERG_REST_SPEC_PACKAGE);
     packages.addAll(icebergConfig.get(IcebergConfig.REST_API_EXTENSION_PACKAGES));
     return packages.toArray(new String[0]);
+  }
+
+  private static HttpAuditFilter createHttpAuditFilter(
+      EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        eventBus,
+        EventSource.GRAVITINO_ICEBERG_REST_SERVER,
+        new IcebergHealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 }

@@ -54,6 +54,15 @@ public class ErrorConstants {
   /** Error codes for drop an in use entity. */
   public static final int IN_USE_CODE = 1010;
 
+  /** Error codes for unauthorized access. */
+  public static final int UNAUTHORIZED_CODE = 1011;
+
+  /** Error codes for optimistic-lock conflicts. */
+  public static final int OPTIMISTIC_LOCK_CONFLICT_CODE = 1012;
+
+  /** Error codes for service unavailable. */
+  public static final int SERVICE_UNAVAILABLE_CODE = 1013;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

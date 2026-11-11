@@ -20,11 +20,17 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
+import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Many;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -52,6 +58,21 @@ public interface UserMetaMapper {
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
+  /** Returns and locks an active user by ID for the current transaction. */
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "selectUserMetaByIdForUpdate")
+  UserPO selectUserMetaByIdForUpdate(@Param("userId") Long userId);
+
+  /**
+   * Returns an active user by ID and holds its lock for the current transaction.
+   *
+   * <p>The lock is shared on MySQL/PostgreSQL and exclusive on H2.
+   *
+   * @return the active user, or null if it does not exist
+   */
+  @Nullable
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "selectUserMetaByIdForShare")
+  UserPO selectUserMetaByIdForShare(@Param("userId") Long userId);
+
   @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);
 
@@ -63,13 +84,30 @@ public interface UserMetaMapper {
       method = "listExtendedUserPOsByMetalakeId")
   List<ExtendedUserPO> listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "countUserMetasByMetalakeName")
+  Long countUserMetasByMetalakeName(@Param("metalakeName") String metalakeName);
+
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "listExtendedUserPOsByMetalakeNamePaginated")
+  List<ExtendedUserPO> listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit);
+
   @InsertProvider(
       type = UserMetaSQLProviderFactory.class,
       method = "insertUserMetaOnDuplicateKeyUpdate")
   void insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO);
 
+  /**
+   * Soft-deletes an active user only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "softDeleteUserMetaByUserId")
-  void softDeleteUserMetaByUserId(@Param("userId") Long userId);
+  Integer softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = UserMetaSQLProviderFactory.class,
@@ -88,4 +126,74 @@ public interface UserMetaMapper {
       method = "deleteUserMetasByLegacyTimeline")
   Integer deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "touchUserUpdatedAt")
+  void touchUserUpdatedAt(@Param("userId") long userId);
+
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "getUserUpdatedAt")
+  UserUpdatedAt getUserUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName);
+
+  /**
+   * Single-round-trip auth prefetch for the JCasbin authorize hot path. Returns every version
+   * sentinel the request needs:
+   *
+   * <ul>
+   *   <li>the request user's {@code user_meta} row,
+   *   <li>each requested group's {@code group_meta} row,
+   *   <li>the user's direct {@code user_role_rel} role ids (joined to {@code role_meta} for their
+   *       {@code updated_at}),
+   *   <li>the group-inherited {@code group_role_rel} role ids (also joined for versions).
+   * </ul>
+   *
+   * <p>Implementation is up to four {@code UNION ALL} branches that map 1:1 to {@link
+   * AuthPrefetchRow.Kind} values — see {@link AuthPrefetchRow}'s class-level Javadoc for the row
+   * shape and how its fields are interpreted per Kind. Consumers switch on {@code subjectType} and
+   * bucket each row into the matching collection.
+   *
+   * <p>Empty {@code groupNames} skips the {@code GROUP} and {@code GROUP_ROLE} branches so the
+   * query degrades to a 2-branch UNION ({@code USER} + {@code USER_ROLE}) for users without group
+   * membership.
+   *
+   * @param metalakeName the metalake the user and groups belong to
+   * @param userName the user to probe
+   * @param groupNames the group names to probe; may be empty (never null)
+   * @return polymorphic rows for the user, each present group, the user's direct roles, and each
+   *     group's inherited roles
+   */
+  @SelectProvider(type = UserMetaSQLProviderFactory.class, method = "batchGetAuthSubjectsForUser")
+  List<AuthPrefetchRow> batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames);
+  /**
+   * Reads a principal and its live role memberships from one statement snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param userName the principal name
+   * @return the principal snapshot, or null when it does not exist
+   */
+  @Nullable
+  @Results({
+    @Result(property = "userId", column = "userId", id = true),
+    @Result(property = "userName", column = "userName"),
+    @Result(property = "metalakeId", column = "metalakeId"),
+    @Result(property = "auditInfo", column = "auditInfo"),
+    @Result(property = "currentVersion", column = "currentVersion"),
+    @Result(property = "lastVersion", column = "lastVersion"),
+    @Result(property = "deletedAt", column = "deletedAt"),
+    @Result(
+        property = "rolePOs",
+        javaType = List.class,
+        many =
+            @Many(
+                resultMap =
+                    "org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.membershipRoleSnapshot",
+                columnPrefix = "role_"))
+  })
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserWithRolesByMetalakeIdAndName")
+  UserPO selectUserWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("userName") String userName);
 }

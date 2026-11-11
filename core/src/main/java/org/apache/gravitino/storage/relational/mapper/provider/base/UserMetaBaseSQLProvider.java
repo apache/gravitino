@@ -19,11 +19,15 @@
 
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_ROLE_RELATION_TABLE_NAME;
+import static org.apache.gravitino.storage.relational.mapper.GroupMetaMapper.GROUP_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -41,21 +45,40 @@ public class UserMetaBaseSQLProvider {
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId, user_name as userName,"
         + " metalake_id as metalakeId,"
-        + " audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active user by ID. */
+  public String selectUserMetaByIdForUpdate(@Param("userId") Long userId) {
+    return selectUserMetaById(userId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active user by ID and locks it for shared access. */
+  public String selectUserMetaByIdForShare(@Param("userId") Long userId) {
+    return selectUserMetaById(userId) + " LOCK IN SHARE MODE";
+  }
+
+  /** Returns SQL that selects an active user by ID. */
+  protected String selectUserMetaById(Long userId) {
+    return "SELECT user_id as userId, user_name as userName,"
+        + " metalake_id as metalakeId,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
+
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " (user_id, user_name, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
@@ -70,9 +93,8 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name,"
-        + " metalake_id, audit_info,"
-        + " current_version, last_version, deleted_at)"
+        + " (user_id, user_name, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
@@ -86,24 +108,28 @@ public class UserMetaBaseSQLProvider {
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
         + " audit_info = #{userMeta.auditInfo},"
-        + " current_version = #{userMeta.currentVersion},"
-        + " last_version = #{userMeta.lastVersion},"
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
-  public String softDeleteUserMetaByUserId(@Param("userId") Long userId) {
+  public String softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -118,11 +144,7 @@ public class UserMetaBaseSQLProvider {
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
         + " WHERE user_id = #{oldUserMeta.userId}"
-        + " AND user_name = #{oldUserMeta.userName}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -181,10 +203,214 @@ public class UserMetaBaseSQLProvider {
         + " GROUP BY ut.user_id";
   }
 
+  public String countUserMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return "SELECT COUNT(*) FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT ut.user_id FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY ut.user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + USER_TABLE_NAME
+        + " ut ON ut.user_id = paginated.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY ut.user_id"
+        + " ORDER BY ut.user_id ASC";
+  }
+
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
         + USER_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  public String touchUserUpdatedAt(@Param("userId") long userId) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE user_id = #{userId} AND deleted_at = 0";
+  }
+
+  public String getUserUpdatedAt(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return "SELECT um.user_id as userId, um.updated_at as updatedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " um"
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+        + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+        + " AND um.deleted_at = 0";
+  }
+
+  /**
+   * Builds the single-round-trip auth prefetch query for {@code (metalake, userName, groupNames)}.
+   *
+   * <p>The SQL is up to four {@code UNION ALL} branches that map 1:1 to the four {@code
+   * org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow.Kind} values:
+   *
+   * <ul>
+   *   <li>{@code 'USER'} branch — the request user's {@code user_meta} row.
+   *   <li>{@code 'USER_ROLE'} branch — roles bound directly to the request user via {@code
+   *       user_role_rel}; {@code parentId} carries the owning {@code user_id}.
+   *   <li>{@code 'GROUP'} branch — the request user's groups (one row per name in {@code
+   *       groupNames}).
+   *   <li>{@code 'GROUP_ROLE'} branch — roles inherited via group membership through {@code
+   *       group_role_rel}; {@code parentId} carries the owning {@code group_id}.
+   * </ul>
+   *
+   * <p>The {@code GROUP} / {@code GROUP_ROLE} branches are appended only when {@code groupNames} is
+   * non-empty, leaving a 2-branch query in the no-group case.
+   *
+   * <p>All branches must SELECT the same column list and aliases ({@code subjectType}, {@code
+   * entityId}, {@code entityName}, {@code updatedAt}, {@code bindingOwnerId}) because {@code UNION
+   * ALL} requires a uniform row shape. The aliases match {@code AuthPrefetchRow}'s field names so
+   * MyBatis can reflectively map each row.
+   *
+   * @param metalakeName the metalake the user belongs to
+   * @param userName the request user's name
+   * @param groupNames the user's group memberships; may be empty
+   * @return the SQL string
+   */
+  public String batchGetAuthSubjectsForUser(
+      @Param("metalakeName") String metalakeName,
+      @Param("userName") String userName,
+      @Param("groupNames") List<String> groupNames) {
+    // 'USER' branch → AuthPrefetchRow.Kind.USER.
+    String userBranch =
+        "SELECT 'USER' AS subjectType, um.user_id AS entityId, um.user_name AS entityName,"
+            + " um.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm ON um.metalake_id = mm.metalake_id AND mm.deleted_at = 0"
+            + " WHERE mm.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    // 'USER_ROLE' branch → AuthPrefetchRow.Kind.USER_ROLE.
+    // bindingOwnerId carries the owning user_id so consumers can bucket roles back to that user.
+    String userRoleBranch =
+        " UNION ALL "
+            + "SELECT 'USER_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, ur.user_id AS bindingOwnerId"
+            + " FROM "
+            + USER_TABLE_NAME
+            + " um"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm3 ON um.metalake_id = mm3.metalake_id AND mm3.deleted_at = 0"
+            + " JOIN "
+            + USER_ROLE_RELATION_TABLE_NAME
+            + " ur ON ur.user_id = um.user_id AND ur.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = ur.role_id AND rm.deleted_at = 0"
+            + " WHERE mm3.metalake_name = #{metalakeName} AND um.user_name = #{userName}"
+            + " AND um.deleted_at = 0";
+
+    if (groupNames == null || groupNames.isEmpty()) {
+      // No group memberships → 2-branch query (USER + USER_ROLE only).
+      return "<script>" + userBranch + userRoleBranch + "</script>";
+    }
+
+    // 'GROUP' branch → AuthPrefetchRow.Kind.GROUP.
+    String groupBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP' AS subjectType, gm.group_id AS entityId, gm.group_name AS entityName,"
+            + " gm.updated_at AS updatedAt, NULL AS bindingOwnerId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm2 ON gm.metalake_id = mm2.metalake_id AND mm2.deleted_at = 0"
+            + " WHERE mm2.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g' collection='groupNames' open='(' separator=',' close=')'>#{g}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    // 'GROUP_ROLE' branch → AuthPrefetchRow.Kind.GROUP_ROLE.
+    // bindingOwnerId carries the owning group_id so consumers can bucket roles by group.
+    String groupRoleBranch =
+        " UNION ALL "
+            + "SELECT 'GROUP_ROLE' AS subjectType, rm.role_id AS entityId, rm.role_name AS entityName,"
+            + " rm.updated_at AS updatedAt, gr.group_id AS bindingOwnerId"
+            + " FROM "
+            + GROUP_TABLE_NAME
+            + " gm"
+            + " JOIN "
+            + MetalakeMetaMapper.TABLE_NAME
+            + " mm4 ON gm.metalake_id = mm4.metalake_id AND mm4.deleted_at = 0"
+            + " JOIN "
+            + GROUP_ROLE_RELATION_TABLE_NAME
+            + " gr ON gr.group_id = gm.group_id AND gr.deleted_at = 0"
+            + " JOIN "
+            + ROLE_TABLE_NAME
+            + " rm ON rm.role_id = gr.role_id AND rm.deleted_at = 0"
+            + " WHERE mm4.metalake_name = #{metalakeName}"
+            + " AND gm.group_name IN"
+            + " <foreach item='g2' collection='groupNames' open='(' separator=',' close=')'>#{g2}</foreach>"
+            + " AND gm.deleted_at = 0";
+
+    return "<script>" + userBranch + userRoleBranch + groupBranch + groupRoleBranch + "</script>";
+  }
+  /**
+   * Returns a single-statement principal and membership snapshot.
+   *
+   * @param metalakeId the metalake ID
+   * @param userName the principal name
+   * @return the aggregate select SQL
+   */
+  public String selectUserWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
+    return "SELECT p.*, r.role_id AS role_roleId, r.role_name AS role_roleName,"
+        + " r.metalake_id AS role_metalakeId, r.properties AS role_properties,"
+        + " r.audit_info AS role_auditInfo, r.current_version AS role_currentVersion,"
+        + " r.last_version AS role_lastVersion, r.deleted_at AS role_deletedAt FROM ("
+        + selectUserMetaByMetalakeIdAndName(metalakeId, userName)
+        + ") p LEFT JOIN "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " rel"
+        + " ON rel.user_id = p.userId AND rel.deleted_at = 0 LEFT JOIN "
+        + ROLE_TABLE_NAME
+        + " r ON r.role_id = rel.role_id AND r.deleted_at = 0";
   }
 }

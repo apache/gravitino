@@ -21,16 +21,98 @@ from contextlib import asynccontextmanager
 from typing import AsyncIterator
 from urllib.parse import urlparse
 
+import mcp.types as mt
 from fastmcp import FastMCP
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import (
     LoggingMiddleware,
 )
+from fastmcp.server.middleware.middleware import (
+    CallNext,
+    Middleware,
+    MiddlewareContext,
+)
 from fastmcp.server.middleware.timing import TimingMiddleware
+from fastmcp.tools.base import ToolResult
 
-from mcp_server.core.context import GravitinoContext
+from mcp_server.core import audit
+from mcp_server.core.context import (
+    METALAKE_ARGUMENT,
+    GravitinoContext,
+    _get_request_authorization,
+    get_request_metalake,
+    service_fallback_authorization,
+)
+from mcp_server.core.middleware import (
+    TOOLS_WITHOUT_METALAKE,
+    MetalakeArgumentMiddleware,
+)
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
+
+
+def _get_principal_from_request(fallback_authorization: str = "") -> str:
+    """Derive a display principal for audit attribution.
+
+    Uses the incoming HTTP request's Authorization header when present;
+    otherwise falls back to the service identity (``--token`` or OAuth
+    client-credentials), which is what actually authenticates the call in
+    stdio mode or in HTTP requests that carry no Authorization header.
+    Returns "anonymous" when neither is set.
+    """
+    authorization = _get_request_authorization() or fallback_authorization
+    # pylint: disable=protected-access
+    return audit._extract_principal(authorization)
+
+
+class AuditMiddleware(Middleware):
+    """Emit a structured audit record for every tool invocation."""
+
+    def __init__(
+        self, fallback_authorization: str = "", default_metalake: str = ""
+    ):
+        super().__init__()
+        self._fallback_authorization = fallback_authorization
+        self._default_metalake = default_metalake
+
+    def _metalake(self, tool_name: str) -> str:
+        """The metalake the call actually used, named or defaulted.
+
+        Recording the resolved value keeps each record self-contained: an
+        auditor can tell which tenant was touched without joining against the
+        server's startup configuration. Tools that are not metalake-scoped
+        record nothing rather than the default, which they never touch - a
+        metalake listing spans every tenant the caller can see.
+        """
+        if tool_name in TOOLS_WITHOUT_METALAKE:
+            return ""
+        return get_request_metalake() or self._default_metalake
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        tool_name = context.message.name if context.message else "unknown"
+        principal = _get_principal_from_request(self._fallback_authorization)
+        try:
+            result = await call_next(context)
+            audit.emit(
+                principal=principal,
+                tool=tool_name,
+                outcome="allow",
+                metalake=self._metalake(tool_name),
+            )
+            return result
+        except Exception as exc:
+            audit.emit(
+                principal=principal,
+                tool=tool_name,
+                outcome="deny",
+                error_type=type(exc).__name__,
+                metalake=self._metalake(tool_name),
+            )
+            raise
 
 
 def _create_lifespan_manager(gravitino_context: GravitinoContext):
@@ -44,22 +126,25 @@ def _create_lifespan_manager(gravitino_context: GravitinoContext):
 
 
 def _create_gravitino_mcp(setting: Setting) -> FastMCP:
-    if setting.tags is not None and len(setting.tags) > 0:
-        mcp = FastMCP(
-            "Gravitino MCP Server",
-            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
-            include_tags=setting.tags,
-        )
-    else:
-        mcp = FastMCP(
-            "Gravitino MCP Server",
-            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
-        )
+    mcp = FastMCP(
+        "Gravitino MCP Server",
+        lifespan=_create_lifespan_manager(GravitinoContext(setting)),
+    )
+    if setting.tags:
+        # Allowlist mode: disable everything, then re-enable the wanted tags.
+        mcp.enable(tags=setting.tags, only=True)
 
+    # Added first so it wraps the others: it must publish the call's metalake
+    # before AuditMiddleware records it.
+    mcp.add_middleware(MetalakeArgumentMiddleware())
+    mcp.add_middleware(
+        AuditMiddleware(
+            service_fallback_authorization(setting), setting.metalake
+        )
+    )
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
-
     mcp.add_middleware(TimingMiddleware())
     mcp.add_middleware(
         ErrorHandlingMiddleware(
@@ -70,17 +155,75 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
-def _parse_mcp_url(url: str) -> ():
+def log_service_identity_fallback_policy(setting: Setting) -> None:
+    """Log how HTTP requests without Authorization are handled at startup."""
+    if setting.transport == "stdio":
+        if setting.no_service_identity_fallback:
+            logging.info(
+                "--no-service-identity-fallback is ignored for stdio transport"
+            )
+        return
+    if not setting.has_service_identity():
+        return
+    if setting.no_service_identity_fallback:
+        logging.info(
+            "HTTP requests without an Authorization header will be "
+            "rejected (--no-service-identity-fallback)"
+        )
+        return
+    if setting.token.strip():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "configured --token service identity. Do not expose this "
+            "endpoint to untrusted callers."
+        )
+        return
+    if setting.has_oauth_client():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "OAuth client-credentials service identity (%s). Do not expose "
+            "this endpoint to untrusted callers.",
+            setting.oauth_client_id.strip(),
+        )
+
+
+def log_metalake_policy(setting: Setting) -> None:
+    """Log how the metalake is resolved for tool calls at startup."""
+    if setting.metalake:
+        logging.info(
+            "Default metalake '%s' configured; a tool call may override it "
+            "with the '%s' argument.",
+            setting.metalake,
+            METALAKE_ARGUMENT,
+        )
+        return
+    logging.info(
+        "No default --metalake configured; every tool call must name one "
+        "with the '%s' argument%s.",
+        METALAKE_ARGUMENT,
+        (
+            " (see the 'list_metalakes' tool)"
+            if setting.exposes_metalake_discovery()
+            else ", and --include-tool-tags hides the 'list_metalakes' tool "
+            "that would let an agent discover them"
+        ),
+    )
+
+
+def _parse_mcp_url(url: str) -> tuple[str, int, str]:
     try:
         parsed = urlparse(url)
-        if parsed.scheme.lower() != "http":
-            raise ValueError(f"Not support: {parsed.scheme}，only support HTTP")
+        scheme = parsed.scheme.lower()
+        if scheme not in ("http", "https"):
+            raise ValueError(
+                f"Not supported: {parsed.scheme}, only http/https are supported"
+            )
 
         host = parsed.hostname or "0.0.0.0"
 
         port = parsed.port
         if port is None:
-            port = 80
+            port = 443 if scheme == "https" else 80
 
         path = parsed.path
         if not path.startswith("/"):
@@ -109,8 +252,55 @@ class GravitinoMCPServer:
 
     def _run_http(self):
         _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
-        asyncio.run(
-            self.mcp.run_async(
-                transport="http", host=_host, port=_port, path=_path
-            )
+        self._validate_tls_config()
+        # FastMCP accepts "http" and "streamable-http" as equivalent aliases.
+        transport = (
+            "streamable-http"
+            if self.setting.transport == "streamable-http"
+            else "http"
         )
+
+        run_kwargs = {
+            "transport": transport,
+            "host": _host,
+            "port": _port,
+            "path": _path,
+        }
+
+        # Serve over TLS when both certificate and key are provided. FastMCP
+        # forwards uvicorn_config to the underlying uvicorn server.
+        if self.setting.tls_cert and self.setting.tls_key:
+            run_kwargs["uvicorn_config"] = {
+                "ssl_certfile": self.setting.tls_cert,
+                "ssl_keyfile": self.setting.tls_key,
+            }
+            logging.info(
+                "Serving MCP endpoint over TLS (cert=%s)", self.setting.tls_cert
+            )
+
+        asyncio.run(self.mcp.run_async(**run_kwargs))
+
+    def _validate_tls_config(self):
+        """Reject inconsistent TLS configuration before starting the server.
+
+        Guards against serving plain HTTP on an ``https://`` URL (or TLS behind
+        an ``http://`` URL), and against providing only one of cert/key.
+        """
+        cert, key = self.setting.tls_cert, self.setting.tls_key
+        if bool(cert) != bool(key):
+            raise ValueError(
+                "Both --tls-cert and --tls-key must be provided together "
+                "(or neither)."
+            )
+        scheme = urlparse(self.setting.mcp_url).scheme.lower()
+        tls_enabled = bool(cert and key)
+        if scheme == "https" and not tls_enabled:
+            raise ValueError(
+                f"mcp_url '{self.setting.mcp_url}' uses https but TLS is not "
+                "configured; provide --tls-cert and --tls-key."
+            )
+        if scheme == "http" and tls_enabled:
+            raise ValueError(
+                "--tls-cert/--tls-key are set but mcp_url "
+                f"'{self.setting.mcp_url}' uses http; use an https URL."
+            )

@@ -24,19 +24,43 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.io.Closeable;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.AzureAccountKeyCredential;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.GCSTokenCredential;
+import org.apache.gravitino.credential.OSSSecretKeyCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.IsolatedClassLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +95,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private CatalogEntity entity;
 
   private Map<String, String> conf;
+
+  private SecretManager secretManager;
 
   private volatile CatalogOperations ops;
 
@@ -196,6 +222,97 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return ops;
   }
 
+  /**
+   * Validates the initialized configuration without contacting the catalog backend.
+   *
+   * @throws IllegalArgumentException if the configuration is invalid
+   */
+  public final void validateConfiguration() {
+    validateConfiguration(conf);
+  }
+
+  /**
+   * Validates the complete proposed catalog configuration without contacting its backend.
+   *
+   * <p>Called on explicit create and alter operations, independently of optional backend
+   * verification, with the catalog ClassLoader installed. The configuration may differ from the
+   * current entity on alter. Implementations must not mutate it, initialize operations, open
+   * connections, or retain resources. The default accepts the configuration for compatibility.
+   * Existing catalogs are not validated on ordinary reads.
+   *
+   * @param configuration the complete effective configuration, with secret references resolved
+   * @throws IllegalArgumentException if the configuration is invalid
+   */
+  public void validateConfiguration(Map<String, String> configuration) {}
+
+  /**
+   * Whether to validate this catalog against its backend at create time rather than on first use.
+   *
+   * @return {@code true} to validate at create; {@code false} (default) to defer
+   */
+  public boolean shouldValidateOnCreate() {
+    return false;
+  }
+
+  /**
+   * Validates this catalog at create time when {@link #shouldValidateOnCreate()} returns true. The
+   * default eagerly initializes {@link #ops()}, which preserves the current behavior for every
+   * existing opt-in (for example Iceberg REST, which only needs eager initialization). Subclasses
+   * that can cheaply probe their backend — such as JDBC — override this to run a real connection
+   * check and throw a connection-failed error when the backend is unreachable.
+   *
+   * <p>This is {@code public} rather than {@code protected} because {@code CatalogManager}, in a
+   * different package, invokes it on the create-time validation path (mirroring {@link #ops()} and
+   * {@link #shouldValidateOnCreate()}).
+   */
+  public void validateOnCreate() {
+    ops();
+  }
+
+  /**
+   * Whether this catalog provides path-based credential contexts, which token credential providers
+   * such as {@code s3-token} require to vend credentials.
+   *
+   * <p>A catalog that cannot provide path-based contexts, neither through operations implementing
+   * {@link SupportsPathBasedCredentials} nor through another server such as the Iceberg REST
+   * server, should override this method to return {@code false}, so that creating or altering it
+   * with a token provider fails.
+   *
+   * @return {@code true} (default) if path-based credentials are supported; {@code false} otherwise
+   */
+  public boolean supportsPathBasedCredentials() {
+    return true;
+  }
+
+  /**
+   * Validates that the credential providers set in {@code properties} can vend credentials for this
+   * catalog. Token providers listed in {@link CredentialUtils#PATH_BASED_CREDENTIAL_TYPES} are
+   * rejected when {@link #supportsPathBasedCredentials()} returns {@code false}.
+   *
+   * @param properties the catalog properties to validate, may be null
+   * @throws IllegalArgumentException if a credential provider cannot be vended by this catalog
+   */
+  public void validateCredentialProviders(@Nullable Map<String, String> properties) {
+    if (properties == null || supportsPathBasedCredentials()) {
+      return;
+    }
+    List<String> unsupportedProviders =
+        CredentialUtils.getCredentialProvidersByOrder(() -> properties).stream()
+            // Provider lookup ignores case, so match the type names case-insensitively too.
+            .filter(
+                p ->
+                    CredentialUtils.PATH_BASED_CREDENTIAL_TYPES.contains(
+                        p.toLowerCase(Locale.ROOT)))
+            .sorted()
+            .collect(Collectors.toList());
+    Preconditions.checkArgument(
+        unsupportedProviders.isEmpty(),
+        "Credential providers %s are not supported by catalog provider %s, it cannot vend"
+            + " path-based credentials",
+        unsupportedProviders,
+        provider());
+  }
+
   public void checkMetalakeAndCatalogInUse() {
     Map<String, String> catalogProperties = entity.getProperties();
     if (catalogProperties == null) {
@@ -239,23 +356,35 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return Boolean.parseBoolean(catalogInUseStr);
   }
 
-  private boolean isInvokedBy(String methodName) {
-    return StackWalker.getInstance()
-        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
-  }
-
+  /**
+   * Returns the authorization plugin configured for this catalog.
+   *
+   * <p>A configured provider without a plugin means the catalog's authorization lifecycle is
+   * incomplete. Silently treating that state as authorization being disabled could leave stale
+   * grants in the external authorization system.
+   *
+   * @return the authorization plugin, or null if no authorization provider is configured
+   * @throws AuthorizationPluginException if a configured authorization plugin is unavailable
+   */
+  @Nullable
   public AuthorizationPlugin getAuthorizationPlugin() {
-    if (authorizationPlugin == null) {
-      synchronized (this) {
-        if (authorizationPlugin == null) {
-          return null;
-        }
-      }
+    AuthorizationPlugin plugin = authorizationPlugin;
+    if (plugin == null && isAuthorizationProviderConfigured()) {
+      throw new AuthorizationPluginException(
+          "The authorization plugin of catalog %s is unavailable although an authorization "
+              + "provider is configured",
+          name());
     }
-    return authorizationPlugin;
+    return plugin;
   }
 
-  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
+  /**
+   * Initializes the authorization plugin for this catalog.
+   *
+   * @param classLoader the catalog isolated class loader
+   * @param metalakeId the stable entity ID of the metalake containing this catalog
+   */
+  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader, long metalakeId) {
     if (authorizationPlugin == null) {
       synchronized (this) {
         if (authorizationPlugin == null) {
@@ -265,16 +394,19 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             LOG.info("Authorization provider is not set!");
             return;
           }
-
           // use try-with-resources to auto-close authorization object if exit with exception
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
+
+            Map<String, String> authorizationConfig = Maps.newHashMap(conf);
+            authorizationConfig.put(BaseAuthorization.METALAKE_ID, String.valueOf(metalakeId));
+            authorizationConfig.put(BaseAuthorization.CATALOG_ID, String.valueOf(entity().id()));
 
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
+                            entity.namespace().level(0), provider(), authorizationConfig));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
@@ -341,11 +473,22 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (catalogCredentialManager == null) {
       synchronized (this) {
         if (catalogCredentialManager == null) {
-          this.catalogCredentialManager = new CatalogCredentialManager(name(), properties());
+          this.catalogCredentialManager =
+              new CatalogCredentialManager(name(), propertiesWithCredentialProviders());
         }
       }
     }
     return catalogCredentialManager;
+  }
+
+  private boolean isInvokedBy(String methodName) {
+    return StackWalker.getInstance()
+        .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
+  }
+
+  private boolean isAuthorizationProviderConfigured() {
+    return conf != null
+        && catalogPropertiesMetadata().getOrDefault(conf, AUTHORIZATION_PROVIDER) != null;
   }
 
   private CatalogOperations createOps(Map<String, String> conf) {
@@ -392,6 +535,17 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Sets the {@link SecretManager} used to resolve secret URNs for this catalog.
+   *
+   * @param secretManager The SecretManager instance; may be null when secrets are not configured.
+   * @return The instance of the concrete subclass of BaseCatalog.
+   */
+  public T withSecretManager(SecretManager secretManager) {
+    this.secretManager = secretManager;
+    return (T) this;
+  }
+
+  /**
    * Retrieves the CatalogEntity associated with this catalog.
    *
    * @return The CatalogEntity instance.
@@ -429,20 +583,187 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (properties == null) {
       synchronized (this) {
         if (properties == null) {
-          Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
-          Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
-          tempProperties
-              .entrySet()
-              .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+          Map<String, String> tempProperties =
+              HiddenPropertyMaskUtils.maskHiddenProperties(
+                  entity.getProperties(), catalogPropertiesMetadata());
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());
+          // Expose the inferred provider names (never the credential values) so that clients
+          // make routing decisions from the same provider list the server vends credentials
+          // with. An explicitly configured list is returned as-is.
+          if (StringUtils.isBlank(tempProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+            String inferredProviders =
+                propertiesWithCredentialProviders().get(CredentialConstants.CREDENTIAL_PROVIDERS);
+            if (StringUtils.isNotBlank(inferredProviders)) {
+              tempProperties.put(CredentialConstants.CREDENTIAL_PROVIDERS, inferredProviders);
+            }
+          }
 
           properties = tempProperties;
         }
       }
     }
-    return properties;
+    if (!shouldBackfillCredential()) {
+      return properties;
+    }
+    // Escape hatch for legacy connectors: intentionally return plaintext credentials when
+    // gravitino.catalog.credential.backfillToProperties=true. Do not remask here.
+    Map<String, String> result = Maps.newHashMap(properties);
+    result.putAll(propertiesWithCredentialProviders());
+    return result;
+  }
+
+  /**
+   * Retrieves the properties of the catalog including credential providers. Detects storage and
+   * catalog-specific credential providers from the raw entity properties (including hidden ones)
+   * and injects them before {@link CatalogCredentialManager} is initialized. When a {@link
+   * SecretManager} is set, secret URN values are resolved to plaintext so credential vending can
+   * use them. Subclasses may override {@link #addCatalogSpecificCredentialProviders} to add
+   * additional providers.
+   *
+   * @return A map of properties with credential providers set.
+   */
+  public Map<String, String> propertiesWithCredentialProviders() {
+    // Entity storage keeps secret URNs; resolve to plaintext when SecretManager is available.
+    // toPlaintextOrMasked so a deleted/rotated secret does not block catalog load (disable, drop,
+    // list, re-bind). Unresolved secrets become the masked placeholder.
+    Map<String, String> props = Maps.newHashMap(entity().getProperties());
+    if (secretManager != null) {
+      props = Maps.newHashMap(secretManager.toPlaintextOrMasked(props));
+    }
+    if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      // Explicit credential-providers wins: do not auto-append detected static providers (e.g.
+      // s3-secret-key beside s3-token), which breaks path-based credential selection. Catalogs that
+      // must keep jdbc/aws/dlf listed call ensureCredentialProviderListed in their overrides.
+      return props;
+    }
+    List<String> credentialProviders = new ArrayList<>();
+    addCatalogSpecificCredentialProviders(props, credentialProviders);
+    if (!credentialProviders.isEmpty()) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, String.join(",", credentialProviders));
+    }
+    return props;
+  }
+
+  /**
+   * Detects credential providers for this catalog type and appends them to {@code
+   * credentialProviders}. The default implementation calls {@link
+   * #addStorageCredentialProviders(Map, List)} to detect S3/OSS/Azure/GCS/COS credentials.
+   * Subclasses override this to add catalog-specific providers (e.g., JDBC).
+   *
+   * @param properties the raw catalog properties
+   * @param credentialProviders the list to append detected provider names to
+   */
+  protected void addCatalogSpecificCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
+    addStorageCredentialProviders(properties, credentialProviders);
+  }
+
+  /**
+   * Appends {@code credentialType} to {@link CredentialConstants#CREDENTIAL_PROVIDERS} when it is
+   * not already listed. Used by subclasses that must keep catalog-specific providers (jdbc / aws /
+   * dlf) available even when the property was set explicitly (so {@link
+   * #addCatalogSpecificCredentialProviders} was skipped).
+   *
+   * @param props mutable catalog properties
+   * @param credentialType provider type name to ensure
+   */
+  protected static void ensureCredentialProviderListed(
+      Map<String, String> props, String credentialType) {
+    String providers = props.get(CredentialConstants.CREDENTIAL_PROVIDERS);
+    if (StringUtils.isBlank(providers)) {
+      props.put(CredentialConstants.CREDENTIAL_PROVIDERS, credentialType);
+      return;
+    }
+    for (String part : providers.split(",")) {
+      if (credentialType.equals(part.trim())) {
+        return;
+      }
+    }
+    props.put(CredentialConstants.CREDENTIAL_PROVIDERS, providers + "," + credentialType);
+  }
+
+  /**
+   * Returns whether hidden credentials should be backfilled into catalog properties for backward
+   * compatibility with connectors that do not support credential vending. Controlled by
+   * server-level config {@code gravitino.catalog.credential.backfillToProperties}.
+   *
+   * @return true if backfill is enabled
+   */
+  protected boolean shouldBackfillCredential() {
+    Config serverConfig = GravitinoEnv.getInstance().config();
+    return serverConfig != null
+        && Boolean.TRUE.equals(serverConfig.get(Configs.CATALOG_CREDENTIAL_BACKFILL_TO_PROPERTIES));
+  }
+
+  @Evolving
+  protected void addStorageCredentialProviders(
+      Map<String, String> properties, List<String> credentialProviders) {
+    String s3AccessKeyId = properties.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID);
+    String s3SecretAccessKey = properties.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+    if (StringUtils.isNotBlank(s3AccessKeyId) && StringUtils.isNotBlank(s3SecretAccessKey)) {
+      credentialProviders.add(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(s3AccessKeyId) || StringUtils.isNotBlank(s3SecretAccessKey)) {
+      LOG.warn(
+          "Incomplete S3 static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+          S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+          StringUtils.isBlank(s3AccessKeyId),
+          StringUtils.isBlank(s3SecretAccessKey));
+    }
+
+    String ossAccessKeyId = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID);
+    String ossSecretAccessKey = properties.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(ossAccessKeyId) && StringUtils.isNotBlank(ossSecretAccessKey)) {
+      credentialProviders.add(OSSSecretKeyCredential.OSS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(ossAccessKeyId)
+        || StringUtils.isNotBlank(ossSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete OSS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID,
+          OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(ossAccessKeyId),
+          StringUtils.isBlank(ossSecretAccessKey));
+    }
+
+    String azureAccountName = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME);
+    String azureAccountKey = properties.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY);
+    if (StringUtils.isNotBlank(azureAccountName) && StringUtils.isNotBlank(azureAccountKey)) {
+      credentialProviders.add(AzureAccountKeyCredential.AZURE_ACCOUNT_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(azureAccountName)
+        || StringUtils.isNotBlank(azureAccountKey)) {
+      LOG.warn(
+          "Incomplete Azure static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accountNameBlank={}, accountKeyBlank={}",
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+          AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+          StringUtils.isBlank(azureAccountName),
+          StringUtils.isBlank(azureAccountKey));
+    }
+
+    String gcsServiceAccountFile = properties.get(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE);
+    // gcs-token only vends credentials for path-based contexts.
+    if (StringUtils.isNotBlank(gcsServiceAccountFile) && supportsPathBasedCredentials()) {
+      credentialProviders.add(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE);
+    }
+
+    String cosAccessKeyId = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID);
+    String cosSecretAccessKey = properties.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET);
+    if (StringUtils.isNotBlank(cosAccessKeyId) && StringUtils.isNotBlank(cosSecretAccessKey)) {
+      credentialProviders.add(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE);
+    } else if (StringUtils.isNotBlank(cosAccessKeyId)
+        || StringUtils.isNotBlank(cosSecretAccessKey)) {
+      LOG.warn(
+          "Incomplete COS static credential pair: both {} and {} are required to recover via"
+              + " getCredentials; found accessKeyIdBlank={}, secretAccessKeyBlank={}",
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+          COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+          StringUtils.isBlank(cosAccessKeyId),
+          StringUtils.isBlank(cosSecretAccessKey));
+    }
   }
 
   @Override

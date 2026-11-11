@@ -123,6 +123,12 @@ public class GravitinoVirtualFileSystem extends FileSystem {
     return this.uri;
   }
 
+  /** Returns the GVFS scheme to avoid {@link UnsupportedOperationException} in commit jobs. */
+  @Override
+  public String getScheme() {
+    return GravitinoVirtualFileSystemConfiguration.GVFS_SCHEME;
+  }
+
   @Override
   public synchronized Path getWorkingDirectory() {
     return this.workingDirectory;

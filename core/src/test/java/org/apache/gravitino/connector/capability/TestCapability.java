@@ -25,6 +25,18 @@ import org.junit.jupiter.api.Test;
 public class TestCapability {
 
   @Test
+  void testExistingColumnReferencesPreserveDefaultRestrictions() {
+    Assertions.assertTrue(
+        Capability.DEFAULT
+            .specificationOnExistingName(Capability.Scope.COLUMN, "valid")
+            .supported());
+    Assertions.assertFalse(
+        Capability.DEFAULT
+            .specificationOnExistingName(Capability.Scope.COLUMN, "c`, DROP COLUMN victim -- ")
+            .supported());
+  }
+
+  @Test
   void testDefaultNameSpecification() {
     for (Capability.Scope scope : Capability.Scope.values()) {
       // test for normal name
@@ -92,6 +104,14 @@ public class TestCapability {
       result = Capability.DEFAULT.specificationOnName(scope, longName.toString());
       Assertions.assertFalse(result.supported());
       Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
+    }
+  }
+
+  @Test
+  void testDefaultNormalizeNameMatchesCaseSensitiveOnName() {
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      // The default capability is case-sensitive, so normalizeName must be a no-op.
+      Assertions.assertEquals("MixedCase", Capability.DEFAULT.normalizeName(scope, "MixedCase"));
     }
   }
 }
