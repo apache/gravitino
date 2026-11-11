@@ -19,6 +19,10 @@ registrations and a new active registration to retain the same external identifi
 Each external identifier can have only one active registration; importing it through another
 catalog or schema is rejected.
 
+Loading an externally renamed object no longer automatically moves a conflicting active
+registration. There is no per-object metadata-only unregister API; recovery here requires catalog
+re-registration as described below.
+
 Dropping a catalog clears owner, privilege, tag, and statistic associations for the catalog
 and its descendants. The upgrade also soft-deletes orphaned associations for retained schema,
 table, topic, and view IDs that have no active registration. Associations for IDs with an

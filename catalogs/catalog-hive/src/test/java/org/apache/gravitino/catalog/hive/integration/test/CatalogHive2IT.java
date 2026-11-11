@@ -1588,7 +1588,11 @@ public class CatalogHive2IT extends BaseIT {
       UnsupportedOperationException exception =
           assertThrows(
               UnsupportedOperationException.class, () -> loadColumn(newIdent, HIVE_COL_NAME1));
-      Assertions.assertTrue(exception.getMessage().contains("`gravitino.identifier`"));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not automatically reconcile external table renames"),
+          exception.getMessage());
       MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
       Assertions.assertEquals(1, objects.length);
       Assertions.assertEquals(

@@ -304,12 +304,14 @@ creation. External schema creation now checks the entity store before calling th
 registration lookup stops creation without issuing source DDL. Managed schema creation does not
 perform this additional lookup.
 A different source identifier does not prove that the old object was deleted: it may have been
-renamed. For an external rename that preserves the Gravitino identifier, load the new name first
-to move the registration before creating the old name again. If the old source identity was
-actually deleted, verify that fact before explicitly removing its stale registration. Conflicting
-registrations are never automatically cascade-deleted by an overwrite; children and governance
-metadata remain intact. A concurrent registration after the preflight can still cause a partial
-create failure, since source creation and the entity-store write are not one transaction.
+renamed. Loading the new name does not automatically move an existing registration or reconcile
+conflicting identities. Gravitino does not support metadata-only unregister of an individual
+external schema. Follow the catalog-specific recovery guidance before resetting a catalog;
+catalog re-registration clears all of its stored registrations and governance associations, which
+must be reapplied as described in the [migration guide](./migration-guide.md#external-catalog-re-registration).
+Conflicting registrations are never automatically cascade-deleted by an overwrite. A concurrent
+registration after the preflight can still cause a partial create failure, since source creation
+and the entity-store write are not one transaction.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
