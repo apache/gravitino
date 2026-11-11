@@ -40,24 +40,6 @@ public class TestPropertiesMetadata {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  void testTableLocationProviderPropertyIsImmutableWithDefault() {
-    PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
-
-    Assertions.assertTrue(
-        catalogPropertiesMetadata.containsProperty(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
-    Assertions.assertEquals(
-        DefaultTableLocationProvider.NAME,
-        catalogPropertiesMetadata.getOrDefault(
-            ImmutableMap.of(), GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
-    Assertions.assertTrue(
-        catalogPropertiesMetadata.isImmutableProperty(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
-  }
-
-  @Test
   void testExternalPurgePolicyDefaultsToDisabledAndCanBeChangedAtCatalogLevel() {
     PropertiesMetadata metadata = genericCatalog.catalogPropertiesMetadata();
     Assertions.assertTrue(metadata.containsProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
@@ -71,7 +53,6 @@ public class TestPropertiesMetadata {
   }
 
   @Test
->>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
   void testCatalogPropertiesMetadata() {
     PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
     Assertions.assertNotNull(catalogPropertiesMetadata);

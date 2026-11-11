@@ -26,6 +26,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -245,9 +246,7 @@ public class TestLanceTableOperations {
       throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "purge_policy");
     String location = tempDir.resolve("purge_policy").toString();
-    try (Dataset ignored =
-        lanceTableOps.createDataset(
-            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+    try (Dataset ignored = writeDataset(location)) {
       // Purge must preserve both a real dataset and its metadata when the policy rejects it.
     }
     Map<String, String> properties =
@@ -289,7 +288,7 @@ public class TestLanceTableOperations {
     NameIdentifier ident = NameIdentifier.of("schema", "protected_table");
     String location = tempDir.resolve("protected_table").toString();
     Column[] columns = {Column.of("id", Types.IntegerType.get())};
-    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+    try (Dataset ignored = writeDataset(location)) {
       // The existing external dataset is not owned by this overwrite request.
     }
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))

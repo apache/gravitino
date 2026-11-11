@@ -1240,13 +1240,8 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-<<<<<<< HEAD
   void testDropTableWhenLocationMissingOrNotCreated() {
-    catalog = createCatalog(CATALOG_NAME);
-=======
-  void testDropTableWhenLocationMissingOrNotCreated() throws IOException {
     catalog = createCatalog(CATALOG_NAME, true);
->>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
     createSchema();
 
     // Create table via register with non-existent location

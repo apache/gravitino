@@ -32,11 +32,7 @@ import java.util.List;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
->>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -58,6 +54,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.lance.Dataset;
+import org.lance.WriteParams;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DeclareTableRequest;
@@ -127,6 +124,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
     // Registered by the admin, so neither owner below owns the table itself.
+    createDataset(location(OWNED_SCHEMA_TABLE));
     assertStatus(
         200, register(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, null, location(OWNED_SCHEMA_TABLE)));
     assertStatus(
@@ -357,16 +355,12 @@ public class LanceTableAuthorizationIT extends BaseIT {
     // The denied requests left the table in place.
     assertStatus(200, table(ADMIN, VISIBLE_TABLE, "describe"));
 
-<<<<<<< HEAD
-    // Creating assigns ownership, so the creator may use either removal operation.
+    // Ownership permits deregistration. Physical deletion also requires catalog permission.
+    createDataset(location(DEREGISTER_TABLE));
+    createDataset(location(DROP_TABLE));
     assertStatus(
         200, register(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, null, location(DEREGISTER_TABLE)));
     assertStatus(200, register(PROBER, WRITE_SCHEMA, DROP_TABLE, null, location(DROP_TABLE)));
-=======
-    // Ownership permits deregistration. Physical deletion also requires catalog permission.
-    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE));
-    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DROP_TABLE));
->>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
     assertStatus(200, table(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, "deregister"));
     assertStatus(406, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
     assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "describe"));
@@ -425,7 +419,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     String alias = "purge_alias_" + operation;
     Path parent = tempDir.resolve("purge_parent_" + operation);
     Path victimLocation = parent.resolve("victim");
-    LanceDatasetTestUtils.createDataset(victimLocation.toString());
+    createDataset(victimLocation.toString());
     assertStatus(200, register(ADMIN, SCHEMA, victim, null, victimLocation.toString()));
     try {
       assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
@@ -525,6 +519,14 @@ public class LanceTableAuthorizationIT extends BaseIT {
       body.addIdItem(level);
     }
     assertStatus(200, send(ADMIN, "/v1/namespace/" + namespaceId + "/create", body));
+  }
+
+  private void createDataset(String location) {
+    Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    try (Dataset ignored =
+        Dataset.write().schema(schema).uri(location).mode(WriteParams.WriteMode.CREATE).execute()) {
+      // Seed real data so the purge regressions prove retention or deletion on storage.
+    }
   }
 
   private void registerTable(String tableName) throws Exception {

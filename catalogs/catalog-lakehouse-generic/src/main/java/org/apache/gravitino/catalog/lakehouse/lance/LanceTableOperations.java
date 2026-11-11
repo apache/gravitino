@@ -311,15 +311,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
-<<<<<<< HEAD
-=======
-    } catch (IllegalArgumentException | UnsupportedOperationException e) {
+    } catch (UnsupportedOperationException e) {
       throw e;
-    } catch (OptimisticLockException e) {
-      // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
-      // not changed, so the dataset is kept and the operation can be retried.
-      throw e;
->>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }
