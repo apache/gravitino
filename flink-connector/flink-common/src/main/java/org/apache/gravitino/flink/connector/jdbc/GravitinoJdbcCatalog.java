@@ -23,6 +23,11 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+<<<<<<< HEAD
+=======
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+>>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802))
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
 import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
@@ -47,7 +52,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   private final CatalogFactory.Context context;
   private AbstractCatalog jdbcCatalog;
   // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
-  // visible to toFlinkTable() and to the inner JdbcCatalogFactory context.
+  // visible to toFlinkTable(). The inner JdbcCatalogFactory context gets a filtered copy taken
+  // after the injection.
   private final Map<String, String> mutableOptions;
 
   protected GravitinoJdbcCatalog(
@@ -103,6 +109,28 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
       // In this case credentials are already present in the user-provided options.
     }
+<<<<<<< HEAD
+=======
+    if (configuredDefaultDatabase == null) {
+      return;
+    }
+    // The inner Flink JDBC catalog connects to its 'default-database' and rejects unknown options,
+    // so pass it the connection database instead when the converter tracks one separately.
+    Map<String, String> innerCatalogOptions = new HashMap<>(mutableOptions);
+    String connectionDatabase =
+        innerCatalogOptions.remove(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE);
+    if (connectionDatabase != null) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
+    }
+    // Flink JDBC 4.x takes "jdbc:dialect://host:port/" as a URL that already names a database and
+    // connects to it as is, so drop the trailing slash to have 'default-database' appended.
+    String baseUrl = innerCatalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL);
+    if (baseUrl != null && baseUrl.indexOf('?') < 0) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_URL, StringUtils.stripEnd(baseUrl.trim(), "/"));
+    }
+>>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802))
     CatalogFactory.Context contextWithCredentials =
         new CatalogFactory.Context() {
           @Override
@@ -112,7 +140,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
           @Override
           public Map<String, String> getOptions() {
-            return mutableOptions;
+            return innerCatalogOptions;
           }
 
           @Override

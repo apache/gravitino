@@ -19,7 +19,40 @@
 
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
+<<<<<<< HEAD:spark-connector/v3.4/spark/src/test/java/org/apache/gravitino/spark/connector/integration/test/iceberg/SparkIcebergCatalogRestRoutingIT34.java
 import org.junit.jupiter.api.condition.DisabledIf;
 
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public class SparkIcebergCatalogRestRoutingIT34 extends SparkIcebergCatalogRestRoutingIT {}
+=======
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink120;
+
+public class TestGravitinoJdbcCatalogFlink120 extends TestGravitinoJdbcCatalog {
+
+  @Override
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink120.INSTANCE;
+  }
+
+  @Override
+  protected GravitinoJdbcCatalog createNativeCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    return new GravitinoJdbcCatalogFlink120(
+        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter) {
+      @Override
+      protected Catalog catalog() {
+        throw new NoSuchCatalogException("Catalog %s does not exist", context.getName());
+      }
+    };
+  }
+}
+>>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802)):flink-connector/v1.20/flink/src/test/java/org/apache/gravitino/flink/connector/jdbc/TestGravitinoJdbcCatalogFlink120.java

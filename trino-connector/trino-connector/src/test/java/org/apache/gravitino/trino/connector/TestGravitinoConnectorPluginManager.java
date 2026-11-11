@@ -20,7 +20,17 @@ package org.apache.gravitino.trino.connector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+<<<<<<< HEAD:trino-connector/trino-connector/src/test/java/org/apache/gravitino/trino/connector/TestGravitinoConnectorPluginManager.java
 import org.junit.jupiter.api.Test;
+=======
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink21;
+>>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802)):flink-connector/v2.1/flink/src/test/java/org/apache/gravitino/flink/connector/jdbc/TestGravitinoJdbcCatalogFlink21.java
 
 class TestGravitinoConnectorPluginManager {
 
@@ -28,5 +38,20 @@ class TestGravitinoConnectorPluginManager {
   void testStarburstAiModelUsesApplicationClassLoader() {
     assertThat(GravitinoConnectorPluginManager.PARENT_FIRST_PACKAGES)
         .contains("io.starburst.ai.model.");
+  }
+
+  @Override
+  protected GravitinoJdbcCatalog createNativeCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    return new GravitinoJdbcCatalogFlink21(
+        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter) {
+      @Override
+      protected Catalog catalog() {
+        throw new NoSuchCatalogException("Catalog %s does not exist", context.getName());
+      }
+    };
   }
 }
