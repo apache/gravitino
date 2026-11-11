@@ -207,9 +207,6 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 ```
 
-<<<<<<< HEAD
-## Statistics tool parameters
-=======
 The server reads the certificate and key at startup, so restart it after rotating them.
 
 ### Connecting to Gravitino over HTTPS
@@ -228,8 +225,7 @@ SSL_CERT_FILE=/path/to/ca-bundle.crt uv run mcp_server --metalake test \
 - The bundle applies to every outbound HTTPS connection, including the `--oauth-token-endpoint` request.
 - If the certificate is not trusted, tool calls fail with `CERTIFICATE_VERIFY_FAILED`. Restart the server after replacing the bundle.
 
-## Selecting a metalake
->>>>>>> 8dc5c43bf ([#14871] improvement(mcp-server): Document private CA trust for HTTPS Gravitino and test both TLS hops (#14872))
+## Statistics tool parameters
 
 The statistic tools (`list_statistics_for_metadata`, `list_statistics_for_partition`) require `metalake_name` to identify the metalake.
 

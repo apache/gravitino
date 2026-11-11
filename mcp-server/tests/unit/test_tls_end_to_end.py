@@ -51,7 +51,7 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 )
 
 _PROJECT_DIR = Path(__file__).resolve().parents[2]
-_METALAKES = {"code": 0, "metalakes": [{"name": "lake_over_tls"}]}
+_CATALOGS = {"code": 0, "catalogs": [{"name": "catalog_over_tls"}]}
 
 
 def _free_port() -> int:
@@ -132,7 +132,7 @@ def _write_private_ca(directory: Path) -> tuple[Path, Path, Path]:
 
 class _GravitinoHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):  # pylint: disable=invalid-name
-        body = json.dumps(_METALAKES).encode()
+        body = json.dumps(_CATALOGS).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
@@ -184,30 +184,26 @@ class TestGravitinoOverTls(unittest.IsolatedAsyncioTestCase):
     def tearDownClass(cls):
         cls.tls.close()
 
-    async def _list_metalakes(self, trust: dict) -> str:
+    async def _list_catalogs(self, trust: dict) -> str:
         # httpx reads SSL_CERT_FILE when the client is created.
         with patch.dict(os.environ, trust):
             operation = PlainRESTClientOperation("lake", self.tls.gravitino_uri)
         try:
-            return (
-                await operation.as_metalake_operation().get_list_of_metalakes()
-            )
+            return await operation.as_catalog_operation().get_list_of_catalogs()
         finally:
             await operation.close()
 
     async def test_gravitino_signed_by_trusted_private_ca(self):
-        result = await self._list_metalakes(
+        result = await self._list_catalogs(
             {"SSL_CERT_FILE": str(self.tls.bundle), "SSL_CERT_DIR": ""}
         )
-        self.assertIn("lake_over_tls", result)
+        self.assertIn("catalog_over_tls", result)
 
     async def test_gravitino_signed_by_untrusted_private_ca(self):
         with self.assertRaisesRegex(
             httpx.ConnectError, "CERTIFICATE_VERIFY_FAILED"
         ):
-            await self._list_metalakes(
-                {"SSL_CERT_FILE": "", "SSL_CERT_DIR": ""}
-            )
+            await self._list_catalogs({"SSL_CERT_FILE": "", "SSL_CERT_DIR": ""})
 
 
 class TestMcpEndpointOverTls(unittest.TestCase):
