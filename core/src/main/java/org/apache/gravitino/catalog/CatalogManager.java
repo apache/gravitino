@@ -1358,7 +1358,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 LOG.warn("Failed to clean up resources for dropped catalog {}", ident, e);
               }
             }
-            catalogCache.invalidate(ident);
             return deleted;
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
@@ -1367,6 +1366,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
+          } finally {
+            // Discard the wrapper on every outcome. Operations initialized during the drop skip the
+            // catalog in-use check, so a refused or failed drop must not leave them cached for
+            // later calls on a disabled catalog.
+            catalogCache.invalidate(ident);
           }
         });
   }
