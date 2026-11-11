@@ -131,6 +131,11 @@ public class TestClickHouseColumnDefaultValueConverter {
         IllegalArgumentException.class,
         () -> CONVERTER.fromGravitino(Literals.of("", Types.IntegerType.get())));
     Assertions.assertEquals("1.0E10", CONVERTER.fromGravitino(Literals.doubleLiteral(1.0E10)));
+    Assertions.assertEquals(
+        "5", CONVERTER.fromGravitino(Literals.of("'5'", Types.IntegerType.get())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CONVERTER.fromGravitino(Literals.of("'1, x String'", Types.IntegerType.get())));
     Assertions.assertEquals("NaN", CONVERTER.fromGravitino(Literals.doubleLiteral(Double.NaN)));
     Assertions.assertEquals(
         "-Infinity", CONVERTER.fromGravitino(Literals.doubleLiteral(Double.NEGATIVE_INFINITY)));

@@ -104,6 +104,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         // Numeric values are written without quotes, so anything other than a number must be
         // rejected. ClickHouse also accepts NaN and infinity literals for floating-point columns.
         String value = literal.value().toString().trim();
+        // Drop caller-supplied quotes the same way checkDefaultValue does, then write the number.
+        if (value.length() >= 2 && value.startsWith("'") && value.endsWith("'")) {
+          value = value.substring(1, value.length() - 1).trim();
+        }
         return NON_FINITE_PATTERN.matcher(value).matches() ? value : validateNumericLiteral(value);
       } else {
         Object value = literal.value();
