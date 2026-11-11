@@ -78,6 +78,11 @@ import org.slf4j.LoggerFactory;
  * original name is A and when a new user B tries to call the clientPool() method, it will use the
  * connection that belongs to A. This will not work with kerberos authentication as it will change
  * the user name.
+ *
+ * <p>The shared cache expires each key after the configured idle interval and closes removed pools.
+ * There is no maximum cache size: expiry limits idle retention, but does not bound the number of
+ * active identities or pools created within an expiry interval. By default, fresh proxy UGIs and
+ * renewed delegation tokens for the same authentication identity reuse the same key.
  */
 public class IcebergHiveCachedClientPool
     implements ClientPool<IMetaStoreClient, TException>, Closeable {

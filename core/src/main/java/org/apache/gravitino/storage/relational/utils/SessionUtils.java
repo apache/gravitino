@@ -81,8 +81,11 @@ public class SessionUtils {
    * Performs a read after clearing the current session's local query cache.
    *
    * <p>Use at full-role authorization read boundaries so subsequent ID-to-name queries observe peer
-   * commits at READ_COMMITTED. This does not change JDBC isolation, session ownership, or the cache
-   * policy of other reads.
+   * commits at READ_COMMITTED. Clearing applies to all local query results in the shared session,
+   * including reads cached earlier by an enclosing write transaction. Previously cached reads may
+   * therefore execute again. The operation uses the same connection without committing or rolling
+   * back; uncommitted writes, JDBC isolation, and session ownership are preserved. Other reads
+   * continue to use the default session cache between fresh-read boundaries.
    *
    * @param mapperClazz the mapper class
    * @param func the read operation
