@@ -230,7 +230,8 @@ By default, ClickHouse rejects `FixedString(n)` with `n` greater than 256 unless
 Literal column default values are checked against the column type before the DDL is sent, because
 ClickHouse does not validate them when creating or altering a table. Integer defaults must be in the
 range of the type, `Decimal(p,s)` defaults must fit the precision, `Date` defaults must be between
-`1970-01-01` and `2149-06-06`, and `UUID` defaults must be valid UUID strings.
+`1970-01-01` and `2149-06-06`, `UUID` defaults must be valid UUID strings, and `Float`/`Double`
+defaults must be numbers. Default values of other types, such as `Timestamp`, are not checked.
 
 ### Table Properties
 

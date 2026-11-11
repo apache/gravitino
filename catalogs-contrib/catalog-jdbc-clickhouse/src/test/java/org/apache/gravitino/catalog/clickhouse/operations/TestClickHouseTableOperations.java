@@ -330,6 +330,40 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testNumericDefaultValueCannotInjectDdl() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_inject_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("v")
+          .withType(Types.StringType.get())
+          .withNullable(true)
+          .withDefaultValue(Literals.of("1, x String", Types.IntegerType.get()))
+          .build()
+    };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.create(
+                TEST_DB_NAME.toString(),
+                tableName,
+                columns,
+                null,
+                new HashMap<>(),
+                null,
+                Distributions.NONE,
+                null,
+                getSortOrders("id")));
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString()).contains(tableName));
+  }
+
+  @Test
   public void testAlterTable() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_al_table";
     String tableComment = "test_comment";

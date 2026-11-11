@@ -98,6 +98,11 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertAccepted(Types.ByteType.get(), "127.9");
     assertAccepted(Types.ByteType.unsigned(), "-0.5");
     assertAccepted(Types.UUIDType.get(), "61F0C404-5CB3-11E7-907B-A6006AD3DBA0");
+    assertAccepted(Types.DoubleType.get(), "1.5");
+    assertAccepted(Types.DoubleType.get(), "-1e10");
+    assertAccepted(Types.DoubleType.get(), "nan");
+    assertAccepted(Types.FloatType.get(), "-inf");
+    assertAccepted(Types.FloatType.get(), "'1.5'");
     // Callers may wrap the value in single quotes.
     assertAccepted(Types.DateType.get(), "'2024-01-01'");
     assertAccepted(Types.UUIDType.get(), "'61f0c404-5cb3-11e7-907b-a6006ad3dba0'");
@@ -115,6 +120,20 @@ public class TestClickHouseColumnDefaultValueConverter {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> CONVERTER.checkDefaultValue(Types.ByteType.get(), Literals.integerLiteral(128)));
+  }
+
+  @Test
+  void testNumericLiteralMustBeNumber() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CONVERTER.fromGravitino(Literals.of("1, x String", Types.IntegerType.get())));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> CONVERTER.fromGravitino(Literals.of("", Types.IntegerType.get())));
+    Assertions.assertEquals("1.0E10", CONVERTER.fromGravitino(Literals.doubleLiteral(1.0E10)));
+    Assertions.assertEquals("NaN", CONVERTER.fromGravitino(Literals.doubleLiteral(Double.NaN)));
+    Assertions.assertEquals(
+        "-Infinity", CONVERTER.fromGravitino(Literals.doubleLiteral(Double.NEGATIVE_INFINITY)));
   }
 
   @Test
@@ -157,6 +176,8 @@ public class TestClickHouseColumnDefaultValueConverter {
     assertRejected(Types.DateType.get(), "2150-01-01");
     assertRejected(Types.DateType.get(), "2024-13-01");
     assertRejected(Types.UUIDType.get(), "not-a-uuid");
+    assertRejected(Types.DoubleType.get(), "abc");
+    assertRejected(Types.FloatType.get(), "1, x String");
   }
 
   private static void assertAccepted(Type type, String value) {

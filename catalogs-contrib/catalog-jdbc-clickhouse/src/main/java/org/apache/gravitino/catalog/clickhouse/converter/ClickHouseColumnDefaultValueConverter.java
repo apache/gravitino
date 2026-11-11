@@ -49,6 +49,7 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
   // ClickHouse Date stores days since 1970-01-01 as UInt16, so its range is fixed.
   private static final LocalDate MIN_DATE = LocalDate.of(1970, 1, 1);
   private static final LocalDate MAX_DATE = LocalDate.of(2149, 6, 6);
+  private static final Pattern NON_FINITE_PATTERN = Pattern.compile("(?i)-?(nan|inf|infinity)");
   private static final Pattern UUID_PATTERN =
       Pattern.compile(
           "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
@@ -65,9 +66,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
    *       the precision.
    *   <li>Date: the value must be a {@code yyyy-MM-dd} date between 1970-01-01 and 2149-06-06.
    *   <li>UUID: the value must be a valid UUID string.
+   *   <li>Float and Double: the value must be a number, NaN or infinity. The range is not checked.
    * </ul>
    *
-   * <p>Other column types, and non-literal or NULL defaults, are not checked.
+   * <p>Other column types such as DateTime, and non-literal or NULL defaults, are not checked.
    *
    * @param columnType the Gravitino type of the column
    * @param defaultValue the default value of the column
@@ -99,7 +101,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
       if (defaultValue.equals(Literals.NULL)) {
         return NULL;
       } else if (type instanceof Type.NumericType) {
-        return literal.value().toString();
+        // Numeric values are written without quotes, so anything other than a number must be
+        // rejected. ClickHouse also accepts NaN and infinity literals for floating-point columns.
+        String value = literal.value().toString().trim();
+        return NON_FINITE_PATTERN.matcher(value).matches() ? value : validateNumericLiteral(value);
       } else {
         Object value = literal.value();
         Preconditions.checkArgument(
@@ -232,6 +237,10 @@ public class ClickHouseColumnDefaultValueConverter extends JdbcColumnDefaultValu
         checkIntegralRange(value, 32, integerType.signed(), columnType);
       } else if (columnType instanceof Types.LongType longType) {
         checkIntegralRange(value, 64, longType.signed(), columnType);
+      } else if (columnType instanceof Types.FloatType || columnType instanceof Types.DoubleType) {
+        if (!NON_FINITE_PATTERN.matcher(value).matches()) {
+          new BigDecimal(value);
+        }
       } else if (columnType instanceof Types.DecimalType decimalType) {
         // ClickHouse discards excess fractional digits, so the value fits as long as its integer
         // part has at most (precision - scale) digits.
