@@ -470,6 +470,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "cryptography" },
     { name = "parameterized" },
     { name = "pylint" },
     { name = "pytest" },
@@ -485,6 +486,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "cryptography", specifier = ">=46" },
     { name = "parameterized", specifier = ">=0.9.0" },
     { name = "pylint", specifier = ">=2.20.0" },
     { name = "pytest", specifier = ">=8.4.1" },
