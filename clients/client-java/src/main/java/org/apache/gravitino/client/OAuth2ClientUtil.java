@@ -118,9 +118,7 @@ class OAuth2ClientUtil {
       case CLIENT_SECRET_BASIC:
         return buildClientSecretBasicRequest(credentialPair, scopes);
       case CLIENT_SECRET_POST:
-        return Pair.of(
-            clientCredentialsRequest(credentialPair.getLeft(), credentialPair.getRight(), scopes),
-            ImmutableMap.of());
+        return buildClientCredentialRequest(credentialPair, scopes);
       default:
         throw new IllegalArgumentException(
             "Unsupported OAuth2 client authentication method: " + authenticationMethod);
@@ -160,17 +158,17 @@ class OAuth2ClientUtil {
     return Pair.of(formData, requestHeaders);
   }
 
-  private static Map<String, String> clientCredentialsRequest(
-      String clientId, String clientSecret, List<String> scopes) {
+  private static Pair<Map<String, String>, Map<String, String>> buildClientCredentialRequest(
+      Pair<String, String> credentialPair, List<String> scopes) {
     ImmutableMap.Builder<String, String> formData = ImmutableMap.builder();
     formData.put(GRANT_TYPE, CLIENT_CREDENTIALS);
-    if (clientId != null) {
-      formData.put(CLIENT_ID, clientId);
+    if (credentialPair.getLeft() != null) {
+      formData.put(CLIENT_ID, credentialPair.getLeft());
     }
-    formData.put(CLIENT_SECRET, clientSecret);
+    formData.put(CLIENT_SECRET, credentialPair.getRight());
     formData.put(SCOPE, toScope(scopes));
 
-    return formData.build();
+    return Pair.of(formData.build(), ImmutableMap.of());
   }
 
   /**
