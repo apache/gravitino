@@ -159,7 +159,8 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
   server walks up from B, level by level, under the hierarchy lock (see Locking). A term cannot be
   its own parent.
 - **Depth limit**: a `BROADER` chain has at most 20 levels. A new link that makes a chain longer
-  fails with 400. This bounds the cycle check and the hierarchy read.
+  fails with 400. This bounds the cycle check and the hierarchy read. 20 is a first estimate. The
+  performance test in Critical User Journeys sets the final value.
 - **No overlap**: two terms cannot be `RELATED` if one is an ancestor of the other. Adding such a
   `RELATED` link, or a `BROADER` link that creates such a pair, fails with 400. This follows the
   SKOS rule. The check uses the same walk as the cycle check.
@@ -745,6 +746,26 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
 
+## Critical User Journeys
+
+A critical user journey (CUJ) is a main path a user takes through the feature, from start to end.
+Each CUJ below becomes one end-to-end test. Step 1 ships only when all of them pass on H2, MySQL
+and PostgreSQL.
+
+| #   | Journey                             | Steps                                                                                                                         | Expected result                                                                                                      |
+| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| 1   | Define terms                        | An admin creates `Customer` in a domain. An analyst creates `Active Customer` with a synonym, a broader term, links and a tag | Both terms are `APPROVED` by default and visible to `VIEW_DEFINITION`; the hierarchy read shows the parent and child |
+| 2   | Link terms to data                  | Bind a term to a table, a column and a metric; then list the terms of each object                                             | Implemented by and Used by show the objects; each object lists the term                                              |
+| 3   | Agent lookup                        | Call `resolve_business_term` with a synonym, a name and an unknown word                                                       | The first two return the term and its data; the unknown word is in `unmatched`; `DRAFT` and `DEPRECATED` never show  |
+| 4   | Privileges                          | Users with only `VIEW_`, only `CREATE_` and with `MANAGE_DEFINITIONS` try to read and edit terms                              | `VIEW_` reads only; `CREATE_` edits only its own terms; `MANAGE_` edits any term; a hidden draft never shows         |
+| 5   | Status and delete                   | Set a term to `DRAFT`, back to `APPROVED`, then to `DEPRECATED`; try to delete it in each state                               | Who can see and delete it follows Status and versions; the revision grows on each change                             |
+| 6   | Bad relations                       | Add a link that makes a cycle, a chain longer than the limit, and a `RELATED` link between a term and its ancestor            | Each one fails with 400 and nothing changes; the same holds when two servers add the links at the same time          |
+| 7   | Cleanup                             | Drop a bound column and table, a domain that has terms, a term with children, and the metalake                                | Bindings go away with the object; the domain drop fails with 409; children keep other parents; all rows go away      |
+| 8   | Edit on one server, read on another | Edit, move or bind a term on one server, then read it on a second server                                                      | The second server returns the new data at once (nothing is cached)                                                   |
+
+A performance test also measures the cycle check and the hierarchy read for chains of 10, 20 and
+50 levels, with many parents per term. The result sets the final depth limit (20 for now).
+
 ## Task Breakdown
 
 These tasks build Step 1.
@@ -775,6 +796,11 @@ These tasks build Step 1.
 - [ ] Java and Python clients, including `matchTerms`
 - [ ] MCP `glossary` tools, with the agent rules in the tool descriptions and tests for unmatched and ambiguous words
 - [ ] OpenAPI spec (validated with `./gradlew :docs:build`) and user docs
+
+### Part 4: CUJ tests
+
+- [ ] End-to-end tests for CUJs 1–8 through the Java client, the REST API and MCP, on H2, MySQL and PostgreSQL (Docker); all must pass before Step 1 ships
+- [ ] Performance test for deep and wide hierarchies; set the final depth limit from the result
 
 ## Implementation Steps
 
