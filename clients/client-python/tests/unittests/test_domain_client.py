@@ -199,6 +199,21 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual(self.NAME, self.metalake.get_domain(self.NAME).name())
         self._request("GET", self.path + "/" + encode_string(self.NAME))
 
+    def test_list_responses_require_explicit_arrays(self):
+        for field, operation in (
+            ("names", self.metalake.list_domains),
+            ("domains", self.metalake.list_domains_info),
+            ("members", lambda: self._domain().list_members(DomainMemberFilter())),
+        ):
+            for payload in ({"code": 0}, {"code": 0, field: None}):
+                with self.subTest(field=field, payload=payload):
+                    self._respond(payload)
+                    with self.assertRaises(IllegalArgumentException):
+                        operation()
+            with self.subTest(field=field, value=[]):
+                self._respond({"code": 0, field: []})
+                self.assertEqual([], operation())
+
     def test_alter_domain_serializes_all_changes(self):
         self._respond({"code": 0, "domain": self._dto(name="renamed")})
         result = self.metalake.alter_domain(

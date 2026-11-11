@@ -30,7 +30,9 @@ from gravitino.utils.precondition import Precondition
 class DomainNamesListResponse(BaseResponse):
     """Visible domain names."""
 
-    _names: list[str] = field(default_factory=list, metadata=config(field_name="names"))
+    _names: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="names")
+    )
 
     def names(self) -> list[str]:
         return self._names
@@ -52,8 +54,8 @@ class DomainNamesListResponse(BaseResponse):
 class DomainListResponse(BaseResponse):
     """Visible domain snapshots."""
 
-    _domains: list[DomainDTO] = field(
-        default_factory=list, metadata=config(field_name="domains")
+    _domains: Optional[list[DomainDTO]] = field(
+        default=None, metadata=config(field_name="domains")
     )
 
     def domains(self) -> list[DomainDTO]:
@@ -93,8 +95,8 @@ class DomainResponse(BaseResponse):
 class DomainMemberListResponse(BaseResponse):
     """Accessible members and their relations."""
 
-    _members: list[DomainMemberDTO] = field(
-        default_factory=list, metadata=config(field_name="members")
+    _members: Optional[list[DomainMemberDTO]] = field(
+        default=None, metadata=config(field_name="members")
     )
 
     def members(self) -> list[DomainMemberDTO]:
