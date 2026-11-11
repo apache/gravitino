@@ -65,6 +65,11 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String STRUCT = "struct";
   static final String UNIONTYPE = "uniontype";
 
+  // Hive length limits, see
+  // https://cwiki.apache.org/confluence/display/hive/languagemanual+types#LanguageManualTypes-char
+  static final int MAX_CHAR_LENGTH = 255;
+  static final int MAX_VARCHAR_LENGTH = 65535;
+
   // Matches name(body): char(10), varchar(255), decimal(10,2)
   private static final Pattern PAREN_TYPE_PATTERN = Pattern.compile("(\\w+)\\(([^)]*)\\)");
   // Matches name<body>: array<string>, map<string,int>, struct<id:bigint>
@@ -221,10 +226,22 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.IntervalYearType) return INTERVAL_YEAR_MONTH;
     if (type instanceof Types.IntervalDayType) return INTERVAL_DAY_TIME;
     if (type instanceof Types.FixedCharType) {
-      return String.format("%s(%d)", CHAR, ((Types.FixedCharType) type).length());
+      int length = ((Types.FixedCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_CHAR_LENGTH,
+          "Glue/Hive char length must be in [1, %s], got %s",
+          MAX_CHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", CHAR, length);
     }
     if (type instanceof Types.VarCharType) {
-      return String.format("%s(%d)", VARCHAR, ((Types.VarCharType) type).length());
+      int length = ((Types.VarCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_VARCHAR_LENGTH,
+          "Glue/Hive varchar length must be in [1, %s], got %s",
+          MAX_VARCHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", VARCHAR, length);
     }
     if (type instanceof Types.DecimalType) {
       Types.DecimalType d = (Types.DecimalType) type;

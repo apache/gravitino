@@ -106,6 +106,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private static final Logger LOG = LoggerFactory.getLogger(GlueCatalogOperations.class);
 
+  // The Glue Column structure has no nullable field, so a Hive-format column cannot be NOT NULL.
+  // See https://docs.aws.amazon.com/glue/latest/webapi/API_Column.html
+  private static final String HIVE_NOT_NULL_UNSUPPORTED =
+      "AWS Glue Data Catalog does not support NOT NULL constraints on columns of Hive-format"
+          + " tables. Illegal column: %s";
+
   /**
    * Properties that identify the format of an Iceberg table, its metadata file and whether it was
    * registered; an alter cannot change them.
@@ -535,6 +541,9 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     validateColumns(columns);
     // Iceberg tables delegate partitioning and ordering to GlueIcebergTableHelper.
     if (!isIceberg) {
+      for (Column column : columns) {
+        Preconditions.checkArgument(column.nullable(), HIVE_NOT_NULL_UNSUPPORTED, column.name());
+      }
       validateHivePartitioning(columns, partitions);
       validateHiveDistribution(distribution);
       validateHiveSortOrders(sortOrders);
@@ -845,6 +854,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
         TableChange.AddColumn add = (TableChange.AddColumn) change;
         Preconditions.checkArgument(
             !add.isAutoIncrement(), "Glue does not support auto-increment columns: %s", name);
+        Preconditions.checkArgument(add.isNullable(), HIVE_NOT_NULL_UNSUPPORTED, name);
         Preconditions.checkArgument(
             indexOf(dataCols, name) < 0 && indexOf(partCols, name) < 0,
             "Column %s already exists",
@@ -909,6 +919,13 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       } else if (change instanceof TableChange.UpdateColumnType) {
         Type newType = ((TableChange.UpdateColumnType) change).getNewDataType();
         dataCols.set(index, old.toBuilder().type(toGlueType(name, newType)).build());
+      } else if (change instanceof TableChange.UpdateColumnNullability) {
+        Preconditions.checkArgument(
+            ((TableChange.UpdateColumnNullability) change).nullable(),
+            HIVE_NOT_NULL_UNSUPPORTED,
+            name);
+        // Every Hive-format column is nullable already.
+        return false;
       } else if (change instanceof TableChange.UpdateColumnPosition) {
         dataCols.remove(index);
         dataCols.add(

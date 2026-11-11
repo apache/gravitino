@@ -340,6 +340,104 @@ class AwsGlueCatalogIT extends AbstractGlueCatalogIT {
     }
   }
 
+  @Test
+  void testIcebergColumnNullability() {
+    String bucket = System.getenv("AWS_S3_TEST_BUCKET");
+    String schema = "glue_it_" + System.nanoTime();
+    NameIdentifier ident = NameIdentifier.of("ml", "cat", schema, "ice_nullability");
+    ops.createSchema(NameIdentifier.of("ml", "cat", schema), null, Collections.emptyMap());
+    Map<String, String> props = new HashMap<>();
+    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
+    props.put(GlueConstants.LOCATION, "s3://" + bucket + "/" + schema + "/ice_nullability");
+    try {
+      ops.createTable(
+          ident,
+          new Column[] {
+            Column.of("id", Types.LongType.get(), null, false, false, Column.DEFAULT_VALUE_NOT_SET),
+            Column.of("name", Types.StringType.get(), null)
+          },
+          null,
+          props,
+          new Transform[0],
+          Distributions.NONE,
+          new SortOrder[0],
+          new Index[0]);
+      assertFalse(ops.loadTable(ident).columns()[0].nullable());
+
+      ops.alterTable(ident, TableChange.updateColumnNullability(new String[] {"id"}, true));
+      assertTrue(ops.loadTable(ident).columns()[0].nullable());
+
+      // Iceberg refuses optional -> required as an incompatible change.
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ops.alterTable(
+                  ident, TableChange.updateColumnNullability(new String[] {"name"}, false)));
+    } finally {
+      ops.purgeTable(ident);
+      ops.dropSchema(NameIdentifier.of("ml", "cat", schema), true);
+    }
+  }
+
+  @Test
+  void testHiveColumnConstraints() {
+    String schema = "glue_it_" + System.nanoTime();
+    NameIdentifier ident = NameIdentifier.of("ml", "cat", schema, "hive_constraints");
+    ops.createSchema(NameIdentifier.of("ml", "cat", schema), null, Collections.emptyMap());
+    try {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> createHiveTable(ident, Column.of("c", Types.FixedCharType.of(256), null)));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              createHiveTable(
+                  ident,
+                  Column.of(
+                      "c",
+                      Types.LongType.get(),
+                      null,
+                      false,
+                      false,
+                      Column.DEFAULT_VALUE_NOT_SET)));
+
+      createHiveTable(
+          ident,
+          Column.of("c", Types.FixedCharType.of(255), null),
+          Column.of("v", Types.VarCharType.of(65535), null));
+      Table loaded = ops.loadTable(ident);
+      assertEquals(Types.FixedCharType.of(255), loaded.columns()[0].dataType());
+      assertEquals(Types.VarCharType.of(65535), loaded.columns()[1].dataType());
+
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ops.alterTable(
+                  ident,
+                  TableChange.updateColumnType(new String[] {"v"}, Types.VarCharType.of(0))));
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              ops.alterTable(
+                  ident, TableChange.updateColumnNullability(new String[] {"c"}, false)));
+    } finally {
+      ops.dropTable(ident);
+      ops.dropSchema(NameIdentifier.of("ml", "cat", schema), true);
+    }
+  }
+
+  private void createHiveTable(NameIdentifier ident, Column... columns) {
+    ops.createTable(
+        ident,
+        columns,
+        null,
+        Collections.emptyMap(),
+        new Transform[0],
+        Distributions.NONE,
+        new SortOrder[0],
+        new Index[0]);
+  }
+
   private void createIcebergTable(NameIdentifier ident, String location) {
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
