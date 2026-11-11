@@ -132,6 +132,26 @@ GravitinoClient client = GravitinoClient.builder(uri)
     .build();
 ```
 
+#### OAuth2 Client Authentication Method
+
+By default, the Java OAuth2 token provider uses `client_secret_post`, which sends the client credentials in the request body. To use HTTP Basic authentication, configure the provider with `OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC`:
+
+```java
+DefaultOAuth2TokenProvider authDataProvider = DefaultOAuth2TokenProvider.builder()
+    .withUri("oauth server uri")
+    .withCredential("yy:xx")
+    .withPath("oauth/token")
+    .withScope("test")
+    .withClientAuthenticationMethod(
+        OAuth2ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+    .build();
+```
+
+The Java GVFS Hadoop integration supports the configuration property `fs.gravitino.client.oauth2.authenticationMethod`, with `client_secret_post` as the default. The Python GVFS integration supports `oauth2_client_authentication_method`, also defaulting to `client_secret_post`.
+
+**Current limitation:** The Spark, Flink, and Trino connector OAuth2 initialization paths do not yet expose a configuration option for selecting the client authentication method. These integrations continue to use `client_secret_post`.
+
+
 ### Kerberos Mode
 
 To enable Kerberos mode, users must ensure that the server and client have the correct Kerberos configuration. On the server side, users should set `gravitino.authenticators` as `kerberos` and give
