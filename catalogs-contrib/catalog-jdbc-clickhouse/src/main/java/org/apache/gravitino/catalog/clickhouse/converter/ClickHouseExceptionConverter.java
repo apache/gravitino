@@ -37,8 +37,11 @@ public class ClickHouseExceptionConverter extends JdbcExceptionConverter {
   static final int ERROR_CODE_TABLE_IS_DROPPED = 218;
 
   /**
-   * ClickHouse error codes for DDL refused because of the request itself. Unknown identifiers (47)
-   * and syntax errors (62) are left out because generated statements can also raise them.
+   * ClickHouse error codes treated as request errors. BAD_ARGUMENTS (36) and ILLEGAL_COLUMN (44)
+   * are intentionally included for invalid engine options and column definitions, although they can
+   * also report server-side or generated-query failures. Without operation context, the same
+   * mapping applies to metadata reads. Unknown identifiers (47) and syntax errors (62) remain
+   * excluded because generated statements can also raise them.
    */
   private static final Set<Integer> INVALID_REQUEST_CODES =
       ImmutableSet.of(

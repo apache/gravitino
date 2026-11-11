@@ -33,10 +33,10 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 public class JdbcExceptionConverter {
 
   /**
-   * MySQL error codes for DDL the source refuses because of the request itself: a definition it
-   * cannot create, a value or default that does not fit, or data that does not allow the change.
-   * Unknown column (1054) and syntax errors (1064) are left out because generated statements can
-   * also raise them.
+   * MySQL error codes commonly raised when the source refuses requested DDL. Duplicate-entry (1062)
+   * and data conversion/range errors (1264, 1265, 1366, 1406) are included because existing data
+   * can prevent a requested constraint or column type change. Unknown column (1054) and syntax
+   * errors (1064) are left out because generated statements can also raise them.
    */
   private static final Set<Integer> INVALID_REQUEST_CODES =
       ImmutableSet.of(
@@ -73,6 +73,10 @@ public class JdbcExceptionConverter {
    * Convert JDBC exception to GravitinoException. The default implementation of this method is
    * based on MySQL exception code, and if the catalog does not compatible with MySQL exception
    * code, this method needs to be rewritten.
+   *
+   * <p>This converter is shared by DDL and metadata reads. Classification uses source error codes
+   * without operation context, so a bad-request result does not establish whether user input,
+   * generated SQL, or the source server caused the failure.
    *
    * @param sqlException The sql exception to map
    * @return The best attempt at a corresponding connector exception or generic with the
