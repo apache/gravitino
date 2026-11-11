@@ -141,7 +141,7 @@ abstract class AbstractGlueCatalogIT {
 
   private Column[] hiveColumns() {
     return new Column[] {
-      Column.of("id", Types.LongType.get(), "primary key", false, false, null),
+      Column.of("id", Types.LongType.get(), "primary key"),
       Column.of("name", Types.StringType.get(), null),
     };
   }
@@ -168,8 +168,7 @@ abstract class AbstractGlueCatalogIT {
 
   private Column[] partitionedColumns() {
     return new Column[] {
-      Column.of("id", Types.LongType.get(), null, false, false, null),
-      Column.of("dt", Types.DateType.get(), null),
+      Column.of("id", Types.LongType.get(), null), Column.of("dt", Types.DateType.get(), null),
     };
   }
 
