@@ -472,4 +472,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```
 
-If you need to override storage on a single table, `lance.storage.*` table properties are still supported.
+A table can add `lance.storage.*` table properties for keys that the catalog does not set. If the
+catalog sets a key, the catalog value is used, and the table value is ignored. This prevents a table
+creator from sending the catalog credentials to another endpoint. Put tables that need a different
+endpoint or credentials in a separate catalog.
