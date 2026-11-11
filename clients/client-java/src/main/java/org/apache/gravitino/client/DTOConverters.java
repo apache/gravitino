@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 import static org.apache.gravitino.dto.util.DTOConverters.toDTO;
 import static org.apache.gravitino.dto.util.DTOConverters.toFunctionArg;
 
+import com.google.common.base.Preconditions;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,6 +32,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
@@ -47,6 +49,7 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkTemplateUpdateDTO;
 import org.apache.gravitino.dto.job.TemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.DomainUpdateRequest;
 import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.FunctionUpdateRequest;
 import org.apache.gravitino.dto.requests.JobTemplateUpdateRequest;
@@ -426,6 +429,32 @@ class DTOConverters {
     } else if (change instanceof TagChange.RemoveProperty) {
       return new TagUpdateRequest.RemoveTagPropertyRequest(
           ((TagChange.RemoveProperty) change).getProperty());
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static DomainUpdateRequest toDomainUpdateRequest(DomainChange change) {
+    Preconditions.checkArgument(change != null, "domain change must not be null");
+    if (change instanceof DomainChange.RenameDomain) {
+      String newName = ((DomainChange.RenameDomain) change).getNewName();
+      GenericDomain.validateName(newName);
+      return new DomainUpdateRequest.RenameDomainRequest(newName);
+
+    } else if (change instanceof DomainChange.UpdateDomainComment) {
+      return new DomainUpdateRequest.UpdateDomainCommentRequest(
+          ((DomainChange.UpdateDomainComment) change).getNewComment());
+
+    } else if (change instanceof DomainChange.SetProperty) {
+      return new DomainUpdateRequest.SetDomainPropertyRequest(
+          ((DomainChange.SetProperty) change).getProperty(),
+          ((DomainChange.SetProperty) change).getValue());
+
+    } else if (change instanceof DomainChange.RemoveProperty) {
+      return new DomainUpdateRequest.RemoveDomainPropertyRequest(
+          ((DomainChange.RemoveProperty) change).getProperty());
 
     } else {
       throw new IllegalArgumentException(
