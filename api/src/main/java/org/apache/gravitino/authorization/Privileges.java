@@ -153,6 +153,10 @@ public class Privileges {
         return CreateTable.allow();
       case MODIFY_TABLE:
         return ModifyTable.allow();
+      case ALTER:
+        return Alter.allow();
+      case WRITE_TABLE:
+        return WriteTable.allow();
       case SELECT_TABLE:
         return SelectTable.allow();
       case PROBE_TABLE_LIKE:
@@ -297,6 +301,10 @@ public class Privileges {
         return CreateTable.deny();
       case MODIFY_TABLE:
         return ModifyTable.deny();
+      case ALTER:
+        return Alter.deny();
+      case WRITE_TABLE:
+        return WriteTable.deny();
       case SELECT_TABLE:
         return SelectTable.deny();
       case PROBE_TABLE_LIKE:
@@ -661,6 +669,66 @@ public class Privileges {
      * @return The instance with deny condition of the privilege.
      */
     public static ModifyTable deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return TABLE_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to insert, update, or delete table data. */
+  public static class WriteTable extends GenericPrivilege<WriteTable> {
+    private static final WriteTable ALLOW_INSTANCE =
+        new WriteTable(Condition.ALLOW, Name.WRITE_TABLE);
+    private static final WriteTable DENY_INSTANCE =
+        new WriteTable(Condition.DENY, Name.WRITE_TABLE);
+
+    private WriteTable(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static WriteTable allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static WriteTable deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return TABLE_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to alter object metadata. Currently supported for tables. */
+  public static class Alter extends GenericPrivilege<Alter> {
+    private static final Alter ALLOW_INSTANCE = new Alter(Condition.ALLOW, Name.ALTER);
+    private static final Alter DENY_INSTANCE = new Alter(Condition.DENY, Name.ALTER);
+
+    private Alter(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static Alter allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static Alter deny() {
       return DENY_INSTANCE;
     }
 

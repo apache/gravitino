@@ -204,6 +204,37 @@ public class TestSecurableObjects {
   }
 
   @Test
+  public void testIndependentAlterAndWriteTablePrivileges() {
+    for (Privilege.Name name :
+        new Privilege.Name[] {Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE}) {
+      Privilege allow = Privileges.allow(name);
+      Privilege deny = Privileges.deny(name.name());
+      Assertions.assertEquals(name, allow.name());
+      Assertions.assertEquals(name, deny.name());
+      Assertions.assertEquals(Privilege.Condition.ALLOW, allow.condition());
+      Assertions.assertEquals(Privilege.Condition.DENY, deny.condition());
+      Assertions.assertSame(allow, Privileges.allow(name.name()));
+      Assertions.assertSame(deny, Privileges.deny(name));
+      for (MetadataObject.Type type : MetadataObject.Type.values()) {
+        boolean supported =
+            type == MetadataObject.Type.METALAKE
+                || type == MetadataObject.Type.CATALOG
+                || type == MetadataObject.Type.SCHEMA
+                || type == MetadataObject.Type.TABLE;
+        Assertions.assertEquals(supported, allow.canBindTo(type));
+        Assertions.assertEquals(supported, deny.canBindTo(type));
+      }
+      Assertions.assertEquals(0L, name.getHighBits());
+      for (Privilege.Name other : Privilege.Name.values()) {
+        if (other != name) {
+          Assertions.assertEquals(0L, name.getLowBits() & other.getLowBits());
+        }
+      }
+    }
+    Assertions.assertEquals(1L << 6, Privilege.Name.MODIFY_TABLE.getLowBits());
+  }
+
+  @Test
   public void testPrivileges() {
     Privilege createCatalog = Privileges.CreateCatalog.allow();
     Privilege useCatalog = Privileges.UseCatalog.allow();

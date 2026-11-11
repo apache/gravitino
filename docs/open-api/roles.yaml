@@ -201,6 +201,8 @@ components:
             - CREATE_TABLE
             - PROBE_TABLE_LIKE
             - MODIFY_TABLE
+            - ALTER
+            - WRITE_TABLE
             - SELECT_TABLE
             - CREATE_FILESET
             - WRITE_FILESET

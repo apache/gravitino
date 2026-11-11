@@ -41,9 +41,11 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
+import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
@@ -57,6 +59,37 @@ import org.mockito.Mockito;
 class TestAuthorizationUtils {
 
   String metalake = "metalake";
+
+  @Test
+  void testAlterAndWriteTableRequireRelationalCatalogs() {
+    CatalogDispatcher dispatcher = Mockito.mock(CatalogDispatcher.class);
+    Catalog catalog = Mockito.mock(Catalog.class);
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.internalCatalogDispatcher()).thenReturn(dispatcher);
+    Mockito.when(dispatcher.loadCatalog(NameIdentifier.of(metalake, "catalog")))
+        .thenReturn(catalog);
+    try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      for (Privilege.Name name : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
+        for (MetadataObject object :
+            List.of(
+                MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG),
+                MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA))) {
+          for (Privilege.Condition condition : Privilege.Condition.values()) {
+            PrivilegeDTO privilege =
+                PrivilegeDTO.builder().withName(name).withCondition(condition).build();
+            Mockito.when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+            Assertions.assertDoesNotThrow(
+                () -> AuthorizationUtils.checkPrivilege(privilege, object, metalake));
+            Mockito.when(catalog.type()).thenReturn(Catalog.Type.FILESET);
+            Assertions.assertThrows(
+                IllegalPrivilegeException.class,
+                () -> AuthorizationUtils.checkPrivilege(privilege, object, metalake));
+          }
+        }
+      }
+    }
+  }
 
   @Test
   void testCheckCurrentUserUsesNeutralMembershipMessage() {

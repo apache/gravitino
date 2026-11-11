@@ -24,10 +24,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.RoleChange;
@@ -80,6 +82,45 @@ public class TestJdbcAuthorizationPlugin {
           return true;
         }
       };
+
+  @Test
+  public void testAlterAndWriteTableTranslation() {
+    JdbcSecurableObjectMappingProvider mapping = new JdbcSecurableObjectMappingProvider();
+    Assertions.assertEquals(
+        Set.of(JdbcPrivilege.ALTER), mapping.privilegesMappingRule().get(Privilege.Name.ALTER));
+    Assertions.assertEquals(
+        Set.of(JdbcPrivilege.INSERT, JdbcPrivilege.UPDATE, JdbcPrivilege.DELETE),
+        mapping.privilegesMappingRule().get(Privilege.Name.WRITE_TABLE));
+    for (MetadataObject.Type type :
+        List.of(
+            MetadataObject.Type.METALAKE,
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE)) {
+      String fullName =
+          type == MetadataObject.Type.METALAKE
+              ? "metalake"
+              : type == MetadataObject.Type.CATALOG
+                  ? "catalog"
+                  : type == MetadataObject.Type.SCHEMA ? "catalog.schema" : "catalog.schema.table";
+      for (Privilege.Name name : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
+        SecurableObject object =
+            SecurableObjects.parse(fullName, type, List.of(Privileges.allow(name)));
+        var translated = mapping.translatePrivilege(object);
+        Assertions.assertEquals(1, translated.size());
+        Assertions.assertEquals(
+            mapping.privilegesMappingRule().get(name), Set.copyOf(translated.get(0).privileges()));
+      }
+    }
+    Assertions.assertEquals(
+        Set.of(
+            JdbcPrivilege.SELECT,
+            JdbcPrivilege.UPDATE,
+            JdbcPrivilege.DELETE,
+            JdbcPrivilege.INSERT,
+            JdbcPrivilege.ALTER),
+        mapping.privilegesMappingRule().get(Privilege.Name.MODIFY_TABLE));
+  }
 
   @Test
   public void testUserManagement() {

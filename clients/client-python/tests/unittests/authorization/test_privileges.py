@@ -63,6 +63,26 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestPrivileges(unittest.TestCase):
+    def test_alter_and_write_table_bindings(self) -> None:
+        supported = {
+            MetadataObject.Type.METALAKE,
+            MetadataObject.Type.CATALOG,
+            MetadataObject.Type.SCHEMA,
+            MetadataObject.Type.TABLE,
+        }
+        for name in (Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE):
+            for factory in (Privileges.allow, Privileges.deny):
+                privilege = factory(name.name)
+                for obj_type in MetadataObject.Type:
+                    self.assertEqual(
+                        obj_type in supported, privilege.can_bind_to(obj_type)
+                    )
+            self.assertEqual(0, name.high_bits)
+            for other in Privilege.Name:
+                if other != name:
+                    self.assertEqual(0, name.low_bits & other.low_bits)
+        self.assertEqual(1 << 6, Privilege.Name.MODIFY_TABLE.low_bits)
+
     def test_allow_and_deny_return_instances_for_all_privileges(self) -> None:
         for name in Privilege.Name:
             with self.subTest(privilege=name.name):

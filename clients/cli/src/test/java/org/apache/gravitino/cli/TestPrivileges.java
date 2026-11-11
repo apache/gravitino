@@ -19,12 +19,22 @@
 
 package org.apache.gravitino.cli;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.authorization.Privilege;
 import org.junit.jupiter.api.Test;
 
 class TestsPrivileges {
+
+  @Test
+  void testAlterAndWriteTablePrivileges() {
+    assertTrue(Privileges.isValid("alter"));
+    assertTrue(Privileges.isValid("write_table"));
+    assertEquals(Privilege.Name.ALTER, Privileges.toName("alter"));
+    assertEquals(Privilege.Name.WRITE_TABLE, Privileges.toName("write_table"));
+  }
 
   @Test
   void testValidPrivilege() {

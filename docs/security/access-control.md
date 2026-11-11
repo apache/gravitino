@@ -191,6 +191,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `CREATE_TABLE`       | Metalake, Catalog, Schema                                                   | Create tables in any schema in scope                                 |
 | `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View                                      | Probe whether a table-like object exists without reading its data    |
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read any table in scope                                              |
+| `ALTER`              | Metalake, Catalog, Schema, Table                                            | Alter table metadata through authorization plugins; reserved for future object types |
+| `WRITE_TABLE`        | Metalake, Catalog, Schema, Table                                            | Insert, update, and delete table data through authorization plugins |
 | `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read and write to, and alter the schema of, any table in scope       |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema                                                   | Create views in any schema in scope                                  |
 | `SELECT_VIEW`        | Metalake, Catalog, Schema, View                                             | Read view metadata in scope                                          |
@@ -211,6 +213,12 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
 | `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
 | `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
+
+`ALTER` and `WRITE_TABLE` provide separate grants for schema changes and data writes in the
+JDBC and Ranger HadoopSQL authorization plugins. `ALTER` maps to `ALTER`; `WRITE_TABLE` maps to
+`INSERT`, `UPDATE`, and `DELETE` in JDBC, and `UPDATE` and `WRITE` in Ranger. Grant `SELECT_TABLE`
+separately when reading data is needed. These additions leave `MODIFY_TABLE` and the existing
+Gravitino REST operation checks unchanged.
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
