@@ -33,8 +33,8 @@ import org.apache.ibatis.session.SqlSession;
 /**
  * Fences metadata-object endpoints while a relation write is in progress.
  *
- * <p>Statistic writers take a schema lock of their own today and adopt this fence in #13177, so
- * nothing here covers them yet.
+ * <p>Statistic writes and deletes also take this fence, so a statistic cannot be committed against
+ * a target that a concurrent drop has already removed.
  */
 public final class LiveEndpointService {
 

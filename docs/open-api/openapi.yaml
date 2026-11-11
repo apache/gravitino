@@ -168,6 +168,24 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
     $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views~1%7Bview%7D"
 
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/semantic-model-datasets:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1semantic-model-datasets"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-model-metrics"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1ossie"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ossie"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
 
@@ -407,6 +425,43 @@ components:
             "message": "Malformed request"
           }
 
+    ForbiddenErrorResponse:
+      description: >-
+        Forbidden - The caller is not allowed to perform the operation. When authorization
+        is enabled, a missing metalake or a caller who is not a member of the metalake
+        also returns 403.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example:
+            code: 1008
+            type: ForbiddenException
+            message: Current user alice is not a member of metalake metalake1, or the metalake does not exist
+
+    NotAcceptableErrorResponse:
+      description: >-
+        Not Acceptable - The requested API version is unsupported, or the effective
+        Accept header cannot be served by this operation. When Accept has no Gravitino
+        API version, including application/json, */*, or an absent header, the server
+        uses the version from Content-Type if present, otherwise the default API version.
+        Both cases return HTTP 406 with a JSON ErrorModel response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedApiVersion:
+              value:
+                code: 1001
+                type: IllegalArgumentException
+                message: Unsupported version v99 in request header
+            IncompatibleAccept:
+              value:
+                code: 1000
+                type: RESTException
+                message: HTTP 406 Not Acceptable
+
     ServerErrorResponse:
       description:
         A server-side problem that might not be addressable from the client
@@ -565,6 +620,14 @@ components:
       name: view
       in: path
       description: The name of the view
+      required: true
+      schema:
+        type: string
+
+    semanticModel:
+      name: semanticModel
+      in: path
+      description: The name of the Semantic Model
       required: true
       schema:
         type: string

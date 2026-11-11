@@ -55,8 +55,8 @@ import org.slf4j.LoggerFactory;
  *       whole cache is cleared instead, which is strictly stronger than the invalidation that
  *       failed and only costs a cold-cache penalty, since the cache is derived state. If even the
  *       clear also fails, the exception goes up to {@link EntityChangeLogPoller}, which only logs
- *       it and moves on. The batch is never sent again, so this node may keep serving stale entries
- *       until they expire.
+ *       it and moves on. Failed delivery has no guaranteed retry, so this node may serve stale
+ *       entries until they expire.
  * </ul>
  */
 public class EntityCacheChangeLogListener implements EntityChangeLogListener {
@@ -141,6 +141,12 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
         cache.clear();
       }
     };
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean supportsReplay() {
+    return true;
   }
 
   @Override

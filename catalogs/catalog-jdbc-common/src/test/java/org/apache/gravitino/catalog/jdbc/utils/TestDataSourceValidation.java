@@ -27,6 +27,8 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.sql.Statement;
 import java.time.Duration;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import javax.annotation.Nullable;
@@ -41,6 +43,28 @@ import org.sqlite.SQLiteConnection;
 
 /** Tests default driver validation and explicitly configured SQL validation. */
 public class TestDataSourceValidation {
+
+  @Test
+  void testInvalidConfigurationFailsBeforeConnection() {
+    for (Map<String, String> invalid :
+        List.of(
+            Map.of("jdbc-driver", "java.lang.String"),
+            Map.of("jdbc-driver", "missing.Driver"),
+            Map.of("jdbc-url", "jdbc:postgresql://localhost/db"),
+            Map.of("verify-on-create", "yes"),
+            Map.of("jdbc.pool.test-on-borrow", "maybe"),
+            Map.of("jdbc.pool.min-size", "0"),
+            Map.of("jdbc.pool.max-size", "-1"),
+            Map.of("jdbc.pool.min-size", "5", "jdbc.pool.max-size", "2"),
+            Map.of("jdbc.pool.max-wait-ms", "0"),
+            Map.of("jdbc.pool.connect-timeout-ms", "2147483648"))) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(IllegalArgumentException.class, () -> createDataSource(invalid));
+      Assertions.assertTrue(
+          exception.getMessage().toLowerCase(Locale.ROOT).contains("jdbc")
+              || exception.getMessage().contains("verify-on-create"));
+    }
+  }
 
   /** Verifies default validation preserves a live physical SQLite connection across borrows. */
   @Test
@@ -113,6 +137,32 @@ public class TestDataSourceValidation {
       Assertions.assertEquals(
           Duration.ofSeconds(5), dataSource.getValidationQueryTimeoutDuration());
       Assertions.assertFalse(dataSource.getTestOnBorrow());
+      try (Connection connection = dataSource.getConnection()) {
+        Assertions.assertTrue(connection.isValid(1));
+      }
+    }
+  }
+
+  /**
+   * Verifies that for an unknown driver family (SQLite) no connect/socket timeout connection
+   * property is injected and the datasource still builds and borrows a connection. This guards the
+   * "unknown driver -> no-op" contract of {@link JdbcConnectionTimeouts}: SQLite does not
+   * understand {@code connectTimeout}/{@code socketTimeout}, so injecting them would make the
+   * connection fail.
+   */
+  @Test
+  public void testUnknownDriverInjectsNoConnectionTimeout() throws SQLException {
+    // JdbcConnectionTimeouts emits nothing for the SQLite driver family.
+    Map<String, String> props = new HashMap<>();
+    props.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.sqlite.JDBC");
+    props.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    Assertions.assertTrue(
+        JdbcConnectionTimeouts.connectionProperties(
+                new JdbcConfig(props), props.get(JdbcConfig.JDBC_URL.getKey()))
+            .isEmpty());
+
+    // And the datasource built from it still borrows a working connection (no leak, no failure).
+    try (BasicDataSource dataSource = createDataSource(Map.of())) {
       try (Connection connection = dataSource.getConnection()) {
         Assertions.assertTrue(connection.isValid(1));
       }

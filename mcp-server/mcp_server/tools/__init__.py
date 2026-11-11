@@ -26,6 +26,7 @@ from mcp_server.tools.model import load_model_tools
 from mcp_server.tools.partition import load_partition_tools
 from mcp_server.tools.policy import load_policy_tools
 from mcp_server.tools.schema import load_schema_tools
+from mcp_server.tools.semantic_model import load_semantic_model_tools
 from mcp_server.tools.statistic import load_statistic_tools
 from mcp_server.tools.table import load_table_tools
 from mcp_server.tools.tag import load_tag_tool
@@ -43,6 +44,7 @@ SUPPORTED_TOOL_TAGS = frozenset(
         "partition",
         "policy",
         "schema",
+        "semantic_model",
         "statistic",
         "table",
         "tag",
@@ -67,3 +69,4 @@ def load_tools(mcp: FastMCP):
     load_policy_tools(mcp)
     load_partition_tools(mcp)
     load_view_tools(mcp)
+    load_semantic_model_tools(mcp)

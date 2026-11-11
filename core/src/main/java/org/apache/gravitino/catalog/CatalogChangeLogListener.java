@@ -36,18 +36,17 @@ import org.slf4j.LoggerFactory;
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
  *
- * <p>The poller hands each batch to a listener only once, so a listener has to clean up after
- * itself when it fails. This one does what {@code EntityCacheChangeLogListener} and {@code
+ * <p>The poller does not retry a failed callback, so a listener has to clean up after itself when
+ * it fails. This one does what {@code EntityCacheChangeLogListener} and {@code
  * JcasbinChangeListener} do: if removing one catalog from the cache fails, it clears the whole
  * catalog cache, which also covers the entry it failed to remove and the rest of the batch. A row
  * that cannot be parsed is simply skipped, because it does not point at any catalog and so cannot
  * leave anything stale.
  *
- * <p>Before removing anything, the listener first goes through the whole batch and marks off the
- * changes this node made itself. Doing it in that order means a later failure cannot leave one of
- * those marks behind, which would otherwise make a future change from another node look like a
- * local one. If the clear itself fails, the exception goes up to the poller, which logs it at
- * {@code ERROR} and moves on, and the catalog stays stale until it expires.
+ * <p>Every valid catalog event invalidates its entry, including local events and replayed rows. A
+ * name-based local marker cannot reliably identify an originating transaction. Extra removals are
+ * preferable to suppressing a remote mutation; operation leases protect wrappers in use. If the
+ * clear itself fails, the exception goes to the poller for error logging.
  *
  * <p><b>What clearing costs:</b> dropping a catalog from the cache retires its {@code
  * CatalogWrapper}. Idle wrappers release their connection pools and {@code IsolatedClassLoader}s
@@ -72,9 +71,15 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
     this.catalogManager = catalogManager;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public boolean supportsReplay() {
+    return true;
+  }
+
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
-    List<CatalogInvalidation> remoteInvalidations = new ArrayList<>();
+    List<CatalogInvalidation> invalidations = new ArrayList<>();
     for (EntityChangeRecord change : changes) {
       if (!isCatalogChange(change)) {
         continue;
@@ -88,41 +93,17 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       }
       NameIdentifier ident = identOpt.get();
 
-      boolean localMutation;
-      try {
-        localMutation = catalogManager.consumeLocalMutation(ident);
-      } catch (RuntimeException e) {
-        // We could not tell whether this change came from this node or another one. The name is
-        // valid, so assume it came from another node: the worst case is one extra cache removal,
-        // while skipping it could leave an old catalog cached forever.
-        LOG.error(
-            "Failed to check local mutation state for catalog {}, treating change log record id {} "
-                + "as remote to avoid serving stale metadata",
-            ident,
-            change.getId(),
-            e);
-        localMutation = false;
-      }
-
-      if (localMutation) {
-        LOG.debug(
-            "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
-            ident,
-            change.getId());
-        continue;
-      }
-
-      remoteInvalidations.add(new CatalogInvalidation(change, ident));
+      invalidations.add(new CatalogInvalidation(change, ident));
     }
 
-    for (CatalogInvalidation invalidation : remoteInvalidations) {
+    for (CatalogInvalidation invalidation : invalidations) {
       EntityChangeRecord change = invalidation.change;
       NameIdentifier ident = invalidation.ident;
       // INFO on purpose: dropping the catalog from the cache retires its wrapper and eventually
       // closes the connection pool and isolated classloader, either immediately or after active
       // leases finish. This is the main thing the change log does across nodes.
       LOG.info(
-          "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+          "Invalidating catalog cache for {} due to a {} recorded in change log id {}",
           ident,
           change.getOperateType(),
           change.getId());
@@ -130,8 +111,8 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       try {
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
-        // This batch will never be sent again, so giving up here would keep serving the old
-        // catalog until it expires on its own. Clear the whole cache instead; active operation
+        // Failed callbacks have no guaranteed retry; bounded replay may not redeliver this row.
+        // Clear the whole cache instead of serving an old catalog until expiry; active operation
         // leases defer resource cleanup until those operations finish.
         LOG.error(
             "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "

@@ -20,6 +20,7 @@ package org.apache.gravitino.rel;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.function.Function;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.Privilege;
@@ -35,6 +36,10 @@ import org.junit.jupiter.api.Test;
 public class TestTableCatalog {
 
   private static TableCatalog minimalCatalog() {
+    return minimalCatalog(ident -> null);
+  }
+
+  private static TableCatalog minimalCatalog(Function<NameIdentifier, Table> loader) {
     return new TableCatalog() {
       @Override
       public NameIdentifier[] listTables(Namespace namespace) throws NoSuchSchemaException {
@@ -43,7 +48,7 @@ public class TestTableCatalog {
 
       @Override
       public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-        return null;
+        return loader.apply(ident);
       }
 
       @Override
@@ -70,6 +75,32 @@ public class TestTableCatalog {
         return false;
       }
     };
+  }
+
+  @Test
+  void testTableExistsReturnsFalseForMissingSchemaOrTable() {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    TableCatalog missingSchema =
+        minimalCatalog(
+            ignored -> {
+              throw new NoSuchSchemaException("schema missing");
+            });
+    TableCatalog missingTable =
+        minimalCatalog(
+            ignored -> {
+              throw new NoSuchTableException("table missing");
+            });
+    Assertions.assertFalse(missingSchema.tableExists(ident));
+    Assertions.assertFalse(missingTable.tableExists(ident));
+    IllegalStateException failure = new IllegalStateException("backend unavailable");
+    TableCatalog unavailable =
+        minimalCatalog(
+            ignored -> {
+              throw failure;
+            });
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(IllegalStateException.class, () -> unavailable.tableExists(ident)));
   }
 
   @Test

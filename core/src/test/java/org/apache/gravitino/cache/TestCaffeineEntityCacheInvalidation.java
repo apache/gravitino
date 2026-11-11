@@ -26,6 +26,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
@@ -123,6 +124,57 @@ public class TestCaffeineEntityCacheInvalidation {
 
     Assertions.assertFalse(cache.contains(catalog1.nameIdentifier(), Entity.EntityType.CATALOG));
     Assertions.assertTrue(cache.contains(catalog10.nameIdentifier(), Entity.EntityType.CATALOG));
+  }
+
+  @Test
+  void testInvalidateWithDottedLevelsDoesNotCollide() {
+    // Both render as "lake.cat.sch.a.b".
+    TableEntity t1 = TestUtil.getTestTableEntity(1L, "a.b", Namespace.of("lake", "cat", "sch"));
+    TableEntity t2 = TestUtil.getTestTableEntity(2L, "b", Namespace.of("lake", "cat", "sch.a"));
+    Assertions.assertNotEquals(t1.nameIdentifier(), t2.nameIdentifier());
+    Assertions.assertEquals(t1.nameIdentifier().toString(), t2.nameIdentifier().toString());
+
+    cache.put(t1);
+    cache.put(t2);
+    Assertions.assertEquals(2, cache.size());
+
+    cache.invalidate(NameIdentifier.of("lake", "cat", "sch"), Entity.EntityType.SCHEMA);
+
+    Assertions.assertFalse(
+        cache.contains(t1.nameIdentifier(), Entity.EntityType.TABLE),
+        "T1 (table 'a.b' in schema 'sch') must be invalidated with its schema");
+    Assertions.assertTrue(
+        cache.contains(t2.nameIdentifier(), Entity.EntityType.TABLE),
+        "T2 (table 'b' in schema 'sch.a') must survive invalidation of schema 'sch'");
+  }
+
+  @Test
+  void testInvalidateDottedLevelEntryKeepsOtherEntryIndexed() {
+    TableEntity t1 = TestUtil.getTestTableEntity(1L, "a.b", Namespace.of("lake", "cat", "sch"));
+    TableEntity t2 = TestUtil.getTestTableEntity(2L, "b", Namespace.of("lake", "cat", "sch.a"));
+    cache.put(t1);
+    cache.put(t2);
+
+    // Removing T1 must not drop the index entry of T2.
+    cache.invalidate(t1.nameIdentifier(), Entity.EntityType.TABLE);
+    Assertions.assertTrue(cache.contains(t2.nameIdentifier(), Entity.EntityType.TABLE));
+
+    cache.invalidate(NameIdentifier.of("lake", "cat", "sch.a"), Entity.EntityType.SCHEMA);
+    Assertions.assertFalse(cache.contains(t2.nameIdentifier(), Entity.EntityType.TABLE));
+  }
+
+  @Test
+  void testInvalidateWithEscapeCharacterInLevelsDoesNotCollide() {
+    // Escaping only '.' would render both as "lake.cat.s<ESC>.b<ESC>.c", where ESC is U+0001.
+    TableEntity t1 = TestUtil.getTestTableEntity(1L, "b.c", Namespace.of("lake", "cat", "s\u0001"));
+    TableEntity t2 = TestUtil.getTestTableEntity(2L, "c", Namespace.of("lake", "cat", "s.b\u0001"));
+    cache.put(t1);
+    cache.put(t2);
+    Assertions.assertEquals(2, cache.size());
+
+    cache.invalidate(NameIdentifier.of("lake", "cat", "s\u0001"), Entity.EntityType.SCHEMA);
+    Assertions.assertFalse(cache.contains(t1.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(t2.nameIdentifier(), Entity.EntityType.TABLE));
   }
 
   @Test

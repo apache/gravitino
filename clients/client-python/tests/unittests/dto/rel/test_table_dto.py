@@ -35,6 +35,7 @@ from gravitino.dto.rel.partitioning.identity_partitioning_dto import (
 from gravitino.dto.rel.partitioning.partitioning import SingleFieldPartitioning
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
 from gravitino.dto.rel.table_dto import TableDTO
+from gravitino.dto.responses.table_response import TableResponse
 from gravitino.exceptions.base import IllegalArgumentException
 from tests.unittests.fixtures.table_fixtures import TABLE_DTO_JSON_STRING
 
@@ -65,6 +66,29 @@ class TestTableDTO(unittest.TestCase):
         self.assertListEqual(index_dto.field_names(), [["id"]])
 
         self.assertDictEqual(dto.properties(), {"format": "ORC"})
+
+    def test_table_response_with_text_index(self):
+        table_json = json.loads(self.complete_json)
+        table_json["indexes"] = [
+            {
+                "indexType": "DATA_SKIPPING_TEXT",
+                "name": "idx_text",
+                "fieldNames": [["name"]],
+                "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+            }
+        ]
+
+        response = TableResponse.from_json(
+            json.dumps({"code": 0, "table": table_json}), infer_missing=True
+        )
+        response.validate()
+        index = response.table().index()[0]
+        self.assertIs(index.type(), Index.IndexType.DATA_SKIPPING_TEXT)
+        self.assertEqual(index.properties(), {"tokenizer": "ngrams", "ngram_size": "3"})
+        self.assertEqual(
+            json.loads(response.table().to_json())["indexes"][0]["properties"],
+            index.properties(),
+        )
 
     def test_table_dto_deserialize_required_fields_success(self):
         json_string = """

@@ -272,16 +272,7 @@ class FilesetCatalog extends BaseSchemaCatalog
     return resp.dropped();
   }
 
-  /**
-   * Get the actual path of a file or directory based on the storage location of Fileset and the sub
-   * path.
-   *
-   * @param ident A fileset identifier.
-   * @param subPath The sub path to the file or directory.
-   * @param locationName The name of the location to be accessed.
-   * @return The actual location of the file or directory.
-   * @throws NoSuchFilesetException If the fileset does not exist.
-   */
+  /** {@inheritDoc} */
   @Override
   public String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, NoSuchLocationNameException {

@@ -28,16 +28,23 @@ from gravitino.api.function.function_definition import FunctionDefinition
 from gravitino.api.function.function_type import FunctionType
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.function_catalog_operations import FunctionCatalogOperations
 from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
 )
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
@@ -73,7 +80,8 @@ class BaseSchemaCatalog(
     FunctionCatalog,
     SupportsRoles,
     SupportsTags,
-):  # pylint: disable=too-many-ancestors
+    SupportsPolicies,
+):  # pylint: disable=too-many-ancestors,too-many-instance-attributes
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -127,6 +135,9 @@ class BaseSchemaCatalog(
             rest_client, catalog_namespace, self.name()
         )
         self._object_tag_operations = MetadataObjectTagOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_policy_operations = MetadataObjectPolicyOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
         self._object_role_operations = MetadataObjectRoleOperations(
@@ -235,6 +246,8 @@ class BaseSchemaCatalog(
 
         Raises:
             NoSuchSchemaException if the schema with specified identifier does not exist.
+            SchemaAlreadyExistsException if the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             The Schema with specified identifier.
@@ -293,12 +306,17 @@ class BaseSchemaCatalog(
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
         """Drop the schema with specified identifier.
 
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
+
         Args:
             schema_name: The name of the schema.
-            cascade: Whether to drop all the tables under the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Raises:
-            NonEmptySchemaException if the schema is not empty and cascade is false.
+            NonEmptySchemaException if the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
 
         Returns:
              true if the schema is dropped successfully, false otherwise.
@@ -402,8 +420,14 @@ class BaseSchemaCatalog(
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> List[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)
@@ -421,6 +445,21 @@ class BaseSchemaCatalog(
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
 
     def supports_tags(self) -> SupportsTags:
+        return self
+
+    def list_policies(self) -> List[str]:
+        return self._object_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._object_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> List[Policy]:
+        return self._object_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._object_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
         return self
 
     def supports_roles(self) -> SupportsRoles:

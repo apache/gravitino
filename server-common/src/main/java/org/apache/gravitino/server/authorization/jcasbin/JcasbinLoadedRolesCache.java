@@ -34,10 +34,9 @@ import org.slf4j.LoggerFactory;
  * cleaner may ignore a stale removal when the role was reloaded while the callback waited for the
  * authorizer's policy mutation lock.
  *
- * <p>This cache owns role permission policies only. Therefore, eviction must clear only {@code
- * p(roleId, ...)} policies and must not delete the role itself, because JCasbin's {@code
- * deleteRole(roleId)} also removes {@code g(user/group, roleId)} bindings that are managed
- * separately by {@link JcasbinAuthorizer}.
+ * <p>This cache owns role permission policies only. Eviction clears the {@code p(roleId, ...)}
+ * policies; requests evaluate their own role-id sets, so there is no user or group membership in
+ * the enforcers to remove.
  *
  * <p>The TTL is <b>write-based</b>, matching every other authorization cache. An access-based TTL
  * would be renewed by the version probe that {@code versionCheckAndLoadRoles} performs on every

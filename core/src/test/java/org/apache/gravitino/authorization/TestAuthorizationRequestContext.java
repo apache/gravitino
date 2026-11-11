@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,11 +30,20 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.ActiveRoles;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
@@ -234,6 +244,137 @@ public class TestAuthorizationRequestContext {
   }
 
   @Test
+  public void testNormalizationDeduplicatesConcurrentLoaders() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
+    AtomicInteger calls = new AtomicInteger();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Callable<MetadataObject> lookup =
+          () ->
+              context.computeNormalizedMetadataObjectIfAbsent(
+                  "ml::table",
+                  NameIdentifier.of("ml", "cat"),
+                  key -> {
+                    calls.incrementAndGet();
+                    entered.countDown();
+                    try {
+                      assertTrue(release.await(5, TimeUnit.SECONDS));
+                    } catch (InterruptedException e) {
+                      Thread.currentThread().interrupt();
+                      throw new IllegalStateException(e);
+                    }
+                    return object;
+                  });
+      Future<MetadataObject> first = workers.submit(lookup);
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      // The second lookup starts while the first is still normalizing, so it must wait for it.
+      Future<MetadataObject> second = workers.submit(lookup);
+      assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS));
+      release.countDown();
+      assertEquals(object, first.get(5, TimeUnit.SECONDS));
+      assertEquals(object, second.get(5, TimeUnit.SECONDS));
+      assertEquals(1, calls.get());
+    } finally {
+      workers.shutdownNow();
+    }
+  }
+
+  /** Verifies that concurrent objects share one failed catalog initialization per request. */
+  @Test
+  public void testConcurrentCatalogFailuresAreRememberedAcrossObjects() throws Exception {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    NameIdentifier catalog = NameIdentifier.of("ml", "cat");
+    AtomicInteger calls = new AtomicInteger();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    ExecutorService workers = Executors.newFixedThreadPool(2);
+    try {
+      Future<?> first =
+          workers.submit(
+              () ->
+                  assertThrows(
+                      IllegalStateException.class,
+                      () ->
+                          context.computeNormalizedMetadataObjectIfAbsent(
+                              "table1",
+                              catalog,
+                              key -> {
+                                calls.incrementAndGet();
+                                entered.countDown();
+                                try {
+                                  assertTrue(release.await(5, TimeUnit.SECONDS));
+                                } catch (InterruptedException e) {
+                                  Thread.currentThread().interrupt();
+                                  throw new IllegalStateException(e);
+                                }
+                                throw new IllegalStateException("Unavailable");
+                              })));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+      Future<?> second =
+          workers.submit(
+              () ->
+                  assertThrows(
+                      IllegalStateException.class,
+                      () ->
+                          context.computeNormalizedMetadataObjectIfAbsent(
+                              "table2",
+                              catalog,
+                              key -> {
+                                calls.incrementAndGet();
+                                throw new IllegalStateException("Unavailable");
+                              })));
+      assertThrows(TimeoutException.class, () -> second.get(200, TimeUnit.MILLISECONDS));
+      release.countDown();
+      first.get(5, TimeUnit.SECONDS);
+      second.get(5, TimeUnit.SECONDS);
+      assertEquals(1, calls.get());
+    } finally {
+      release.countDown();
+      workers.shutdownNow();
+    }
+  }
+
+  /** Verifies that missing catalogs retain the existing retry behavior. */
+  @Test
+  public void testMissingCatalogDoesNotPreventRetry() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    NameIdentifier catalog = NameIdentifier.of("ml", "cat");
+    MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
+    assertThrows(
+        NoSuchCatalogException.class,
+        () ->
+            context.computeNormalizedMetadataObjectIfAbsent(
+                "key",
+                catalog,
+                key -> {
+                  throw new NoSuchCatalogException("Missing");
+                }));
+    assertEquals(
+        object, context.computeNormalizedMetadataObjectIfAbsent("key", catalog, key -> object));
+  }
+
+  @Test
+  public void testNormalizationDoesNotCacheFailuresOrNull() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            context.computeNormalizedMetadataObjectIfAbsent(
+                "key",
+                key -> {
+                  throw new IllegalStateException("Unavailable");
+                }));
+    assertThrows(
+        NullPointerException.class,
+        () -> context.computeNormalizedMetadataObjectIfAbsent("key", key -> null));
+    MetadataObject object = MetadataObjects.parse("cat.schema.table", MetadataObject.Type.TABLE);
+    assertEquals(object, context.computeNormalizedMetadataObjectIfAbsent("key", key -> object));
+  }
+
+  @Test
   public void testComputeMetadataIdIfAbsentDedupesLoaderInvocation() {
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     AtomicInteger loaderCalls = new AtomicInteger();
@@ -406,5 +547,75 @@ public class TestAuthorizationRequestContext {
     assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
     assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
     assertEquals(7L, context.getRolePolicyGeneration());
+  }
+
+  /** Successful auth-subject prefetch is reused without executing another loader. */
+  @Test
+  public void testAuthSubjectPrefetchCachesUser() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Optional<UserUpdatedAt> user = Optional.of(new UserUpdatedAt(1L, 2L));
+    AtomicInteger queries = new AtomicInteger();
+    assertSame(
+        user,
+        context.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              queries.incrementAndGet();
+              return user;
+            }));
+    assertSame(
+        user,
+        context.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              throw new AssertionError("Successful prefetch must not be repeated");
+            }));
+    assertEquals(1, queries.get());
+  }
+
+  /** A missing user is a completed prefetch result, not a reason to repeat the query. */
+  @Test
+  public void testAuthSubjectPrefetchCachesMissingUser() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger queries = new AtomicInteger();
+    for (int i = 0; i < 2; i++) {
+      assertEquals(
+          Optional.empty(),
+          context.computeAuthSubjectPrefetchIfAbsent(
+              () -> {
+                queries.incrementAndGet();
+                return Optional.empty();
+              }));
+    }
+    assertEquals(1, queries.get());
+  }
+
+  /** Failed prefetch stays failed in this request, while a fresh request can recover. */
+  @Test
+  public void testAuthSubjectPrefetchFailureIsRequestScoped() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    RuntimeException failure = new RuntimeException("database unavailable");
+    AtomicInteger queries = new AtomicInteger();
+    for (int i = 0; i < 2; i++) {
+      assertSame(
+          failure,
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  context.computeAuthSubjectPrefetchIfAbsent(
+                      () -> {
+                        queries.incrementAndGet();
+                        throw failure;
+                      })));
+    }
+    assertEquals(1, queries.get());
+    AuthorizationRequestContext nextRequest = new AuthorizationRequestContext();
+    Optional<UserUpdatedAt> recovered = Optional.of(new UserUpdatedAt(1L, 2L));
+    assertSame(
+        recovered,
+        nextRequest.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              queries.incrementAndGet();
+              return recovered;
+            }));
+    assertEquals(2, queries.get());
   }
 }

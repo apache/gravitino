@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -46,29 +45,20 @@ public class TestCatalogChangeLogListener {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
     NameIdentifier failing = NameIdentifier.of("metalake", "failing");
-    NameIdentifier laterLocal = NameIdentifier.of("metalake", "later_local");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(failing)).thenReturn(false);
-    when(catalogManager.consumeLocalMutation(laterLocal)).thenReturn(true);
     doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(failing);
     doThrow(new RuntimeException("clear failed")).when(catalogCache).invalidateAll();
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
-    // There is nothing else we can do here, so let the exception go up. That is fine now: the
-    // poller only logs it and never sends the batch again. Re-sending was the dangerous part,
-    // because consumeLocalMutation() works only once and a second pass would mistake a change made
-    // by this node for one made by another node.
+    // Preserve whole-cache recovery failures for the poller's error log.
     Assertions.assertThrows(
         RuntimeException.class,
         () ->
             listener.onEntityChange(
                 List.of(change(1L, "metalake.failing"), change(2L, "metalake.later_local"))));
 
-    // The "made by this node" marks are all read before any removal starts, even when both the
-    // removal and the clear fail.
-    verify(catalogManager).consumeLocalMutation(laterLocal);
     verify(catalogCache).invalidateAll();
   }
 
@@ -82,9 +72,6 @@ public class TestCatalogChangeLogListener {
     NameIdentifier laterLocal = NameIdentifier.of("metalake", "later_local");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(failing)).thenReturn(false);
-    when(catalogManager.consumeLocalMutation(laterRemote)).thenReturn(false);
-    when(catalogManager.consumeLocalMutation(laterLocal)).thenReturn(true);
     doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(failing);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
@@ -97,9 +84,7 @@ public class TestCatalogChangeLogListener {
                     change(2L, "metalake.later_remote"),
                     change(3L, "metalake.later_local"))));
 
-    // The later local mark is read before any removal starts. Clearing the whole cache then covers
-    // both the removal that failed and every remote record, so nothing else has to be removed.
-    verify(catalogManager).consumeLocalMutation(laterLocal);
+    // Whole-cache recovery covers the failed removal and the rest of the batch.
     verify(catalogCache).invalidateAll();
     verify(catalogCache, never()).invalidate(laterRemote);
     verify(catalogCache, never()).invalidate(laterLocal);
@@ -114,7 +99,6 @@ public class TestCatalogChangeLogListener {
     NameIdentifier second = NameIdentifier.of("metalake", "cat2");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
@@ -122,8 +106,7 @@ public class TestCatalogChangeLogListener {
 
     verify(catalogCache).invalidate(first);
     verify(catalogCache).invalidate(second);
-    // Clearing closes IsolatedClassLoaders that are still in use, so it must never happen during
-    // normal operation.
+    // Successful targeted eviction does not need whole-cache recovery.
     verify(catalogCache, never()).invalidateAll();
   }
 
@@ -135,7 +118,6 @@ public class TestCatalogChangeLogListener {
     NameIdentifier healthy = NameIdentifier.of("metalake", "healthy");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
@@ -155,40 +137,12 @@ public class TestCatalogChangeLogListener {
 
   @Test
   @SuppressWarnings("unchecked")
-  void testFailedLocalMutationProbeTreatsTheRecordAsRemote() {
-    CatalogManager catalogManager = mock(CatalogManager.class);
-    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
-    NameIdentifier failing = NameIdentifier.of("metalake", "failing");
-    NameIdentifier healthy = NameIdentifier.of("metalake", "healthy");
-
-    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(failing))
-        .thenThrow(new RuntimeException("probe failed"));
-    when(catalogManager.consumeLocalMutation(healthy)).thenReturn(false);
-
-    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
-
-    // When we cannot tell which node made the change, assume another node did. Removing one entry
-    // for nothing is cheaper than missing a real remote change, which we would never see again.
-    Assertions.assertDoesNotThrow(
-        () ->
-            listener.onEntityChange(
-                List.of(change(1L, "metalake.failing"), change(2L, "metalake.healthy"))));
-
-    verify(catalogCache).invalidate(failing);
-    verify(catalogCache).invalidate(healthy);
-    verify(catalogCache, never()).invalidateAll();
-  }
-
-  @Test
-  @SuppressWarnings("unchecked")
-  void testSkipsLocalMutationAndNonCatalogRecords() {
+  void testInvalidatesLocalCatalogAndSkipsNonCatalogRecords() {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
     NameIdentifier localIdentifier = NameIdentifier.of("metalake", "local");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(localIdentifier)).thenReturn(true);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
@@ -202,7 +156,9 @@ public class TestCatalogChangeLogListener {
                     new EntityChangeRecord(
                         4L, "metalake", "SCHEMA", "metalake.cat.sch", OperateType.ALTER, 0L))));
 
-    verify(catalogCache, never()).invalidate(any());
+    verify(catalogCache).invalidate(localIdentifier);
+    verify(catalogCache, never()).invalidate(NameIdentifier.of("metalake", "cat"));
+    verify(catalogCache, never()).invalidateAll();
   }
 
   @Test
@@ -227,7 +183,6 @@ public class TestCatalogChangeLogListener {
     NameIdentifier healthy = NameIdentifier.of("metalake", "healthy");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 

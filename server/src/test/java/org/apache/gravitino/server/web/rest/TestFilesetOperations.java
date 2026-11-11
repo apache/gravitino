@@ -34,10 +34,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Context;
+import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -77,16 +81,24 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 import org.mockito.stubbing.Answer;
 
 public class TestFilesetOperations extends BaseOperationsTest {
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
+    @Context private HttpHeaders headers;
+
     @Override
     public HttpServletRequest get() {
       HttpServletRequest request = mock(HttpServletRequest.class);
       when(request.getRemoteUser()).thenReturn(null);
-      when(request.getHeader(Version.CLIENT_VERSION_HEADER)).thenReturn(null);
+      when(request.getHeader(Version.CLIENT_VERSION_HEADER))
+          .thenReturn(headers.getHeaderString(Version.CLIENT_VERSION_HEADER));
       return request;
     }
   }
@@ -444,6 +456,27 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameFilesetToExistingName() {
+    FilesetAlreadyExistsException exception =
+        new FilesetAlreadyExistsException("Fileset existing already exists");
+    doThrow(exception).when(dispatcher).alterFileset(any(), any(FilesetChange.class));
+    FilesetUpdatesRequest request =
+        new FilesetUpdatesRequest(
+            Collections.singletonList(new FilesetUpdateRequest.RenameFilesetRequest("existing")));
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(FilesetAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testRenameFileset() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     Fileset fileset =
@@ -485,6 +518,37 @@ public class TestFilesetOperations extends BaseOperationsTest {
         mockFileset(
             "fileset1", Fileset.Type.MANAGED, "new comment", "mock location", ImmutableMap.of());
     assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+  }
+
+  @ParameterizedTest
+  @EnumSource(Fileset.Type.class)
+  void testUpdateFilesetType(Fileset.Type type) {
+    FilesetUpdateRequest req = new FilesetUpdateRequest.UpdateFilesetTypeRequest(type);
+    Fileset fileset =
+        mockFileset("fileset1", type, "comment", "mock location", ImmutableMap.of("k1", "v1"));
+    assertUpdateFileset(new FilesetUpdatesRequest(ImmutableList.of(req)), fileset);
+    Mockito.verify(dispatcher)
+        .alterFileset(
+            NameIdentifier.of(metalake, catalog, schema, "fileset1"),
+            FilesetChange.updateType(type));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "{\"updates\":[{\"@type\":\"updateType\"}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":null}]}",
+        "{\"updates\":[{\"@type\":\"updateType\",\"newType\":\"unknown\"}]}"
+      })
+  void testUpdateFilesetTypeRejectsInvalidRequest(String json) {
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(400, response.getStatus());
+      Mockito.verifyNoInteractions(dispatcher);
+    }
   }
 
   @Test
@@ -720,6 +784,49 @@ public class TestFilesetOperations extends BaseOperationsTest {
     mockOperations.getFileLocation(
         "test_metalake", "test_catalog", "test_schema", "fileset4", "/test", "default");
     Assertions.assertNull(CallerContext.CallerContextHolder.get());
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidSubPathRequests")
+  void testInvalidSubPathsReturnBadRequest(String route, String subPath, String clientVersion)
+      throws IOException {
+    Mockito.clearInvocations(dispatcher);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, schema, "fileset1");
+    String decodedSubPath = "/../outside";
+    IllegalArgumentException exception =
+        new IllegalArgumentException("subPath must not contain parent directory segments");
+    doThrow(exception).when(dispatcher).getFileLocation(ident, decodedSubPath, null);
+    doThrow(exception).when(dispatcher).listFiles(ident, null, decodedSubPath);
+
+    try (Response response =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/" + route)
+            .queryParam("sub_path", subPath)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .header(Version.CLIENT_VERSION_HEADER, clientVersion)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+
+    if (route.equals("location")) {
+      Mockito.verify(dispatcher).getFileLocation(ident, decodedSubPath, null);
+    } else {
+      Mockito.verify(dispatcher).listFiles(ident, null, decodedSubPath);
+    }
+  }
+
+  private static Stream<Arguments> invalidSubPathRequests() {
+    return Stream.of("files", "location")
+        .flatMap(
+            route ->
+                Stream.of(
+                    Arguments.of(route, "/../outside", null),
+                    Arguments.of(route, "%2F%2e%2E%2Foutside", "1.3.0"),
+                    Arguments.of(route, "%252F%252e%252e%252Foutside", "0.9.1")));
   }
 
   private void assertUpdateFileset(FilesetUpdatesRequest req, Fileset updatedFileset) {

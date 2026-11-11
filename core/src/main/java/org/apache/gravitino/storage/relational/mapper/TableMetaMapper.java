@@ -20,10 +20,15 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
+import org.apache.ibatis.annotations.Many;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Result;
+import org.apache.ibatis.annotations.ResultMap;
+import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -37,6 +42,64 @@ import org.apache.ibatis.annotations.UpdateProvider;
  */
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
+
+  /**
+   * Reads table metadata, its current version, and columns from one database statement snapshot.
+   *
+   * @param schemaId the parent schema ID
+   * @param tableName the table name
+   * @return the aggregate snapshot, or null when the table does not exist
+   */
+  @Results(
+      id = "tableWithColumns",
+      value = {
+        @Result(property = "tableId", column = "tableId", id = true),
+        @Result(property = "tableName", column = "tableName"),
+        @Result(property = "metalakeId", column = "metalakeId"),
+        @Result(property = "catalogId", column = "catalogId"),
+        @Result(property = "schemaId", column = "schemaId"),
+        @Result(property = "auditInfo", column = "auditInfo"),
+        @Result(property = "currentVersion", column = "currentVersion"),
+        @Result(property = "lastVersion", column = "lastVersion"),
+        @Result(property = "deletedAt", column = "deletedAt"),
+        @Result(property = "format", column = "format"),
+        @Result(property = "properties", column = "properties"),
+        @Result(property = "partitions", column = "partitions"),
+        @Result(property = "sortOrders", column = "sortOrders"),
+        @Result(property = "distribution", column = "distribution"),
+        @Result(property = "indexes", column = "indexes"),
+        @Result(property = "comment", column = "comment"),
+        @Result(
+            property = "columnPOs",
+            javaType = List.class,
+            many = @Many(resultMap = "tableColumnSnapshot", columnPrefix = "col_"))
+      })
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableWithColumnsBySchemaIdAndName")
+  @Nullable
+  TablePO selectTableWithColumnsBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("tableName") String tableName);
+
+  /**
+   * Reads a table aggregate by its full name, retaining missing-parent placeholders.
+   *
+   * @param metalakeName the metalake name
+   * @param catalogName the catalog name
+   * @param schemaName the physical schema name
+   * @param tableName the table name
+   * @return the aggregate or parent placeholder, or null when the metalake or catalog is absent
+   */
+  @ResultMap("tableWithColumns")
+  @SelectProvider(
+      type = TableMetaSQLProviderFactory.class,
+      method = "selectTableWithColumnsByFullQualifiedName")
+  @Nullable
+  TablePO selectTableWithColumnsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("tableName") String tableName);
 
   @SelectProvider(type = TableMetaSQLProviderFactory.class, method = "listTablePOsBySchemaId")
   List<TablePO> listTablePOsBySchemaId(@Param("schemaId") Long schemaId);

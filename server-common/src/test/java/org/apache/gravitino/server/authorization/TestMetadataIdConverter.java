@@ -22,14 +22,17 @@ package org.apache.gravitino.server.authorization;
 import static org.mockito.Answers.CALLS_REAL_METHODS;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -42,6 +45,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -288,6 +293,140 @@ public class TestMetadataIdConverter {
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "entityStore", originalEntityStore, true);
+    }
+  }
+
+  @Test
+  void testTableAuthorizationResolvesPhysicalNameSameAsDispatcher() {
+    // The authorization path must resolve a table to the same physical name the dispatcher operates
+    // on. Here the catalog's ops implements SupportsTableNameResolution and maps the normalized
+    // name T_NORM to the stored physical name t_phys; normalizeCaseSensitive (used by getID for
+    // authorization) must return t_phys, so authorization and the operation target the same table.
+    NameIdentifier tableIdent = NameIdentifier.of("metalake", "catalog", "schema", "T_NORM");
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+
+    // A capability that leaves the name unchanged, to isolate the resolution step.
+    Capability identityCapability = new Capability() {};
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(identityCapability);
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+
+    // doWithCatalog runs the callback with the mock catalog (used by both getCapability and the
+    // shared resolver inside normalizeCaseSensitive).
+    doAnswer(
+            invocation -> {
+              org.apache.gravitino.utils.ThrowableFunction<BaseCatalog, Object> fn =
+                  invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    NameIdentifier authorized =
+        MetadataIdConverter.normalizeCaseSensitive(
+            tableIdent, Capability.Scope.TABLE, mockCatalogManager);
+
+    Assertions.assertEquals(
+        "t_phys",
+        authorized.name(),
+        "authorization must resolve to the physical name the dispatcher operates on");
+    Assertions.assertEquals(physical, authorized);
+  }
+
+  @Test
+  void testColumnAuthorizationResolvesParentPhysicalName() {
+    // Tag operations and authorization share one helper, so a column's parent table resolves to
+    // the same physical name as a table does.
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(new Capability() {});
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> fn = invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "t_phys", "col"),
+        MetadataIdConverter.normalizeCaseSensitive(
+            NameIdentifier.of("metalake", "catalog", "schema", "T_NORM", "col"),
+            Capability.Scope.COLUMN,
+            mockCatalogManager));
+  }
+
+  @Test
+  void testColumnAuthorizationKeepsExactStoredColumnName() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("lowercase");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    TableEntity table = mock(TableEntity.class);
+    ColumnEntity column = mock(ColumnEntity.class);
+    when(column.name()).thenReturn("MyCol");
+    when(table.columns()).thenReturn(Collections.singletonList(column));
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "orders"),
+            Entity.EntityType.TABLE,
+            TableEntity.class))
+        .thenReturn(table);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          "catalog.schema.orders.MyCol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse("catalog.SCHEMA.ORDERS.MyCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
+      Assertions.assertEquals(
+          "catalog.schema.orders.othercol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse(
+                      "catalog.SCHEMA.ORDERS.OtherCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
     }
   }
 

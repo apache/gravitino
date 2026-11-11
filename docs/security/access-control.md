@@ -203,8 +203,8 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_MODEL`     | Metalake, Catalog, Schema                                                   | Register models in any schema in scope                               |
 | `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model                                            | Link versions to any model in scope                                  |
 | `USE_MODEL`          | Metalake, Catalog, Schema, Model                                            | Read the metadata of, and download versions of, any model in scope   |
-| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`) |
-| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in the `getSecrets` result |
+| `USE_SECRETS`                   | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | Call `getSecrets` (cloud access-key pairs omitted unless also granted `INCLUDE_CREDENTIAL_SECRETS`); required with `INCLUDE_CREDENTIAL_SECRETS` for catalog `getCredentials` |
+| `INCLUDE_CREDENTIAL_SECRETS`    | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model | With `USE_SECRETS`, include cloud access-key pairs in `getSecrets` and authorize catalog `getCredentials` |
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema                                                   | Register functions in any schema in scope                            |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function                                         | Read the metadata of, and execute, any function in scope             |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function                                         | Alter or drop any function in scope                                  |
@@ -292,8 +292,9 @@ Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
-holds `INCLUDE_CREDENTIAL_SECRETS`. Vend credentials (`getCredentials`) requires no dedicated
-privilege beyond being able to load the object. Callers who can load the object but lack
+holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata access plus both
+`USE_SECRETS` and `INCLUDE_CREDENTIAL_SECRETS`, or metalake ownership. Missing either privilege
+returns a forbidden error. Fileset credential vending retains its path-based authorization. Callers who can load the object but lack
 `USE_SECRETS` receive an empty `getSecrets` result rather than a forbidden error.
 
 The View row applies to metadata operations through both the native Gravitino REST API and the
@@ -309,6 +310,16 @@ authorization behavior.
 
 The native View rename operation changes only the name within the existing schema and remains
 owner-only; it does not accept a target schema.
+
+Creating or importing a Semantic Model, or replacing its definition, validates every dataset source
+as a Table or supported logical View under the
+caller's permissions, including cross-catalog references within the request's metalake. Each lookup
+requires visibility of that source type before loading metadata. Primary-key, unique-key, and
+relationship columns must exist in the resolved source. Source existence and column validation also
+run when authorization is disabled. Access denial returns `403`, missing sources or columns return
+`400`, and source catalog connection failures return `502`. These checks do not authorize queries
+against the referenced data or interpret SQL expressions. A missing table in a catalog without View
+support is a missing source (`400`); no unsupported View lookup is attempted.
 
 #### Metalake Objects
 
@@ -448,6 +459,26 @@ X-Gravitino-Active-Roles: analyst,reader
 Role names are matched exactly, and `ALL` and `NONE` are recognized only in upper case, so `all` is
 read as the name of a role. Surrounding whitespace is trimmed and repeated names collapse.
 
+### Role Names Outside ASCII
+
+Many HTTP clients cannot send non-ASCII header values: the Apache HttpClient used by Spark, Trino and
+the Gravitino Java client replaces such characters with `?`. To activate a role whose name contains
+non-ASCII characters, a comma, or `%`, percent-encode the UTF-8 bytes of the name:
+
+```text
+X-Gravitino-Active-Roles: vrf_%E8%A7%92%E8%89%B2
+```
+
+This activates the role `vrf_角色`. Each comma-separated entry is decoded on its own, so `a%2Cb`
+names the single role `a,b`, and a literal `%` is sent as `%25`. `+` is not decoded as a space, and
+whitespace is trimmed before decoding, so an encoded space such as `%20` is part of the name. `ALL`
+and `NONE` are matched before decoding, so `%41LL` and `%4EONE` name roles literally called `ALL` and
+`NONE`.
+
+A client that sends raw UTF-8 bytes, such as `curl`, can also send the name unencoded, as long as it
+contains no `,` or `%`. A header value is always read as UTF-8, so bytes in another encoding, such as
+ISO-8859-1, are rejected.
+
 ### What Narrowing Changes
 
 Narrowing only ever subtracts. The server validates the declaration against the roles the caller
@@ -469,6 +500,8 @@ as before.
 |--------------------------------------------------------------------|-------------------|
 | An empty entry, such as the trailing comma in `analyst,`           | `400 Bad Request` |
 | `ALL` or `NONE` combined with anything else, such as `ALL,analyst` | `400 Bad Request` |
+| A malformed escape, such as `%G1`, or a value that is not UTF-8    | `400 Bad Request` |
+| A name that is blank or has a control character after decoding     | `400 Bad Request` |
 | A well-formed value naming a role the caller does not hold         | `403 Forbidden`   |
 
 A role that does not exist and a role the caller was never granted both return `403`, so the response

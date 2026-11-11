@@ -1,24 +1,77 @@
 name: Web UI Tests
 
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-    paths:
-      - 'web/web/**'
-      - '.github/workflows/web-ui-tests.yml'
-  pull_request:
-    branches: [ "main", "branch-*" ]
-    paths:
-      - 'web/web/**'
-      - '.github/workflows/web-ui-tests.yml'
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
+
+concurrency:
+  group: fork-ci-web-ui-${{ inputs.head-sha || github.ref }}
+  cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
+        id: filter
+        with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
+          filters: |
+            source_changes:
+              - 'web/web/**'
+              - '.github/**'
+
   test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+    - uses: ./.github/actions/checkout-and-sync
+      with:
+        base-ref: ${{ inputs.base-ref }}
+        base-sha: ${{ inputs.base-sha }}
+        head-repository: ${{ inputs.head-repository }}
+        head-sha: ${{ inputs.head-sha }}
+        sync: ${{ inputs.sync }}
     
     - name: Setup pnpm
       uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10

@@ -56,6 +56,8 @@ public class AuthorizeExecutorFactory {
           secondaryExpression,
           secondaryExpressionCondition,
           allowCheckExistenceExpression);
+      case LOAD_VIEW -> new LoadViewAuthorizationExecutor(
+          expression, metadataContext, pathParams, entityType, allowCheckExistenceExpression);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
       case TEST_CATALOG_CONNECTION -> new CatalogConnectionTestAuthorizationExecutor(

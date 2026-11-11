@@ -47,6 +47,12 @@ public interface Column {
   Expression DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
 
   /**
+   * A default value that indicates the initial default value is not set. This is used in {@link
+   * #initialDefaultValue()}.
+   */
+  Expression INITIAL_DEFAULT_VALUE_NOT_SET = () -> Expression.EMPTY_EXPRESSION;
+
+  /**
    * A default value that indicates the default value will be set to the current timestamp. This is
    * used in {@link #defaultValue()}.
    */
@@ -78,9 +84,34 @@ public interface Column {
   boolean autoIncrement();
 
   /**
+   * Returns the default value used for new records that omit this column.
+   *
+   * <p>Catalogs that do not support column defaults leave this unset ({@link
+   * Column#DEFAULT_VALUE_NOT_SET}).
+   *
+   * <p>For example, for Iceberg format-version 3 this maps to {@code write-default}: the value
+   * writers fill in when a field is not supplied.
+   *
    * @return The default value of this column, {@link Column#DEFAULT_VALUE_NOT_SET} if not specified
    */
   Expression defaultValue();
+
+  /**
+   * Returns the default value used when reading stored records that lack this column, such as
+   * records written before the column was added.
+   *
+   * <p>Catalogs that do not distinguish an initial default leave this unset ({@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
+   *
+   * <p>For example, for Iceberg format-version 3 this maps to {@code initial-default}: the value
+   * assumed for rows written before the field was added.
+   *
+   * @return The initial default value, {@link Column#INITIAL_DEFAULT_VALUE_NOT_SET} if not
+   *     specified
+   */
+  default Expression initialDefaultValue() {
+    return INITIAL_DEFAULT_VALUE_NOT_SET;
+  }
 
   /**
    * @return the {@link SupportsTags} if the column supports tag operations.
@@ -146,13 +177,46 @@ public interface Column {
       boolean nullable,
       boolean autoIncrement,
       Expression defaultValue) {
+    return of(
+        name,
+        dataType,
+        comment,
+        nullable,
+        autoIncrement,
+        defaultValue,
+        INITIAL_DEFAULT_VALUE_NOT_SET);
+  }
+
+  /**
+   * Create a {@link Column} instance.
+   *
+   * @param name The name of the column.
+   * @param dataType The data type of the column.
+   * @param comment The comment of the column.
+   * @param nullable True if the column may produce null values.
+   * @param autoIncrement True if the column is an auto-increment column.
+   * @param defaultValue The write-time default value of the column. {@link
+   *     Column#DEFAULT_VALUE_NOT_SET} if null.
+   * @param initialDefaultValue The initial default value of the column. {@link
+   *     Column#INITIAL_DEFAULT_VALUE_NOT_SET} if null.
+   * @return A {@link Column} instance.
+   */
+  static ColumnImpl of(
+      String name,
+      Type dataType,
+      String comment,
+      boolean nullable,
+      boolean autoIncrement,
+      Expression defaultValue,
+      Expression initialDefaultValue) {
     return new ColumnImpl(
         name,
         dataType,
         comment,
         nullable,
         autoIncrement,
-        defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue);
+        defaultValue == null ? DEFAULT_VALUE_NOT_SET : defaultValue,
+        initialDefaultValue == null ? INITIAL_DEFAULT_VALUE_NOT_SET : initialDefaultValue);
   }
 
   /** The implementation of {@link Column} for users to use API. */
@@ -163,6 +227,7 @@ public interface Column {
     private boolean nullable;
     private boolean autoIncrement;
     private Expression defaultValue;
+    private Expression initialDefaultValue;
 
     private ColumnImpl(
         String name,
@@ -170,7 +235,8 @@ public interface Column {
         String comment,
         boolean nullable,
         boolean autoIncrement,
-        Expression defaultValue) {
+        Expression defaultValue,
+        Expression initialDefaultValue) {
       Preconditions.checkArgument(!Strings.isNullOrEmpty(name), "Column name cannot be null");
       Preconditions.checkArgument(dataType != null, "Column data type cannot be null");
       this.name = name;
@@ -179,6 +245,7 @@ public interface Column {
       this.nullable = nullable;
       this.autoIncrement = autoIncrement;
       this.defaultValue = defaultValue;
+      this.initialDefaultValue = initialDefaultValue;
     }
 
     @Override
@@ -212,6 +279,11 @@ public interface Column {
     }
 
     @Override
+    public Expression initialDefaultValue() {
+      return initialDefaultValue;
+    }
+
+    @Override
     public boolean equals(Object o) {
       if (this == o) {
         return true;
@@ -225,12 +297,14 @@ public interface Column {
           && Objects.equals(name, column.name)
           && Objects.equals(dataType, column.dataType)
           && Objects.equals(comment, column.comment)
-          && Objects.equals(defaultValue, column.defaultValue);
+          && Objects.equals(defaultValue, column.defaultValue)
+          && Objects.equals(initialDefaultValue, column.initialDefaultValue);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(name, dataType, comment, nullable, autoIncrement, defaultValue);
+      return Objects.hash(
+          name, dataType, comment, nullable, autoIncrement, defaultValue, initialDefaultValue);
     }
   }
 }
