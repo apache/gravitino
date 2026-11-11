@@ -56,6 +56,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -78,6 +79,7 @@ import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -95,7 +97,9 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -112,6 +116,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.server.authorization.AuthorizationRequestScope;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
@@ -119,6 +124,7 @@ import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.MetadataIdConverter;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
@@ -131,6 +137,8 @@ import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.RoleUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -147,6 +155,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -1214,6 +1223,362 @@ public class TestJcasbinAuthorizer {
     assertFalse(
         getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
         "the completed load's policies must survive a late partial result");
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a late partial result must not mark a completely loaded role as incomplete");
+  }
+
+  @Test
+  public void testCompleteResultAfterPartialLoadClearsIncompleteMarker() throws Exception {
+    // Mirror of testPartialResultCannotOverwriteCompletedConcurrentLoad with the opposite ordering:
+    // the partial result wins first, then a complete result for the same version replaces it.
+    String roleIdStr = String.valueOf(ALLOW_ROLE_ID);
+    String[] policyRow =
+        new String[] {
+          roleIdStr,
+          MetadataObject.Type.CATALOG.name(),
+          String.valueOf(CATALOG_ID),
+          USE_CATALOG.name(),
+          AuthConstants.ALLOW
+        };
+    ResolvedRolePolicies complete =
+        new ResolvedRolePolicies(
+            ImmutableList.<String[]>of(policyRow),
+            Collections.emptyList(),
+            Collections.emptyList());
+    ResolvedRolePolicies partial =
+        new ResolvedRolePolicies(
+            Collections.emptyList(),
+            Collections.emptyList(),
+            ImmutableList.of("CATALOG:testCatalog"));
+    long roleVersion = 43L;
+
+    assertTrue(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, partial));
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a partial load must mark the role's policies as incomplete");
+    assertFalse(
+        getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a partial load must stay out of loadedRoles");
+
+    // The complete result replaces the partial rows, so nothing can be missing any longer.
+    assertTrue(invokeReplaceRolePolicies(jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion, complete));
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a complete load must clear the incomplete marker");
+    assertFalse(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "the complete load's policies must be installed");
+
+    // An explicit invalidation drops the rows, so the marker must not outlive them. Re-arm the
+    // marker first with a newer partial load that still installs a row; otherwise the assertion
+    // below would pass even if clearing the rows left the marker behind.
+    ResolvedRolePolicies partialWithRow =
+        new ResolvedRolePolicies(
+            ImmutableList.<String[]>of(policyRow),
+            Collections.emptyList(),
+            ImmutableList.of("CATALOG:testCatalog"));
+    assertTrue(
+        invokeReplaceRolePolicies(
+            jcasbinAuthorizer, ALLOW_ROLE_ID, roleVersion + 1, partialWithRow));
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "a newer partial load must re-arm the incomplete marker");
+
+    jcasbinAuthorizer.handleRolePrivilegeChange(ALLOW_ROLE_ID);
+    assertTrue(
+        getAllowEnforcer(jcasbinAuthorizer).getFilteredPolicy(0, roleIdStr).isEmpty(),
+        "an explicit invalidation must drop the partial rows");
+    assertFalse(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(roleIdStr),
+        "clearing a role's policies must also clear its incomplete marker");
+  }
+
+  @Test
+  public void testHasDenyPolicyReportsMissingDenyOfIncompleteRoleLoad() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // The user holds a role that DENIES USE_CATALOG on a parent scope, but the role's securable
+    // object cannot be resolved, so no deny row is installed. hasDenyPolicy answers an existence
+    // question ("can a DENY hide one of the listed objects?"), and a row that was never installed
+    // cannot prove there is none. Reporting "no deny" would let list authorization take the
+    // parent-scope short-circuit; reporting one forces the per-object evaluation, which is the
+    // strongest guarantee this fix provides (it does not make the missing DENY effective; see
+    // testListStillIncludesObjectDeniedByIncompleteRoleUntilCompleteReload).
+    mockRoleInStore(DENY_ROLE_ID, "denyRole", ImmutableList.of(getDenySecurableObject()));
+    when(roleMetaMapper.listRolesByUserId(eq(USER_ID)))
+        .thenReturn(ImmutableList.of(buildRolePO(DENY_ROLE_ID, "denyRole")));
+    when(userMetaMapper.getUserUpdatedAt(eq(METALAKE), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(USER_ID, nextUserVersion()));
+
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    try {
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              currentPrincipal,
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              new AuthorizationRequestContext()),
+          "an incomplete role load must be reported as possibly holding a DENY");
+      assertTrue(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredNamedPolicy("p", 0, String.valueOf(DENY_ROLE_ID))
+              .isEmpty(),
+          "the deny row must really be absent, so the answer cannot come from the policy scan");
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+
+    // The retry throttle is a TTL cache and lapses independently of the partial policies. In
+    // production it can expire after loadRolePrivilege and before the evaluation, while the partial
+    // rows are still installed. The null entity below is only a test stand-in for that window: it
+    // keeps the retry from reloading the role or re-arming the throttle. (A role that really cannot
+    // be read throws instead, is marked unreadable, and hasDenyPolicy fails closed.) The marker,
+    // not the throttle, must carry the answer.
+    getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(METALAKE, "denyRole")),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(null);
+
+    assertTrue(
+        jcasbinAuthorizer.hasDenyPolicy(
+            currentPrincipal,
+            METALAKE,
+            ImmutableSet.of(USE_CATALOG),
+            new AuthorizationRequestContext()),
+        "the deny must still be reported after the retry throttle expired");
+    assertFalse(
+        getPartialRoleLoadBackoffCache(jcasbinAuthorizer).getIfPresent(DENY_ROLE_ID).isPresent(),
+        "the retry must not have re-armed the throttle, proving the marker carries the answer");
+    assertTrue(
+        getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(DENY_ROLE_ID)),
+        "the incomplete marker must survive the retry throttle");
+  }
+
+  @Test
+  public void testHasDenyPolicyRecoversAfterCompleteRoleLoad() throws Exception {
+    Principal currentPrincipal = PrincipalUtils.getCurrentPrincipal();
+
+    // An ALLOW-only role so that the deny enforcer never holds a row: every hasDenyPolicy answer
+    // below is driven solely by policy completeness, which makes the recovery observable.
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    mockDirectUserRoles(allowRole);
+
+    try {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.empty());
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              currentPrincipal,
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              new AuthorizationRequestContext()),
+          "no policy could be installed, so the DENY enforcer cannot be trusted yet");
+      assertTrue(
+          getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+
+      // 1. Recovery: once every object resolves the role loads completely, the marker goes away and
+      //    the deny enforcer is authoritative again.
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+      getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+      assertFalse(
+          jcasbinAuthorizer.hasDenyPolicy(
+              currentPrincipal,
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              new AuthorizationRequestContext()),
+          "a completely loaded ALLOW-only role holds no deny");
+      assertFalse(
+          getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+      assertTrue(getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent());
+
+      // 2. Partial reloads: a newer version of an already complete role that fails to resolve one
+      //    securable object must re-arm the marker.
+      RoleEntity partiallyResolvable =
+          getRoleEntity(
+              ALLOW_ROLE_ID,
+              "allowRole",
+              ImmutableList.of(
+                  getAllowSecurableObject(),
+                  buildSecurableObject(
+                      ALLOW_ROLE_ID,
+                      MetadataObject.Type.CATALOG,
+                      "unresolvableCatalog",
+                      USE_CATALOG,
+                      "ALLOW")));
+      when(entityStore.get(
+              eq(NameIdentifierUtil.ofRole(METALAKE, "allowRole")),
+              eq(Entity.EntityType.ROLE),
+              eq(RoleEntity.class)))
+          .thenReturn(partiallyResolvable);
+      mockedRoleVersions.put(
+          ALLOW_ROLE_ID, new RoleUpdatedAt(ALLOW_ROLE_ID, "allowRole", nextRoleVersion()));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenAnswer(
+              invocation -> {
+                MetadataObject object = invocation.getArgument(0);
+                return object.fullName().contains("unresolvableCatalog")
+                    ? Optional.empty()
+                    : Optional.of(CATALOG_ID);
+              });
+      getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(ALLOW_ROLE_ID);
+
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              currentPrincipal,
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              new AuthorizationRequestContext()),
+          "a partial reload must re-arm the marker even though the previous load was complete");
+      assertTrue(
+          getIncompleteRolePolicyIds(jcasbinAuthorizer).contains(String.valueOf(ALLOW_ROLE_ID)));
+      assertFalse(
+          getAllowEnforcer(jcasbinAuthorizer)
+              .getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID))
+              .isEmpty(),
+          "the resolvable securable object must still install its row");
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  /**
+   * Documents the limit of the incomplete-role marker through the real list filter: disabling the
+   * parent-scope short-circuit does not make an unresolved DENY hide its object. Per-object
+   * evaluation is unchanged, so the object stays listed until the role reloads completely and
+   * installs the deny row. The remaining authorization gap is tracked separately.
+   */
+  @Test
+  public void testListStillIncludesObjectDeniedByIncompleteRoleUntilCompleteReload()
+      throws Exception {
+    Field executorField = MetadataAuthzHelper.class.getDeclaredField("executor");
+    executorField.setAccessible(true);
+    Object previousExecutor = executorField.get(null);
+    executorField.set(null, (Executor) Runnable::run);
+    Config previousConfig = gravitinoEnv.config();
+    Config config = mock(Config.class);
+    when(config.get(eq(Configs.ENABLE_AUTHORIZATION))).thenReturn(true);
+    when(gravitinoEnv.config()).thenReturn(config);
+    try {
+      // A metalake-level ALLOW USE_CATALOG satisfies the catalog-list parent-scope path, and a
+      // catalog-level DENY USE_CATALOG on the same catalog must invalidate it.
+      RoleEntity allowRole =
+          mockRoleInStore(
+              ALLOW_ROLE_ID,
+              "listAllowRole",
+              ImmutableList.of(
+                  buildSecurableObject(
+                      ALLOW_ROLE_ID,
+                      MetadataObject.Type.METALAKE,
+                      METALAKE,
+                      USE_CATALOG,
+                      "ALLOW")));
+      RoleEntity denyRole =
+          mockRoleInStore(
+              DENY_ROLE_ID,
+              "listDenyRole",
+              ImmutableList.of(
+                  buildSecurableObject(
+                      DENY_ROLE_ID,
+                      MetadataObject.Type.CATALOG,
+                      "testCatalog",
+                      USE_CATALOG,
+                      "DENY")));
+      mockDirectUserRoles(allowRole, denyRole);
+
+      // The DENY's catalog cannot be resolved while the role loads, so only the ALLOW role
+      // installs rows and the deny enforcer has no row for this catalog.
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenAnswer(
+              invocation -> {
+                MetadataObject object = invocation.getArgument(0);
+                return object.type() == MetadataObject.Type.CATALOG
+                        && "testCatalog".equals(object.fullName())
+                    ? Optional.empty()
+                    : Optional.of(CATALOG_ID);
+              });
+
+      AuthorizationRequestContext context = new AuthorizationRequestContext();
+      assertTrue(
+          jcasbinAuthorizer.hasDenyPolicy(
+              PrincipalUtils.getCurrentPrincipal(),
+              METALAKE,
+              ImmutableSet.of(USE_CATALOG),
+              context),
+          "the incomplete role must be reported as possibly holding a DENY");
+      assertTrue(
+          getDenyEnforcer(jcasbinAuthorizer)
+              .getFilteredNamedPolicy("p", 0, String.valueOf(DENY_ROLE_ID))
+              .isEmpty(),
+          "the deny row must really be absent");
+
+      // The per-object path can resolve the catalog now, but the deny row is still missing, so the
+      // listed catalog is still returned. This is the documented limit of the fix.
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+
+      GravitinoAuthorizerProvider provider = mock(GravitinoAuthorizerProvider.class);
+      when(provider.getGravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
+      NameIdentifier deniedCatalog = NameIdentifier.of(METALAKE, "testCatalog");
+      try (MockedStatic<GravitinoAuthorizerProvider> providerMock =
+              mockStatic(GravitinoAuthorizerProvider.class);
+          AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+        providerMock.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+        scope.bind(METALAKE, context);
+        NameIdentifier[] filtered =
+            MetadataAuthzHelper.filterByExpression(
+                METALAKE,
+                AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                Entity.EntityType.CATALOG,
+                new NameIdentifier[] {deniedCatalog});
+        assertEquals(
+            1,
+            filtered.length,
+            "the unresolved DENY row cannot hide the catalog: per-object evaluation still allows it");
+      }
+
+      // A complete reload of the same DENY installs the row, and the per-object path now excludes
+      // the catalog.
+      getPartialRoleLoadBackoffCache(jcasbinAuthorizer).invalidate(DENY_ROLE_ID);
+      AuthorizationRequestContext reloadedContext = new AuthorizationRequestContext();
+      try (MockedStatic<GravitinoAuthorizerProvider> providerMock =
+              mockStatic(GravitinoAuthorizerProvider.class);
+          AuthorizationRequestScope scope = AuthorizationRequestScope.open()) {
+        providerMock.when(GravitinoAuthorizerProvider::getInstance).thenReturn(provider);
+        scope.bind(METALAKE, reloadedContext);
+        NameIdentifier[] filtered =
+            MetadataAuthzHelper.filterByExpression(
+                METALAKE,
+                AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                Entity.EntityType.CATALOG,
+                new NameIdentifier[] {deniedCatalog});
+        assertEquals(0, filtered.length, "a completely loaded DENY must hide the catalog again");
+      }
+      assertTrue(
+          getIncompleteRolePolicyIds(jcasbinAuthorizer).isEmpty(),
+          "the complete reload must clear the incomplete marker");
+    } finally {
+      executorField.set(null, previousExecutor);
+      when(gravitinoEnv.config()).thenReturn(previousConfig);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
   }
 
   /**
@@ -5282,12 +5647,13 @@ public class TestJcasbinAuthorizer {
     SemanticModel renamed = mock(SemanticModel.class);
     when(renamed.name()).thenReturn(newIdent.name());
     SemanticModelChange rename = SemanticModelChange.rename(newIdent.name());
-    when(dispatcher.alterSemanticModel(oldIdent, rename)).thenReturn(renamed);
+    when(dispatcher.alterSemanticModel(oldIdent, SemanticModelSourceUpdate.preserve(), rename))
+        .thenReturn(renamed);
     when(dispatcher.dropSemanticModel(newIdent)).thenReturn(true);
     when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(jcasbinAuthorizer);
     SemanticModelHookDispatcher hook = new SemanticModelHookDispatcher(dispatcher, () -> null);
     try {
-      hook.alterSemanticModel(oldIdent, rename);
+      hook.alterSemanticModel(oldIdent, SemanticModelSourceUpdate.preserve(), rename);
       metadataIdConverterMockedStatic
           .when(
               () ->
@@ -5329,6 +5695,112 @@ public class TestJcasbinAuthorizer {
       when(gravitinoEnv.gravitinoAuthorizer()).thenReturn(null);
       when(gravitinoEnv.catalogManager()).thenReturn(null);
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testMetalakeDropEvictsEveryMetadataTypeAndKeepsOtherMetalake(boolean peerReplay)
+      throws Exception {
+    // Use a dedicated metalake so the shared MetadataIdConverter stubs do not leak into other
+    // tests. The other metalake name extends the dropped one to check the name boundary.
+    String metalakeName = peerReplay ? "peer_drop_ml" : "local_drop_ml";
+    String otherMetalake = metalakeName + "_other";
+    GravitinoCache<String, Long> metadataIdCache = getMetadataIdCache(jcasbinAuthorizer);
+    JcasbinAuthorizationLookups lookups =
+        new JcasbinAuthorizationLookups(metadataIdCache, getOwnerRelCache(jcasbinAuthorizer));
+    MetadataObject.Type[] types = MetadataObject.Type.values();
+    for (int i = 0; i < types.length; i++) {
+      MetadataObject object = metadataObjectOfType(metalakeName, types[i]);
+      MetadataObject otherObject = metadataObjectOfType(otherMetalake, types[i]);
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(object, metalakeName))
+          .thenReturn(Optional.of(1000L + i), Optional.of(2000L + i));
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(otherObject, otherMetalake))
+          .thenReturn(Optional.of(3000L + i));
+
+      assertEquals(Optional.of(1000L + i), resolve(lookups, object, metalakeName));
+      assertEquals(Optional.of(3000L + i), resolve(lookups, otherObject, otherMetalake));
+      assertEquals(
+          Optional.of(1000L + i),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalakeName, object)),
+          types[i].name());
+    }
+
+    metalakeDropInvalidation(metalakeName, peerReplay).run();
+
+    for (int i = 0; i < types.length; i++) {
+      MetadataObject object = metadataObjectOfType(metalakeName, types[i]);
+      MetadataObject otherObject = metadataObjectOfType(otherMetalake, types[i]);
+      assertEquals(
+          Optional.empty(),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalakeName, object)),
+          types[i].name());
+      assertEquals(
+          Optional.of(3000L + i),
+          metadataIdCache.getIfPresent(
+              JcasbinAuthorizationCacheKeys.metadataIdCacheKey(otherMetalake, otherObject)),
+          types[i].name());
+      // The recreated metalake resolves same-named objects to their new IDs.
+      assertEquals(Optional.of(2000L + i), resolve(lookups, object, metalakeName));
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"false, false", "true, false", "false, true", "true, true"})
+  public void testRecreatedMetalakeDoesNotInheritOldOwnershipOrPermissions(
+      boolean peerReplay, boolean viaGroup) throws Exception {
+    // Use a dedicated metalake so the shared mapper and MetadataIdConverter stubs do not leak into
+    // other tests.
+    String metalakeName =
+        (peerReplay ? "peer" : "local") + (viaGroup ? "_group" : "") + "_recreate_ml";
+    String roleName = "recreated_role";
+    // With viaGroup, the role is bound to the user's group instead of to the user directly.
+    Long oldGroupId = viaGroup ? 7005L : null;
+    Long newGroupId = viaGroup ? 8005L : null;
+    long oldCatalogId = 7001L;
+    long oldUserId = 7002L;
+    long oldRoleId = 7003L;
+    long newCatalogId = 8001L;
+    long newUserId = 8002L;
+    long newRoleId = 8003L;
+    long otherCatalogId = 8004L;
+    long otherOwnerId = 9999L;
+    Principal principal = setCurrentPrincipalWithGroup(viaGroup ? GROUP_NAME : null);
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    MetadataObject otherCatalog = MetadataObjects.parse("other_cat", MetadataObject.Type.CATALOG);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(catalog, metalakeName))
+        .thenReturn(Optional.of(oldCatalogId), Optional.of(newCatalogId));
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(otherCatalog, metalakeName))
+        .thenReturn(Optional.of(otherCatalogId));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(oldCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(oldUserId, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(newCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(otherOwnerId, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(otherCatalogId), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(newUserId, "USER"));
+
+    // Old metalake: the user owns "cat" and holds a role that grants USE_CATALOG on it.
+    mockMetalakeUserWithRole(metalakeName, oldUserId, oldGroupId, oldRoleId, roleName, "cat");
+    assertTrue(authorizeUseCatalog(principal, metalakeName, catalog));
+    assertTrue(isOwner(principal, metalakeName, catalog));
+
+    // Drop the metalake, then recreate the same user, group, role and catalog names with new IDs.
+    // The new role grants USE_CATALOG on "other_cat" instead, and someone else owns "cat".
+    metalakeDropInvalidation(metalakeName, peerReplay).run();
+    mockedRoleVersions.remove(oldRoleId);
+    mockMetalakeUserWithRole(metalakeName, newUserId, newGroupId, newRoleId, roleName, "other_cat");
+
+    // The old ownership entry is retained, but the ID checks keep it from granting access.
+    assertTrue(getOwnerRelCache(jcasbinAuthorizer).getIfPresent(oldCatalogId).isPresent());
+    assertFalse(authorizeUseCatalog(principal, metalakeName, catalog));
+    assertFalse(isOwner(principal, metalakeName, catalog));
+    assertTrue(authorizeUseCatalog(principal, metalakeName, otherCatalog));
+    assertTrue(isOwner(principal, metalakeName, otherCatalog));
   }
 
   @Test
@@ -5380,6 +5852,41 @@ public class TestJcasbinAuthorizer {
     } finally {
       when(gravitinoEnv.catalogManager()).thenReturn(null);
     }
+  }
+
+  /**
+   * Legacy names remain usable when invalidating their authorization mappings and owner cache.
+   *
+   * @param type the single-level metadata type
+   * @throws Exception if the test cache cannot be inspected
+   */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TAG", "POLICY"})
+  public void testLegacyNameCacheInvalidation(Entity.EntityType type) throws Exception {
+    NameIdentifier identifier =
+        type == Entity.EntityType.TAG
+            ? NameIdentifierUtil.ofTag(METALAKE, "legacy.with.dot")
+            : NameIdentifierUtil.ofPolicy(METALAKE, "legacy.with.dot");
+    MetadataObject object =
+        MetadataObjects.of(null, "legacy.with.dot", MetadataObject.Type.valueOf(type.name()));
+    GravitinoCache<String, Long> metadataIds = getMetadataIdCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Optional<OwnerInfo>> owners = getOwnerRelCache(jcasbinAuthorizer);
+    String key = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(METALAKE, object);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(object, METALAKE))
+        .thenReturn(Optional.of(CATALOG_ID));
+
+    metadataIds.put(key, CATALOG_ID);
+    jcasbinAuthorizer.handleEntityNameIdMappingChange(METALAKE, identifier, type);
+    assertFalse(metadataIds.getIfPresent(key).isPresent());
+
+    metadataIds.put(key, CATALOG_ID);
+    owners.put(CATALOG_ID, Optional.of(new OwnerInfo(USER_ID, "USER")));
+    jcasbinAuthorizer.handleMetadataOwnerChange(METALAKE, USER_ID, identifier, type);
+    assertFalse(metadataIds.getIfPresent(key).isPresent());
+    assertFalse(owners.getIfPresent(CATALOG_ID).isPresent());
   }
 
   @Test
@@ -5981,6 +6488,14 @@ public class TestJcasbinAuthorizer {
   }
 
   @SuppressWarnings("unchecked")
+  private static Set<String> getIncompleteRolePolicyIds(JcasbinAuthorizer authorizer)
+      throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("incompleteRolePolicyIds");
+    field.setAccessible(true);
+    return (Set<String>) field.get(authorizer);
+  }
+
+  @SuppressWarnings("unchecked")
   private static GravitinoCache<Long, Optional<OwnerInfo>> getOwnerRelCache(
       JcasbinAuthorizer authorizer) throws Exception {
     Field field = JcasbinAuthorizer.class.getDeclaredField("ownerRelCache");
@@ -6050,5 +6565,109 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("denyEnforcer");
     field.setAccessible(true);
     return (Enforcer) field.get(authorizer);
+  }
+
+  private Runnable metalakeDropInvalidation(String metalakeName, boolean peerReplay)
+      throws Exception {
+    if (!peerReplay) {
+      return () ->
+          jcasbinAuthorizer.handleEntityNameIdMappingChange(
+              metalakeName, NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
+    }
+    JcasbinChangeListener listener =
+        new JcasbinChangeListener(
+            getMetadataIdCache(jcasbinAuthorizer), getOwnerRelCache(jcasbinAuthorizer), 1);
+    EntityChangeRecord metalakeDrop =
+        new EntityChangeRecord(
+            1L,
+            metalakeName,
+            MetadataObject.Type.METALAKE.name(),
+            EntityChangeLogNameIdentifierCodec.encode(NameIdentifier.of(metalakeName)),
+            OperateType.DROP,
+            0L);
+    return () -> listener.onEntityChange(ImmutableList.of(metalakeDrop));
+  }
+
+  private static MetadataObject metadataObjectOfType(String metalake, MetadataObject.Type type) {
+    String leaf = type.name().toLowerCase(Locale.ROOT);
+    switch (type) {
+      case METALAKE:
+        return MetadataObjects.parse(metalake, type);
+      case CATALOG:
+        return MetadataObjects.parse("catalog", type);
+      case SCHEMA:
+        return MetadataObjects.parse("catalog.schema", type);
+      case COLUMN:
+        return MetadataObjects.parse("catalog.schema.table.column", type);
+      case FILESET:
+      case TABLE:
+      case VIEW:
+      case SEMANTIC_MODEL:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+        return MetadataObjects.parse("catalog.schema." + leaf, type);
+      default:
+        return MetadataObjects.parse(leaf, type);
+    }
+  }
+
+  /**
+   * Mocks a metalake user, with the given ID, that holds one role granting USE_CATALOG. When {@code
+   * groupId} is set, the role is bound to the {@link #GROUP_NAME} group with that ID instead of to
+   * the user.
+   */
+  private static void mockMetalakeUserWithRole(
+      String metalake,
+      long userId,
+      @Nullable Long groupId,
+      long roleId,
+      String roleName,
+      String catalogName)
+      throws IOException {
+    RoleEntity role =
+        RoleEntity.builder()
+            .withNamespace(NamespaceUtil.ofRole(metalake))
+            .withId(roleId)
+            .withName(roleName)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withSecurableObjects(
+                ImmutableList.of(
+                    SecurableObjects.ofCatalog(
+                        catalogName, ImmutableList.of(Privileges.UseCatalog.allow()))))
+            .build();
+    when(entityStore.get(
+            eq(NameIdentifierUtil.ofRole(metalake, roleName)),
+            eq(Entity.EntityType.ROLE),
+            eq(RoleEntity.class)))
+        .thenReturn(role);
+    mockedRoleVersions.put(roleId, new RoleUpdatedAt(roleId, roleName, nextRoleVersion()));
+    List<RolePO> rolePOs = ImmutableList.of(buildRolePO(roleId, roleName));
+    if (groupId == null) {
+      when(roleMetaMapper.listRolesByUserId(eq(userId))).thenReturn(rolePOs);
+    } else {
+      when(roleMetaMapper.listRolesByUserId(eq(userId))).thenReturn(ImmutableList.of());
+      when(groupMetaMapper.getGroupUpdatedAt(eq(metalake), eq(GROUP_NAME)))
+          .thenReturn(new GroupUpdatedAt(groupId, groupVersionCounter.incrementAndGet()));
+      when(roleMetaMapper.listRolesByGroupId(eq(groupId))).thenReturn(rolePOs);
+    }
+    when(userMetaMapper.getUserUpdatedAt(eq(metalake), eq(USERNAME)))
+        .thenReturn(new UserUpdatedAt(userId, nextUserVersion()));
+  }
+
+  private boolean authorizeUseCatalog(
+      Principal principal, String metalake, MetadataObject catalog) {
+    return jcasbinAuthorizer.authorize(
+        principal, metalake, catalog, USE_CATALOG, new AuthorizationRequestContext());
+  }
+
+  private boolean isOwner(Principal principal, String metalake, MetadataObject metadataObject) {
+    return jcasbinAuthorizer.isOwner(
+        principal, metalake, metadataObject, new AuthorizationRequestContext());
+  }
+
+  private static Optional<Long> resolve(
+      JcasbinAuthorizationLookups lookups, MetadataObject metadataObject, String metalake) {
+    return lookups.resolveMetadataId(metadataObject, metalake, new AuthorizationRequestContext());
   }
 }

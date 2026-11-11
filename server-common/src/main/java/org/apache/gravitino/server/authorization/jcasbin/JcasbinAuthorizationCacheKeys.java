@@ -39,7 +39,8 @@ final class JcasbinAuthorizationCacheKeys {
     String[] names = metadataObject.fullName().split("\\.");
     switch (metadataObject.type()) {
       case METALAKE:
-        parts.add(MetadataObject.Type.METALAKE.name());
+        // No type token: the metalake key must stay a strict prefix of every key in the metalake,
+        // so a metalake drop can evict them all with one prefix invalidation.
         break;
       case CATALOG:
         parts.add(MetadataObject.Type.CATALOG.name());

@@ -20,12 +20,14 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import org.apache.gravitino.semantic.SemanticModelSource;
+import org.apache.gravitino.storage.relational.po.SemanticModelSourceListingPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.Insert;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.UpdateProvider;
 
-/** Persists dataset-to-source associations and their retirement state. */
+/** Reads and persists dataset-to-source associations and their retirement state. */
 public interface SemanticModelSourceMapper {
   /** The dataset source association table name. */
   String TABLE_NAME = "semantic_model_source_rel";
@@ -74,4 +76,22 @@ public interface SemanticModelSourceMapper {
       method = "deleteByLegacyTimeline")
   int deleteByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  /** Reads live models and matching datasets with current parent names in a single statement. */
+  @Select(
+      """
+      SELECT model.semantic_model_id AS semanticModelId, model.semantic_model_name AS semanticModelName,
+             metalake.metalake_name AS metalakeName, catalog.catalog_name AS catalogName,
+             schema_meta.schema_name AS schemaName, rel.dataset_name AS datasetName
+      FROM semantic_model_source_rel rel
+      JOIN semantic_model_meta model ON model.semantic_model_id = rel.semantic_model_id AND model.deleted_at = 0
+      JOIN schema_meta ON schema_meta.schema_id = model.schema_id AND schema_meta.deleted_at = 0
+      JOIN catalog_meta catalog ON catalog.catalog_id = model.catalog_id AND catalog.deleted_at = 0
+      JOIN metalake_meta metalake ON metalake.metalake_id = rel.metalake_id AND metalake.deleted_at = 0
+      WHERE rel.deleted_at = 0 AND rel.metalake_id = #{metalakeId} AND rel.source_type = #{sourceType} AND rel.source_id = #{sourceId}
+      """)
+  List<SemanticModelSourceListingPO> listForSource(
+      @Param("metalakeId") long metalakeId,
+      @Param("sourceType") String sourceType,
+      @Param("sourceId") long sourceId);
 }

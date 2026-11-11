@@ -116,7 +116,11 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
       throws NonEmptyEntityException, MetalakeInUseException {
     // Child catalog/schema/fileset write-through secrets are cleaned when MetalakeManager
     // force-drops catalogs via CatalogManager.dropCatalog → FilesetCatalogOperations.dropSchema.
-    return dispatcher.dropMetalake(ident, force);
+    boolean dropped = dispatcher.dropMetalake(ident, force);
+    // Evict even when this node dropped nothing: a concurrent drop on a peer returns false here,
+    // and the cached mappings are always reloadable.
+    AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.METALAKE);
+    return dropped;
   }
 
   @Override
@@ -133,7 +137,11 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   public boolean dropMetalake(NameIdentifier ident) {
     // For metalake, we don't clear all the privileges of catalog authorization plugin.
     // we just remove metalake.
-    return dispatcher.dropMetalake(ident);
+    boolean dropped = dispatcher.dropMetalake(ident);
+    // Evict even when this node dropped nothing: a concurrent drop on a peer returns false here,
+    // and the cached mappings are always reloadable.
+    AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.METALAKE);
+    return dropped;
   }
 
   @Override

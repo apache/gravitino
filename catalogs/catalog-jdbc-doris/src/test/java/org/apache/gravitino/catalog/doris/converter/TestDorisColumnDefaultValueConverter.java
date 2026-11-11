@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog.doris.converter;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import java.time.LocalDate;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -64,6 +65,22 @@ public class TestDorisColumnDefaultValueConverter {
   public void testNumericDefaultUsesLegacyCompatibleQuotedSyntax() {
     Assertions.assertEquals(
         "\"7\"", CONVERTER.fromGravitinoForAddColumn(Literals.integerLiteral(7), false));
+    Assertions.assertEquals(
+        "\"42\"",
+        CONVERTER.fromGravitinoForAddColumn(Literals.of(" 42 ", Types.IntegerType.get()), false));
+    Assertions.assertEquals(
+        "\"\"",
+        CONVERTER.fromGravitinoForAddColumn(Literals.of("", Types.IntegerType.get()), false));
+    for (String invalid : new String[] {"abc", "1); DROP TABLE t; --"}) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  CONVERTER.fromGravitinoForAddColumn(
+                      Literals.of(invalid, Types.IntegerType.get()), false));
+      Assertions.assertEquals(
+          "Invalid numeric column default value: " + invalid, exception.getMessage());
+    }
   }
 
   @Test
@@ -128,6 +145,20 @@ public class TestDorisColumnDefaultValueConverter {
         CONVERTER.toGravitino(
             new JdbcTypeConverter.JdbcTypeBean(JdbcTypeConverter.TEXT),
             "owner's\\\\value",
+            false,
+            false));
+    Assertions.assertEquals(
+        Literals.stringLiteral("owner's \"value\"\\path"),
+        CONVERTER.toGravitino(
+            new JdbcTypeConverter.JdbcTypeBean(DorisTypeConverter.STRING),
+            "owner's \\\"value\\\"\\\\path",
+            false,
+            false));
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 1, 2)),
+        CONVERTER.toGravitino(
+            new JdbcTypeConverter.JdbcTypeBean(DorisTypeConverter.DATEV2),
+            "2024-01-02",
             false,
             false));
     Assertions.assertEquals(

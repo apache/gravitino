@@ -23,19 +23,43 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
 public class TestPOStorageReadRouting {
 
   private static final Object MAPPER = new Object();
+
+  /** Functions follow the shared parent-ID route when entity caching is enabled. */
+  @Test
+  public void functionsUseParentIdForCachedGetAndList() {
+    FunctionMetaMapper mapper = mock(FunctionMetaMapper.class);
+    FunctionPOStorageOps ops = new FunctionPOStorageOps();
+    Namespace namespace = Namespace.of("ml", "cat", "schema");
+    try (MockedStatic<EntityIdService> entityIds = mockStatic(EntityIdService.class)) {
+      entityIds
+          .when(
+              () ->
+                  EntityIdService.getEntityId(
+                      NameIdentifier.of(namespace.levels()), Entity.EntityType.SCHEMA))
+          .thenReturn(42L);
+      POStorageReadRouting.getPO(
+          mapper, NameIdentifier.of(namespace, "function"), ops, Entity.EntityType.FUNCTION, true);
+      POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.FUNCTION, true);
+      verify(mapper).selectFunctionMetaBySchemaIdAndName(42L, "function");
+      verify(mapper).listFunctionPOsBySchemaId(42L);
+    }
+  }
 
   @Test
   public void getPOUsesFullNameWhenCacheDisabled() {

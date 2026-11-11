@@ -96,9 +96,10 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   Its native libraries include [Snappy 1.1.10](https://github.com/google/snappy/blob/1.1.10/COPYING)
   and [Bitshuffle 0.3.4](https://github.com/kiyo-masui/bitshuffle/blob/0.3.4/LICENSE),
   as recorded by the tagged Makefile and VERSION file.
-- Netty 4.1.109/110/118: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
+- Netty 4.1.109/110/118/140: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
   and [companion license texts](https://github.com/netty/netty/tree/netty-4.1.118.Final/license).
-  The selected companions match across these versions. They cover embedded
+  The NOTICE and companion texts are identical in 4.1.118 and 4.1.140 (compared file by file),
+  and the selected companions match across these versions. They cover embedded
   SLF4J/Harmony/JCTools in common, Webbit and Hoehrmann UTF-8 validation in HTTP,
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver.

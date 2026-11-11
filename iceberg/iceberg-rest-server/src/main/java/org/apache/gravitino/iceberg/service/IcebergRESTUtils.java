@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
@@ -38,7 +39,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
@@ -50,15 +53,18 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.common.DynMethods;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.responses.BaseScanTaskResponse;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -70,6 +76,17 @@ import org.slf4j.LoggerFactory;
 public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
+
+  // Resolve scan-only methods lazily so an incompatible runtime cannot prevent unrelated REST
+  // helpers from loading. Successful lookups are cached; failed lookups retain a useful error.
+  private static final Supplier<DynMethods.UnboundMethod> SCAN_RESPONSE_SPECS =
+      Suppliers.memoize(() -> resolveScanResponseMethod(BaseScanTaskResponse.class, "specsById"));
+
+  private static final Supplier<DynMethods.UnboundMethod> SCAN_RESPONSE_WITH_SPECS =
+      Suppliers.memoize(
+          () ->
+              resolveScanResponseMethod(
+                  BaseScanTaskResponse.Builder.class, "withSpecsById", Map.class));
 
   /**
    * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
@@ -347,15 +364,45 @@ public class IcebergRESTUtils {
   static PlanTableScanResponse copyWithCredentials(
       PlanTableScanResponse response,
       List<org.apache.iceberg.rest.credentials.Credential> credentials) {
-    return PlanTableScanResponse.builder()
+    return scanPlanResponseBuilder(scanResponseSpecs(response))
         .withPlanStatus(response.planStatus())
         .withPlanId(response.planId())
         .withPlanTasks(response.planTasks())
         .withFileScanTasks(response.fileScanTasks())
-        .withSpecsById(response.specsById())
         .withErrorResponse(response.errorResponse())
         .withCredentials(credentials)
         .build();
+  }
+
+  /** Creates a scan response builder with specs on both supported Iceberg runtimes. */
+  static PlanTableScanResponse.Builder scanPlanResponseBuilder(
+      @Nullable Map<Integer, PartitionSpec> specs) {
+    return SCAN_RESPONSE_WITH_SPECS.get().invoke(PlanTableScanResponse.builder(), specs);
+  }
+
+  /** Returns the full response spec map, including historical specs not referenced by tasks. */
+  @Nullable
+  static Map<Integer, PartitionSpec> scanResponseSpecs(PlanTableScanResponse response) {
+    return SCAN_RESPONSE_SPECS.get().invoke(response);
+  }
+
+  /** Resolves public methods first, then protected methods used by experimental Iceberg. */
+  static DynMethods.UnboundMethod resolveScanResponseMethod(
+      Class<?> implementation, String name, Class<?>... argumentTypes) {
+    try {
+      return DynMethods.builder(name)
+          .impl(implementation, argumentTypes)
+          .hiddenImpl(implementation, argumentTypes)
+          .buildChecked();
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      throw new IllegalStateException(
+          "Cannot access Iceberg scan response method "
+              + implementation.getName()
+              + "."
+              + name
+              + ". Use a supported Iceberg runtime with accessible scan response spec methods.",
+          e);
+    }
   }
 
   public static <T> Response ok(T t) {

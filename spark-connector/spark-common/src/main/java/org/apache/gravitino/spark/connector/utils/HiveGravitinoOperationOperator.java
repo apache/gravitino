@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.spark.sql.catalyst.InternalRow;
@@ -64,7 +65,11 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
       fields.add(new String[] {structField.name()});
-      values.add(SparkPartitionUtils.toGravitinoLiteral(ident, i, dataType));
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
+      values.add(
+          ident.isNullAt(i)
+              ? Literals.stringLiteral(SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME)
+              : SparkPartitionUtils.toGravitinoLiteral(ident, i, dataType));
     }
 
     Partition partition =
@@ -95,29 +100,16 @@ public class HiveGravitinoOperationOperator {
 
     boolean isNeedAll = names != null && names.length == 0 ? true : false;
 
-    String[] partitionNames =
-        getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER);
-    String[] partitionNamesWithDelimiter =
-        Arrays.stream(partitionNames)
-            .map(name -> name + PARTITION_NAME_DELIMITER)
-            .toArray(String[]::new);
+    List<String> requestedParts =
+        Arrays.asList(
+            getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER));
 
     return Arrays.stream(allPartitions)
-        .map(e -> e + PARTITION_NAME_DELIMITER)
+        // Match whole column=value parts; a substring match lets region=us match subregion=us.
         .filter(
-            e -> {
-              if (isNeedAll) {
-                return true;
-              }
-              for (String name : partitionNamesWithDelimiter) {
-                // exactly match
-                if (!e.contains(name)) {
-                  return false;
-                }
-              }
-              return true;
-            })
-        .map(e -> e.substring(0, e.length() - 1))
+            e ->
+                isNeedAll
+                    || Arrays.asList(e.split(PARTITION_NAME_DELIMITER)).containsAll(requestedParts))
         .map(e -> toSparkPartition(e, partitionSchema))
         .toArray(GenericInternalRow[]::new);
   }
@@ -159,12 +151,15 @@ public class HiveGravitinoOperationOperator {
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
     Preconditions.checkArgument(names != null, "Partition column names must not be null");
+    // names can be any subset of the partition columns, so look each column up by name.
     for (int i = 0; i < names.length; i++) {
-      StructField structField = partitionSchema.apply(i);
+      StructField structField = partitionSchema.apply(names[i]);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
       partitionName.append(
           partitionNamePart(
-              names[i], SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType)));
+              names[i], value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < names.length - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
@@ -178,10 +173,11 @@ public class HiveGravitinoOperationOperator {
     for (int i = 0; i < numFields; i++) {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
       partitionName.append(
           partitionNamePart(
               structField.name(),
-              SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType)));
+              value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < numFields - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }

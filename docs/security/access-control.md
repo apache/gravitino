@@ -459,6 +459,26 @@ X-Gravitino-Active-Roles: analyst,reader
 Role names are matched exactly, and `ALL` and `NONE` are recognized only in upper case, so `all` is
 read as the name of a role. Surrounding whitespace is trimmed and repeated names collapse.
 
+### Role Names Outside ASCII
+
+Many HTTP clients cannot send non-ASCII header values: the Apache HttpClient used by Spark, Trino and
+the Gravitino Java client replaces such characters with `?`. To activate a role whose name contains
+non-ASCII characters, a comma, or `%`, percent-encode the UTF-8 bytes of the name:
+
+```text
+X-Gravitino-Active-Roles: vrf_%E8%A7%92%E8%89%B2
+```
+
+This activates the role `vrf_角色`. Each comma-separated entry is decoded on its own, so `a%2Cb`
+names the single role `a,b`, and a literal `%` is sent as `%25`. `+` is not decoded as a space, and
+whitespace is trimmed before decoding, so an encoded space such as `%20` is part of the name. `ALL`
+and `NONE` are matched before decoding, so `%41LL` and `%4EONE` name roles literally called `ALL` and
+`NONE`.
+
+A client that sends raw UTF-8 bytes, such as `curl`, can also send the name unencoded, as long as it
+contains no `,` or `%`. A header value is always read as UTF-8, so bytes in another encoding, such as
+ISO-8859-1, are rejected.
+
 ### What Narrowing Changes
 
 Narrowing only ever subtracts. The server validates the declaration against the roles the caller
@@ -480,6 +500,8 @@ as before.
 |--------------------------------------------------------------------|-------------------|
 | An empty entry, such as the trailing comma in `analyst,`           | `400 Bad Request` |
 | `ALL` or `NONE` combined with anything else, such as `ALL,analyst` | `400 Bad Request` |
+| A malformed escape, such as `%G1`, or a value that is not UTF-8    | `400 Bad Request` |
+| A name that is blank or has a control character after decoding     | `400 Bad Request` |
 | A well-formed value naming a role the caller does not hold         | `403 Forbidden`   |
 
 A role that does not exist and a role the caller was never granted both return `403`, so the response
