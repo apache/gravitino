@@ -22,6 +22,7 @@ import com.google.common.collect.Maps;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import org.apache.gravitino.spark.connector.paimon.PaimonPropertiesConstants;
 import org.apache.hadoop.fs.Path;
 import org.apache.spark.sql.SparkSession;
@@ -48,9 +49,8 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
 
   @Override
   protected Map<String, String> getExtraSparkConfigs() {
-    // A Paimon SparkCatalog that talks to the same Hive metastore directly. It creates the format
-    // tables that the Gravitino catalog is then expected to read, since creating a format table
-    // through Gravitino is not supported.
+    // A Paimon SparkCatalog that talks to the same Hive metastore directly. The tests use it to
+    // create tables outside Gravitino and to check what Gravitino created.
     Map<String, String> configs = Maps.newHashMap(super.getExtraSparkConfigs());
     configs.put("spark.sql.catalog." + DIRECT_CATALOG, "org.apache.paimon.spark.SparkCatalog");
     configs.put("spark.sql.catalog." + DIRECT_CATALOG + ".metastore", "hive");
@@ -135,5 +135,88 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
     Assertions.assertFalse(tableExists(tableName));
     Assertions.assertTrue(hdfs.exists(new Path(location)));
     hdfs.delete(new Path(location), true);
+  }
+
+  @Test
+  void testCreateFormatTable() throws Exception {
+    String tableName = "test_create_csv_format_table";
+    String database = getDefaultDatabase();
+    String location = warehouse + "/" + database + ".db/" + tableName + "_data";
+    dropTableIfExists(tableName);
+    hdfs.delete(new Path(location), true);
+
+    // Create a CSV format table through the Gravitino catalog.
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT, name STRING, dt STRING) USING csv PARTITIONED BY (dt) "
+                + "LOCATION '%s'",
+            tableName, location));
+    sql(
+        String.format(
+            "INSERT INTO %s VALUES (1, 'a', '20260101'), (2, 'b', '20260101'), (3, 'c', '20260102')",
+            tableName));
+
+    // The Paimon catalog sees a CSV format table at the given location.
+    Map<String, String> paimonOptions = getPaimonOptions(tableName);
+    Assertions.assertEquals("format-table", paimonOptions.get("type"));
+    Assertions.assertEquals("csv", paimonOptions.get("file.format"));
+    Assertions.assertTrue(hdfs.exists(new Path(location, "dt=20260102")));
+
+    // Read it back through Gravitino and directly through Paimon.
+    List<String> expected = Arrays.asList("1,a,20260101", "2,b,20260101", "3,c,20260102");
+    Assertions.assertEquals(
+        expected, getQueryData(String.format("SELECT * FROM %s ORDER BY id", tableName)));
+    Assertions.assertEquals(
+        expected,
+        getQueryData(
+            String.format(
+                "SELECT * FROM %s.%s.%s ORDER BY id", DIRECT_CATALOG, database, tableName)));
+
+    sql(String.format("DROP TABLE %s", tableName));
+    Assertions.assertFalse(tableExists(tableName));
+    hdfs.delete(new Path(location), true);
+  }
+
+  @Test
+  void testCreateTableUsingPaimonIsNotAFormatTable() {
+    String tableName = "test_create_using_paimon";
+    dropTableIfExists(tableName);
+    sql(String.format("CREATE TABLE %s (id INT, name STRING) USING paimon", tableName));
+    Map<String, String> paimonOptions = getPaimonOptions(tableName);
+    Assertions.assertNotEquals("format-table", paimonOptions.get("type"));
+    Assertions.assertNull(paimonOptions.get("file.format"));
+    sql(String.format("DROP TABLE %s", tableName));
+  }
+
+  @Test
+  @Override
+  protected void testCreateDatasourceFormatPartitionTable() {
+    // With the Hive backend, USING PARQUET creates a Paimon format table, as in Paimon's own
+    // SparkCatalog. Spark reports such a table without its database, so the common checks on the
+    // Spark table do not apply; check the Paimon table and the data instead.
+    String tableName = "datasource_partition_table";
+    dropTableIfExists(tableName);
+    sql(getCreateSimpleTableString(tableName) + " USING PARQUET PARTITIONED BY (name, age)");
+    Map<String, String> paimonOptions = getPaimonOptions(tableName);
+    Assertions.assertEquals("format-table", paimonOptions.get("type"));
+    Assertions.assertEquals("parquet", paimonOptions.get("file.format"));
+
+    sql(String.format("INSERT INTO %s VALUES (1, 'a', 10), (2, 'b', 20)", tableName));
+    Assertions.assertEquals(
+        Arrays.asList("1,a,10", "2,b,20"),
+        getQueryData(String.format("SELECT id, name, age FROM %s ORDER BY id", tableName)));
+    Assertions.assertEquals(
+        Arrays.asList("2"),
+        getQueryData(String.format("SELECT id FROM %s WHERE age = 20", tableName)));
+    sql(String.format("DROP TABLE %s", tableName));
+  }
+
+  private Map<String, String> getPaimonOptions(String tableName) {
+    return getSparkSession()
+        .sql(
+            String.format(
+                "SHOW TBLPROPERTIES %s.%s.%s", DIRECT_CATALOG, getDefaultDatabase(), tableName))
+        .collectAsList().stream()
+        .collect(Collectors.toMap(r -> r.getString(0), r -> r.getString(1)));
   }
 }
