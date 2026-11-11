@@ -49,6 +49,7 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      |
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       |
+| `lance.allow-external-table-purge` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. | `false` | No |
 
 #### Key Property: `location`
 

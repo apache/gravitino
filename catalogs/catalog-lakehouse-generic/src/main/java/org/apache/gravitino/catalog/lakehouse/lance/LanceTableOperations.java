@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -280,6 +281,14 @@ public class LanceTableOperations extends ManagedTableOperations {
       // dataset) for a table that is about to be deleted anyway.
       Table table = super.loadTable(ident);
       boolean external = LancePropertiesUtils.isExternalTable(table.properties());
+      if (external
+          && !Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_TABLE_PURGE))) {
+        throw new UnsupportedOperationException(
+            "Purging external Lance tables is disabled. Use dropTable or Lance REST deregister"
+                + " to remove metadata only. A catalog administrator may enable "
+                + LANCE_ALLOW_EXTERNAL_TABLE_PURGE
+                + " to allow physical deletion of external data.");
+      }
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -302,6 +311,8 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
+    } catch (UnsupportedOperationException e) {
+      throw e;
     } catch (Exception e) {
       throw ExceptionMessages.wrap("Failed to purge Lance dataset for table " + ident, e);
     }

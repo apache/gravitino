@@ -41,7 +41,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -207,7 +206,7 @@ public class TestGenericCatalogOperations {
     Assertions.assertTrue(lanceOps.dropTable(ident));
   }
 
-  /** Legacy registrations preserve real data on drop and schema cascade; purge deletes it. */
+  /** Legacy registrations retain real data when dropped, cascaded, or denied a purge. */
   @ParameterizedTest
   @CsvSource(
       value = {
@@ -260,20 +259,17 @@ public class TestGenericCatalogOperations {
     store.put(entity, false);
 
     if ("purge".equals(operation)) {
-      Assertions.assertTrue(lanceOps.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> lanceOps.purgeTable(ident));
     } else if ("cascade".equals(operation)) {
       Assertions.assertTrue(lanceOps.dropSchema(schemaIdent, true));
     } else {
       Assertions.assertTrue(lanceOps.dropTable(ident));
     }
 
-    Assertions.assertFalse(lanceOps.tableExists(ident));
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
-    } else {
-      try (Dataset dataset = Dataset.open().uri(location).build()) {
-        Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
-      }
+    Assertions.assertEquals("purge".equals(operation), lanceOps.tableExists(ident));
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 

@@ -118,8 +118,10 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   private static final Schema tableSchema =
       new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
 
+  // Optional: IRC schema checks reject a new required field without an initial default even when
+  // the table has no snapshots (#14429).
   private static final Schema newTableSchema =
-      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+      new Schema(NestedField.of(2, true, "foo_string1", StringType.get()));
 
   private DummyEventListener dummyEventListener;
 

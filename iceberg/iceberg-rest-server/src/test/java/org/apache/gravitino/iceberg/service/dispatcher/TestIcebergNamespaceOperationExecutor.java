@@ -213,6 +213,27 @@ public class TestIcebergNamespaceOperationExecutor {
     verifyNoInteractions(mockCatalogWrapper);
   }
 
+  @Test
+  public void testRegisterTablePropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/missing/v1.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation))
+        .thenThrow(
+            new BadRequestException("Metadata location %s does not exist", metadataLocation));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(any(), any(), any(Boolean.class));
+  }
+
   @ParameterizedTest
   @ValueSource(
       ints = {EntityFieldLimits.MAX_NAME_LENGTH + 1, EntityFieldLimits.MAX_COLUMN_NAME_LENGTH})
