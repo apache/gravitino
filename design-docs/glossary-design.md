@@ -768,39 +768,93 @@ A performance test also measures the cycle check and the hierarchy read for chai
 
 ## Task Breakdown
 
-These tasks build Step 1.
+Step 1 is split into one issue per PR, under one epic. Each PR has its own unit tests, and REST
+PRs update the OpenAPI spec (`./gradlew :docs:build`). Tasks in the same group can be done in
+parallel once the tasks they depend on are merged.
 
-### Part 0: Prerequisites
+### Prerequisites
 
-- [ ] Domain design (#13867) merged: domain storage and domain authorization
-- [ ] Decision on default read access (Open Question 3)
+- [ ] Domain code merged to `main` (it is on `branch-domain-dev` now). Only T7 needs it.
+- [ ] Decision on Open Question 1 (membership) before T7, and on Open Question 3 (PUBLIC role)
+      before T8.
 
-### Part 1: Terms, storage and authorization
+### Group A: API and storage
 
-- [ ] `GlossaryTerm` API and `MetadataObject.Type.GLOSSARY_TERM` in `api/`; definition privileges on the metalake
-- [ ] Storage: the six glossary tables and `glossary_hierarchy_lock` (H2, MySQL, PostgreSQL, upgrade scripts)
-- [ ] `GlossaryManager`: CRUD, name and synonym rules, relations with the cycle check, domain membership, status, revision, `TermChangeHandler`, locking
-- [ ] Authorization: the `GLOSSARY_TERM` case in `JcasbinAuthorizer`, owner checks for `CREATE_DEFINITION`, draft visibility
-- [ ] Tags on terms: `GLOSSARY_TERM` as a taggable type in the existing tag APIs
-- [ ] REST endpoints for terms (including links and status) and hierarchy; `GlossaryEventDispatcher`; the domain drop check
-- [ ] Tests on H2, MySQL and PostgreSQL: name and synonym rules, default status, cycle check with concurrent edits, hidden drafts in relation lists, an owner with only `CREATE_DEFINITION` cannot edit another user's term, and a multi-node test (edit or move on one server, read on another)
+- [ ] **T1. Add the Glossary API** (`api/`). `GlossaryTerm` with `Status`, `TermChange`,
+      `GlossaryOperations` on the metalake, the relation and binding types, `GLOSSARY_TERM` in
+      `MetadataObject.Type`, the three definition privileges (metalake only), and the exceptions.
+      Depends on: none.
+- [ ] **T2. Add term entity and storage** (`core/`). `EntityType.GLOSSARY_TERM`,
+      `GlossaryTermEntity`, and the tables `glossary_term_meta`, `glossary_term_synonym` and
+      `glossary_term_version_info` (created, no rows) on H2, MySQL and PostgreSQL with upgrade
+      scripts. POs, mappers, SQL providers and `GlossaryTermMetaService`: insert, get, list,
+      update, soft delete, GC, and cleanup on metalake drop. Depends on: T1.
+- [ ] **T3. Add term relation storage** (`core/`). `glossary_term_rel` and `glossary_hierarchy_lock`;
+      insert and remove links; list broader, narrower and related terms; the per-level batched
+      walk. Depends on: T2.
 
-### Part 2: Bindings and lookup
+### Group B: Core logic
 
-- [ ] Binding storage; bind and unbind endpoints on all supported objects and on metrics, with both privilege paths; cleanup on object drop, column drop and metric removal
-- [ ] Binding reads: objects of a term, terms of an object or a metric, and `children=true` for tables, views and semantic models
-- [ ] `domain`, `nameContains` and `match` filters on the list endpoint, and `bindings=true` with the limit per term
+- [ ] **T4. Add the Glossary manager** (`core/`). Create, get, list, alter and drop; name and
+      synonym rules; links, properties and source reference; status; revision; `TermChangeHandler`
+      with the default handler; row locks. Depends on: T2.
+- [ ] **T5. Add term relations to the manager** (`core/`). Set broader and related terms; cycle
+      check, depth limit and the no-overlap rule under the hierarchy lock; hierarchy read; cleanup
+      on delete. Depends on: T3, T4.
+- [ ] **T6. Add Glossary authorization** (`core/`, `server/`). The `GLOSSARY_TERM` case in
+      `JcasbinAuthorizer`, owner checks for `CREATE_DEFINITION`, draft visibility, and filtering of
+      hidden terms inside relation lists. Depends on: T4.
+- [ ] **T7. Add domain membership** (`core/`). Membership storage (Option A or B, per Open
+      Question 1), add and remove domains on create and alter, and the 409 check on domain drop.
+      Depends on: T4, prerequisites.
 
-### Part 3: Clients, MCP and docs
+### Group C: REST and events
 
-- [ ] Java and Python clients, including `matchTerms`
-- [ ] MCP `glossary` tools, with the agent rules in the tool descriptions and tests for unmatched and ambiguous words
-- [ ] OpenAPI spec (validated with `./gradlew :docs:build`) and user docs
+- [ ] **T8. Add Glossary REST APIs and OpenAPI** (`common/`, `server/`). DTOs, requests and
+      responses; endpoints for terms, status, relations, hierarchy and domains; error mapping.
+      Depends on: T5, T6.
+- [ ] **T9. Support tags on terms** (`core/`, `server/`). `GLOSSARY_TERM` as a taggable type in
+      the existing tag APIs. Depends on: T8.
+- [ ] **T10. Add Glossary events and audit** (`core/`). `GlossaryEventDispatcher` with pre, post
+      and failure events for every write. Depends on: T8.
 
-### Part 4: CUJ tests
+### Group D: Bindings and lookup
 
-- [ ] End-to-end tests for CUJs 1–8 through the Java client, the REST API and MCP, on H2, MySQL and PostgreSQL (Docker); all must pass before Step 1 ships
-- [ ] Performance test for deep and wide hierarchies; set the final depth limit from the result
+- [ ] **T11. Add term bindings** (`core/`). `glossary_term_binding` storage; bind and unbind on all
+      supported objects and on metrics, with both privilege paths; cleanup on object drop, column
+      drop and metric removal. Depends on: T6.
+- [ ] **T12. Add binding REST APIs and reads** (`server/`). Bind and unbind endpoints; objects of a
+      term; terms of an object or a metric; `children=true`; OpenAPI. Depends on: T8, T11.
+- [ ] **T13. Add term lookup filters** (`core/`, `server/`). `domain`, `status`, `nameContains`
+      and `match` on the list endpoint, `matchedBy` in the result, and `bindings=true` with the limit
+      per term. Depends on: T12.
+
+### Group E: Clients and agents
+
+- [ ] **T14. Add Glossary to the Java client**, including `matchTerms`. Depends on: T13.
+- [ ] **T15. Add Glossary to the Python client**, including `match_terms`. Depends on: T13.
+- [ ] **T16. Add Glossary MCP tools** (`mcp-server/`), with the agent rules in the tool
+      descriptions, and tests for unmatched and ambiguous words. Depends on: T15.
+
+### Group F: Release checks
+
+- [ ] **T17. Add CUJ integration tests.** End-to-end tests for CUJs 1–8 through the Java client,
+      the REST API and MCP, on H2, MySQL and PostgreSQL (Docker). Depends on: T14, T16.
+- [ ] **T18. Add a hierarchy performance test** and set the final depth limit from it. Depends on:
+      T5.
+- [ ] **T19. Add Glossary user documentation** (`docs/`). Depends on: T14, T15.
+
+Step 1 ships when T1–T19 are merged and all CUJs pass.
+
+### Step 2 tasks (not filed yet)
+
+These are filed as a separate epic after Step 1 ships. Their scope is in Implementation Steps.
+
+- [ ] Proposed-change storage and the review handler for `TermChangeHandler`
+- [ ] Snapshots in `glossary_term_version_info`, and the history and diff APIs
+- [ ] Grants on domains, inherited by subdomains
+- [ ] The metalake setting for the default status
+- [ ] Web UI: term pages, hierarchy, binding drawers, review queue and history
 
 ## Implementation Steps
 
