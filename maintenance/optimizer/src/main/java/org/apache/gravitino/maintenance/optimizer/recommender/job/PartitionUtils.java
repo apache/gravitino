@@ -37,6 +37,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 
 /**
  * Builds Iceberg Spark {@code rewrite_data_files} {@code where} predicates from partition paths.
@@ -81,7 +82,8 @@ public class PartitionUtils {
    *   <li>{@code years}/{@code months}/{@code hours}: compare to the stored Iceberg int (years
    *       since 1970, etc.)—not a calendar year/month
    *   <li>{@code days}: Iceberg Spark {@code days()} returns {@code DateType}, so the RHS is {@code
-   *       DATE "yyyy-MM-dd"} (ISO from update-stats or epoch-day from metadata)
+   *       DATE "yyyy-MM-dd"}. Stored partition strings are converted like Iceberg {@code
+   *       DateTimeUtil} (ISO {@code yyyy-MM-dd} or epoch-day int only)
    * </ul>
    */
   public static String getWhereClauseForPartition(
@@ -115,7 +117,9 @@ public class PartitionUtils {
       Preconditions.checkNotNull(column, "Column '%s' not found in table schema", columnName);
 
       String expression = buildExpression(transform, columnName);
-      String literal = formatLiteral(transform, column, entry.partitionValue());
+      // Walk into struct fields so nested identity uses TIMESTAMP/INT/... not STRUCT→string.
+      String literal =
+          formatLiteral(transform, resolveLeafDataType(column, columnName), entry.partitionValue());
       predicates.add(String.format("%s = %s", expression, literal));
     }
 
@@ -134,6 +138,35 @@ public class PartitionUtils {
       return joinFieldName(fieldNames[0]);
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
+  }
+
+  /** Resolves the leaf type for {@code event.ts}-style paths under a top-level struct column. */
+  private static Type resolveLeafDataType(Column column, String columnName) {
+    // Exact match (including odd top-level names that contain '.') — no nested walk.
+    if (column.name().equalsIgnoreCase(columnName) || columnName.indexOf('.') < 0) {
+      return column.dataType();
+    }
+    Type type = column.dataType();
+    String[] parts = columnName.split("\\.");
+    for (int i = 1; i < parts.length; i++) {
+      if (!(type instanceof Types.StructType)) {
+        throw new IllegalArgumentException(
+            "Cannot resolve nested field '" + columnName + "': not a struct path");
+      }
+      Types.StructType.Field matched = null;
+      for (Types.StructType.Field field : ((Types.StructType) type).fields()) {
+        if (field.name().equalsIgnoreCase(parts[i])) {
+          matched = field;
+          break;
+        }
+      }
+      if (matched == null) {
+        throw new IllegalArgumentException(
+            "Nested field '" + columnName + "' not found in table schema");
+      }
+      type = matched.type();
+    }
+    return type;
   }
 
   /**
@@ -170,7 +203,7 @@ public class PartitionUtils {
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
-  private static String formatLiteral(Transform transform, Column column, String rawValue) {
+  private static String formatLiteral(Transform transform, Type type, String rawValue) {
     // years/months/hours/bucket partition values are already Iceberg ints; leave unchanged.
     if (transform instanceof Transforms.YearTransform
         || transform instanceof Transforms.MonthTransform
@@ -181,10 +214,9 @@ public class PartitionUtils {
 
     // days() → DateType; double-quoted DATE survives CALL where => '...' embedding.
     if (transform instanceof Transforms.DayTransform) {
-      return "DATE \"" + toIsoDateFromDayPartitionValue(rawValue) + "\"";
+      return "DATE \"" + escapeStringLiteral(toIsoDateFromDayPartitionValue(rawValue)) + "\"";
     }
 
-    Type type = column.dataType();
     switch (type.name()) {
       case BOOLEAN:
         return rawValue.toLowerCase(Locale.ROOT);
@@ -199,8 +231,8 @@ public class PartitionUtils {
       case DATE:
       case TIMESTAMP:
       case TIME:
-        // Same CALL embedding constraint as days(); see class Javadoc.
-        return type.name() + " \"" + rawValue + "\"";
+        // Same CALL embedding constraint as days(); escape " / \ like string literals.
+        return type.name() + " \"" + escapeStringLiteral(rawValue) + "\"";
       default:
         return "\"" + escapeStringLiteral(rawValue) + "\"";
     }
@@ -209,24 +241,34 @@ public class PartitionUtils {
   /**
    * Converts a day-partition stored value to {@code yyyy-MM-dd}.
    *
-   * <p>Update-stats persists Spark {@code date} partition fields via {@code String.valueOf}, which
-   * yields ISO dates (for example {@code 2026-01-01}). Iceberg metadata may also expose the raw
-   * epoch-day integer. Accept both; reject anything else with a clear error.
+   * <p>Supported inputs match Iceberg {@code DateTimeUtil} (no iceberg-api dependency):
+   *
+   * <ul>
+   *   <li>ISO {@code yyyy-MM-dd} — same as {@code DateTimeUtil.isoDateToDays(String)}
+   *   <li>epoch-day integer string — same as {@code DateTimeUtil.daysToIsoDate(int)}
+   * </ul>
+   *
+   * <p>Both appear because callers store partition values as strings: update-stats uses {@code
+   * String.valueOf(Spark date)} (ISO), while Iceberg metadata may expose the raw epoch-day int.
+   * Compact forms like {@code 20260101} are not ISO dates; if all digits they are parsed as
+   * epoch-day (same as {@code daysToIsoDate(20260101)}), not as a calendar compact date.
    */
   private static String toIsoDateFromDayPartitionValue(String rawValue) {
     try {
+      // DateTimeUtil.isoDateToDays(String): ISO_LOCAL_DATE only.
       return LocalDate.parse(rawValue, DateTimeFormatter.ISO_LOCAL_DATE)
           .format(DateTimeFormatter.ISO_LOCAL_DATE);
     } catch (DateTimeParseException ignored) {
       // fall through to epoch-day
     }
     try {
-      // Mirrors Iceberg DateTimeUtil.daysToIsoDate without depending on iceberg-api.
+      // DateTimeUtil.daysToIsoDate(int).
       return LocalDate.ofEpochDay(Integer.parseInt(rawValue))
           .format(DateTimeFormatter.ISO_LOCAL_DATE);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
-          "Day partition value must be an ISO date (yyyy-MM-dd) or epoch-day integer, but got: "
+          "Day partition value must be an ISO date (yyyy-MM-dd) or epoch-day integer "
+              + "(Iceberg DateTimeUtil), but got: "
               + rawValue,
           e);
     }

@@ -239,6 +239,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         assertRewriteCallForStructHour(spark, ansi);
         assertRewriteCallForStructBucket(spark, ansi);
         assertRewriteCallForStructTruncate(spark, ansi);
+        assertRewriteCallForStructIdentityTimestamp(spark, ansi);
+        assertRewriteCallForStructIdentityInt(spark, ansi);
       }
     } finally {
       spark.stop();
@@ -518,6 +520,45 @@ public class TestBuiltinIcebergRewriteDataFiles {
             },
             new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})});
     Assertions.assertEquals("(truncate(2, event.loc) = \"ab\")", where);
+    callRewrite(spark, table, where);
+  }
+
+  private static void assertRewriteCallForStructIdentityTimestamp(
+      SparkSession spark, boolean ansi) {
+    String table = fullTable("struct_id_ts_" + ansiFlag(ansi));
+    recreateStructTsTable(spark, table, "event.ts");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(
+                PartitionPath.of(
+                    List.of(new PartitionEntryImpl("event.ts", "2026-03-18 12:00:00")))),
+            new Column[] {eventStructColumn()},
+            new Transform[] {Transforms.identity(new String[] {"event", "ts"})});
+    Assertions.assertEquals("(event.ts = TIMESTAMP \"2026-03-18 12:00:00\")", where);
+    callRewrite(spark, table, where);
+  }
+
+  private static void assertRewriteCallForStructIdentityInt(SparkSession spark, boolean ansi) {
+    String table = fullTable("struct_id_int_" + ansiFlag(ansi));
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<code: INT>) USING iceberg "
+            + "PARTITIONED BY (event.code)");
+    spark.sql("INSERT INTO " + table + " SELECT id, named_struct('code', 7) FROM range(0, 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.code", "7")))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField("code", Types.IntegerType.get())))
+            },
+            new Transform[] {Transforms.identity(new String[] {"event", "code"})});
+    Assertions.assertEquals("(event.code = 7)", where);
     callRewrite(spark, table, where);
   }
 

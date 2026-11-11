@@ -113,6 +113,18 @@ public class TestPartitionUtils {
   }
 
   @Test
+  void testIdentityTimestampPartitionEscapesQuotesAndBackslashes() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("ts", "2024-01-01 00:00:00\"x\\y"));
+    Column[] columns = new Column[] {column("ts", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.identity("ts")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\"x\\\\y\"", where);
+  }
+
+  @Test
   void testBucketPartitionUsesIcebergArgumentOrder() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("bucket", "14"));
     Column[] columns = new Column[] {column("user_id", Types.LongType.get())};
@@ -191,6 +203,50 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     Assertions.assertEquals("days(event.ts) = DATE \"2026-03-18\"", where);
+  }
+
+  @Test
+  void testIdentityPartitionOnNestedTimestampUsesTypedLiteral() {
+    // Must resolve leaf TIMESTAMP type; falling back to STRUCT would emit a plain string literal.
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.ts", "2026-03-18 12:00:00"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms = new Transform[] {Transforms.identity(new String[] {"event", "ts"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("event.ts = TIMESTAMP \"2026-03-18 12:00:00\"", where);
+  }
+
+  @Test
+  void testIdentityPartitionOnNestedIntegerUsesBareLiteral() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.id", "7"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField("id", Types.IntegerType.get())))
+        };
+    Transform[] transforms = new Transform[] {Transforms.identity(new String[] {"event", "id"})};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("event.id = 7", where);
+  }
+
+  @Test
+  void testNestedFieldNotFoundThrowsClearError() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.missing", "x"));
+    Column[] columns = new Column[] {eventStructColumn()};
+    Transform[] transforms =
+        new Transform[] {Transforms.identity(new String[] {"event", "missing"})};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("event.missing"));
   }
 
   @Test
@@ -287,6 +343,18 @@ public class TestPartitionUtils {
             IllegalArgumentException.class,
             () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
     Assertions.assertTrue(ex.getMessage().contains("not-a-day"));
+  }
+
+  @Test
+  void testDayPartitionDigitStringUsesEpochDayLikeIcebergDaysToIsoDate() {
+    // Same as DateTimeUtil.daysToIsoDate(19723); compact yyyymmdd is not an ISO date.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "19723"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.day("event_time")};
+
+    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+
+    Assertions.assertEquals("days(event_time) = DATE \"2024-01-01\"", where);
   }
 
   @Test
