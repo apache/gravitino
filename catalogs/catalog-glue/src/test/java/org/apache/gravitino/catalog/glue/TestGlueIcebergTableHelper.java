@@ -609,6 +609,45 @@ class TestGlueIcebergTableHelper {
     }
   }
 
+  @Test
+  void testAlterTableUpdatesColumnNullability() throws IOException {
+    try (InMemoryCatalog catalog = newCatalog()) {
+      catalog.createTable(
+          TableIdentifier.of("db", "t"),
+          new Schema(
+              NestedField.required(1, "id", LongType.get()),
+              NestedField.optional(2, "name", StringType.get())));
+
+      GlueIcebergTableHelper.alterTable(
+          catalog, "db", "t", TableChange.updateColumnNullability(new String[] {"id"}, true));
+      assertTrue(
+          catalog.loadTable(TableIdentifier.of("db", "t")).schema().findField("id").isOptional());
+
+      // Iceberg refuses optional -> required as an incompatible change.
+      IllegalArgumentException e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  GlueIcebergTableHelper.alterTable(
+                      catalog,
+                      "db",
+                      "t",
+                      TableChange.updateColumnNullability(new String[] {"name"}, false)));
+      assertTrue(e.getMessage().contains("optional -> required"), e.getMessage());
+
+      e =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  GlueIcebergTableHelper.alterTable(
+                      catalog,
+                      "db",
+                      "t",
+                      TableChange.addColumn(new String[] {"c"}, Types.StringType.get(), false)));
+      assertTrue(e.getMessage().contains("optional -> required"), e.getMessage());
+    }
+  }
+
   private static void assertColumnsAfterAlter(List<String> expected, TableChange... changes)
       throws IOException {
     try (InMemoryCatalog catalog = newCatalog()) {
