@@ -307,6 +307,12 @@ through the Gravitino table API removes only the metadata. Explicit `purgeTable`
 catalog properties; a table property cannot enable it. Use Lance REST `deregister` to remove
 metadata while preserving data. The opt-in does not validate location ownership.
 
+A new Lance table, whether created, registered or declared, cannot use a location that equals,
+contains or is inside the location of another table in the same catalog. Dropping a table deletes its
+whole location, so this keeps one table from deleting or changing the data of another. The check uses
+Gravitino metadata only: it does not see tables in other catalogs, symbolic links, or data that no
+table owns. Tables that already overlap are not changed.
+
 Gravitino did not create the dataset of a registered or declared table, and its location may hold
 another table's dataset. Column and index changes to that dataset are rejected by default, and the
 same catalog setting allows them. The catalog marks these tables with the reserved property

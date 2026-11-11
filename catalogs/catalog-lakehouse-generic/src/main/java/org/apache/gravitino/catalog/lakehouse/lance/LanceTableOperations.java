@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -47,6 +48,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.GenericColumn;
@@ -62,6 +64,7 @@ import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -245,6 +248,10 @@ public class LanceTableOperations extends ManagedTableOperations {
         throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
       }
     }
+
+    // Before any storage access, so a location that holds another table's data is never written,
+    // adopted or later deleted through this table.
+    rejectOverlappingLocation(ident, location);
 
     if (register) {
       // Validate before OVERWRITE can remove existing metadata or managed data.
@@ -625,6 +632,93 @@ public class LanceTableOperations extends ManagedTableOperations {
         .map(mode -> mode.trim().replace('-', '_').toUpperCase())
         .map(SchemaRefreshMode::valueOf)
         .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
+  }
+
+  /**
+   * Rejects a location that equals, contains or is inside the location of another table in the same
+   * catalog. Dropping a table deletes its whole location, so a table at a parent directory could
+   * delete the datasets of other tables, and a table at another table's location could change that
+   * table's dataset.
+   *
+   * <p>This compares stored metadata only. It does not see other catalogs, symbolic links or tables
+   * created concurrently. The other table is not named, because the caller may not be allowed to
+   * see it.
+   *
+   * @param ident the table being created; an existing table with this name is ignored, because an
+   *     overwrite replaces it
+   * @param location the requested table location
+   */
+  private void rejectOverlappingLocation(NameIdentifier ident, String location) {
+    Namespace schemaNamespace = ident.namespace();
+    if (schemaNamespace.length() < 3) {
+      // Only a metalake.catalog.schema namespace identifies the catalog to compare against.
+      return;
+    }
+    List<String> requested = locationSegments(location);
+    Namespace catalogNamespace = Namespace.of(schemaNamespace.level(0), schemaNamespace.level(1));
+    try {
+      for (SchemaEntity schema :
+          store().list(catalogNamespace, SchemaEntity.class, Entity.EntityType.SCHEMA)) {
+        Namespace tableNamespace =
+            Namespace.of(catalogNamespace.level(0), catalogNamespace.level(1), schema.name());
+        for (TableEntity table :
+            store().list(tableNamespace, TableEntity.class, Entity.EntityType.TABLE)) {
+          if (table.nameIdentifier().equals(ident) || table.properties() == null) {
+            continue;
+          }
+          String other = table.properties().get(Table.PROPERTY_LOCATION);
+          if (StringUtils.isNotBlank(other) && isPrefixOrSame(requested, locationSegments(other))) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Location %s of Lance table %s overlaps the location of another table in"
+                        + " this catalog",
+                    location, ident));
+          }
+        }
+      }
+    } catch (IOException e) {
+      throw ExceptionMessages.wrap("Failed to check the table locations for " + ident, e);
+    }
+  }
+
+  /**
+   * Splits a location into scheme, authority and normalized path segments. A path without a scheme
+   * is a local file path. Segments are compared whole, so {@code s3://b/v1} does not contain {@code
+   * s3://b/v10}.
+   */
+  static List<String> locationSegments(String location) {
+    String path = location.trim();
+    String scheme = "file";
+    String authority = "";
+    int separator = path.indexOf("://");
+    if (separator > 0) {
+      scheme = path.substring(0, separator).toLowerCase(Locale.ROOT);
+      String rest = path.substring(separator + 3);
+      int slash = rest.indexOf('/');
+      authority = slash < 0 ? rest : rest.substring(0, slash);
+      path = slash < 0 ? "" : rest.substring(slash);
+    } else if (path.regionMatches(true, 0, "file:", 0, 5)) {
+      path = path.substring(5);
+    }
+    List<String> segments = new ArrayList<>(List.of(scheme, authority));
+    for (String segment : path.split("/")) {
+      if (segment.isEmpty() || ".".equals(segment)) {
+        continue;
+      }
+      if ("..".equals(segment)) {
+        if (segments.size() > 2) {
+          segments.remove(segments.size() - 1);
+        }
+        continue;
+      }
+      segments.add(segment);
+    }
+    return segments;
+  }
+
+  private static boolean isPrefixOrSame(List<String> first, List<String> second) {
+    int common = Math.min(first.size(), second.size());
+    return first.subList(0, common).equals(second.subList(0, common));
   }
 
   private boolean externalDatasetModificationAllowed() {

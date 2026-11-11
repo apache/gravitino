@@ -144,6 +144,10 @@ on a table that was registered or declared, because Gravitino did not create its
 created through `CreateTable` can be altered without it. This setting was named
 `lance.allow-external-table-purge` before.
 
+`CreateTable`, `DeclareTable` and `RegisterTable` reject a location that equals, contains or is
+inside the location of another table in the same catalog, with HTTP `400`. The error does not name
+the other table.
+
 When `CreateTable` fails because the table name already exists, the request is rejected before any
 data is written. If a concurrent request creates the same name after that check, the dataset written
 at the external location is kept, and an administrator must remove it.

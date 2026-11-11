@@ -59,6 +59,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
@@ -67,6 +68,7 @@ import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -2473,6 +2475,65 @@ public class TestLanceTableOperations {
       Assertions.assertEquals(1L, dataset.version());
       Assertions.assertEquals(2, dataset.getSchema().getFields().size());
     }
+  }
+
+  @Test
+  void testLocationSegmentsCompareWholeSegments() {
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("/tmp/a/b/"),
+        LanceTableOperations.locationSegments("file:///tmp/a/./c/../b"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("file:/tmp/a"),
+        LanceTableOperations.locationSegments("/tmp/a"));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("s3://bucket/v1").subList(0, 3),
+        LanceTableOperations.locationSegments("s3://bucket/v10").subList(0, 3));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("s3://bucket/a"),
+        LanceTableOperations.locationSegments("s3://other/a"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"parent", "same", "child"})
+  void testCreateRejectsLocationOverlappingAnotherTable(String relation) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier other = NameIdentifier.of("metalake", "catalog", "other_schema", "victim");
+    Path parent = tempDir.resolve("overlap-" + relation);
+    String victim = parent.resolve("victim").toString();
+    String requested =
+        switch (relation) {
+          case "parent" -> parent.toString();
+          case "same" -> "file://" + victim + "/";
+          default -> victim + "/nested";
+        };
+    SchemaEntity schema = mock(SchemaEntity.class);
+    when(schema.name()).thenReturn("other_schema");
+    when(store.list(
+            Namespace.of("metalake", "catalog"), SchemaEntity.class, Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(schema));
+    when(store.list(
+            Namespace.of("metalake", "catalog", "other_schema"),
+            TableEntity.class,
+            Entity.EntityType.TABLE))
+        .thenReturn(
+            List.of(tableEntity(other, List.of(), Map.of(Table.PROPERTY_LOCATION, victim))));
+    when(store.exists(ident, Entity.EntityType.TABLE)).thenReturn(false);
+
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                create(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    requested,
+                    Map.of()));
+
+    Assertions.assertTrue(error.getMessage().contains("overlaps"), error.getMessage());
+    // The caller may not see the other table, so it is not named.
+    Assertions.assertFalse(error.getMessage().contains(other.toString()), error.getMessage());
+    verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
+    verify(store, never()).put(any(), anyBoolean());
   }
 
   private Table create(

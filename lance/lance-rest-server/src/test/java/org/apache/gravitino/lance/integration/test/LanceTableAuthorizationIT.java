@@ -44,12 +44,14 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.AfterAll;
@@ -77,6 +79,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String SCHEMA_OWNER = "lance_table_authz_schema_owner";
   private static final String LONE_OWNER = "lance_table_authz_lone_owner";
   private static final String CATALOG = "lance_table_authz_catalog";
+  // Holds a dataset that a table of CATALOG adopts, out of reach of CATALOG's location check.
+  private static final String OTHER_CATALOG = "lance_table_authz_other_catalog";
   private static final String SCHEMA = "lance_table_authz_schema";
   // Tables created by the write tests live in their own schema, so the listing tests keep asserting
   // the exact contents of the read schema whatever order the tests run in.
@@ -126,6 +130,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
     createNamespace(id(CATALOG, WRITE_SCHEMA));
     createNamespace(id(CATALOG, OWNED_SCHEMA));
     createNamespace(id(CATALOG, LONE_SCHEMA));
+    createNamespace(OTHER_CATALOG);
+    createNamespace(id(OTHER_CATALOG, SCHEMA));
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
@@ -395,40 +401,59 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(404, table(ADMIN, MISSING_TABLE, "deregister"));
   }
 
+  /** A table cannot be placed at, above or inside another table's location in the catalog. */
   @ParameterizedTest
-  @ValueSource(strings = {"register", "create"})
-  void testTableOwnerCannotPurgeAnotherSchemasData(String operation) throws Exception {
-    String victim = "purge_victim_" + operation;
-    String alias = "purge_alias_" + operation;
-    Path parent = tempDir.resolve("purge_parent_" + operation);
+  @ValueSource(strings = {"register", "declare", "create", "managed"})
+  void testTableCannotOverlapAnotherTablesLocation(String operation) throws Exception {
+    String victim = "overlap_victim_" + operation;
+    String alias = "overlap_alias_" + operation;
+    Path parent = tempDir.resolve("overlap_parent_" + operation);
     Path victimLocation = parent.resolve("victim");
     LanceDatasetTestUtils.createDataset(victimLocation.toString());
     assertStatus(200, register(ADMIN, SCHEMA, victim, null, victimLocation.toString()));
     try {
       assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
-      if ("register".equals(operation)) {
-        assertStatus(200, register(PROBER, WRITE_SCHEMA, alias, null, victimLocation.toString()));
-      } else {
-        Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
-        HttpRequest create =
-            request(PROBER, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, alias) + "/create", "")
-                .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
-                .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, parent.toString())
-                .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
-                .build();
-        assertStatus(200, httpClient.send(create, HttpResponse.BodyHandlers.ofString()));
+      switch (operation) {
+        case "register" -> assertStatus(
+            400, register(PROBER, WRITE_SCHEMA, alias, null, victimLocation.toString()));
+        case "declare" -> {
+          DeclareTableRequest body = new DeclareTableRequest();
+          body.setId(List.of(CATALOG, WRITE_SCHEMA, alias));
+          body.setLocation(victimLocation.toString());
+          assertStatus(
+              400,
+              send(PROBER, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, alias) + "/declare", body));
+        }
+        case "create" -> assertStatus(
+            400, createAt(PROBER, WRITE_SCHEMA, alias, parent.toString()));
+        default -> {
+          // A managed table deletes its location on drop, so it must not hold another dataset.
+          try (GravitinoAdminClient prober =
+              GravitinoAdminClient.builder(serverUri).withSimpleAuth(PROBER).build()) {
+            TableCatalog tables =
+                prober
+                    .loadMetalake(getLanceRESTServerMetalakeName())
+                    .loadCatalog(CATALOG)
+                    .asTableCatalog();
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tables.createTable(
+                        NameIdentifier.of(WRITE_SCHEMA, alias),
+                        new Column[] {Column.of("id", Types.IntegerType.get(), "id")},
+                        null,
+                        Map.of(
+                            Table.PROPERTY_TABLE_FORMAT,
+                            "lance",
+                            Table.PROPERTY_LOCATION,
+                            parent.toString())));
+          }
+        }
       }
-      HttpResponse<String> rejected = table(PROBER, WRITE_SCHEMA, alias, "drop");
-      assertStatus(406, rejected);
-      Assertions.assertTrue(
-          rejected.body().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
-      assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
-      assertStatus(200, table(ADMIN, SCHEMA, victim, "describe"));
+      assertStatus(404, table(ADMIN, WRITE_SCHEMA, alias, "describe"));
       try (Dataset dataset = Dataset.open().uri(victimLocation.toString()).build()) {
         Assertions.assertFalse(dataset.getSchema().getFields().isEmpty());
       }
-      assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "deregister"));
-      Assertions.assertTrue(Files.exists(victimLocation));
     } finally {
       table(ADMIN, WRITE_SCHEMA, alias, "deregister");
       table(ADMIN, SCHEMA, victim, "deregister");
@@ -459,15 +484,18 @@ public class LanceTableAuthorizationIT extends BaseIT {
     }
   }
 
-  /** A table registered or declared at another table's dataset must not change that dataset. */
+  /**
+   * A table registered or declared at a dataset that Gravitino did not create must not change it.
+   * The dataset here belongs to a table of another catalog, which the location check of this
+   * catalog cannot see.
+   */
   @ParameterizedTest
   @ValueSource(strings = {"register", "declare"})
   void testTableOwnerCannotChangeAnotherTablesDataset(String operation) throws Exception {
     String victim = "change_victim_" + operation;
     String alias = "change_alias_" + operation;
-    createTable(SCHEMA, victim);
+    createTable(OTHER_CATALOG, SCHEMA, victim);
     try {
-      assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
       if ("register".equals(operation)) {
         assertStatus(200, register(PROBER, WRITE_SCHEMA, alias, null, location(victim)));
       } else {
@@ -492,7 +520,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
       }
     } finally {
       table(ADMIN, WRITE_SCHEMA, alias, "deregister");
-      table(ADMIN, SCHEMA, victim, "deregister");
+      sendRaw(ADMIN, "/v1/table/" + id(OTHER_CATALOG, SCHEMA, victim) + "/deregister", "{}");
     }
   }
 
@@ -582,13 +610,18 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
+    createTable(CATALOG, schemaName, tableName);
+  }
+
+  private void createTable(String catalogName, String schemaName, String tableName)
+      throws Exception {
     Schema schema =
         new Schema(
             List.of(
                 Field.nullable("id", new ArrowType.Int(32, true)),
                 Field.nullable("value", new ArrowType.Utf8())));
     HttpRequest request =
-        request(ADMIN, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+        request(ADMIN, "/v1/table/" + id(catalogName, schemaName, tableName) + "/create", "")
             .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
             .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
