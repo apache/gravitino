@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
@@ -54,6 +56,27 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 null, /* defaultValue */
                 false /* hidden */,
                 false /* reserved */),
+<<<<<<< HEAD
+=======
+            stringOptionalPropertyEntry(
+                TABLE_LOCATION_PROVIDER,
+                "The name of the table location provider that provisions and unprovisions the"
+                    + " locations of this catalog's tables. It is fixed when the catalog is"
+                    + " created, because switching it would leave the tables of a single catalog"
+                    + " spread over two different location schemes.",
+                true /* immutable */,
+                DefaultTableLocationProvider.NAME, /* defaultValue */
+                false /* hidden */),
+            booleanPropertyEntry(
+                LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                "Allow physical deletion of external and registered Lance datasets. Table"
+                    + " properties cannot enable this catalog-level policy.",
+                false /* required */,
+                false /* immutable */,
+                false /* defaultValue */,
+                false /* hidden */,
+                false /* reserved */),
+>>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
             enumPropertyEntry(
                 LANCE_SCHEMA_REFRESH_MODE,
                 "Controls when Lance table schemas are refreshed from the underlying dataset.",

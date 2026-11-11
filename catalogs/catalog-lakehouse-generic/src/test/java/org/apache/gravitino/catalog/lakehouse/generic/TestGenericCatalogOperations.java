@@ -41,7 +41,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
@@ -260,13 +259,19 @@ public class TestGenericCatalogOperations {
     store.put(entity, false);
 
     if ("purge".equals(operation)) {
+<<<<<<< HEAD
       Assertions.assertTrue(lanceOps.purgeTable(ident));
+=======
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> opsWithFakeProvider.purgeTable(ident));
+>>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
     } else if ("cascade".equals(operation)) {
       Assertions.assertTrue(lanceOps.dropSchema(schemaIdent, true));
     } else {
       Assertions.assertTrue(lanceOps.dropTable(ident));
     }
 
+<<<<<<< HEAD
     Assertions.assertFalse(lanceOps.tableExists(ident));
     if ("purge".equals(operation)) {
       Assertions.assertFalse(Files.exists(lanceDataDir.resolve("legacy/_versions")));
@@ -274,6 +279,12 @@ public class TestGenericCatalogOperations {
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
       }
+=======
+    Assertions.assertEquals("purge".equals(operation), opsWithFakeProvider.tableExists(ident));
+    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+>>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
     }
   }
 

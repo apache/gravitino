@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Schema;
@@ -38,6 +40,38 @@ public class TestPropertiesMetadata {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  void testTableLocationProviderPropertyIsImmutableWithDefault() {
+    PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
+
+    Assertions.assertTrue(
+        catalogPropertiesMetadata.containsProperty(
+            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+    Assertions.assertEquals(
+        DefaultTableLocationProvider.NAME,
+        catalogPropertiesMetadata.getOrDefault(
+            ImmutableMap.of(), GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+    Assertions.assertTrue(
+        catalogPropertiesMetadata.isImmutableProperty(
+            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER));
+  }
+
+  @Test
+  void testExternalPurgePolicyDefaultsToDisabledAndCanBeChangedAtCatalogLevel() {
+    PropertiesMetadata metadata = genericCatalog.catalogPropertiesMetadata();
+    Assertions.assertTrue(metadata.containsProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertEquals(
+        false, metadata.getOrDefault(Map.of(), LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertEquals(
+        true,
+        metadata.getOrDefault(
+            Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"), LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertFalse(metadata.isImmutableProperty(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+  }
+
+  @Test
+>>>>>>> 8985ffad6 ([#13696] fix(lance): require catalog opt-in to purge external datasets (#14870))
   void testCatalogPropertiesMetadata() {
     PropertiesMetadata catalogPropertiesMetadata = genericCatalog.catalogPropertiesMetadata();
     Assertions.assertNotNull(catalogPropertiesMetadata);
