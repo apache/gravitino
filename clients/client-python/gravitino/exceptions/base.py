@@ -20,14 +20,14 @@ class GravitinoRuntimeException(RuntimeError):
     """Base class for all Gravitino runtime exceptions."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
 
 
 class RESTException(RuntimeError):
     """An exception thrown when a REST request fails."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
 
 
 class HTTPResponseException(RESTException):
@@ -64,7 +64,7 @@ class IllegalArgumentException(ValueError):
     """Base class for all exceptions thrown when arguments are invalid."""
 
     def __init__(self, message, *args):
-        super().__init__(message % args)
+        super().__init__(message % args if args else message)
 
 
 class IllegalNameIdentifierException(IllegalArgumentException):
