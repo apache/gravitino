@@ -91,7 +91,7 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 - The Glue catalog supports creating, updating, and deleting tables in the AWS Glue Data Catalog.
 - All entries in the Glue `Table.parameters()` pass through Gravitino intact, so downstream tools can correctly identify the table format.
 - Does not support column default value.
-- Does not support NOT NULL constraints on columns of Hive-format tables. Iceberg tables support them. For Hive-format tables, NOT NULL on nested fields (list elements, map values and struct fields) is not stored, and those fields are read back as nullable.
+- Does not support NOT NULL constraints on columns of Hive-format tables. Iceberg tables support them. For Hive-format tables, NOT NULL on nested fields (list elements, map values and struct fields) is refused as well.
 - `char` and `varchar` columns of Hive-format tables follow the Hive length limits: `char` length is 1 to 255 and `varchar` length is 1 to 65535.
 - Does not support table indexes.
 

@@ -312,6 +312,23 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testNestedNotNullIsRefused() {
+    for (Type type :
+        new Type[] {
+          Types.ListType.notNull(Types.StringType.get()),
+          Types.MapType.valueNotNull(Types.StringType.get(), Types.LongType.get()),
+          Types.StructType.of(Types.StructType.Field.notNullField("a", Types.LongType.get())),
+          Types.ListType.nullable(
+              Types.StructType.of(Types.StructType.Field.notNullField("a", Types.LongType.get())))
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(type));
+      assertTrue(
+          e.getMessage().contains("does not support NOT NULL on nested fields"), e.getMessage());
+    }
+  }
+
+  @Test
   void testUnsupportedTypeMessageUsesTypeSyntax() {
     IllegalArgumentException e =
         assertThrows(

@@ -1139,6 +1139,17 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateRefusesNestedNotNullOnHiveTable() {
+    assertCreateRefused(
+        "Column tags: Glue/Hive does not support NOT NULL on nested fields, got list<string, NOT NULL>",
+        new Column[] {col("tags", Types.ListType.notNull(Types.StringType.get()))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
   void testCreateUnsupportedTypeNamesColumn() {
     assertCreateRefused(
         "Column f",
