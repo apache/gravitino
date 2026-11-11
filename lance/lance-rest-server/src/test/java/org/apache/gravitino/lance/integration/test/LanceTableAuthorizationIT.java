@@ -460,6 +460,55 @@ public class LanceTableAuthorizationIT extends BaseIT {
     }
   }
 
+  /** Local URI aliases must not let a managed table contain another user's dataset. */
+  @ParameterizedTest
+  @ValueSource(strings = {"encoded", "localhost", "file-object-store"})
+  void testManagedTableCannotOverlapThroughLocationAlias(String kind) throws Exception {
+    String victim = "alias_victim_" + kind;
+    String alias = "alias_table_" + kind;
+    Path parent = tempDir.resolve("alias_parent_" + kind);
+    Path victimLocation = parent.resolve("victim");
+    LanceDatasetTestUtils.createDataset(victimLocation.toString());
+    assertStatus(200, register(ADMIN, SCHEMA, victim, null, victimLocation.toString()));
+    String requested =
+        switch (kind) {
+          case "encoded" -> parent.toUri().toString().replace("alias_parent_", "%61lias_parent_");
+          case "localhost" -> "file://localhost" + parent.toUri().getRawPath();
+          default -> parent.toUri().toString().replace("file:", "file-object-store:");
+        };
+    try (GravitinoAdminClient prober =
+        GravitinoAdminClient.builder(serverUri).withSimpleAuth(PROBER).build()) {
+      assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
+      TableCatalog tables =
+          prober
+              .loadMetalake(getLanceRESTServerMetalakeName())
+              .loadCatalog(CATALOG)
+              .asTableCatalog();
+      IllegalArgumentException rejected =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  tables.createTable(
+                      NameIdentifier.of(WRITE_SCHEMA, alias),
+                      new Column[] {Column.of("id", Types.IntegerType.get(), "id")},
+                      null,
+                      Map.of(
+                          Table.PROPERTY_TABLE_FORMAT,
+                          "lance",
+                          Table.PROPERTY_LOCATION,
+                          requested)));
+      Assertions.assertTrue(rejected.getMessage().contains("overlaps"), rejected.getMessage());
+      assertStatus(404, table(ADMIN, WRITE_SCHEMA, alias, "describe"));
+      Assertions.assertFalse(Files.exists(parent.resolve("_versions")));
+      try (Dataset dataset = Dataset.open().uri(victimLocation.toString()).build()) {
+        Assertions.assertFalse(dataset.getSchema().getFields().isEmpty());
+      }
+    } finally {
+      table(ADMIN, WRITE_SCHEMA, alias, "deregister");
+      table(ADMIN, SCHEMA, victim, "deregister");
+    }
+  }
+
   /** A failed create at a parent directory must not delete the datasets under it. */
   @Test
   void testConflictingCreateCannotDeleteAnotherSchemasData() throws Exception {
@@ -490,7 +539,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
    * catalog cannot see.
    */
   @ParameterizedTest
-  @ValueSource(strings = {"register", "declare"})
+  @ValueSource(strings = {"register", "declare", "api-declare"})
   void testTableOwnerCannotChangeAnotherTablesDataset(String operation) throws Exception {
     String victim = "change_victim_" + operation;
     String alias = "change_alias_" + operation;
@@ -498,6 +547,31 @@ public class LanceTableAuthorizationIT extends BaseIT {
     try {
       if ("register".equals(operation)) {
         assertStatus(200, register(PROBER, WRITE_SCHEMA, alias, null, location(victim)));
+      } else if ("api-declare".equals(operation)) {
+        try (GravitinoAdminClient prober =
+            GravitinoAdminClient.builder(serverUri).withSimpleAuth(PROBER).build()) {
+          TableCatalog tables =
+              prober
+                  .loadMetalake(getLanceRESTServerMetalakeName())
+                  .loadCatalog(CATALOG)
+                  .asTableCatalog();
+          Table declared =
+              tables.createTable(
+                  NameIdentifier.of(WRITE_SCHEMA, alias),
+                  new Column[0],
+                  null,
+                  Map.of(
+                      Table.PROPERTY_TABLE_FORMAT,
+                      "lance",
+                      Table.PROPERTY_LOCATION,
+                      location(victim),
+                      Table.PROPERTY_EXTERNAL,
+                      "false",
+                      LanceConstants.LANCE_TABLE_DECLARED,
+                      "true"));
+          Assertions.assertEquals("true", declared.properties().get(Table.PROPERTY_EXTERNAL));
+        }
+        assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
       } else {
         DeclareTableRequest body = new DeclareTableRequest();
         body.setId(List.of(CATALOG, WRITE_SCHEMA, alias));
@@ -508,6 +582,10 @@ public class LanceTableAuthorizationIT extends BaseIT {
         assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
       }
 
+      assertStatus(
+          403,
+          sendRaw(PROBER, "/v1/table/" + id(OTHER_CATALOG, SCHEMA, victim) + "/describe", "{}"));
+      assertStatus(406, table(PROBER, WRITE_SCHEMA, alias, "drop"));
       HttpResponse<String> rejected = dropColumns(PROBER, WRITE_SCHEMA, alias, "value");
       assertStatus(406, rejected);
       Assertions.assertTrue(

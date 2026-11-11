@@ -202,12 +202,20 @@ public class TestGenericCatalogOperations {
 
   @TempDir private Path lanceDataDir;
 
-  /** The provider must see effective ownership before allocating a registered table location. */
+  /** The provider must see effective ownership before allocating an adopted table location. */
   @ParameterizedTest
   @CsvSource(
-      value = {"NULL", "false", "true"},
+      value = {
+        "register,NULL",
+        "register,false",
+        "register,true",
+        "declared,NULL",
+        "declared,false",
+        "declared,true"
+      },
       nullValues = "NULL")
-  void testRegisterPropertiesAreExternalBeforeProvisioning(String external) throws Exception {
+  void testAdoptedPropertiesAreExternalBeforeProvisioning(String operation, String external)
+      throws Exception {
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier ident =
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "registered");
@@ -229,7 +237,7 @@ public class TestGenericCatalogOperations {
             Map.of(
                 Table.PROPERTY_TABLE_FORMAT,
                 "lance",
-                "lance.register",
+                "lance." + operation,
                 "true",
                 Table.PROPERTY_LOCATION,
                 location));

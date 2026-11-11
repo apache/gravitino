@@ -20,6 +20,8 @@
 package org.apache.gravitino.lance.common.utils;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DATASET_ADOPTED;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 
@@ -49,25 +51,26 @@ public final class LancePropertiesUtils {
   /**
    * Returns whether the table's data is externally owned.
    *
-   * <p>Registered Lance tables are external even when an older registration omitted or incorrectly
-   * stored the external flag. Other formats retain their explicit external flag semantics.
+   * <p>Registered, declared and adopted Lance tables are external even when older metadata omitted
+   * or incorrectly stored the external flag. Other formats retain their explicit external flag
+   * semantics.
    *
    * @param tableProperties the stored table properties
-   * @return true for an explicitly external table or a registered Lance table
+   * @return true for an explicitly external table or an adopted Lance table
    */
   public static boolean isExternalTable(Map<String, String> tableProperties) {
     return Boolean.parseBoolean(tableProperties.get(Table.PROPERTY_EXTERNAL))
-        || isRegisteredLanceTable(tableProperties);
+        || isAdoptedLanceTable(tableProperties);
   }
 
   /**
-   * Makes registered Lance table properties explicitly external without changing the input map.
+   * Makes adopted Lance table properties explicitly external without changing the input map.
    *
    * @param tableProperties the table properties
-   * @return a copy with external=true for a registered Lance table, or the input when unchanged
+   * @return a copy with external=true for an adopted Lance table, or the input when unchanged
    */
   public static Map<String, String> normalizeTableProperties(Map<String, String> tableProperties) {
-    if (!isRegisteredLanceTable(tableProperties)
+    if (!isAdoptedLanceTable(tableProperties)
         || "true".equals(tableProperties.get(Table.PROPERTY_EXTERNAL))) {
       return tableProperties;
     }
@@ -139,8 +142,10 @@ public final class LancePropertiesUtils {
                     entry -> LANCE_STORAGE_OPTIONS_PREFIX + entry.getKey(), Map.Entry::getValue));
   }
 
-  private static boolean isRegisteredLanceTable(Map<String, String> tableProperties) {
+  private static boolean isAdoptedLanceTable(Map<String, String> tableProperties) {
     return isLanceTableFormat(tableProperties.get(Table.PROPERTY_TABLE_FORMAT))
-        && Boolean.parseBoolean(tableProperties.get(LANCE_TABLE_REGISTER));
+        && (Boolean.parseBoolean(tableProperties.get(LANCE_TABLE_REGISTER))
+            || Boolean.parseBoolean(tableProperties.get(LANCE_TABLE_DECLARED))
+            || Boolean.parseBoolean(tableProperties.get(LANCE_TABLE_DATASET_ADOPTED)));
   }
 }

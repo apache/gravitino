@@ -142,18 +142,26 @@ Existing catalogs must explicitly opt in to retain their previous destructive dr
 The same setting is required for `AlterTableAlterColumns`, `AlterTableDropColumns` and index changes
 on a table that was registered or declared, because Gravitino did not create its dataset. Tables
 created through `CreateTable` can be altered without it. This setting was named
-`lance.allow-external-table-purge` before.
+`lance.allow-external-table-purge` before. Registered and declared tables retain external dataset
+ownership even when created through the Gravitino table API with `external=false`.
+
+Enabling it permits deletion at caller-supplied locations; it does not verify storage ownership or
+provide isolation between tables. Enable it only when table owners are trusted to delete data at
+locations they can register. Underlying storage permissions still apply.
 
 `CreateTable`, `DeclareTable` and `RegisterTable` reject a location that equals, contains or is
 inside the location of another table in the same catalog, with HTTP `400`. The error does not name
-the other table.
+the other table. The comparison recognizes local file URI aliases and resolves relative paths
+against the server working directory. Malformed location URIs are rejected before dataset access;
+an administrator must correct malformed existing metadata before new table creation can continue.
+Azure `az`/`abfss` aliases are recognized. An Azure URI without an account conservatively conflicts
+with the same container path in any account; fully qualified account URIs distinguish disjoint
+accounts. Concurrent creates, cross-catalog locations and storage endpoint aliases remain outside
+this check (#14788).
 
 When `CreateTable` fails because the table name already exists, the request is rejected before any
 data is written. If a concurrent request creates the same name after that check, the dataset written
 at the external location is kept, and an administrator must remove it.
-Enabling it permits deletion at caller-supplied locations; it does not verify storage ownership or
-provide isolation between tables. Enable it only when table owners are trusted to delete data at
-locations they can register. Underlying storage permissions still apply.
 
 
 ## Deployment

@@ -308,15 +308,35 @@ catalog properties; a table property cannot enable it. Use Lance REST `deregiste
 metadata while preserving data. The opt-in does not validate location ownership.
 
 A new Lance table, whether created, registered or declared, cannot use a location that equals,
-contains or is inside the location of another table in the same catalog. Dropping a table deletes its
+contains or is inside the location of another table in the same catalog. Dataset deletion removes its
 whole location, so this keeps one table from deleting or changing the data of another. The check uses
 Gravitino metadata only: it does not see tables in other catalogs, symbolic links, or data that no
-table owns. Tables that already overlap are not changed.
+table owns. Tables that already overlap are not changed. Checks are not atomic with concurrent
+creates; cross-catalog ownership and storage scopes remain follow-up work in #14788.
+
+The comparison resolves plain relative paths against the server working directory, expands `~`,
+and recognizes file URI encoding, `localhost`, and Lance's local-store URI schemes. URI query and
+fragment components do not select a dataset path. S3 bucket user information and ports do not
+select another dataset, and Unicode URI paths are compared in their ASCII-encoded form. URI paths
+must be hierarchical and correctly percent-encoded; file URIs must not contain user information or
+a port. Malformed URI locations are rejected before dataset access. If an existing table has a malformed
+location, new table creation fails until a catalog administrator corrects that metadata. Each new
+creation scans stored table locations across the catalog; it does not open the other datasets.
+
+Azure `az` and `abfss` locations are compared by container, account and path, including the `dfs` and
+`blob` host spellings. If a URI omits its account, the comparison conservatively treats matching
+container paths in any account as overlapping. This can reject disjoint accounts sharing a container
+name; use fully qualified account URIs to distinguish them. Storage endpoint aliases and runtime
+routing cannot be inferred from metadata and remain outside this check (#14788).
 
 Gravitino did not create the dataset of a registered or declared table, and its location may hold
 another table's dataset. Column and index changes to that dataset are rejected by default, and the
 same catalog setting allows them. The catalog marks these tables with the reserved property
-`lance.dataset-adopted=true`. Declared tables created before this property existed are not marked.
+`lance.dataset-adopted=true`. Registered, declared and adopted tables are always treated as external,
+including when a request supplies `external=false`. Metadata-only drop retains their data; purge
+requires the catalog opt-in. Legacy declarations that still carry `lance.declared=true` gain the
+adopted marker when their schema is loaded. Older declarations whose flag was already cleared
+cannot be identified automatically and are not marked.
 
 Existing registrations with a missing or false stored `external` flag receive the same protection
 when dropped or deregistered. Their stored properties are not automatically migrated.

@@ -27,6 +27,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -249,7 +255,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
-    // Before any storage access, so a location that holds another table's data is never written,
+    // Before Lance dataset access, so a location that holds another table's data is never written,
     // adopted or later deleted through this table.
     rejectOverlappingLocation(ident, location);
 
@@ -264,6 +270,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       // schema is loaded from the dataset, so it cannot serve as this record.
       Map<String, String> adoptedProperties = new HashMap<>(properties);
       adoptedProperties.put(LanceConstants.LANCE_TABLE_DATASET_ADOPTED, "true");
+      adoptedProperties.put(Table.PROPERTY_EXTERNAL, "true");
       properties = adoptedProperties;
     }
 
@@ -636,7 +643,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
   /**
    * Rejects a location that equals, contains or is inside the location of another table in the same
-   * catalog. Dropping a table deletes its whole location, so a table at a parent directory could
+   * catalog. Dataset deletion removes its whole location, so a table at a parent directory could
    * delete the datasets of other tables, and a table at another table's location could change that
    * table's dataset.
    *
@@ -667,7 +674,22 @@ public class LanceTableOperations extends ManagedTableOperations {
             continue;
           }
           String other = table.properties().get(Table.PROPERTY_LOCATION);
-          if (StringUtils.isNotBlank(other) && isPrefixOrSame(requested, locationSegments(other))) {
+          if (StringUtils.isBlank(other)) {
+            continue;
+          }
+          final List<String> existing;
+          try {
+            existing = locationSegments(other);
+          } catch (IllegalArgumentException invalid) {
+            // Fail closed without exposing the other table's name or location to its peers.
+            LOG.warn("Invalid stored Lance location for table {}", table.nameIdentifier(), invalid);
+            // Main REST can serialize exception causes by default. Keep the private URI in server
+            // logs only, not in the throwable returned to a caller of another table.
+            throw new IllegalStateException(
+                "Cannot check table locations in this catalog; ask a catalog administrator to"
+                    + " correct an existing table's invalid location");
+          }
+          if (isPrefixOrSame(requested, existing)) {
             throw new IllegalArgumentException(
                 String.format(
                     "Location %s of Lance table %s overlaps the location of another table in"
@@ -682,31 +704,133 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   /**
-   * Splits a location into scheme, authority and normalized path segments. A path without a scheme
-   * is a local file path. Segments are compared whole, so {@code s3://b/v1} does not contain {@code
-   * s3://b/v10}.
+   * Splits a location into a storage namespace and normalized path segments. Azure namespaces also
+   * carry an account, or a wildcard when the URI relies on runtime account settings. A path without
+   * a scheme is a local file path, resolved against the server working directory. File URI escapes,
+   * localhost and Lance's local-store schemes are normalized without resolving symbolic links.
+   * Remote paths retain their escapes, as in Lance's object-store providers. Segments are compared
+   * whole, so {@code s3://b/v1} does not contain {@code s3://b/v10}.
    */
   static List<String> locationSegments(String location) {
-    String path = location.trim();
-    String scheme = "file";
-    String authority = "";
-    int separator = path.indexOf("://");
-    if (separator > 0) {
-      scheme = path.substring(0, separator).toLowerCase(Locale.ROOT);
-      String rest = path.substring(separator + 3);
-      int slash = rest.indexOf('/');
-      authority = slash < 0 ? rest : rest.substring(0, slash);
-      path = slash < 0 ? "" : rest.substring(slash);
-    } else if (path.regionMatches(true, 0, "file:", 0, 5)) {
-      path = path.substring(5);
+    URI uri = null;
+    String candidate = location.trim();
+    int colon = candidate.indexOf(':');
+    if (colon > 0 && candidate.substring(0, colon).matches("[a-zA-Z][a-zA-Z0-9+.-]*")) {
+      try {
+        // Like Lance's URL parser, accept spaces in URI paths. Plain paths below retain literal
+        // spaces, percent signs, query characters and fragments.
+        uri = URI.create(encodeLocationUri(candidate));
+      } catch (IllegalArgumentException invalid) {
+        throw ExceptionMessages.illegalArgument(
+            "Invalid Lance location URI; encode URI characters or use a plain local path", invalid);
+      }
+    }
+    String scheme = uri == null ? "file" : uri.getScheme().toLowerCase(Locale.ROOT);
+    String authority = uri == null || uri.getRawAuthority() == null ? "" : uri.getRawAuthority();
+    String azureAccount = null;
+    String path;
+    boolean rawUriPath = uri != null;
+    if (uri == null) {
+      String local = location;
+      if (local.equals("~") || local.startsWith("~/")) {
+        String home =
+            Optional.ofNullable(System.getenv("HOME")).orElse(System.getProperty("user.home"));
+        local = home + local.substring(1);
+      }
+      path = Path.of(local).toAbsolutePath().normalize().toString();
+    } else {
+      Preconditions.checkArgument(
+          !uri.isOpaque(), "Lance location URI must have a hierarchical path");
+      Preconditions.checkArgument(uri.getPort() <= 65535, "Invalid port in Lance location URI");
+      path = uri.getRawPath();
+      if (path == null) {
+        path = uri.getRawSchemeSpecificPart();
+      }
+      if (scheme.equals("file")
+          || scheme.equals("file-object-store")
+          || scheme.equals("file+uring")) {
+        if (scheme.equals("file")) {
+          Preconditions.checkArgument(
+              uri.getRawUserInfo() == null
+                  && uri.getPort() == -1
+                  && (authority.isEmpty() || uri.getHost() != null),
+              "File location URI must not contain user information or a port");
+        }
+        // Lance's local-store schemes decode URL paths and address the same filesystem. Their
+        // authority does not select a remote filesystem.
+        path = decodeLocalUriPath(path);
+        rawUriPath = false;
+        path = path.startsWith("/") ? path : "/" + path;
+        scheme = "file";
+        authority = "";
+      } else {
+        if (scheme.equals("s3+ddb")) {
+          // DynamoDB changes the commit protocol, not the S3 bucket or object prefix.
+          scheme = "s3";
+        }
+        if (Set.of("s3", "gs", "oss", "cos").contains(scheme)) {
+          // Bucket providers select the host, not user information or a URI port. Endpoints come
+          // from storage options; retaining these ignored fields would create aliases. Use the
+          // raw authority as Java's server-host parser does not accept valid GCS underscores.
+          String bucketAuthority = authority.substring(authority.lastIndexOf('@') + 1);
+          Preconditions.checkArgument(
+              bucketAuthority.matches("[a-zA-Z0-9._-]+(:[0-9]+)?"),
+              "Invalid bucket authority in Lance location URI");
+          int port = bucketAuthority.lastIndexOf(':');
+          if (port >= 0) {
+            try {
+              Preconditions.checkArgument(
+                  Integer.parseInt(bucketAuthority.substring(port + 1)) <= 65535,
+                  "Invalid port in Lance location URI");
+            } catch (NumberFormatException invalidPort) {
+              throw new IllegalArgumentException("Invalid port in Lance location URI", invalidPort);
+            }
+            bucketAuthority = bucketAuthority.substring(0, port);
+          }
+          authority = bucketAuthority;
+        } else if (scheme.equals("az") || scheme.equals("abfss")) {
+          scheme = "az";
+          String host = uri.getHost();
+          Preconditions.checkArgument(host != null, "Azure location URI must specify a container");
+          String user = uri.getRawUserInfo();
+          if (StringUtils.isEmpty(user)) {
+            authority = host;
+            // No account in the URI: its effective account depends on runtime storage settings.
+            // Conservatively compare this container against any explicit account, rather than
+            // assume that two spellings identify different data.
+            azureAccount = "*";
+          } else {
+            Preconditions.checkArgument(
+                host.matches(
+                    "[^.]+\\.(dfs|blob)\\.(core\\.windows\\.net|fabric\\.microsoft\\.com)"),
+                "Azure location URI must use a fully qualified storage account host");
+            authority = user.split(":", 2)[0];
+            azureAccount = host.replaceFirst("\\.(dfs|blob)\\.", ".");
+          }
+        }
+      }
     }
     List<String> segments = new ArrayList<>(List.of(scheme, authority));
+    if (azureAccount != null) {
+      segments.add(azureAccount);
+    }
+    int namespaceSize = segments.size();
     for (String segment : path.split("/")) {
+      if (rawUriPath) {
+        // URL parsing removes percent-encoded dot segments even for object stores. Other remote
+        // path escapes remain literal: Lance's object-store providers use the raw URL path.
+        segment =
+            switch (segment.toLowerCase(Locale.ROOT)) {
+              case "%2e" -> ".";
+              case ".%2e", "%2e.", "%2e%2e" -> "..";
+              default -> segment;
+            };
+      }
       if (segment.isEmpty() || ".".equals(segment)) {
         continue;
       }
       if ("..".equals(segment)) {
-        if (segments.size() > 2) {
+        if (segments.size() > namespaceSize) {
           segments.remove(segments.size() - 1);
         }
         continue;
@@ -716,7 +840,68 @@ public class LanceTableOperations extends ManagedTableOperations {
     return segments;
   }
 
+  private static String encodeLocationUri(String location) {
+    try {
+      // URI.toASCIIString normalizes Unicode to NFC, whereas Lance preserves path composition.
+      // Encode UTF-8 directly so decomposed names do not become aliases of different S3 keys.
+      ByteBuffer bytes =
+          StandardCharsets.UTF_8.newEncoder().encode(CharBuffer.wrap(location.replace(" ", "%20")));
+      StringBuilder encoded = new StringBuilder();
+      String hex = "0123456789ABCDEF";
+      while (bytes.hasRemaining()) {
+        int value = Byte.toUnsignedInt(bytes.get());
+        if (value < 128) {
+          encoded.append((char) value);
+        } else {
+          encoded.append('%').append(hex.charAt(value >> 4)).append(hex.charAt(value & 15));
+        }
+      }
+      return encoded.toString();
+    } catch (CharacterCodingException invalid) {
+      throw new IllegalArgumentException("Location URI must contain valid UTF-8", invalid);
+    }
+  }
+
+  private static String decodeLocalUriPath(String rawPath) {
+    // URI.getPath silently replaces invalid UTF-8. Lance can fall back to a literal escaped local
+    // filename instead, so reject that ambiguity before I/O rather than comparing a different path.
+    byte[] bytes = new byte[rawPath.length()];
+    int length = 0;
+    for (int i = 0; i < rawPath.length(); i++) {
+      char value = rawPath.charAt(i);
+      if (value == '%') {
+        bytes[length++] = (byte) Integer.parseInt(rawPath.substring(i + 1, i + 3), 16);
+        i += 2;
+      } else {
+        bytes[length++] = (byte) value;
+      }
+    }
+    try {
+      return StandardCharsets.UTF_8
+          .newDecoder()
+          .decode(ByteBuffer.wrap(bytes, 0, length))
+          .toString();
+    } catch (CharacterCodingException invalid) {
+      throw new IllegalArgumentException(
+          "File location URI must contain valid UTF-8 escapes", invalid);
+    }
+  }
+
   private static boolean isPrefixOrSame(List<String> first, List<String> second) {
+    if (first.get(0).equals("az") && second.get(0).equals("az")) {
+      if (!first.get(1).equals(second.get(1))) {
+        return false;
+      }
+      String firstAccount = first.get(2);
+      String secondAccount = second.get(2);
+      if (!firstAccount.equals(secondAccount)
+          && !firstAccount.equals("*")
+          && !secondAccount.equals("*")) {
+        return false;
+      }
+      first = first.subList(3, first.size());
+      second = second.subList(3, second.size());
+    }
     int common = Math.min(first.size(), second.size());
     return first.subList(0, common).equals(second.subList(0, common));
   }
@@ -728,7 +913,8 @@ public class LanceTableOperations extends ManagedTableOperations {
   private static boolean isAdoptedDataset(Map<String, String> properties) {
     // Registrations made before the adopted flag existed carry only lance.register.
     return Boolean.parseBoolean(properties.get(LanceConstants.LANCE_TABLE_DATASET_ADOPTED))
-        || Boolean.parseBoolean(properties.get(LANCE_TABLE_REGISTER));
+        || Boolean.parseBoolean(properties.get(LANCE_TABLE_REGISTER))
+        || Boolean.parseBoolean(properties.get(LanceConstants.LANCE_TABLE_DECLARED));
   }
 
   private boolean isDeclaredOnly(Table table) {
@@ -911,6 +1097,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       TableEntity tableEntity, Column[] columns, long datasetVersion) {
     Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
     updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+    if (isDeclaredOnly(tableEntity.properties())) {
+      // Preserve provenance for legacy declarations before clearing their last identifying flag.
+      updatedProperties.put(LanceConstants.LANCE_TABLE_DATASET_ADOPTED, "true");
+      updatedProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    }
     updatedProperties.remove(LanceConstants.LANCE_TABLE_DECLARED);
 
     AuditInfo columnAuditInfo =

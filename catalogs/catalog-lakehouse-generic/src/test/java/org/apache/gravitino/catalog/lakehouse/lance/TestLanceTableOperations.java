@@ -63,8 +63,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -2534,6 +2536,312 @@ public class TestLanceTableOperations {
     Assertions.assertFalse(error.getMessage().contains(other.toString()), error.getMessage());
     verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
     verify(store, never()).put(any(), anyBoolean());
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "encoded",
+        "localhost",
+        "relative",
+        "file-object-store",
+        "tilde",
+        "query",
+        "encoded-dot-name",
+        "plus-space",
+        "object-store-escaped",
+        "host",
+        "invalid-utf8",
+        "unicode",
+        "unicode-decomposed"
+      })
+  void testLocationAliasesCannotAdoptAnotherTablesDataset(String alias) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "alias");
+    NameIdentifier other = NameIdentifier.of("metalake", "catalog", "other_schema", "victim");
+    Path victim =
+        switch (alias) {
+          case "encoded-dot-name" -> tempDir.resolve("%2e").resolve("alias-victim");
+          case "plus-space" -> tempDir.resolve("alias space+%victim");
+          case "object-store-escaped" -> tempDir.resolve("alias victim");
+          case "invalid-utf8" -> tempDir.resolve("alias%FFvictim");
+          case "unicode" -> tempDir.resolve("别名");
+          case "unicode-decomposed" -> tempDir.resolve("cafe\u0301");
+          default -> tempDir.resolve("alias-victim");
+        };
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(victim.toString(), columns, Map.of())) {
+      // The URI and path aliases below all point to this actual dataset.
+    }
+    String requested =
+        switch (alias) {
+          case "encoded" -> victim.toUri().toString().replace("alias-victim", "%61lias-victim");
+          case "localhost" -> "file://localhost" + victim.toUri().getRawPath();
+          case "host" -> "file://other-host" + victim.toUri().getRawPath();
+          case "invalid-utf8" -> "file://" + victim;
+          case "unicode" -> victim.toUri().toString();
+          case "unicode-decomposed" -> "file://" + victim;
+          case "encoded-dot-name", "plus-space" -> victim.toUri().toString();
+          case "object-store-escaped" -> "file-object-store://"
+              + victim.toString().replace(" ", "%20");
+          case "relative" -> Path.of("").toAbsolutePath().relativize(victim).toString();
+          case "file-object-store" -> victim
+              .toUri()
+              .toString()
+              .replace("file:", "file-object-store:");
+          case "tilde" -> "~/" + Path.of(System.getProperty("user.home")).relativize(victim);
+          default -> victim.toUri().toString().replaceAll("/$", "") + "?ignored=true#ignored";
+        };
+    // Prove this is an alias supported by the actual Lance reader, not just a string comparison.
+    try (Dataset dataset = Dataset.open().uri(requested).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+    SchemaEntity schema = mock(SchemaEntity.class);
+    when(schema.name()).thenReturn("other_schema");
+    when(store.list(
+            Namespace.of("metalake", "catalog"), SchemaEntity.class, Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(schema));
+    when(store.list(
+            Namespace.of("metalake", "catalog", "other_schema"),
+            TableEntity.class,
+            Entity.EntityType.TABLE))
+        .thenReturn(
+            List.of(
+                tableEntity(other, List.of(), Map.of(Table.PROPERTY_LOCATION, victim.toString()))));
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> create(ident, columns, requested, Map.of(LANCE_TABLE_REGISTER, "true")));
+    Assertions.assertTrue(
+        error.getMessage().contains(alias.equals("invalid-utf8") ? "UTF-8" : "overlaps"),
+        error.getMessage());
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  @Test
+  void testLocationNormalizationPreservesStorageSemantics() {
+    Path workingDirectory = Path.of("").toAbsolutePath();
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments(workingDirectory.resolve("data").toString()),
+        LanceTableOperations.locationSegments("data"));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("/data"),
+        LanceTableOperations.locationSegments("data"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("/tmp/a b+%name"),
+        LanceTableOperations.locationSegments("file:///tmp/a%20b+%25name"));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("/tmp/a%20b"),
+        LanceTableOperations.locationSegments("file:///tmp/a%20b"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("/tmp/a b"),
+        LanceTableOperations.locationSegments("file-object-store:///tmp/a%20b"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("s3://bucket/v1/table"),
+        LanceTableOperations.locationSegments(
+            "s3+ddb://bucket/v1/other/%2E%2e/table?ddbTableName=commits"));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("s3://bucket/a%20b"),
+        LanceTableOperations.locationSegments("s3://bucket/a%2520b"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("s3://bucket/a"),
+        LanceTableOperations.locationSegments("s3://bucket/a?option=value#fragment"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> LanceTableOperations.locationSegments("file:///tmp/%invalid"));
+  }
+
+  @Test
+  void testInvalidStoredLocationFailsClosedWithoutExposingIt() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "alias");
+    NameIdentifier other = NameIdentifier.of("metalake", "catalog", "other_schema", "hidden");
+    SchemaEntity schema = mock(SchemaEntity.class);
+    when(schema.name()).thenReturn("other_schema");
+    when(store.list(
+            Namespace.of("metalake", "catalog"), SchemaEntity.class, Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(schema));
+    String invalidLocation = "file:///private/hidden/%invalid";
+    when(store.list(
+            Namespace.of("metalake", "catalog", "other_schema"),
+            TableEntity.class,
+            Entity.EntityType.TABLE))
+        .thenReturn(
+            List.of(
+                tableEntity(other, List.of(), Map.of(Table.PROPERTY_LOCATION, invalidLocation))));
+    IllegalStateException error =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                create(
+                    ident,
+                    new Column[] {Column.of("id", Types.IntegerType.get())},
+                    tempDir.resolve("new").toString(),
+                    Map.of()));
+    Assertions.assertFalse(error.getMessage().contains(other.toString()));
+    Assertions.assertFalse(error.getMessage().contains(invalidLocation));
+    Assertions.assertTrue(error.getMessage().contains("administrator"));
+    Assertions.assertNull(error.getCause());
+    String response =
+        JsonUtils.anyFieldMapper()
+            .writeValueAsString(ErrorResponse.internalError(error.getMessage(), error));
+    Assertions.assertFalse(response.contains(invalidLocation));
+    Assertions.assertFalse(response.contains(other.toString()));
+    verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
+    verify(store, never()).put(any(), anyBoolean());
+  }
+
+  @ParameterizedTest
+  @CsvSource({"drop,false", "drop,true", "purge,false", "purge,true"})
+  void testDeclaredDatasetCannotBecomeManaged(String operation, boolean requestedExternal)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "declared");
+    String location = tempDir.resolve("declared-owned-by-another-table").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // The declaration adopts this existing dataset; it never creates or owns the data.
+    }
+    AtomicReference<TableEntity> stored = new AtomicReference<>();
+    Mockito.doAnswer(
+            invocation -> {
+              stored.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(store)
+        .put(any(TableEntity.class), eq(false));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> stored.get());
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    Table created =
+        create(
+            ident,
+            columns,
+            location,
+            Map.of(
+                LANCE_TABLE_DECLARED,
+                "true",
+                Table.PROPERTY_EXTERNAL,
+                Boolean.toString(requestedExternal)));
+    if (operation.equals("purge")) {
+      Assertions.assertThrows(
+          UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+      verify(store, never()).delete(any(), any());
+    } else {
+      Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    }
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+    Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
+  }
+
+  @Test
+  void testLegacyDeclarationRetainsProtectionAfterSchemaRefresh() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "legacy_declared");
+    String location = tempDir.resolve("legacy-declared").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // The legacy metadata has no adopted marker and an incorrect external flag.
+    }
+    AtomicReference<TableEntity> stored =
+        new AtomicReference<>(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    Table.PROPERTY_EXTERNAL,
+                    "false",
+                    LANCE_TABLE_DECLARED,
+                    "true")));
+    stubMutableTable(ident, stored);
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    Table loaded = lanceTableOps.loadTable(ident);
+    Assertions.assertNull(loaded.properties().get(LANCE_TABLE_DECLARED));
+    Assertions.assertEquals("true", loaded.properties().get(LANCE_TABLE_DATASET_ADOPTED));
+    Assertions.assertEquals("true", loaded.properties().get(Table.PROPERTY_EXTERNAL));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            lanceTableOps.alterTable(ident, TableChange.deleteColumn(new String[] {"id"}, false)));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+    Assertions.assertTrue(lanceTableOps.dropTable(ident));
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "az://container/root,abfss://container/root,true",
+    "az://container@account.dfs.core.windows.net/root,abfss://container@account.blob.core.windows.net/../root,true",
+    "az://container@account.dfs.core.windows.net/root,abfss://container@account.dfs.core.windows.net/%2e%2e/root,true",
+    "az://container/root,abfss://container@account.dfs.core.windows.net/root,true",
+    "az://container@account.blob.core.windows.net/root,abfss://container@account.dfs.core.windows.net/root,true",
+    "az://container@one.dfs.core.windows.net/root,abfss://container@two.dfs.core.windows.net/root,false",
+    "az://container/root,abfss://other/root,false",
+    "az://container/root,abfss://container/root2,false"
+  })
+  void testAzureLocationAliases(String existing, String requested, boolean overlaps)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "declared");
+    NameIdentifier other = NameIdentifier.of("metalake", "catalog", "other_schema", "hidden");
+    SchemaEntity schema = mock(SchemaEntity.class);
+    when(schema.name()).thenReturn("other_schema");
+    when(store.list(
+            Namespace.of("metalake", "catalog"), SchemaEntity.class, Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(schema));
+    when(store.list(
+            Namespace.of("metalake", "catalog", "other_schema"),
+            TableEntity.class,
+            Entity.EntityType.TABLE))
+        .thenReturn(
+            List.of(tableEntity(other, List.of(), Map.of(Table.PROPERTY_LOCATION, existing))));
+    if (overlaps) {
+      IllegalArgumentException failure =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> create(ident, new Column[0], requested, Map.of(LANCE_TABLE_DECLARED, "true")));
+      Assertions.assertTrue(failure.getMessage().contains("overlaps"), failure.getMessage());
+      verify(store, never()).put(any(), anyBoolean());
+    } else {
+      Assertions.assertNotNull(
+          create(ident, new Column[0], requested, Map.of(LANCE_TABLE_DECLARED, "true")));
+    }
+    verify(lanceTableOps, never()).openDataset(anyString(), anyMap());
+    verify(lanceTableOps, never()).createDataset(anyString(), any(), anyMap());
+  }
+
+  @Test
+  void testRemoteLocationAliasesAndInvalidAuthorities() {
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("s3://bucket/caf%C3%A9"),
+        LanceTableOperations.locationSegments("s3://ignored@bucket:1234/café"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("gs://bucket_with_underscore/path"),
+        LanceTableOperations.locationSegments("gs://ignored@bucket_with_underscore:1234/path"));
+    Assertions.assertEquals(
+        LanceTableOperations.locationSegments("s3://bucket/cafe%CC%81"),
+        LanceTableOperations.locationSegments("s3://bucket/cafe\u0301"));
+    Assertions.assertNotEquals(
+        LanceTableOperations.locationSegments("s3://bucket/caf%C3%A9"),
+        LanceTableOperations.locationSegments("s3://bucket/cafe\u0301"));
+    for (String invalid :
+        List.of(
+            "s3://bucket:99999/path",
+            "s3://bucket:invalid/path",
+            "s3:bucket/path",
+            "file://user@localhost/path",
+            "file://localhost:1234/path")) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> LanceTableOperations.locationSegments(invalid),
+          invalid);
+    }
   }
 
   private Table create(
