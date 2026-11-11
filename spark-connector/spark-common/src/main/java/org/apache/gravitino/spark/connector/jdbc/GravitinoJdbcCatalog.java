@@ -75,7 +75,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    applyJdbcCredential(gravitinoCatalogClient, all);
+    applyJdbcCredential(gravitinoCatalog(), all);
     useTimestampNtz = false;
     if (supportsPreferTimestampNtz()) {
       String value = preferTimestampNtz(options, properties);
@@ -247,7 +247,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    * @return true if the catalog reads {@code preferTimestampNTZ} from its options
    */
   protected boolean supportsPreferTimestampNtz() {
-    return "jdbc-postgresql".equalsIgnoreCase(gravitinoCatalogClient.provider());
+    return "jdbc-postgresql".equalsIgnoreCase(gravitinoCatalog().provider());
   }
 
   /**

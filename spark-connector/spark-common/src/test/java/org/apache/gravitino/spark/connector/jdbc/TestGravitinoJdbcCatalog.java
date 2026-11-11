@@ -257,8 +257,13 @@ public class TestGravitinoJdbcCatalog {
       Catalog source = mock(Catalog.class);
       when(source.provider()).thenReturn("jdbc-mysql");
       when(source.supportsCredentials()).thenReturn(credentials);
-      OptInCatalog catalog = new OptInCatalog();
-      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      OptInCatalog catalog =
+          new OptInCatalog() {
+            @Override
+            protected Catalog gravitinoCatalog() {
+              return source;
+            }
+          };
 
       JDBCOptions options =
           initialize(
@@ -282,8 +287,13 @@ public class TestGravitinoJdbcCatalog {
       Catalog source = mock(Catalog.class);
       when(source.provider()).thenReturn("jdbc-mysql");
       when(source.supportsCredentials()).thenReturn(credentials);
-      OptInCatalog catalog = new OptInCatalog();
-      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      OptInCatalog catalog =
+          new OptInCatalog() {
+            @Override
+            protected Catalog gravitinoCatalog() {
+              return source;
+            }
+          };
 
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -396,8 +406,13 @@ public class TestGravitinoJdbcCatalog {
     Catalog source = mock(Catalog.class);
     when(source.provider()).thenReturn(provider);
     when(source.supportsCredentials()).thenReturn(credentials);
-    GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
-    FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+    GravitinoJdbcCatalog catalog =
+        new GravitinoJdbcCatalog() {
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return source;
+          }
+        };
     return catalog;
   }
 
