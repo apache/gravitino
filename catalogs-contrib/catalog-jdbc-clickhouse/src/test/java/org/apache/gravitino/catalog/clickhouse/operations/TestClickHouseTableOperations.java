@@ -25,6 +25,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -211,6 +212,155 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName),
         "dropping non-existent table should return false");
+  }
+
+  @Test
+  public void testStringDefaultValueWithSpecialCharsRoundTrip() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_str_default";
+    String[] values = {"a'b", "a\\b", "a\\'b"};
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build());
+    for (int i = 0; i < values.length; i++) {
+      columns.add(
+          JdbcColumn.builder()
+              .withName("c" + i)
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .withDefaultValue(Literals.stringLiteral(values[i]))
+              .build());
+    }
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    for (int i = 0; i < values.length; i++) {
+      String columnName = "c" + i;
+      Column column =
+          Arrays.stream(load.columns())
+              .filter(c -> c.name().equals(columnName))
+              .findFirst()
+              .orElseThrow();
+      Assertions.assertEquals(Literals.stringLiteral(values[i]), column.defaultValue());
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME.toString(),
+                tableName,
+                TableChange.addColumn(
+                    new String[] {"c_invalid"},
+                    Types.ByteType.get(),
+                    Literals.of("128", Types.ByteType.get()))));
+  }
+
+  @Test
+  public void testNumericDefaultValueTruncationOnClickHouse() throws Exception {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_num_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("dec_col")
+          .withType(Types.DecimalType.of(3, 2))
+          .withNullable(false)
+          .withDefaultValue(Literals.decimalLiteral(Decimal.of("9.995")))
+          .build(),
+      JdbcColumn.builder()
+          .withName("int_col")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.doubleLiteral(1.9))
+          .build(),
+      JdbcColumn.builder()
+          .withName("byte_col")
+          .withType(Types.ByteType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.of("-128.9", Types.ByteType.get()))
+          .build()
+    };
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection conn =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO `%s`.`%s` (id) VALUES (1)".formatted(TEST_DB_NAME.toString(), tableName));
+      try (ResultSet rs =
+          stmt.executeQuery(
+              "SELECT toString(dec_col), int_col, byte_col FROM `%s`.`%s`"
+                  .formatted(TEST_DB_NAME.toString(), tableName))) {
+        Assertions.assertTrue(rs.next());
+        Assertions.assertEquals("9.99", rs.getString(1));
+        Assertions.assertEquals(1, rs.getInt(2));
+        Assertions.assertEquals(-128, rs.getInt(3));
+      }
+    }
+  }
+
+  @Test
+  public void testNumericDefaultValueCannotInjectDdl() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_inject_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("v")
+          .withType(Types.StringType.get())
+          .withNullable(true)
+          .withDefaultValue(Literals.of("1, x String", Types.IntegerType.get()))
+          .build()
+    };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.create(
+                TEST_DB_NAME.toString(),
+                tableName,
+                columns,
+                null,
+                new HashMap<>(),
+                null,
+                Distributions.NONE,
+                null,
+                getSortOrders("id")));
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString()).contains(tableName));
   }
 
   @Test
@@ -2054,6 +2204,79 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         .withComment("table_comment")
         .withTableOperation(null)
         .build();
+  }
+
+  @Test
+  public void testAlterTableDefaultValueValidation() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("c1")
+            .withType(Types.IntegerType.get())
+            .withDefaultValue(Literals.of("300", Types.IntegerType.get()))
+            .build();
+    // A default that does not fit its type can exist when the table was created outside Gravitino.
+    JdbcColumn c2 =
+        JdbcColumn.builder()
+            .withName("c2")
+            .withType(Types.ByteType.get())
+            .withDefaultValue(Literals.of("200", Types.ByteType.get()))
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("tbl")
+            .withColumns(new JdbcColumn[] {c1, c2})
+            .withTableOperation(null)
+            .build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"c1"}, Literals.of("2147483648", Types.IntegerType.get()))
+                }));
+
+    IllegalArgumentException typeChange =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildAlterSql(
+                    "db",
+                    "tbl",
+                    new TableChange[] {
+                      TableChange.updateColumnType(new String[] {"c1"}, Types.ByteType.get())
+                    }));
+    Assertions.assertTrue(
+        typeChange.getMessage().contains("existing default value of column c1"),
+        typeChange.getMessage());
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnType(new String[] {"c1"}, Types.LongType.get())
+                }));
+
+    // Changes that keep the existing default do not validate it again.
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnComment(new String[] {"c2"}, "new comment")
+                }));
   }
 
   private static JdbcTable buildStubTableWithNullDefault() {
