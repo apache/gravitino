@@ -1948,29 +1948,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return -1;
   }
 
-<<<<<<< HEAD
-=======
-  private static int findClosingQuote(String value, int openQuote) {
-    char quote = value.charAt(openQuote);
-    for (int i = openQuote + 1; i < value.length(); i++) {
-      char current = value.charAt(i);
-      if (current == '\\' && i + 1 < value.length()) {
-        i++;
-      } else if (current == quote) {
-        if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
-          i++;
-        } else {
-          return i;
-        }
-      }
-    }
-    return -1;
-  }
-
-  private static boolean isQuoteDelimiter(char value) {
-    return value == '\'' || value == '"' || value == '`';
-  }
-
   private void checkDefaultValue(Type columnType, Expression defaultValue) {
     Preconditions.checkState(
         columnDefaultValueConverter instanceof ClickHouseColumnDefaultValueConverter,
@@ -1980,7 +1957,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         .checkDefaultValue(columnType, defaultValue);
   }
 
->>>>>>> 707a0ca42 ([#14858] fix(catalog-jdbc-clickhouse): Fix column default value escaping and validation (#14859))
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
     // Add Nullable data type
     String dataType = typeConverter.fromGravitino(column.dataType());
