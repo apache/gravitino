@@ -373,6 +373,15 @@ public class TestDomainOperations extends TestBase {
   public void testInvalidRequests() {
     GravitinoMetalake metalake = metalake();
     for (String segment : new String[] {".", ".."}) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> metalake.createDomain(segment, null, null, TagValue.noValue("dept"), false));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> domain().createSubdomain(segment, null, null, TagValue.noValue("dept"), false));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> metalake.alterDomain(NAME, DomainChange.rename(segment)));
       Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(segment));
       Domain snapshot =
           new GenericDomain(

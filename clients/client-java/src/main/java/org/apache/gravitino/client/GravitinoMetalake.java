@@ -1073,6 +1073,7 @@ public class GravitinoMetalake extends MetalakeDTO
       TagValue backingTag,
       boolean createBackingTag) {
     Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
+    GenericDomain.validateName(name);
     DomainCreateRequest request =
         new DomainCreateRequest(
             name,

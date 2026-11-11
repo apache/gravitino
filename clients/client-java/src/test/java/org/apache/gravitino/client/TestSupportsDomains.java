@@ -49,7 +49,7 @@ import org.mockito.Mockito;
 
 /** Tests domain lookup through all six leaf resource interfaces. */
 public class TestSupportsDomains extends TestBase {
-  private static final String NAME = "asset/a. b";
+  private static final String NAME = "asset/a";
   private static final Namespace NAMESPACE = Namespace.of("metalake", "cat", "db");
 
   /**
