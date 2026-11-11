@@ -250,7 +250,10 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
    * Highest observed role versions while calls are loading or waiting. A partial load has no
    * loadedRoles marker, so that cache alone cannot stop an older in-progress load from overwriting
    * it. References keep this floor alive until all such calls finish, independently of the partial
-   * retry backoff. Guarded by the write lock of {@link #rolePolicyLock}; removed when idle.
+   * retry backoff. This is not a persistent version watermark: once these calls finish and any
+   * partial-load backoff expires, a caller delayed before retention can still publish an older
+   * probed version. A later request probing the newer version reloads it. Guarded by the write lock
+   * of {@link #rolePolicyLock}; removed when idle.
    */
   private final Map<Long, RolePolicyLoadState> rolePolicyLoadStates = new HashMap<>();
 
@@ -1670,6 +1673,11 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     // Resolve every securable object to a metadata id before touching the enforcers, so the
     // critical section below stays free of DB round-trips.
+    // Shared loads reuse the owner's request context, including catalog normalization failures
+    // remembered earlier in that request. A transient failure can therefore publish a partial load
+    // for all waiters; unresolved DENY objects install catalog-level deny guards. Other requests
+    // reuse that fail-closed state until PARTIAL_ROLE_LOAD_RETRY_MS expires (unless invalidated).
+    // Keeping this context also preserves request-local lookup deduplication.
     Optional<ResolvedRolePolicies> resolution = resolveRolePolicies(roleEntity, requestContext);
     if (!resolution.isPresent()) {
       return false;
