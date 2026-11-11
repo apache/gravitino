@@ -19,7 +19,7 @@ from abc import ABC, abstractmethod
 from typing import Optional
 
 from gravitino.api.domain.domain import Domain
-from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.tag.tag_value import TagValue
 
 
@@ -60,7 +60,7 @@ class DomainOperations(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def alter_domain(self, name: str, *changes: DomainChange) -> Domain:
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
         """Alter name, comment or properties without renaming the backing tag."""
         raise NotImplementedError
 

@@ -35,7 +35,7 @@ from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.domain.domain import Domain
-from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
 from gravitino.api.tag.tag_value import TagValue
 from gravitino.api.tag.tag_operations import TagOperations
@@ -749,7 +749,7 @@ class GravitinoClient(
             name, comment, properties, backing_tag, create_backing_tag
         )
 
-    def alter_domain(self, name: str, *changes: DomainChange) -> Domain:
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
         """Alter the named domain and return a new snapshot."""
         return self.get_metalake().alter_domain(name, *changes)
 

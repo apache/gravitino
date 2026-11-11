@@ -79,6 +79,7 @@ from gravitino.exceptions.base import (
     NoSuchMetadataObjectException,
     NoSuchTagException,
     NonEmptyDomainException,
+    NotEmptyException,
     OptimisticLockException,
     RESTException,
     TagAlreadyExistsException,
@@ -430,6 +431,25 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual([], self._domain().list_members(DomainMemberFilter()))
         self._request("GET", self.path + "/" + encode_string(self.NAME) + "/objects")
 
+    def test_single_domain_filter(self):
+        self._respond({"code": 0, "members": []})
+        self._domain().list_members(DomainMemberFilter(domains="Tax"))
+        self._request(
+            "GET",
+            self.path + "/" + encode_string(self.NAME) + "/objects",
+            query={"domains": ["Tax"]},
+        )
+
+    def test_domain_identifier_parent(self):
+        for parent in ("Finance", ""):
+            with self.subTest(parent=parent), self.assertRaises(
+                IllegalArgumentException
+            ):
+                MetadataObjects.of("Tax", MetadataObject.Type.DOMAIN, parent=parent)
+        domain = MetadataObjects.of("Finance.Tax", MetadataObject.Type.DOMAIN)
+        self.assertEqual("Finance.Tax", domain.name())
+        self.assertIsNone(domain.parent())
+
     def test_leaf_lookup_all_six_types(self):
         for object_type in (
             MetadataObject.Type.TABLE,
@@ -538,6 +558,19 @@ class TestDomainClient(unittest.TestCase):
                 )
                 with self.assertRaisesRegex(exception, "server error"):
                     self.metalake.get_domain(self.NAME)
+
+    def test_nonempty_domain_can_be_caught_as_not_empty(self):
+        body = {
+            "code": ErrorConstants.NON_EMPTY_CODE,
+            "type": "NonEmptyDomainException",
+            "message": "Domain still has children",
+        }
+        self.opener.open.side_effect = HTTPError(
+            "url", 409, "Conflict", {}, BytesIO(json.dumps(body).encode())
+        )
+        with self.assertRaises(NotEmptyException) as caught:
+            self.metalake.delete_domain(self.NAME)
+        self.assertIsInstance(caught.exception, NonEmptyDomainException)
 
     def test_validation_before_http(self):
         for name in (None, "", " ", ".", ".."):

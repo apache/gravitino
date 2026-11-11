@@ -146,3 +146,11 @@ class DomainChange(ABC):
 
         def __str__(self) -> str:
             return f"REMOVEDOMAINPROPERTY {self._property}"
+
+
+DomainChangeVariant = (
+    DomainChange.RenameDomain
+    | DomainChange.UpdateDomainComment
+    | DomainChange.SetProperty
+    | DomainChange.RemoveProperty
+)

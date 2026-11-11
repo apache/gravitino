@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 from dataclasses_json import config, dataclass_json
 
-from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_change import DomainChange, DomainChangeVariant
 from gravitino.dto.requests.domain_update_request import (
     DomainUpdateRequest,
     DomainUpdateRequestBase,
@@ -39,7 +39,9 @@ class DomainUpdatesRequest(RESTRequest):
     )
 
     @staticmethod
-    def from_changes(changes: tuple[DomainChange, ...]) -> "DomainUpdatesRequest":
+    def from_changes(
+        changes: tuple[DomainChangeVariant, ...],
+    ) -> "DomainUpdatesRequest":
         updates = []
         for change in changes:
             if isinstance(change, DomainChange.RenameDomain):

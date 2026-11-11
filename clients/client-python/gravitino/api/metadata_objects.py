@@ -72,6 +72,10 @@ class MetadataObjects:
         parent: Optional[str] = None,
     ) -> MetadataObject:
         if isinstance(name_or_names, str):
+            Precondition.check_argument(
+                type_ != MetadataObject.Type.DOMAIN or parent is None,
+                "A domain metadata object must not have a parent",
+            )
             name = name_or_names
             full_name = (
                 MetadataObjects.DOT_JOINER.join([parent, name]) if parent else name

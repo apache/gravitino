@@ -16,6 +16,7 @@
 # under the License.
 
 from dataclasses import dataclass
+from collections.abc import Sequence
 from typing import Optional
 
 from gravitino.api.domain.domain_member import DomainMember
@@ -34,7 +35,7 @@ class DomainMemberFilter:
 
     types: tuple[MetadataObject.Type, ...] = ()
     name_contains: Optional[str] = None
-    domains: tuple[str, ...] = ()
+    domains: Sequence[str] = ()
 
     def _criteria(self) -> tuple:
         return frozenset(self.types), self.name_contains, frozenset(self.domains)
@@ -53,7 +54,8 @@ class DomainMemberFilter:
             self.domains is not None, "domains must not be None"
         )
         object.__setattr__(self, "types", tuple(dict.fromkeys(self.types)))
-        object.__setattr__(self, "domains", tuple(dict.fromkeys(self.domains)))
+        domains = (self.domains,) if isinstance(self.domains, str) else self.domains
+        object.__setattr__(self, "domains", tuple(dict.fromkeys(domains)))
         Precondition.check_argument(
             all(t in DomainMember.SUPPORTED_TYPES for t in self.types),
             "Only leaf metadata types can be domain members",

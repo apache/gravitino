@@ -27,7 +27,7 @@ from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.authorization.user import User
 from gravitino.api.domain.domain import Domain
-from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_change import DomainChangeVariant
 from gravitino.api.domain.domain_operations import DomainOperations
 from gravitino.api.tag.tag_value import TagValue
 from gravitino.client.generic_domain import GenericDomain
@@ -739,7 +739,7 @@ class GravitinoMetalake(
         result.validate()
         return GenericDomain(self.name(), result.domain(), self.rest_client)
 
-    def alter_domain(self, name: str, *changes: DomainChange) -> Domain:
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
         """Alter name, comment or properties; the backing tag is unchanged."""
         request = DomainUpdatesRequest.from_changes(changes)
         request.validate()

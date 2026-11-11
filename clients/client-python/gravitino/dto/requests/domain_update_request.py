@@ -23,7 +23,7 @@ from typing import Optional
 
 from dataclasses_json import config, dataclass_json
 
-from gravitino.api.domain.domain_change import DomainChange
+from gravitino.api.domain.domain_change import DomainChange, DomainChangeVariant
 from gravitino.rest.rest_message import RESTRequest
 from gravitino.rest.rest_utils import validate_domain_name
 from gravitino.utils.precondition import Precondition
@@ -35,7 +35,7 @@ class DomainUpdateRequestBase(RESTRequest, ABC):
     _type: str = field(init=False, metadata=config(field_name="@type"))
 
     @abstractmethod
-    def domain_change(self) -> DomainChange:
+    def domain_change(self) -> DomainChangeVariant:
         """
         Returns the domain change.
 

@@ -313,5 +313,5 @@ class BackingTagAlreadyBoundException(AlreadyExistsException):
     """The backing tag conflicts with another domain's binding."""
 
 
-class NonEmptyDomainException(GravitinoRuntimeException):
+class NonEmptyDomainException(NotEmptyException):
     """A domain with subdomains cannot be deleted."""
