@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Multimap;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -34,13 +35,13 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.math.NumberUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -48,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionSnapshotRowPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -75,41 +77,8 @@ public class ModelVersionMetaService {
     NamespaceUtil.checkModelVersion(ns);
 
     NameIdentifier modelIdent = NameIdentifier.of(ns.levels());
-    // Will throw a NoSuchEntityException if the model does not exist.
-    ModelEntity modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
-
-    List<ModelVersionPO> modelVersionPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionMetaMapper.class,
-            mapper -> mapper.listModelVersionMetasByModelId(modelEntity.id()));
-
-    if (modelVersionPOs.isEmpty()) {
-      return Collections.emptyList();
-    }
-
-    // Get the aliases for all the model versions.
-    List<ModelVersionAliasRelPO> aliasRelPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionAliasRelMapper.class,
-            mapper -> mapper.selectModelVersionAliasRelsByModelId(modelEntity.id()));
-    Multimap<Integer, ModelVersionAliasRelPO> aliasRelPOsByModelVersion =
-        ArrayListMultimap.create();
-    aliasRelPOs.forEach(r -> aliasRelPOsByModelVersion.put(r.getModelVersion(), r));
-
-    return ImmutableList.copyOf(
-        modelVersionPOs.stream()
-            .collect(
-                Collectors.groupingBy(
-                    ModelVersionPO::getModelVersion,
-                    Collectors.collectingAndThen(
-                        Collectors.<ModelVersionPO>toList(),
-                        m -> {
-                          List<ModelVersionAliasRelPO> versionAliasRelPOs =
-                              Lists.newArrayList(
-                                  aliasRelPOsByModelVersion.get(m.get(0).getModelVersion()));
-                          return POConverters.fromModelVersionPO(modelIdent, m, versionAliasRelPOs);
-                        })))
-            .values());
+    ModelVersionSnapshot snapshot = readSnapshot(modelIdent, null, null);
+    return listModelVersions(modelIdent, snapshot);
   }
 
   @Monitored(
@@ -119,44 +88,16 @@ public class ModelVersionMetaService {
     NameIdentifierUtil.checkModelVersion(ident);
 
     NameIdentifier modelIdent = NameIdentifier.of(ident.namespace().levels());
-    // Will throw a NoSuchEntityException if the model does not exist.
-    ModelEntity modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
-
     boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
-
-    List<ModelVersionPO> modelVersionPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionMetaMapper.class,
-            mapper -> {
-              if (isVersionNumber) {
-                return mapper.selectModelVersionMeta(
-                    modelEntity.id(), Integer.valueOf(ident.name()));
-              } else {
-                return mapper.selectModelVersionMetaByAlias(modelEntity.id(), ident.name());
-              }
-            });
-
-    if (modelVersionPOs.isEmpty()) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.MODEL_VERSION.name().toLowerCase(Locale.ROOT),
-          ident.toString());
+    ModelVersionSnapshot snapshot =
+        readSnapshot(
+            modelIdent,
+            isVersionNumber ? Integer.valueOf(ident.name()) : null,
+            isVersionNumber ? null : ident.name());
+    if (snapshot.modelVersions.isEmpty()) {
+      throw noSuchModelVersionException(ident);
     }
-
-    List<ModelVersionAliasRelPO> aliasRelPOs =
-        SessionUtils.getWithoutCommit(
-            ModelVersionAliasRelMapper.class,
-            mapper -> {
-              if (isVersionNumber) {
-                return mapper.selectModelVersionAliasRelsByModelIdAndVersion(
-                    modelEntity.id(), Integer.valueOf(ident.name()));
-              } else {
-                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(
-                    modelEntity.id(), ident.name());
-              }
-            });
-
-    return POConverters.fromModelVersionPO(modelIdent, modelVersionPOs, aliasRelPOs);
+    return POConverters.fromModelVersionPO(modelIdent, snapshot.modelVersions, snapshot.aliases);
   }
 
   @Monitored(
@@ -192,6 +133,8 @@ public class ModelVersionMetaService {
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           });
     } catch (RuntimeException re) {
+      ExceptionUtils.throwIfLockWaitTimeout(
+          re, "A version of the model " + modelVersionEntity.modelIdentifier());
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL_VERSION, modelVersionEntity.modelIdentifier().toString());
       throw re;
@@ -436,6 +379,100 @@ public class ModelVersionMetaService {
     List<String> oldAliases = oldModelVersionEntity.aliases();
     List<String> newAliases = newModelVersionEntity.aliases();
     return !oldAliases.equals(newAliases);
+  }
+
+  private List<ModelVersionEntity> listModelVersions(
+      NameIdentifier modelIdent, ModelVersionSnapshot snapshot) {
+    List<ModelVersionPO> modelVersionPOs = snapshot.modelVersions;
+
+    if (modelVersionPOs.isEmpty()) {
+      return Collections.emptyList();
+    }
+
+    List<ModelVersionAliasRelPO> aliasRelPOs = snapshot.aliases;
+    Multimap<Integer, ModelVersionAliasRelPO> aliasRelPOsByModelVersion =
+        ArrayListMultimap.create();
+    aliasRelPOs.forEach(r -> aliasRelPOsByModelVersion.put(r.getModelVersion(), r));
+
+    return ImmutableList.copyOf(
+        modelVersionPOs.stream()
+            .collect(
+                Collectors.groupingBy(
+                    ModelVersionPO::getModelVersion,
+                    Collectors.collectingAndThen(
+                        Collectors.<ModelVersionPO>toList(),
+                        m -> {
+                          List<ModelVersionAliasRelPO> versionAliasRelPOs =
+                              Lists.newArrayList(
+                                  aliasRelPOsByModelVersion.get(m.get(0).getModelVersion()));
+                          return POConverters.fromModelVersionPO(modelIdent, m, versionAliasRelPOs);
+                        })))
+            .values());
+  }
+
+  private ModelVersionSnapshot readSnapshot(
+      NameIdentifier modelIdent, @Nullable Integer version, @Nullable String alias) {
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
+    // The initial lookup preserves namespace validation and pins the model identity. Version
+    // rows, alias resolution, and model existence are then read in one statement snapshot, so
+    // linking or altering the model cannot tear the result or force a read to retry.
+    List<ModelVersionSnapshotRowPO> rows =
+        SessionUtils.getWithoutCommit(
+            ModelVersionMetaMapper.class,
+            mapper ->
+                mapper.selectModelVersionSnapshot(
+                    modelPO.getModelId(),
+                    modelPO.getSchemaId(),
+                    modelIdent.name(),
+                    version,
+                    alias));
+    if (rows.isEmpty()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          modelIdent.toString());
+    }
+    List<ModelVersionPO> modelVersions = new ArrayList<>();
+    List<ModelVersionAliasRelPO> aliases = new ArrayList<>();
+    for (ModelVersionSnapshotRowPO row : rows) {
+      if (row.getModelVersion() != null) {
+        modelVersions.add(
+            ModelVersionPO.builder()
+                .withModelId(row.getModelId())
+                .withMetalakeId(row.getMetalakeId())
+                .withCatalogId(row.getCatalogId())
+                .withSchemaId(row.getSchemaId())
+                .withModelVersion(row.getModelVersion())
+                .withModelVersionComment(row.getModelVersionComment())
+                .withModelVersionProperties(row.getModelVersionProperties())
+                .withModelVersionUriName(row.getModelVersionUriName())
+                .withModelVersionUri(row.getModelVersionUri())
+                .withAuditInfo(row.getAuditInfo())
+                .withDeletedAt(row.getDeletedAt())
+                .build());
+      } else if (row.getAliasVersion() != null) {
+        aliases.add(
+            ModelVersionAliasRelPO.builder()
+                .withModelId(row.getModelId())
+                .withModelVersion(row.getAliasVersion())
+                .withModelVersionAlias(row.getAliasName())
+                .withDeletedAt(row.getAliasDeletedAt())
+                .build());
+      }
+      // A model-ID-only row represents an existing model with no matching version.
+    }
+    return new ModelVersionSnapshot(modelVersions, aliases);
+  }
+
+  private static final class ModelVersionSnapshot {
+    private final List<ModelVersionPO> modelVersions;
+    private final List<ModelVersionAliasRelPO> aliases;
+
+    private ModelVersionSnapshot(
+        List<ModelVersionPO> modelVersions, List<ModelVersionAliasRelPO> aliases) {
+      this.modelVersions = modelVersions;
+      this.aliases = aliases;
+    }
   }
 
   private boolean isModelVersionUriUpdated(

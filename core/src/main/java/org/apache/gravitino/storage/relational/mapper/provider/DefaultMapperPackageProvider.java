@@ -30,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.LiveEndpointMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -42,6 +43,10 @@ import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
@@ -70,6 +75,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         GroupRoleRelMapper.class,
         JobMetaMapper.class,
         JobTemplateMetaMapper.class,
+        LiveEndpointMapper.class,
         MetalakeMetaMapper.class,
         ModelMetaMapper.class,
         ModelVersionAliasRelMapper.class,
@@ -82,6 +88,10 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         RoleMetaMapper.class,
         SchemaMetaMapper.class,
         SecurableObjectMapper.class,
+        SemanticModelMetaMapper.class,
+        SemanticModelMetricMapper.class,
+        SemanticModelSourceMapper.class,
+        SemanticModelVersionInfoMapper.class,
         StatisticMetaMapper.class,
         TableColumnMapper.class,
         TableMetaMapper.class,

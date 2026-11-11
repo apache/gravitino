@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.TableVersionMapper.TABLE_NAME;
 
+import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TableVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.Param;
@@ -67,11 +70,53 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
   }
 
   @Override
+  public String softDeleteTableVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ")) AND deleted_at = 0"
+        + "</script>";
+  }
+
+  @Override
+  public String softDeleteTableVersionsByCatalogId(@Param("catalogId") Long catalogId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteTableVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE table_id IN (SELECT table_id FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
+  }
+
+  @Override
   public String deleteTableVersionByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    // table_version_info has no row id and holds several rows per table_id, so
+    // matching on table_id would also delete the live row of any table with one
+    // expired tombstone. Match the physical row ids instead.
     return "DELETE FROM "
         + TABLE_NAME
-        + " WHERE table_id IN (SELECT table_id FROM "
+        + " WHERE ctid IN (SELECT ctid FROM "
         + TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
   }

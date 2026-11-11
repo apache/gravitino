@@ -57,6 +57,9 @@ public final class EntityCombinedTable implements Table {
   // unique id, and based on this id, we can label and control the access to the entities.
   private boolean imported;
 
+  // The columns to report instead of the catalog's, set only when the catalog reports none.
+  private Column[] columnsOverride;
+
   private EntityCombinedTable(Table table, TableEntity tableEntity) {
     this.table = table;
     this.tableEntity = tableEntity;
@@ -75,6 +78,18 @@ public final class EntityCombinedTable implements Table {
     MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
     this.keysToMask = classification.keysToMask();
     this.keysToOmit = classification.keysToOmit();
+    return this;
+  }
+
+  /**
+   * Reports the given columns instead of the catalog table's. Used when the catalog returns a table
+   * without a column list and the stored columns stand in for it.
+   *
+   * @param columns The columns to report.
+   * @return This EntityCombinedTable.
+   */
+  EntityCombinedTable withColumns(Column[] columns) {
+    this.columnsOverride = columns;
     return this;
   }
 
@@ -99,7 +114,7 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Column[] columns() {
-    return table.columns();
+    return columnsOverride != null ? columnsOverride : table.columns();
   }
 
   @Override

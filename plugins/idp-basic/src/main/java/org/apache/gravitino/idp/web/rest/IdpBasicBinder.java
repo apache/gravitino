@@ -20,6 +20,7 @@ package org.apache.gravitino.idp.web.rest;
 
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 
 /** Registers built-in IdP REST dependencies for Jersey/HK2 injection. */
@@ -28,7 +29,9 @@ public class IdpBasicBinder extends AbstractBinder {
   @Override
   protected void configure() {
     GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    bind(IdpUserGroupManager.getInstance(gravitinoEnv.config(), gravitinoEnv.idGenerator()))
-        .to(IdpUserGroupManager.class);
+    IdpUserGroupManager manager =
+        IdpUserGroupManager.getInstance(gravitinoEnv.config(), gravitinoEnv.idGenerator());
+    bind(new IdpUserGroupEventDispatcher(gravitinoEnv.eventBus(), manager))
+        .to(IdpUserGroupEventDispatcher.class);
   }
 }

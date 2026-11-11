@@ -159,26 +159,58 @@ public class ViewMetaService {
 
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
-      SchemaMetaService.getInstance()
-          .doWithSchemaWriteLock(
-              newEntity.nameIdentifier(),
-              newSchemaId,
-              newCatalogId,
-              newMetalakeId,
-              () -> {
-                // current_version is the sole OCC token. The root CAS is the transaction's decision
-                // point and must run before the unguarded version-row insert below.
-                int updated =
-                    SessionUtils.getWithoutCommit(
-                        ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
-                if (updated == 0) {
-                  throw viewWriteFailure(ident, oldViewPO);
-                }
-              },
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      ViewVersionInfoMapper.class,
-                      mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      if (isSchemaChanged) {
+        SessionUtils.doMultipleWithCommit(
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockCatalogForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        oldViewEntity.nameIdentifier(),
+                        oldViewPO.getSchemaId(),
+                        oldViewPO.getCatalogId(),
+                        oldViewPO.getMetalakeId()),
+            () ->
+                SchemaMetaService.getInstance()
+                    .lockSchemaForEntityWrite(
+                        newEntity.nameIdentifier(), newSchemaId, newCatalogId, newMetalakeId),
+            () -> {
+              int updated =
+                  SessionUtils.getWithoutCommit(
+                      ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+              if (updated == 0) {
+                throw viewWriteFailure(ident, oldViewPO);
+              }
+            },
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ViewVersionInfoMapper.class,
+                    mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      } else {
+        SchemaMetaService.getInstance()
+            .doWithSchemaWriteLock(
+                newEntity.nameIdentifier(),
+                newSchemaId,
+                newCatalogId,
+                newMetalakeId,
+                () -> {
+                  int updated =
+                      SessionUtils.getWithoutCommit(
+                          ViewMetaMapper.class,
+                          mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+                  if (updated == 0) {
+                    throw viewWriteFailure(ident, oldViewPO);
+                  }
+                },
+                () ->
+                    SessionUtils.doWithoutCommit(
+                        ViewVersionInfoMapper.class,
+                        mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
+      }
       return newEntity;
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(

@@ -21,12 +21,15 @@ package org.apache.gravitino.maintenance.jobs.iceberg;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergExpireSnapshotsJob {
@@ -73,22 +76,23 @@ public class TestIcebergExpireSnapshotsJob {
     IcebergExpireSnapshotsJob job = new IcebergExpireSnapshotsJob();
     SparkJobTemplate template = job.jobTemplate();
 
-    assertNotNull(template.arguments());
-    assertEquals(11, template.arguments().size());
-
-    // Verify all expected arguments are present
-    assertTrue(template.arguments().contains("--catalog"));
-    assertTrue(template.arguments().contains("{{catalog_name}}"));
-    assertTrue(template.arguments().contains("--table"));
-    assertTrue(template.arguments().contains("{{table_identifier}}"));
-    assertTrue(template.arguments().contains("--older-than"));
-    assertTrue(template.arguments().contains("{{older_than}}"));
-    assertTrue(template.arguments().contains("--retain-last"));
-    assertTrue(template.arguments().contains("{{retain_last}}"));
-    // --stream-results is a boolean flag, value is the template variable itself
-    assertTrue(template.arguments().contains("{{stream_results}}"));
-    assertTrue(template.arguments().contains("--spark-conf"));
-    assertTrue(template.arguments().contains("{{spark_conf}}"));
+    // Only the catalog and the table are required; the other options default to empty values,
+    // which the job treats as unset, and stream results defaults to false.
+    assertEquals(
+        Arrays.asList(
+            "--catalog",
+            "{{catalog_name}}",
+            "--table",
+            "{{table_identifier}}",
+            "--older-than",
+            "{{older_than:-}}",
+            "--retain-last",
+            "{{retain_last:-}}",
+            "--stream-results",
+            "{{stream_results:-false}}",
+            "--spark-conf",
+            "{{spark_conf:-}}"),
+        template.arguments());
   }
 
   @Test
@@ -473,5 +477,63 @@ public class TestIcebergExpireSnapshotsJob {
     } catch (IllegalArgumentException e) {
       assertTrue(e.getMessage().contains("--spark-conf"));
     }
+  }
+
+  @Test
+  public void testParseStreamResults() {
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(null));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(""));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults("false"));
+    assertFalse(IcebergExpireSnapshotsJob.parseStreamResults(" FALSE "));
+    assertTrue(IcebergExpireSnapshotsJob.parseStreamResults("true"));
+    assertTrue(IcebergExpireSnapshotsJob.parseStreamResults("True"));
+    assertThrows(
+        IllegalArgumentException.class, () -> IcebergExpireSnapshotsJob.parseStreamResults("yes"));
+
+    // The template renders "--stream-results false" by default, which must not enable streaming,
+    // while a bare "--stream-results" on the command line still does.
+    assertFalse(
+        IcebergExpireSnapshotsJob.parseStreamResults(
+            IcebergJobUtils.parseArguments(new String[] {"--stream-results", "false"})
+                .get("stream-results")));
+    assertTrue(
+        IcebergExpireSnapshotsJob.parseStreamResults(
+            IcebergJobUtils.parseArguments(new String[] {"--stream-results"})
+                .get("stream-results")));
+  }
+
+  @Test
+  public void testExpireSetDifferenceIgnoresConcurrentAdds() {
+    java.util.Set<Long> beforeSnapshots = new java.util.HashSet<>();
+    beforeSnapshots.add(1L);
+    beforeSnapshots.add(2L);
+    beforeSnapshots.add(3L);
+    java.util.Set<Long> afterSnapshots = new java.util.HashSet<>();
+    afterSnapshots.add(2L);
+    afterSnapshots.add(3L);
+    afterSnapshots.add(99L);
+    assertEquals(1L, IcebergExpireSnapshotsJob.snapshotsCleared(beforeSnapshots, afterSnapshots));
+
+    java.util.Map<String, Long> beforeFiles = new java.util.HashMap<>();
+    beforeFiles.put("a.parquet", 100L);
+    beforeFiles.put("b.parquet", 200L);
+    java.util.Map<String, Long> afterFiles = new java.util.HashMap<>();
+    afterFiles.put("b.parquet", 200L);
+    afterFiles.put("c.parquet", 500L);
+    assertEquals(100L, IcebergExpireSnapshotsJob.bytesReclaimed(beforeFiles, afterFiles));
+
+    String sql = IcebergExpireSnapshotsJob.buildReachableContentFilesSql("cat", "db.tbl");
+    assertTrue(sql.contains("FROM `cat`.`db`.`tbl`.`all_files`"));
+    assertTrue(sql.contains("GROUP BY file_path"));
+  }
+
+  @Test
+  public void testExpireMetricNames() {
+    assertEquals("custom-snapshot-number", IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-snapshot-number",
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC);
+    assertEquals(
+        "custom-expired-file-size", IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC);
   }
 }

@@ -34,15 +34,45 @@ public interface StatisticMetaMapper {
   List<StatisticPO> listStatisticPOsByEntityId(
       @Param("metalakeId") Long metalakeId, @Param("entityId") long entityId);
 
-  @InsertProvider(
-      type = StatisticSQLProviderFactory.class,
-      method = "batchInsertStatisticPOsOnDuplicateKeyUpdate")
-  void batchInsertStatisticPOsOnDuplicateKeyUpdate(
-      @Param("statisticPOs") List<StatisticPO> statisticPOs);
+  /** Lists only the named live statistics for a metadata object. */
+  @SelectProvider(type = StatisticSQLProviderFactory.class, method = "listStatisticPOsByNames")
+  List<StatisticPO> listStatisticPOsByNames(
+      @Param("metalakeId") Long metalakeId,
+      @Param("entityId") long entityId,
+      @Param("names") List<String> names);
 
-  @UpdateProvider(type = StatisticSQLProviderFactory.class, method = "batchDeleteStatisticPOs")
-  Integer batchDeleteStatisticPOs(
-      @Param("entityId") Long entityId, @Param("statisticNames") List<String> statisticNames);
+  /**
+   * Inserts statistics in one statement. The whole statement fails with a unique-key violation if
+   * any of them already has a live row with the same name and target.
+   *
+   * @param statisticPOs the statistics to insert, with their initial versions and deleted_at
+   * @return the number of inserted rows
+   */
+  @InsertProvider(type = StatisticSQLProviderFactory.class, method = "batchInsertStatisticPOs")
+  Integer batchInsertStatisticPOs(@Param("statisticPOs") List<StatisticPO> statisticPOs);
+
+  /**
+   * Replaces statistic values in one statement, each only if its observed version is still current.
+   *
+   * @param statisticPOs one PO per observed row: its ID, target, name and current version identify
+   *     the row, and its value and audit info are the replacement
+   * @return the number of replaced rows; fewer than requested means some rows changed meanwhile
+   */
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "batchUpdateStatisticPOsWithVersion")
+  Integer batchUpdateStatisticPOsWithVersion(@Param("statisticPOs") List<StatisticPO> statisticPOs);
+
+  /**
+   * Soft-deletes statistics in one statement, each only if its observed version is still current.
+   *
+   * @param statisticPOs the observed rows, identified by ID, target, name and current version
+   * @return the number of deleted rows; fewer than requested means some rows changed meanwhile
+   */
+  @UpdateProvider(
+      type = StatisticSQLProviderFactory.class,
+      method = "batchDeleteStatisticPOsWithVersion")
+  Integer batchDeleteStatisticPOsWithVersion(@Param("statisticPOs") List<StatisticPO> statisticPOs);
 
   @UpdateProvider(
       type = StatisticSQLProviderFactory.class,

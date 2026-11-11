@@ -32,8 +32,10 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic view. */
@@ -42,6 +44,7 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   private final ViewDTO viewDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
   private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericView(ViewDTO viewDTO, RESTClient restClient, Namespace viewNs) {
@@ -49,6 +52,8 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
     List<String> viewFullName =
         Lists.newArrayList(viewNs.level(1), viewNs.level(2), viewDTO.name());
     MetadataObject viewObject = MetadataObjects.of(viewFullName, MetadataObject.Type.VIEW);
+    this.objectSemanticModelOperations =
+        new MetadataObjectSemanticModelOperations(viewNs.level(0), viewObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(viewNs.level(0), viewObject, restClient);
     this.objectSecretOperations =
@@ -96,6 +101,11 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   }
 
   @Override
+  public SupportsSemanticModels supportsSemanticModels() {
+    return objectSemanticModelOperations;
+  }
+
+  @Override
   public SupportsTags supportsTags() {
     return this;
   }
@@ -116,8 +126,18 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override

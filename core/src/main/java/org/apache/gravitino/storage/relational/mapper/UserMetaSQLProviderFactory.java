@@ -66,6 +66,11 @@ public class UserMetaSQLProviderFactory {
     return getProvider().selectUserMetaByIdForUpdate(userId);
   }
 
+  /** Returns SQL that selects an active user by ID and locks it for shared access. */
+  public static String selectUserMetaByIdForShare(@Param("userId") Long userId) {
+    return getProvider().selectUserMetaByIdForShare(userId);
+  }
+
   public static String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return getProvider().insertUserMeta(userPO);
   }
@@ -130,5 +135,16 @@ public class UserMetaSQLProviderFactory {
       @Param("userName") String userName,
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
+  }
+  /**
+   * Returns SQL for a principal and membership snapshot.
+   *
+   * @param metalakeId the parent metalake ID
+   * @param userName the principal name
+   * @return the aggregate select SQL
+   */
+  public static String selectUserWithRolesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("userName") String userName) {
+    return getProvider().selectUserWithRolesByMetalakeIdAndName(metalakeId, userName);
   }
 }

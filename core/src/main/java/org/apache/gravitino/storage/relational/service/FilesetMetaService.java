@@ -198,6 +198,8 @@ public class FilesetMetaService {
                                 FilesetVersionMapper.class,
                                 versionMapper ->
                                     versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
+                        // storedPO carries no snapshot rows, so an overwrite always allocates a
+                        // new version and writes its snapshot.
                         FilesetPO replacementPO =
                             POConverters.updateFilesetPOWithVersion(
                                 storedPO, replacement, maxStoredVersion);
@@ -452,7 +454,7 @@ public class FilesetMetaService {
                 FilesetMetaMapper.class,
                 mapper ->
                     mapper.softDeleteFilesetMetasByFilesetId(
-                        observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion())),
+                        observedFilesetPO.getFilesetId(), observedFilesetPO.getOccVersion())),
         () -> filesetWriteFailure(identifier, observedFilesetPO));
   }
 
@@ -461,6 +463,13 @@ public class FilesetMetaService {
     FilesetPO newFilesetPO = POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, null);
     if (tryUpdateFileset(newFilesetPO, oldFilesetPO)) {
       return;
+    }
+
+    // The snapshot check is in the statement only when the alter allocates a version, so an alter
+    // that allocates none can have failed for one reason: it lost the OCC race. Its observed
+    // version is fixed, so retrying would repeat the same comparison and fail again.
+    if (newFilesetPO.getCurrentVersion().equals(oldFilesetPO.getCurrentVersion())) {
+      throw filesetWriteFailure(identifier, oldFilesetPO);
     }
 
     // The metadata CAS also rejects a version that already has an active stored snapshot. Only
@@ -486,9 +495,12 @@ public class FilesetMetaService {
             FilesetMetaMapper.class,
             mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
     boolean updated = updateCount != null && updateCount > 0;
-    if (updated) {
+    if (updated && !newFilesetPO.getFilesetVersionPOs().isEmpty()) {
       // The metadata row now points to this complete snapshot. The caller's schema transaction
       // ensures a failed version insert also restores the metadata version.
+      //
+      // An alter that changed nothing the version table stores allocates no snapshot and leaves
+      // current_version alone, so the row keeps pointing at the snapshot it already had.
       SessionUtils.doWithoutCommit(
           FilesetVersionMapper.class,
           mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs()));

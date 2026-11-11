@@ -31,7 +31,7 @@ public class PolicyMetaBaseSQLProvider {
 
   public String listPolicyPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -52,7 +52,7 @@ public class PolicyMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -78,16 +78,16 @@ public class PolicyMetaBaseSQLProvider {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME
         + " (policy_id, policy_name, policy_type, metalake_id,"
-        + " audit_info, current_version, last_version, deleted_at)"
+        + " audit_info, current_version, last_version, occ_version, deleted_at)"
         + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
         + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
-        + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})";
+        + " #{policyMeta.lastVersion}, #{policyMeta.occVersion}, #{policyMeta.deletedAt})";
   }
 
   public String selectPolicyMetaByMetalakeAndName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at, pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
         + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content, pvi.deleted_at as version_deleted_at"
         + " FROM "
@@ -116,20 +116,21 @@ public class PolicyMetaBaseSQLProvider {
         + " audit_info = #{newPolicyMeta.auditInfo},"
         + " current_version = #{newPolicyMeta.currentVersion},"
         + " last_version = #{newPolicyMeta.lastVersion},"
+        + " occ_version = #{newPolicyMeta.occVersion},"
         + " deleted_at = #{newPolicyMeta.deletedAt}"
         + " WHERE policy_id = #{oldPolicyMeta.policyId}"
-        + " AND current_version = #{oldPolicyMeta.currentVersion}"
+        + " AND occ_version = #{oldPolicyMeta.occVersion}"
         + " AND deleted_at = 0";
   }
 
   /** Returns SQL that soft-deletes a policy using its stable ID and observed OCC version. */
   public String softDeletePolicyByIdAndVersion(
-      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
+      @Param("policyId") Long policyId, @Param("occVersion") Long occVersion) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE policy_id = #{policyId} AND current_version = #{currentVersion}"
+        + " WHERE policy_id = #{policyId} AND occ_version = #{occVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -148,9 +149,36 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /**
+   * One join of policy, metalake, and the current policy version, selected by policy id.
+   *
+   * @param policyId policy id
+   * @return the select statement
+   */
+  public String selectPolicyMetaByPolicyId(@Param("policyId") Long policyId) {
+    return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
+        + " pm.deleted_at, mm.metalake_name as metalake_name,"
+        + " pvi.id, pvi.metalake_id as version_metalake_id, pvi.policy_id as version_policy_id,"
+        + " pvi.version, pvi.policy_comment, pvi.enabled, pvi.content,"
+        + " pvi.deleted_at as version_deleted_at"
+        + " FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON pm.metalake_id = mm.metalake_id"
+        + " JOIN "
+        + POLICY_VERSION_TABLE_NAME
+        + " pvi ON pm.policy_id = pvi.policy_id"
+        + " AND pm.current_version = pvi.version"
+        + " WHERE pm.policy_id = #{policyId}"
+        + " AND pm.deleted_at = 0 AND mm.deleted_at = 0"
+        + " AND pvi.deleted_at = 0";
+  }
+
   public String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at"
         + " FROM "
         + POLICY_META_TABLE_NAME
@@ -182,7 +210,7 @@ public class PolicyMetaBaseSQLProvider {
   public String selectPolicyMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at"
         + " FROM "
         + POLICY_META_TABLE_NAME
@@ -203,7 +231,7 @@ public class PolicyMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version, pm.deleted_at,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version, pm.deleted_at,"
         + " pv.id, pv.metalake_id as version_metalake_id, pv.policy_id as version_policy_id,"
         + " pv.version, pv.policy_comment, pv.enabled, pv.content, pv.deleted_at as version_deleted_at"
         + " FROM "
@@ -231,7 +259,7 @@ public class PolicyMetaBaseSQLProvider {
    */
   private String selectPolicyPOsByPolicyIdsBody() {
     return "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"
-        + " pm.audit_info, pm.current_version, pm.last_version,"
+        + " pm.audit_info, pm.current_version, pm.last_version, pm.occ_version,"
         + " pm.deleted_at"
         + " FROM "
         + POLICY_META_TABLE_NAME

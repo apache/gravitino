@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -40,9 +42,12 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -50,6 +55,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -116,12 +122,32 @@ public class PolicyTagRelService {
    * @return All active policy targets for the tag after the update.
    * @throws IOException If selector audit information cannot be serialized.
    * @throws EntityAlreadyExistsException If a relation to add already exists.
-   * @throws IllegalArgumentException If the same relation is both added and removed.
+   * @throws IllegalArgumentException If a selector violates the tag's value constraint or the same
+   *     relation is both added and removed.
    */
   public List<PolicyEntity> updateRelations(
       NameIdentifier tagIdentifier,
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove)
+      throws IOException {
+    return updateRelations(tagIdentifier, targetsToAdd, targetsToRemove, null);
+  }
+
+  /**
+   * Updates policy relations with explicit creation audit metadata.
+   *
+   * @param tagIdentifier The tag identifier.
+   * @param targetsToAdd Policy relations to create.
+   * @param targetsToRemove Policy relations to remove.
+   * @param auditInfo The audit to preserve, or null to use the current principal and time.
+   * @return The resulting policy targets.
+   * @throws IOException If storage or serialization fails.
+   */
+  public List<PolicyEntity> updateRelations(
+      NameIdentifier tagIdentifier,
+      RelationEdgeTarget[] targetsToAdd,
+      RelationEdgeTarget[] targetsToRemove,
+      @Nullable Audit auditInfo)
       throws IOException {
     NameIdentifierUtil.checkTag(tagIdentifier);
     String metalake = tagIdentifier.namespace().level(0);
@@ -138,7 +164,7 @@ public class PolicyTagRelService {
             try {
               updatedPolicies.addAll(
                   updateRelationsWithoutCommit(
-                      tagIdentifier, targetsToAddOrEmpty, targetsToRemoveOrEmpty));
+                      tagIdentifier, targetsToAddOrEmpty, targetsToRemoveOrEmpty, auditInfo));
             } catch (IOException e) {
               throw new UncheckedIOException(e);
             }
@@ -152,12 +178,24 @@ public class PolicyTagRelService {
   private List<PolicyEntity> updateRelationsWithoutCommit(
       NameIdentifier tagIdentifier,
       RelationEdgeTarget[] targetsToAdd,
-      RelationEdgeTarget[] targetsToRemove)
+      RelationEdgeTarget[] targetsToRemove,
+      @Nullable Audit auditInfo)
       throws IOException {
     String metalake = tagIdentifier.namespace().level(0);
+    NameIdentifier metalakeIdentifier = NameIdentifier.of(metalake);
+    LiveEndpointService.lockLiveEndpoint(
+        metalakeIdentifier,
+        Entity.EntityType.METALAKE,
+        EntityIdService.getEntityIds(metalakeIdentifier, Entity.EntityType.METALAKE));
     TagPO tagPO = lockTag(tagIdentifier);
     long tagId = tagPO.getTagId();
     Map<String, Long> policyIds = resolvePolicyIds(metalake, targetsToAdd, targetsToRemove);
+
+    // Validate the locked row in the same transaction as the relation write. Do not carry a
+    // constraint read by REST or a dispatcher across this transaction boundary.
+    for (RelationEdgeTarget target : targetsToAdd) {
+      validateSelector(tagPO, target.relationValue().orElse(null));
+    }
 
     for (RelationEdgeTarget target : targetsToRemove) {
       long policyId = policyIds.get(target.nameIdentifier().name());
@@ -181,12 +219,25 @@ public class PolicyTagRelService {
           target.nameIdentifier(),
           policyId,
           tagId,
-          target.relationValue().orElse(null));
+          target.relationValue().orElse(null),
+          auditInfo);
     }
 
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
         .map(relation -> (PolicyEntity) relation.targetEntity())
         .collect(Collectors.toList());
+  }
+
+  private static void validateSelector(TagPO tagPO, @Nullable String selectorJson)
+      throws IOException {
+    if (selectorJson == null) {
+      return;
+    }
+    PolicyAssociationSelector selector = PolicyAssociationSelectorSerde.deserialize(selectorJson);
+    if (selector instanceof TagValueSelector) {
+      TagMetaService.validateAllowedValue(
+          tagPO, TagValue.of(tagPO.getTagName(), ((TagValueSelector) selector).value()));
+    }
   }
 
   private static List<RelationalEntity<?>> policyTargets(
@@ -254,14 +305,18 @@ public class PolicyTagRelService {
       NameIdentifier policyIdentifier,
       long policyId,
       long tagId,
-      String selector)
+      String selector,
+      @Nullable Audit auditInfo)
       throws IOException {
     PolicyTagRelPO relation =
         PolicyTagRelPO.builder()
             .withPolicyId(policyId)
             .withTagId(tagId)
             .withSelector(selector)
-            .withAuditInfo(auditInfo())
+            .withAuditInfo(
+                auditInfo == null
+                    ? auditInfo()
+                    : JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withCurrentVersion(1L)
             .withLastVersion(1L)
             .withDeletedAt(0L)

@@ -22,16 +22,142 @@ package org.apache.gravitino.flink.connector.jdbc;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.ObjectPath;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-/** Unit tests for {@link GravitinoJdbcCatalog#applyJdbcCredential}. */
-public class TestGravitinoJdbcCatalog {
+/**
+ * Unit tests for {@link GravitinoJdbcCatalog}. Concrete Flink version modules extend this and
+ * supply their own {@link CatalogCompat}, since {@link GravitinoJdbcCatalog} is abstract.
+ */
+public abstract class TestGravitinoJdbcCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
+
+  @Test
+  void testGetFactoryDelegatesToCatalogCompat() {
+    // GravitinoJdbcCatalog.getFactory() must return the version-appropriate JDBC dynamic table
+    // factory via catalogCompat(), not a hardcoded factory -- the JDBC factory's package moved
+    // (and, starting with Flink 2.x, the artifact was split by database) across Flink connector
+    // releases, which is exactly what the CatalogCompat abstraction exists to paper over.
+    GravitinoJdbcCatalog catalog =
+        new TestableGravitinoJdbcCatalog(catalogCompat(), "test", Collections.emptyMap());
+
+    Optional<Factory> factory = catalog.getFactory();
+
+    Assertions.assertTrue(factory.isPresent());
+    // jdbcDynamicTableFactory() constructs a new instance per call, so compare by type rather
+    // than identity.
+    Assertions.assertEquals(
+        catalogCompat().jdbcDynamicTableFactory().getClass(), factory.get().getClass());
+  }
+
+  @Test
+  void testCatalogWithoutDefaultDatabase() throws Exception {
+    TestableGravitinoJdbcCatalog catalog =
+        new TestableGravitinoJdbcCatalog(catalogCompat(), null, Collections.emptyMap());
+
+    Assertions.assertNull(catalog.getDefaultDatabase());
+    Assertions.assertDoesNotThrow(catalog::open);
+    Assertions.assertFalse(catalog.isInnerCatalogCreated());
+    Assertions.assertEquals(
+        CatalogTableStatistics.UNKNOWN,
+        catalog.getTableStatistics(ObjectPath.fromString("database.table")));
+    Assertions.assertEquals(
+        CatalogColumnStatistics.UNKNOWN,
+        catalog.getTableColumnStatistics(ObjectPath.fromString("database.table")));
+
+    CatalogException exception =
+        Assertions.assertThrows(CatalogException.class, catalog::getInnerCatalog);
+    Assertions.assertTrue(exception.getMessage().contains("No default database is configured"));
+  }
+
+  private static class TestableGravitinoJdbcCatalog extends GravitinoJdbcCatalog {
+    private final CatalogCompat catalogCompat;
+    private boolean innerCatalogCreated;
+
+    TestableGravitinoJdbcCatalog(
+        CatalogCompat catalogCompat, String defaultDatabase, Map<String, String> options) {
+      super(
+          new MockCatalogContext("test", options),
+          defaultDatabase,
+          Mockito.mock(SchemaAndTablePropertiesConverter.class),
+          Mockito.mock(PartitionConverter.class));
+      this.catalogCompat = catalogCompat;
+    }
+
+    @Override
+    protected CatalogCompat catalogCompat() {
+      return catalogCompat;
+    }
+
+    @Override
+    protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+      innerCatalogCreated = true;
+      throw new UnsupportedOperationException("The inner catalog must not be created");
+    }
+
+    @Override
+    protected Catalog catalog() {
+      return new PlainCatalogStub();
+    }
+
+    boolean isInnerCatalogCreated() {
+      return innerCatalogCreated;
+    }
+
+    AbstractCatalog getInnerCatalog() {
+      return realCatalog();
+    }
+  }
+
+  private static class MockCatalogContext implements CatalogFactory.Context {
+    private final String name;
+    private final Map<String, String> options;
+
+    MockCatalogContext(String name, Map<String, String> options) {
+      this.name = name;
+      this.options = options;
+    }
+
+    @Override
+    public String getName() {
+      return name;
+    }
+
+    @Override
+    public Map<String, String> getOptions() {
+      return options;
+    }
+
+    @Override
+    public ReadableConfig getConfiguration() {
+      return Configuration.fromMap(options);
+    }
+
+    @Override
+    public ClassLoader getClassLoader() {
+      return Thread.currentThread().getContextClassLoader();
+    }
+  }
 
   private static class PlainCatalogStub implements Catalog {
     @Override

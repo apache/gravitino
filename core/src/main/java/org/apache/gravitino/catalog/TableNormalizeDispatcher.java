@@ -21,11 +21,14 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -62,7 +65,8 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.loadTable(normalizeCaseSensitive(ident));
+    return dispatcher.loadTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   @Override
@@ -95,24 +99,28 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     return dispatcher.alterTable(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager),
+        applyCapabilities(capability, changes));
   }
 
   @Override
   public boolean dropTable(NameIdentifier ident) {
-    return dispatcher.dropTable(normalizeNameIdentifier(ident));
+    return dispatcher.dropTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean purgeTable(NameIdentifier ident) throws UnsupportedOperationException {
-    return dispatcher.purgeTable(normalizeNameIdentifier(ident));
+    return dispatcher.purgeTable(
+        resolvePhysicalTableName(normalizeNameIdentifier(ident), catalogManager));
   }
 
   @Override
   public boolean tableExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return dispatcher.tableExists(normalizeCaseSensitive(ident));
+    return dispatcher.tableExists(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager));
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
@@ -127,6 +135,17 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
     Capability capability = getCapability(tableIdent, catalogManager);
-    return applyCapabilities(tableIdent, Capability.Scope.TABLE, capability);
+    Namespace namespace = tableIdent.namespace();
+    validateExistingName(
+        Capability.Scope.SCHEMA, namespace.level(namespace.length() - 1), capability);
+    validateExistingName(Capability.Scope.TABLE, tableIdent.name(), capability);
+    return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+  }
+
+  private static void validateExistingName(
+      Capability.Scope scope, String name, Capability capability) {
+    CapabilityResult result = capability.specificationOnExistingName(scope, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
   }
 }

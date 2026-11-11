@@ -32,6 +32,11 @@ Gravitino also provides a playground to experience the whole Gravitino system wi
 See the [Gravitino playground repository](https://github.com/apache/gravitino-playground)
 and [How to use the playground](./how-to-use-the-playground.md).
 
+## Migration Guide
+
+Use the [Migration Guide](./migration-guide.md) for version-specific behavior and API changes.
+For database schema upgrades, see [Upgrade Gravitino](./how-to-upgrade.md).
+
 ## Getting Started
 
 To get started with Gravitino, see [Getting started](./getting-started/index.md) for the details.
@@ -57,6 +62,9 @@ Use either to manage metadata. See
   to learn how to manage relational metadata.
 * [Manage view metadata using Gravitino](./manage-view-metadata-using-gravitino.md)
   to learn how to manage view metadata.
+* [Manage Semantic Model metadata using Gravitino](./manage-semantic-model-metadata-using-gravitino.md)
+  to learn how to define, govern, and exchange semantic metadata. Start with
+  [Semantic Models](./semantic-models.md) for concepts and supported use cases.
 * [Manage fileset metadata using Gravitino](./manage-fileset-metadata-using-gravitino.md) to learn
   how to manage fileset metadata.
 * [Manage messaging metadata using Gravitino](./manage-messaging-metadata-using-gravitino.md) to learn how to manage
@@ -107,7 +115,8 @@ To manage table and partition statistics, see [Manage statistics in Gravitino](.
 
 * [**Model catalog**](./model-catalog.md)
 
-If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
+To run maintenance inside the Gravitino server, see [Service](./table-maintenance-service/service.md).
+For the manual CLI workflow, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
 Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
 Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image.  Gravitino provides a
@@ -161,6 +170,8 @@ Gravitino provides governance features to manage metadata in a unified way. See:
   to manage policies.
 * [Manage jobs in Gravitino](./manage-jobs-in-gravitino.md): a complete guide to using Gravitino
   to manage jobs.
+* [Local job executor](./local-job-executor.md) and
+  [Kubernetes job executor](./k8s-job-executor.md): where the jobs run and how to configure them.
 
 ### Gravitino Iceberg REST Catalog Service
 

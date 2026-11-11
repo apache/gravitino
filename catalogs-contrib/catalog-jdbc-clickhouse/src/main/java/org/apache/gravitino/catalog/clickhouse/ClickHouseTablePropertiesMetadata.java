@@ -37,6 +37,8 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
   public static final String GRAVITINO_ENGINE_KEY = TableConstants.ENGINE;
   public static final String CLICKHOUSE_ENGINE_KEY = TableConstants.ENGINE_UPPER;
+  /** Property key for the structured ClickHouse projection definitions. */
+  public static final String CLICKHOUSE_PROJECTIONS_KEY = "clickhouse.projections";
 
   // The following two properties are mapped to ClickHouse table properties and can be used by
   // tables with different engines.
@@ -126,6 +128,18 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           false,
           true);
 
+  /**
+   * Structured ClickHouse projection definitions. This property is immutable because this connector
+   * supports projection metadata round-tripping during table creation, not ALTER.
+   */
+  public static final PropertyEntry<String> CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY =
+      stringOptionalPropertyEntry(
+          CLICKHOUSE_PROJECTIONS_KEY,
+          "Structured ClickHouse projection definitions for table creation",
+          true,
+          null,
+          false);
+
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
       createPropertiesMetadata();
 
@@ -154,6 +168,7 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
     map.put(CLUSTER_SHARDING_KEY_PROPERTY_ENTRY.getName(), CLUSTER_SHARDING_KEY_PROPERTY_ENTRY);
     map.put(ENGINE_PARAMETERS_PROPERTY_ENTRY.getName(), ENGINE_PARAMETERS_PROPERTY_ENTRY);
     map.put(PARTITION_KEY_PROPERTY_ENTRY.getName(), PARTITION_KEY_PROPERTY_ENTRY);
+    map.put(CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY.getName(), CLICKHOUSE_PROJECTIONS_PROPERTY_ENTRY);
 
     return Collections.unmodifiableMap(map);
   }

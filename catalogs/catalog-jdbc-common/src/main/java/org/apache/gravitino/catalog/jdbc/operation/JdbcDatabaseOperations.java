@@ -38,6 +38,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcSchema;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.slf4j.Logger;
@@ -65,7 +66,7 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
     String originComment = StringIdentifier.removeIdFromComment(comment);
     if (!supportSchemaComment() && StringUtils.isNotEmpty(originComment)) {
       throw new UnsupportedOperationException(
-          "Doesn't support setting schema comment: " + originComment);
+          "Schema " + databaseName + ": catalog does not support schema comments");
     }
 
     try (final Connection connection = getConnection()) {
@@ -131,8 +132,11 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
   }
 
   protected void dropDatabase(String databaseName, boolean cascade) {
+    // Generate the SQL before borrowing the connection that executes it, as a non-cascading drop
+    // checks for tables through another connection.
+    String sql = generateDropDatabaseSql(databaseName, cascade);
     try (final Connection connection = getConnection()) {
-      JdbcConnectorUtils.executeUpdate(connection, generateDropDatabaseSql(databaseName, cascade));
+      JdbcConnectorUtils.executeUpdate(connection, sql);
     } catch (final SQLException se) {
       throw this.exceptionMapper.toGravitinoException(se);
     }
@@ -161,9 +165,13 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
    * The default implementation of this method is based on MySQL syntax, and if the catalog does not
    * support MySQL syntax, this method needs to be rewritten.
    *
+   * <p>A non-cascading drop checks for tables through a connection from {@link #dataSource}, so
+   * callers must not hold one while calling this method.
+   *
    * @param databaseName The name of the database.
    * @param cascade cascade If set to true, drops all the tables in the schema as well.
    * @return the SQL statement to drop a database with the given name.
+   * @throws NonEmptySchemaException if the database contains tables and cascade is false
    */
   protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
     final String dropDatabaseSql = String.format("DROP DATABASE `%s`", databaseName);
@@ -177,10 +185,8 @@ public abstract class JdbcDatabaseOperations implements DatabaseOperation {
         // Execute the query and check if there exists any tables in the database
         try (ResultSet resultSet = statement.executeQuery(query)) {
           if (resultSet.next()) {
-            throw new IllegalStateException(
-                String.format(
-                    "Database %s is not empty, the value of cascade should be true.",
-                    databaseName));
+            throw new NonEmptySchemaException(
+                "Database %s is not empty, the value of cascade should be true.", databaseName);
           }
         }
       }

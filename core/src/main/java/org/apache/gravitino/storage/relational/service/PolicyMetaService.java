@@ -23,6 +23,7 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,28 +31,42 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
+import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogWriter;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
+import org.apache.gravitino.storage.relational.po.TagPO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -87,6 +102,28 @@ public class PolicyMetaService {
     return POConverters.fromPolicyPO(policyPO, ident.namespace());
   }
 
+  /**
+   * Loads one active policy by id, including its current version and metalake name.
+   *
+   * <p>The lookup is a single join across policy, metalake, and the current policy version.
+   *
+   * @param policyId policy id
+   * @return the policy, or {@code null} when the policy or its metalake is not active
+   */
+  @Nullable
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getPolicyById")
+  public PolicyEntity getPolicyById(long policyId) {
+    PolicyPO policyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class, mapper -> mapper.selectPolicyMetaByPolicyId(policyId));
+    if (policyPO == null || policyPO.getMetalakeName() == null) {
+      return null;
+    }
+    return POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(policyPO.getMetalakeName()));
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "insertPolicy")
@@ -95,15 +132,7 @@ public class PolicyMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      MetalakePO metalakePO =
-          SessionUtils.getWithoutCommit(
-              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-      if (metalakePO == null) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.METALAKE.name().toLowerCase(),
-            metalakeName);
-      }
+      MetalakePO metalakePO = MetalakeMetaService.getInstance().requireMetalakeByName(metalakeName);
 
       PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);
@@ -111,6 +140,8 @@ public class PolicyMetaService {
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForPolicyCreate(metalakePO),
           () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
     } catch (RuntimeException e) {
       try {
         ExceptionUtils.checkSQLException(
@@ -148,11 +179,10 @@ public class PolicyMetaService {
       PolicyPO newPolicyPO =
           POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
       SessionUtils.doMultipleWithCommit(
+          () -> beforeUpdate(updatedPolicyEntity),
           () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyVersionMapper.class,
-                  mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())));
+          () -> insertPolicyVersionIfAllocated(oldPolicyPO, newPolicyPO),
+          () -> afterUpdate(updatedPolicyEntity));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
@@ -191,7 +221,9 @@ public class PolicyMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> beforeRemove(policyId),
           () -> deletePolicyWithVersion(ident, policyPO),
+          () -> deleteHiddenTagWithoutCommit(policyPO, ident.namespace().level(0)),
           () ->
               SessionUtils.doWithoutCommit(
                   PolicyVersionMapper.class,
@@ -216,7 +248,8 @@ public class PolicyMetaService {
                   SecurableObjectMapper.class,
                   mapper ->
                       mapper.softDeleteObjectRelsByMetadataObject(
-                          policyId, MetadataObject.Type.POLICY.name())));
+                          policyId, MetadataObject.Type.POLICY.name())),
+          () -> afterRemove(policyId));
       return true;
     } catch (NoSuchEntityException e) {
       return false;
@@ -342,7 +375,12 @@ public class PolicyMetaService {
   }
 
   /**
-   * Writes the policy row and its content snapshot.
+   * Writes the policy row and its content snapshot without committing, and fires the matching
+   * lifecycle hooks around the DML.
+   *
+   * <p>A plain create (or an overwrite that finds no row) uses persist hooks. An overwrite that
+   * replaces an existing row uses update hooks and passes the entity as stored — including the
+   * retained policy id when the caller supplied a different id for the same name.
    *
    * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
    * the replacement is written as the next version of that row, so the snapshot history survives
@@ -357,7 +395,10 @@ public class PolicyMetaService {
   private void insertPolicyWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
+      beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      createHiddenTagWithoutCommit(policyEntity, initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
@@ -371,18 +412,68 @@ public class PolicyMetaService {
             "The policy ID %s is reserved by a deleted policy; use a new ID",
             initializedPolicyPO.getPolicyId());
       }
+      beforePersist(policyEntity);
       insertNewPolicyWithoutCommit(initializedPolicyPO);
+      createHiddenTagWithoutCommit(policyEntity, initializedPolicyPO);
+      afterPersist(policyEntity);
       return;
     }
 
     PolicyPO replacementPolicyPO =
         POConverters.updatePolicyPOWithVersion(existingPolicyPO, initializedPolicyPO);
+    PolicyEntity storedPolicy =
+        POConverters.fromPolicyPO(replacementPolicyPO, policyEntity.namespace());
     NameIdentifier observedIdentifier =
         NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
+    beforeUpdate(storedPolicy);
     updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
+    insertPolicyVersionIfAllocated(existingPolicyPO, replacementPolicyPO);
+    afterUpdate(storedPolicy);
+  }
+
+  /**
+   * Inserts the new content snapshot, unless the write allocated none.
+   *
+   * <p>A write that leaves comment, enabled and content untouched keeps {@code current_version}
+   * where it is, and the row still points at the snapshot it already had. Inserting that snapshot
+   * again would collide with the unique key over (policy_id, version, deleted_at).
+   *
+   * @param oldPolicyPO the row being replaced
+   * @param newPolicyPO the replacement, carrying the snapshot it points at
+   */
+  private void insertPolicyVersionIfAllocated(PolicyPO oldPolicyPO, PolicyPO newPolicyPO) {
+    if (newPolicyPO.getCurrentVersion().equals(oldPolicyPO.getCurrentVersion())) {
+      return;
+    }
     SessionUtils.doWithoutCommit(
         PolicyVersionMapper.class,
-        mapper -> mapper.insertPolicyVersion(replacementPolicyPO.getPolicyVersionPO()));
+        mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO()));
+  }
+
+  private void createHiddenTagWithoutCommit(PolicyEntity policy, PolicyPO policyPO) {
+    IdGenerator idGenerator = GravitinoEnv.getInstance().idGenerator();
+    Preconditions.checkState(idGenerator != null, "Policy tag ID generator is not initialized");
+    TagEntity tag = HiddenPolicyTag.create(policy, idGenerator.nextId());
+    try {
+      TagMetaService.getInstance().insertTag(tag, false);
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
+    PolicyTagRelPO relation =
+        PolicyTagRelPO.builder()
+            .withPolicyId(policy.id())
+            .withTagId(tag.id())
+            .withSelector(null)
+            .withAuditInfo(policyPO.getAuditInfo())
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
+            .withDeletedAt(0L)
+            .build();
+    int inserted =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class, mapper -> mapper.insertIfAbsent(relation));
+    Preconditions.checkState(
+        inserted == 1, "Failed to create the hidden tag relation for policy %s", policy.id());
   }
 
   private void insertNewPolicyWithoutCommit(PolicyPO policyPO) {
@@ -450,6 +541,25 @@ public class PolicyMetaService {
         () -> policyWriteFailure(identifier, oldPolicyPO));
   }
 
+  private void deleteHiddenTagWithoutCommit(PolicyPO policy, String metalake) {
+    TagPO tag =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper ->
+                mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+                    policy.getMetalakeId(), HiddenPolicyTag.name(policy.getPolicyId())));
+    if (tag == null) {
+      return;
+    }
+    NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tag.getTagName());
+    Preconditions.checkState(
+        TagMetaService.getInstance().deleteTag(tagIdentifier, tag),
+        "Failed to delete hidden tag %s for policy %s",
+        tag.getTagName(),
+        policy.getPolicyId());
+    EntityChangeLogWriter.append(tagIdentifier, Entity.EntityType.TAG, OperateType.DROP);
+  }
+
   private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {
     OccWriteSupport.deleteWithVersion(
         () ->
@@ -457,7 +567,7 @@ public class PolicyMetaService {
                 PolicyMetaMapper.class,
                 mapper ->
                     mapper.softDeletePolicyByIdAndVersion(
-                        observedPolicyPO.getPolicyId(), observedPolicyPO.getCurrentVersion())),
+                        observedPolicyPO.getPolicyId(), observedPolicyPO.getOccVersion())),
         () -> policyWriteFailure(identifier, observedPolicyPO));
   }
 
@@ -531,5 +641,47 @@ public class PolicyMetaService {
           policyName);
     }
     return policyPO;
+  }
+
+  private static void beforePersist(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforePersist(policy);
+    }
+  }
+
+  private static void afterPersist(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterPersist(policy);
+    }
+  }
+
+  private static void beforeUpdate(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforeUpdate(policy);
+    }
+  }
+
+  private static void afterUpdate(PolicyEntity policy) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterUpdate(policy);
+    }
+  }
+
+  private static void beforeRemove(long policyId) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.beforeRemove(policyId);
+    }
+  }
+
+  private static void afterRemove(long policyId) {
+    PolicyLifecycleHook hook = PolicyLifecycleHooks.get();
+    if (hook != null) {
+      hook.afterRemove(policyId);
+    }
   }
 }

@@ -24,9 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -40,11 +46,14 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.Mockito;
@@ -369,6 +378,67 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+  }
+
+  @TestTemplate
+  void testRenameOntoNameHeldByOpenWriteFailsWithoutWaiting() throws Exception {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    Map<String, String> properties = ImmutableMap.of("k1", "v1");
+    ModelEntity source =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "source",
+            "comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelEntity target =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "target",
+            "comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(source, false);
+    ModelMetaService.getInstance().insertModel(target, false);
+    ModelEntity renamed =
+        ModelEntity.builder()
+            .withId(source.id())
+            .withName(target.name())
+            .withNamespace(source.namespace())
+            .withLatestVersion(source.latestVersion())
+            .withAuditInfo(source.auditInfo())
+            .withComment(source.comment())
+            .withProperties(source.properties())
+            .build();
+    Function<ModelEntity, ModelEntity> renameUpdater = oldModel -> renamed;
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (SqlSession holder =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false);
+        Statement statement = holder.getConnection().createStatement()) {
+      // Holding the target row open is what makes the UPDATE wait on its unique index entry.
+      statement.executeUpdate(
+          "UPDATE "
+              + ModelMetaMapper.TABLE_NAME
+              + " SET model_comment = 'held' WHERE model_name = 'target' AND deleted_at = 0");
+
+      Future<ModelEntity> rename =
+          executor.submit(
+              () ->
+                  ModelMetaService.getInstance()
+                      .updateModel(source.nameIdentifier(), renameUpdater));
+
+      ExecutionException failure =
+          Assertions.assertThrows(ExecutionException.class, () -> rename.get(15, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(EntityAlreadyExistsException.class, failure.getCause());
+      holder.rollback();
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @TestTemplate

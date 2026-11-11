@@ -45,6 +45,11 @@ class TestRESTUtils {
     String expected = "key1=value1&key2=value2";
     assertEquals(expected, RESTUtils.encodeFormData(formData));
 
+    // Form data keeps the form encoding, in which a space becomes '+'.
+    assertEquals(
+        "scope=read+write&secret=a%2Bb",
+        RESTUtils.encodeFormData(ImmutableMap.of("scope", "read write", "secret", "a+b")));
+
     Map<Object, Object> emptyFormData = ImmutableMap.of();
     assertEquals("", RESTUtils.encodeFormData(emptyFormData));
   }
@@ -67,8 +72,9 @@ class TestRESTUtils {
   void testEncodeString() {
     assertEquals("test", RESTUtils.encodeString("test"));
     assertEquals("", RESTUtils.encodeString(""));
-    /* not %20 as you might expect */
-    assertEquals("hello+world", RESTUtils.encodeString("hello world"));
+    assertEquals("hello%20world", RESTUtils.encodeString("hello world"));
+    assertEquals("a%2Bb", RESTUtils.encodeString("a+b"));
+    assertEquals("a+b c", RESTUtils.decodeString(RESTUtils.encodeString("a+b c")));
     assertThrows(IllegalArgumentException.class, () -> RESTUtils.encodeString(null));
   }
 

@@ -18,20 +18,35 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,8 +56,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.function.Function;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -56,18 +74,27 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.HiddenPolicyTag;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHook;
+import org.apache.gravitino.policy.hook.PolicyLifecycleHooks;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
+import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -76,6 +103,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.MockedStatic;
 
 public class TestPolicyMetaService extends TestJDBCBackend {
   private static final String METALAKE_NAME = "metalake_for_policy_test";
@@ -90,6 +118,480 @@ public class TestPolicyMetaService extends TestJDBCBackend {
           MetadataObject.Type.TOPIC);
   private final PolicyContent content =
       PolicyContents.custom(ImmutableMap.of("filed1", 123), supportedObjectTypes, null);
+
+  /** A persisted policy receives a real TagEntity and a presence-matching relation atomically. */
+  @TestTemplate
+  public void testCreatePolicyCreatesHiddenTagModel() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "automatic_hidden_tag",
+            AUDIT_INFO);
+    PolicyMetaService.getInstance().insertPolicy(policy, false);
+    TagEntity tag =
+        TagMetaService.getInstance()
+            .getTagByIdentifier(
+                NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id())));
+    assertEquals(NamespaceUtil.ofTag(METALAKE_NAME), tag.namespace());
+    assertTrue(HiddenPolicyTag.isReservedName(tag.name()));
+    assertEquals(Map.of("gravitino.internal.policy-id", policy.id().toString()), tag.properties());
+    assertEquals(AUDIT_INFO, tag.auditInfo());
+    assertEquals(0, tag.valueConstraint().allowedValues().length);
+    assertFalse(tag.assignment().isPresent());
+    assertEquals(0, countActiveRows("tag_relation_meta", "tag_id = " + tag.id()));
+    PolicyTagRelPO relation =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class,
+            mapper -> mapper.getByPolicyIdAndTagId(policy.id(), tag.id()));
+    Assertions.assertNotNull(relation);
+    Assertions.assertNull(relation.getSelector());
+    assertEquals(1L, relation.getCurrentVersion());
+    assertEquals(1L, relation.getLastVersion());
+  }
+
+  /** New policy identities and their tags share the server generator; overwrites reuse tag IDs. */
+  @TestTemplate
+  public void testHiddenTagUsesServerIdGenerator() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    IdGenerator original = GravitinoEnv.getInstance().idGenerator();
+    IdGenerator generator = mock(IdGenerator.class);
+    when(generator.nextId()).thenReturn(1000L, 1001L, 1002L, 1003L);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", generator, true);
+    try {
+      PolicyMetaService service = PolicyMetaService.getInstance();
+      int generated = 0;
+      for (boolean overwritten : new boolean[] {false, true}) {
+        PolicyEntity policy =
+            createPolicy(
+                generator.nextId(),
+                NamespaceUtil.ofPolicy(METALAKE_NAME),
+                "generated_tag_" + overwritten,
+                AUDIT_INFO);
+        service.insertPolicy(policy, overwritten);
+        NameIdentifier tagIdent =
+            NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+        TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdent);
+        assertEquals(policy.id() + 1, tag.id().longValue());
+        generated += 2;
+        verify(generator, times(generated)).nextId();
+
+        PolicyEntity replacement =
+            createPolicy(2000L, policy.namespace(), policy.name(), AUDIT_INFO);
+        service.insertPolicy(replacement, true);
+        assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdent));
+        verify(generator, times(generated)).nextId();
+      }
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", original, true);
+    }
+  }
+
+  /** An uninitialized generator cannot commit a policy without its hidden tag. */
+  @TestTemplate
+  public void testMissingServerIdGeneratorRollsBackPolicy() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(1000L, NamespaceUtil.ofPolicy(METALAKE_NAME), "missing_generator", AUDIT_INFO);
+    IdGenerator original = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", null, true);
+    try {
+      IllegalStateException failure =
+          assertThrows(
+              IllegalStateException.class,
+              () -> PolicyMetaService.getInstance().insertPolicy(policy, false));
+      assertTrue(failure.getMessage().contains("ID generator is not initialized"));
+      assertFalse(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+      assertEquals(0, countActiveRows("policy_version_info", "policy_id = " + policy.id()));
+      assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+      assertEquals(
+          0, countActiveRows("tag_meta", "tag_name = '" + HiddenPolicyTag.name(policy.id()) + "'"));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", original, true);
+    }
+  }
+
+  /** An overwrite inserts a hidden tag only when it actually creates a policy identity. */
+  @TestTemplate
+  public void testOverwritePreservesHiddenTagIdentity() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "overwrite_hidden_tag",
+            AUDIT_INFO);
+    service.insertPolicy(policy, true);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdentifier);
+    PolicyEntity incoming =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(), policy.namespace(), policy.name(), AUDIT_INFO);
+    service.insertPolicy(incoming, true);
+    assertEquals(policy.id(), service.getPolicyByIdentifier(policy.nameIdentifier()).id());
+    assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+    assertEquals(1, TagMetaService.getInstance().listTagsByNamespace(tag.namespace()).size());
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TagMetaService.getInstance()
+                .getTagByIdentifier(
+                    NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(incoming.id()))));
+    service.updatePolicy(
+        policy.nameIdentifier(),
+        entity -> copyPolicy((PolicyEntity) entity, "renamed_hidden_tag", "new comment"));
+    assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+  }
+
+  /** Deleting a policy finds its hidden tag independently of JSON property formatting. */
+  @TestTemplate
+  public void testDeleteHiddenTagWithReformattedProperties() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "bound_catalog");
+    PolicyEntity policy =
+        createPolicy(
+            42L, NamespaceUtil.ofPolicy(METALAKE_NAME), "formatted_hidden_tag", AUDIT_INFO);
+    backend.insert(policy, false);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdentifier);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            catalog.nameIdentifier(),
+            Entity.EntityType.CATALOG,
+            new NameIdentifier[] {tagIdentifier},
+            null);
+    // Seed authorization rows that could have been written before hidden-tag checks existed.
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "legacy_hidden_tag_owner",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(tagIdentifier, Entity.EntityType.TAG, user.nameIdentifier(), user.type());
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "legacy_hidden_tag_grant",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofTag(
+                    tag.name(), Lists.newArrayList(Privileges.ApplyTag.allow()))),
+            null);
+    backend.insert(role, false);
+    String tagOwner = "metadata_object_id = " + tag.id() + " AND metadata_object_type = 'TAG'";
+    String tagGrant = "metadata_object_id = " + tag.id() + " AND type = 'TAG'";
+    assertEquals(1, countActiveRows("owner_meta", tagOwner));
+    assertEquals(1, countActiveRows("role_meta_securable_object", tagGrant));
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        PreparedStatement statement =
+            session
+                .getConnection()
+                .prepareStatement("UPDATE tag_meta SET properties = ? WHERE tag_id = ?")) {
+      statement.setString(1, "{ \"gravitino.internal.policy-id\" : \"42\" }");
+      statement.setLong(2, tag.id());
+      assertEquals(1, statement.executeUpdate());
+      session.commit();
+    }
+    assertTrue(backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+    assertEquals(0, countActiveRows("tag_meta", "tag_id = " + tag.id()));
+    assertEquals(0, countActiveRows("tag_relation_meta", "tag_id = " + tag.id()));
+    assertEquals(0, countActiveRows("owner_meta", tagOwner));
+    assertEquals(0, countActiveRows("role_meta_securable_object", tagGrant));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertFalse(backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false));
+  }
+
+  /** A failed hidden-tag soft delete must roll back the policy and its relations. */
+  @TestTemplate
+  public void testHiddenTagSoftDeleteFailureRollsBackPolicy() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            43L, NamespaceUtil.ofPolicy(METALAKE_NAME), "failed_hidden_tag_delete", AUDIT_INFO);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    service.insertPolicy(policy, false);
+    TagPO tag =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper ->
+                mapper.selectTagMetaByMetalakeIdAndName(
+                    metalake.id(), HiddenPolicyTag.name(policy.id())));
+    TagMetaMapper tagMapper = mock(TagMetaMapper.class);
+    when(tagMapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+            metalake.id(), HiddenPolicyTag.name(policy.id())))
+        .thenReturn(tag);
+    when(tagMapper.softDeleteTagMetaByIdAndVersion(tag.getTagId(), tag.getCurrentVersion()))
+        .thenReturn(0);
+    try (MockedStatic<SessionUtils> sessions = mockStatic(SessionUtils.class, CALLS_REAL_METHODS)) {
+      sessions
+          .when(() -> SessionUtils.getWithoutCommit(eq(TagMetaMapper.class), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<TagMetaMapper, ?> action = invocation.getArgument(1);
+                return action.apply(tagMapper);
+              });
+      assertThrows(
+          IllegalStateException.class, () -> service.deletePolicy(policy.nameIdentifier()));
+    }
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(1, countActiveRows("tag_meta", "tag_id = " + tag.getTagId()));
+    assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+  }
+
+  /** Failure after deletion restores the policy, hidden tag and relation together. */
+  @TestTemplate
+  public void testHiddenTagDeletionRollsBackWithPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hidden_tag_delete_rollback",
+            AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    TagEntity tag = TagMetaService.getInstance().getTagByIdentifier(tagIdentifier);
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void afterRemove(long policyId) {
+            throw new IllegalStateException("Injected post-delete failure");
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      assertThrows(
+          IllegalStateException.class,
+          () -> backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false));
+      assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+      assertEquals(tag, TagMetaService.getInstance().getTagByIdentifier(tagIdentifier));
+      assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
+
+  /** A checked tag-insert failure propagates unchanged after both inserted entities roll back. */
+  @TestTemplate
+  public void testHiddenTagIOExceptionRollsBackPolicy() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hidden_tag_io_failure",
+            AUDIT_INFO);
+    NameIdentifier tagIdentifier =
+        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id()));
+    IOException failure = new IOException("Hidden tag insertion failed");
+    TagMetaService tags = spy(TagMetaService.getInstance());
+    doAnswer(
+            invocation -> {
+              invocation.callRealMethod();
+              assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+              assertTrue(backend.exists(tagIdentifier, Entity.EntityType.TAG));
+              throw failure;
+            })
+        .when(tags)
+        .insertTag(any(TagEntity.class), eq(false));
+
+    try (MockedStatic<TagMetaService> tagService =
+        mockStatic(TagMetaService.class, CALLS_REAL_METHODS)) {
+      tagService.when(TagMetaService::getInstance).thenReturn(tags);
+      assertSame(
+          failure,
+          assertThrows(
+              IOException.class,
+              () -> PolicyMetaService.getInstance().insertPolicy(policy, false)));
+    }
+
+    assertFalse(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(0, countActiveRows("policy_version_info", "policy_id = " + policy.id()));
+    assertEquals(0, countActiveRows("tag_meta", "tag_name = '" + tagIdentifier.name() + "'"));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+  }
+
+  @TestTemplate
+  public void testLifecycleHookFailureRollsBackInsert() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void afterPersist(PolicyEntity policy) {
+            TagEntity tag =
+                TagMetaService.getInstance()
+                    .getTagByIdentifier(
+                        NameIdentifierUtil.ofTag(METALAKE_NAME, HiddenPolicyTag.name(policy.id())));
+            assertTrue(tag.valueConstraint().allowedValues().length == 0);
+            assertTrue(
+                SessionUtils.getWithoutCommit(
+                        PolicyTagRelMapper.class,
+                        mapper -> mapper.getByPolicyIdAndTagId(policy.id(), tag.id()))
+                    != null);
+            throw new IllegalArgumentException("bad cron");
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      PolicyEntity policyEntity =
+          PolicyEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName("hook-rollback")
+              .withNamespace(NamespaceUtil.ofPolicy(metalake.name()))
+              .withComment("comment")
+              .withPolicyType(Policy.BuiltInType.CUSTOM)
+              .withContent(content)
+              .withEnabled(true)
+              .withAuditInfo(AUDIT_INFO)
+              .build();
+      PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> policyMetaService.insertPolicy(policyEntity, false));
+      assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              policyMetaService.getPolicyByIdentifier(
+                  NameIdentifierUtil.ofPolicy(metalake.name(), "hook-rollback")));
+      assertEquals(
+          0,
+          countActiveRows(
+              "tag_meta", "tag_name = '" + HiddenPolicyTag.name(policyEntity.id()) + "'"));
+      assertEquals(
+          0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policyEntity.id()));
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
+
+  @TestTemplate
+  public void testLifecycleHookFailureRollsBackUpdate() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hook-update-rollback",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void afterUpdate(PolicyEntity updated) {
+            throw new IllegalArgumentException("bad cron on update");
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              policyMetaService.updatePolicy(
+                  policy.nameIdentifier(),
+                  entity -> copyPolicy((PolicyEntity) entity, policy.name(), "should-not-stick")));
+      assertEquals(
+          policy.comment(),
+          policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).comment());
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
+
+  @TestTemplate
+  public void testLifecycleHookFailureRollsBackDelete() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hook-delete-rollback",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void beforeRemove(long policyId) {
+            throw new IllegalArgumentException("bad cron on delete");
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> policyMetaService.deletePolicy(policy.nameIdentifier()));
+      assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
+
+  @TestTemplate
+  public void testOverwriteFiresUpdateHooksWithRetainedPolicyId() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity existing =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "hook-overwrite-id",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(existing, false);
+
+    List<String> events = new ArrayList<>();
+    PolicyLifecycleHook hook =
+        new PolicyLifecycleHook() {
+          @Override
+          public void beforePersist(PolicyEntity policy) {
+            events.add("beforePersist " + policy.id());
+          }
+
+          @Override
+          public void afterPersist(PolicyEntity policy) {
+            events.add("afterPersist " + policy.id());
+          }
+
+          @Override
+          public void beforeUpdate(PolicyEntity policy) {
+            events.add("beforeUpdate " + policy.id());
+          }
+
+          @Override
+          public void afterUpdate(PolicyEntity policy) {
+            events.add("afterUpdate " + policy.id());
+          }
+        };
+    PolicyLifecycleHooks.register(hook);
+    try {
+      long incomingId = RandomIdGenerator.INSTANCE.nextId();
+      PolicyEntity sameNameOtherId =
+          createPolicy(
+              incomingId, NamespaceUtil.ofPolicy(METALAKE_NAME), "hook-overwrite-id", AUDIT_INFO);
+      policyMetaService.insertPolicy(sameNameOtherId, true);
+
+      assertEquals(
+          List.of("beforeUpdate " + existing.id(), "afterUpdate " + existing.id()), events);
+      assertFalse(events.stream().anyMatch(e -> e.contains(String.valueOf(incomingId))));
+    } finally {
+      PolicyLifecycleHooks.unregister(hook);
+    }
+  }
 
   @TestTemplate
   public void testInsertAlreadyExistsException() throws IOException {
@@ -236,6 +738,28 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertTrue(versionDeletedMap2.containsKey(3));
     assertEquals(0L, versionDeletedMap2.get(3));
     assertEquals(1, versionDeletedMap2.values().stream().filter(value -> value == 0L).count());
+  }
+
+  @TestTemplate
+  public void testGetPolicyById() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    Assertions.assertNull(policyMetaService.getPolicyById(404L));
+
+    PolicyEntity policyEntity =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("policy-by-id")
+            .withNamespace(NamespaceUtil.ofPolicy(metalake.name()))
+            .withComment("comment")
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withContent(content)
+            .withEnabled(true)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    policyMetaService.insertPolicy(policyEntity, false);
+
+    assertEquals(policyEntity, policyMetaService.getPolicyById(policyEntity.id()));
   }
 
   @TestTemplate
@@ -433,7 +957,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testMetadataOnlyPolicyAlterCreatesCompleteSnapshot() throws IOException {
+  public void testMetadataOnlyPolicyAlterAdvancesOnlyTheOccVersion() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     PolicyEntity policy =
@@ -452,14 +976,20 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataOnlyUpdate);
 
     PolicyPO updatedPO = getPolicyPO(policy.nameIdentifier());
-    assertEquals(initialPO.getCurrentVersion() + 1, updatedPO.getCurrentVersion().longValue());
-    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getLastVersion());
+    // The audit info is the only thing that changed, and policy_version_info does not store it, so
+    // the alter advances the OCC token alone and writes no snapshot.
+    assertEquals(initialPO.getOccVersion() + 1, updatedPO.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), updatedPO.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), updatedPO.getLastVersion());
+    assertNotEquals(initialPO.getAuditInfo(), updatedPO.getAuditInfo());
+
+    // The row still points at the snapshot it already had, and reads still resolve it.
     assertEquals(updatedPO.getCurrentVersion(), updatedPO.getPolicyVersionPO().getVersion());
     assertEquals(policy.comment(), updatedPO.getPolicyVersionPO().getPolicyComment());
     assertEquals(policy.enabled(), updatedPO.getPolicyVersionPO().isEnabled());
     assertEquals(
         initialPO.getPolicyVersionPO().getContent(), updatedPO.getPolicyVersionPO().getContent());
-    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
@@ -475,12 +1005,29 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(policy, false);
     PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
 
+    PolicyEntity metadataUpdate =
+        copyPolicy(
+            policy,
+            policy.name(),
+            policy.comment(),
+            AuditInfo.builder()
+                .withCreator("updated-creator")
+                .withCreateTime(Instant.now())
+                .build());
+    policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataUpdate);
+    PolicyPO afterMetadataUpdate = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion(), afterMetadataUpdate.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterMetadataUpdate.getLastVersion());
+    assertEquals(initialPO.getOccVersion() + 1, afterMetadataUpdate.getOccVersion().longValue());
+
     PolicyEntity replacement = copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement");
     policyMetaService.insertPolicy(replacement, true);
 
     PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    assertEquals(
+        afterMetadataUpdate.getOccVersion() + 1, overwrittenPO.getOccVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
     assertEquals(
         replacement, policyMetaService.getPolicyByIdentifier(replacement.nameIdentifier()));
@@ -558,6 +1105,92 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(
         0,
         listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+  }
+
+  /** Verifies that an audit-only winner fences a stale audit-only update without a new snapshot. */
+  @TestTemplate
+  public void testMetadataOnlyAlterRejectsAStaleUpdate() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService service = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_conflict",
+            AUDIT_INFO);
+    service.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+    AuditInfo winningAudit =
+        AuditInfo.builder().withCreator("winning-updater").withCreateTime(Instant.now()).build();
+    AuditInfo staleAudit =
+        AuditInfo.builder().withCreator("stale-updater").withCreateTime(Instant.now()).build();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updatePolicy(
+                policy.nameIdentifier(),
+                entity -> {
+                  PolicyEntity current = (PolicyEntity) entity;
+                  // Commit the winner after the outer update reads, before its CAS executes.
+                  assertDoesNotThrow(
+                      () ->
+                          service.updatePolicy(
+                              current.nameIdentifier(),
+                              winner ->
+                                  copyPolicy(
+                                      (PolicyEntity) winner,
+                                      current.name(),
+                                      current.comment(),
+                                      winningAudit)));
+                  return copyPolicy(current, current.name(), current.comment(), staleAudit);
+                }));
+
+    PolicyEntity stored = service.getPolicyByIdentifier(policy.nameIdentifier());
+    assertEquals(winningAudit, stored.auditInfo());
+    assertEquals(policy.comment(), stored.comment());
+    PolicyPO afterConflict = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getOccVersion() + 1, afterConflict.getOccVersion().longValue());
+    assertEquals(initialPO.getCurrentVersion(), afterConflict.getCurrentVersion());
+    assertEquals(initialPO.getLastVersion(), afterConflict.getLastVersion());
+    assertEquals(1, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
+  public void testStalePolicyDeleteAfterMetadataOnlyAlter() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_delete_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(
+        policy.content(),
+        policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).content());
+
+    AuditInfo updatedAudit =
+        AuditInfo.builder().withCreator("updated-creator").withCreateTime(Instant.now()).build();
+    policyMetaService.updatePolicy(
+        policy.nameIdentifier(),
+        entity ->
+            copyPolicy(
+                (PolicyEntity) entity,
+                ((PolicyEntity) entity).name(),
+                ((PolicyEntity) entity).comment(),
+                updatedAudit));
+
+    PolicyPO afterAlter = getPolicyPO(policy.nameIdentifier());
+    assertEquals(stalePO.getCurrentVersion(), afterAlter.getCurrentVersion());
+    assertEquals(stalePO.getOccVersion() + 1, afterAlter.getOccVersion().longValue());
+    assertThrows(
+        OptimisticLockException.class,
+        () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(1, listPolicyVersions(policy.id()).size());
   }
 
   @TestTemplate
@@ -871,7 +1504,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
 
     String policyAsMetadataObject =
         String.format("metadata_object_id = %d AND metadata_object_type = 'POLICY'", policy.id());
-    assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertEquals(2, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
     assertEquals(1, countActiveRows("tag_relation_meta", policyAsMetadataObject));
     assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
     assertEquals(

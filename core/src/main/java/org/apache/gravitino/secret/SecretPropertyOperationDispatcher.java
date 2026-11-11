@@ -34,7 +34,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
-import org.apache.gravitino.exceptions.NoSuchModelVersionException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -45,7 +44,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metalake.MetalakePropertiesMetadata;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.storage.IdGenerator;
@@ -53,8 +51,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.ThrowableFunction;
 
 /**
- * Dispatches secrets requests for metalake, catalog, schema, fileset, table, topic, view, model,
- * and model version metadata objects.
+ * Dispatches secrets requests for metalake, catalog, schema, fileset, table, topic, view, and model
+ * metadata objects.
  *
  * <p>Loads raw entity properties from the entity store / catalog connector, then builds plaintext
  * secrets via {@link SecretPropertyUtils#buildSecrets} (secret-manager URNs plus sensitive-named
@@ -128,8 +126,6 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         return loadViewRawPropertiesAndMetadata(identifier);
       case MODEL:
         return loadModelRawPropertiesAndMetadata(identifier);
-      case MODEL_VERSION:
-        return loadModelVersionRawPropertiesAndMetadata(identifier);
       default:
         throw new NotSupportedException(
             "Doesn't support secret property operations for entity type: " + entityType);
@@ -245,34 +241,6 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
         },
         NoSuchCatalogException.class,
         NoSuchModelException.class);
-  }
-
-  private RawPropertiesAndMetadata loadModelVersionRawPropertiesAndMetadata(
-      NameIdentifier identifier) {
-    NameIdentifier catalogIdent = NameIdentifierUtil.getCatalogIdentifier(identifier);
-    NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
-    String versionName = identifier.name();
-    return doWithCatalog(
-        catalogIdent,
-        wrapper -> {
-          wrapper.catalog().checkMetalakeInUse();
-          ModelVersion modelVersion;
-          try {
-            int version = Integer.parseInt(versionName);
-            modelVersion = wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, version));
-          } catch (NumberFormatException e) {
-            modelVersion =
-                wrapper.doWithModelOps(ops -> ops.getModelVersion(modelIdent, versionName));
-          }
-          Map<String, String> raw =
-              modelVersion.properties() == null ? Map.of() : modelVersion.properties();
-          return new RawPropertiesAndMetadata(
-              raw,
-              resolvePropertiesMetadata(
-                  wrapper, HasPropertyMetadata::modelVersionPropertiesMetadata));
-        },
-        NoSuchCatalogException.class,
-        NoSuchModelVersionException.class);
   }
 
   private Map<String, String> loadMetalakeRawProperties(NameIdentifier identifier) {

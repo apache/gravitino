@@ -19,6 +19,9 @@
 package org.apache.gravitino.catalog.doris.operation;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.startsWith;
 import static org.mockito.Mockito.mock;
@@ -30,6 +33,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.junit.jupiter.api.Test;
 
 class TestDorisTableCommentOperations {
@@ -77,6 +81,74 @@ class TestDorisTableCommentOperations {
     new DorisTableOperations().correctJdbcTableFields(connection, "db", "t", tableBuilder);
 
     assertEquals("crud probe", tableBuilder.comment());
+  }
+
+  @Test
+  void testMissingTableThrowsNoSuchTableException() throws Exception {
+    Connection connection = mock(Connection.class);
+    PreparedStatement statement = mock(PreparedStatement.class);
+    ResultSet result = mock(ResultSet.class);
+    when(connection.prepareStatement(startsWith("SELECT TABLE_COMMENT"))).thenReturn(statement);
+    when(statement.executeQuery()).thenReturn(result);
+    when(result.next()).thenReturn(false);
+
+    NoSuchTableException error =
+        assertThrows(
+            NoSuchTableException.class,
+            () ->
+                new DorisTableOperations()
+                    .correctJdbcTableFields(connection, "db", "t", JdbcTable.builder()));
+
+    assertTrue(error.getMessage().contains("Table db.t does not exist in Doris"));
+    verify(result).close();
+    verify(statement).close();
+    verify(connection, never()).prepareStatement(startsWith("SHOW ALTER TABLE COLUMN"));
+  }
+
+  @Test
+  void testExistingTableWithEmptyCommentIsLoaded() throws Exception {
+    Connection connection = mock(Connection.class);
+    PreparedStatement commentStatement = mock(PreparedStatement.class);
+    ResultSet commentResult = mock(ResultSet.class);
+    PreparedStatement statusStatement = mock(PreparedStatement.class);
+    ResultSet statusResult = mock(ResultSet.class);
+    when(connection.prepareStatement(startsWith("SELECT TABLE_COMMENT")))
+        .thenReturn(commentStatement);
+    when(commentStatement.executeQuery()).thenReturn(commentResult);
+    when(commentResult.next()).thenReturn(true, false);
+    when(commentResult.getString("TABLE_COMMENT")).thenReturn("");
+    when(connection.prepareStatement(startsWith("SHOW ALTER TABLE COLUMN")))
+        .thenReturn(statusStatement);
+    when(statusStatement.executeQuery()).thenReturn(statusResult);
+
+    JdbcTable.Builder tableBuilder = JdbcTable.builder().withComment("OLAP");
+    new DorisTableOperations().correctJdbcTableFields(connection, "db", "t", tableBuilder);
+
+    assertEquals("", tableBuilder.comment());
+    verify(commentResult).close();
+    verify(commentStatement).close();
+  }
+
+  @Test
+  void testNullInformationSchemaCommentIsLoadedAsNull() throws Exception {
+    Connection connection = mock(Connection.class);
+    PreparedStatement commentStatement = mock(PreparedStatement.class);
+    ResultSet commentResult = mock(ResultSet.class);
+    PreparedStatement statusStatement = mock(PreparedStatement.class);
+    ResultSet statusResult = mock(ResultSet.class);
+    when(connection.prepareStatement(startsWith("SELECT TABLE_COMMENT")))
+        .thenReturn(commentStatement);
+    when(commentStatement.executeQuery()).thenReturn(commentResult);
+    when(commentResult.next()).thenReturn(true, false);
+    when(commentResult.getString("TABLE_COMMENT")).thenReturn(null);
+    when(connection.prepareStatement(startsWith("SHOW ALTER TABLE COLUMN")))
+        .thenReturn(statusStatement);
+    when(statusStatement.executeQuery()).thenReturn(statusResult);
+
+    JdbcTable.Builder tableBuilder = JdbcTable.builder().withComment("OLAP");
+    new DorisTableOperations().correctJdbcTableFields(connection, "db", "t", tableBuilder);
+
+    assertNull(tableBuilder.comment());
   }
 
   @Test
