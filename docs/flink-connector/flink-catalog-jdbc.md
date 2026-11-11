@@ -53,7 +53,7 @@ For a PostgreSQL catalog, a Flink "database" corresponds to a PostgreSQL schema,
 `flink.bypass.default-database` does not select the PostgreSQL database to connect to. If you previously set it to a PostgreSQL database name for that purpose, set `jdbc-database` instead.
 :::
 
-If Flink must reach the database through a different address than the Gravitino server, set `flink.bypass.base-url` (for example, `jdbc:postgresql://127.0.0.1:5432/`). It overrides the `base-url` derived from `jdbc-url`.
+If Flink must reach the database through a different address than the Gravitino server, set `flink.bypass.base-url` in the form `jdbc:<dialect>://<host>:<port>` (for example, `jdbc:postgresql://127.0.0.1:5432/`). It overrides the `base-url` derived from `jdbc-url`, and Flink validates it like a `base-url` set on a Flink JDBC catalog.
 
 ### SQL Example
 

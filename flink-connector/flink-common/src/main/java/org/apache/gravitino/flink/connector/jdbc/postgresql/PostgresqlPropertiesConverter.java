@@ -75,12 +75,9 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
   @Override
   protected String getConnectionDatabase(
       Map<String, String> flinkCatalogProperties, ObjectPath tablePath) {
-    // Fall back to 'default-database' when no connection database can be resolved, which is
-    // also what the inner Flink JDBC catalog connects to in that case.
+    // 'default-database' names a schema, so it is never used as the connection database.
     String database =
-        flinkCatalogProperties.getOrDefault(
-            JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE,
-            flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+        flinkCatalogProperties.get(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE);
     Preconditions.checkArgument(
         !Strings.isNullOrEmpty(database),
         "Cannot resolve the PostgreSQL database: set '"

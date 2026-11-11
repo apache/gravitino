@@ -190,11 +190,13 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
 
   @Test
   public void testInjectedTableOptionsDoNotBecomeGravitinoTableProperties() {
-    JdbcPropertiesConverter converter = getConverter(catalogProperties);
+    Map<String, String> catalogPropertiesWithDatabase = new HashMap<>(catalogProperties);
+    catalogPropertiesWithDatabase.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "db");
+    JdbcPropertiesConverter converter = getConverter(catalogPropertiesWithDatabase);
     Map<String, String> flinkTableOptions =
         new HashMap<>(
             converter.toFlinkTableProperties(
-                converter.toFlinkCatalogProperties(catalogProperties),
+                converter.toFlinkCatalogProperties(catalogPropertiesWithDatabase),
                 ImmutableMap.of(),
                 new ObjectPath("db", "source_table")));
     // CREATE TABLE ... LIKE copies the scan options alongside the user's own options.

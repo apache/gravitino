@@ -179,6 +179,25 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
   }
 
   @Test
+  public void testDefaultDatabaseIsNotConnectionDatabase() {
+    // Only flink.bypass.default-database is set, and jdbc-url has no database. The default
+    // database names a schema, so it must not be used as the connection database.
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogProperties).toFlinkCatalogProperties(catalogProperties);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                getConverter(catalogProperties)
+                    .toFlinkTableProperties(
+                        flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t")));
+    Assertions.assertTrue(
+        exception.getMessage().contains(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE),
+        exception.getMessage());
+  }
+
+  @Test
   public void testToFlinkTablePropertiesWithoutJdbcDatabase() {
     Map<String, String> catalogPropertiesWithoutDatabase = new HashMap<>(catalogProperties);
     catalogPropertiesWithoutDatabase.remove(FLINK_BYPASS_DEFAULT_DATABASE);
