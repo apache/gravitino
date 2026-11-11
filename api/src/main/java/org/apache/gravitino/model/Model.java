@@ -24,6 +24,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
@@ -84,6 +85,16 @@ public interface Model extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Model does not support tag operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this model.
+   *
+   * @return The {@link SupportsTerms} if the model supports glossary term operations.
+   * @throws UnsupportedOperationException If the model does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("Model does not support glossary term operations.");
   }
 
   /**

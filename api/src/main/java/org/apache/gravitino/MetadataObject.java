@@ -77,7 +77,12 @@ public interface MetadataObject {
     /** A job template represents a reusable template for creating jobs in Gravitino. */
     JOB_TEMPLATE,
     /** A function represents a user-defined function registered in Gravitino. */
-    FUNCTION;
+    FUNCTION,
+    /**
+     * A glossary term defines a business word in a metalake, and can be bound to the metadata
+     * objects and metrics behind it.
+     */
+    GLOSSARY_TERM;
   }
 
   /**

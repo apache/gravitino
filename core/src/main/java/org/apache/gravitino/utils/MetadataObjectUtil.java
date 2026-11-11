@@ -103,6 +103,16 @@ public class MetadataObjectUtil {
   }
 
   /**
+   * Returns the entity types that metadata object types are mapped to. A metadata object type that
+   * is not backed by an entity yet has no entry here.
+   *
+   * @return The entity types of the metadata objects.
+   */
+  public static Set<Entity.EntityType> metadataObjectEntityTypes() {
+    return TYPE_TO_TYPE_MAP.values();
+  }
+
+  /**
    * Convert the given {@link MetadataObject} full name to the corresponding {@link NameIdentifier}.
    *
    * @param metalakeName The metalake name

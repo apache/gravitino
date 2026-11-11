@@ -129,6 +129,24 @@ public class TestMetadataObjects {
   }
 
   @Test
+  public void testGlossaryTermObject() {
+    MetadataObject termObject =
+        MetadataObjects.of(null, "Active Customer", MetadataObject.Type.GLOSSARY_TERM);
+    Assertions.assertNull(termObject.parent());
+    Assertions.assertEquals("Active Customer", termObject.fullName());
+    Assertions.assertEquals(MetadataObject.Type.GLOSSARY_TERM, termObject.type());
+
+    // A term name can contain dots and slashes; it is parsed as one name.
+    MetadataObject dotted = MetadataObjects.parse("v1.2/Churn", MetadataObject.Type.GLOSSARY_TERM);
+    Assertions.assertNull(dotted.parent());
+    Assertions.assertEquals("v1.2/Churn", dotted.name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> MetadataObjects.of("parent", "Churn", MetadataObject.Type.GLOSSARY_TERM));
+  }
+
+  @Test
   public void testViewObject() {
     MetadataObject viewObject =
         MetadataObjects.of("catalog.schema", "view1", MetadataObject.Type.VIEW);

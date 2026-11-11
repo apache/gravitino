@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.types.Type;
@@ -119,6 +120,16 @@ public interface Column {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Column does not support tag operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this column.
+   *
+   * @return The {@link SupportsTerms} if the column supports glossary term operations.
+   * @throws UnsupportedOperationException If the column does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("Column does not support glossary term operations.");
   }
 
   /**
