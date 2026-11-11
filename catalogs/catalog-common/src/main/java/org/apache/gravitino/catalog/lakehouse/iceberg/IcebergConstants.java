@@ -24,6 +24,9 @@ public class IcebergConstants {
   public static final String CATALOG_BACKEND = "catalog-backend";
   public static final String CATALOG_BACKEND_IMPL = "catalog-backend-impl";
 
+  /** Internal property containing the unique identifier of a Gravitino catalog. */
+  public static final String CATALOG_UUID = "catalog_uuid";
+
   public static final String GRAVITINO_JDBC_USER = "jdbc-user";
   public static final String ICEBERG_JDBC_USER = "jdbc.user";
 
@@ -62,6 +65,32 @@ public class IcebergConstants {
       "adls.auth.shared-key.account.name";
   public static final String ICEBERG_ADLS_STORAGE_ACCOUNT_KEY = "adls.auth.shared-key.account.key";
 
+  /** Iceberg property that specifies the ADLS token credential provider implementation. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER =
+      "adls.token-credential-provider";
+
+  /** Prefix for properties passed to the Iceberg ADLS token credential provider. */
+  public static final String ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER_PREFIX =
+      ICEBERG_ADLS_TOKEN_CREDENTIAL_PROVIDER + ".";
+
+  /** Gravitino's Azure client-secret token credential provider implementation. */
+  public static final String AZURE_CLIENT_SECRET_TOKEN_CREDENTIAL_PROVIDER =
+      "org.apache.gravitino.iceberg.common.credential.AzureClientSecretTokenCredentialProvider";
+
+  /** Iceberg GCSFileIO OAuth2 access token property. */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN = "gcs.oauth2.token";
+
+  /** Iceberg GCSFileIO OAuth2 token expiry property (epoch millis). */
+  public static final String ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT = "gcs.oauth2.token-expires-at";
+
+  /**
+   * Whether Iceberg GCSFileIO should refresh OAuth2 tokens via a credentials endpoint. Defaults to
+   * true in Iceberg; Gravitino disables it when minting a token from {@code
+   * gcs-service-account-file} because that path has no table credentials refresh endpoint.
+   */
+  public static final String ICEBERG_GCS_OAUTH2_REFRESH_CREDENTIALS_ENABLED =
+      "gcs.oauth2.refresh-credentials-enabled";
+
   // Iceberg Table properties constants
 
   public static final String COMMENT = "comment";
@@ -69,6 +98,10 @@ public class IcebergConstants {
   public static final String OWNER = "owner";
   public static final String LOCATION = "location";
   public static final String CURRENT_SNAPSHOT_ID = "current-snapshot-id";
+
+  /** Read-only partition spec ID projected from Iceberg table metadata. */
+  public static final String DEFAULT_SPEC_ID = "default-spec-id";
+
   public static final String CHERRY_PICK_SNAPSHOT_ID = "cherry-pick-snapshot-id";
   public static final String SORT_ORDER = "sort-order";
   public static final String IDENTIFIER_FIELDS = "identifier-fields";
@@ -104,6 +137,62 @@ public class IcebergConstants {
   public static final String ICEBERG_REST_DEFAULT_CATALOG = "default_catalog";
   public static final String ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME = "default-catalog-name";
   public static final String ICEBERG_REST_DISABLE_REST_AUTHZ = "disable-rest-authz";
+
+  /**
+   * Gravitino config key selecting how a REST catalog backend authenticates to the remote catalog:
+   * {@link #REST_BACKEND_AUTH_TYPE_USER_TOKEN} or {@link #REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT}.
+   */
+  public static final String REST_BACKEND_AUTH_TYPE = "rest-backend-auth-type";
+
+  /** Forward the calling user's access token to the remote catalog, which authorizes the user. */
+  public static final String REST_BACKEND_AUTH_TYPE_USER_TOKEN = "user-token";
+
+  /**
+   * Connect to the remote catalog as a service account with a configured credential. Gravitino
+   * authorizes every request locally before proxying it.
+   */
+  public static final String REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT = "service-account";
+
+  /** Gravitino config key for the service account's static bearer token. */
+  public static final String REST_BACKEND_TOKEN = "rest-backend-token";
+
+  /** Gravitino config key for the service account's OAuth2 client credential. */
+  public static final String REST_BACKEND_CREDENTIAL = "rest-backend-credential";
+
+  /** Gravitino config key for the OAuth2 token endpoint used with the client credential. */
+  public static final String REST_BACKEND_OAUTH2_SERVER_URI = "rest-backend-oauth2-server-uri";
+
+  /** Gravitino config key for the OAuth2 scope requested with the client credential. */
+  public static final String REST_BACKEND_SCOPE = "rest-backend-scope";
+
+  /**
+   * Gravitino config key selecting who issues storage credentials for tables of a federated REST
+   * catalog: {@link #REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE} or {@link
+   * #REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL}.
+   */
+  public static final String REST_BACKEND_STORAGE_CREDENTIAL_SOURCE =
+      "rest-backend-storage-credential-source";
+
+  /** Pass through the storage credentials the remote catalog vends. */
+  public static final String REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE = "remote";
+
+  /**
+   * Do not request credentials from the remote catalog; issue them through this catalog's own
+   * credential providers, scoped to the table and to the caller's privilege.
+   */
+  public static final String REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL = "local";
+
+  /** Iceberg REST client property for a static bearer token. */
+  public static final String ICEBERG_REST_TOKEN = "token";
+
+  /** Iceberg REST client property for an OAuth2 client credential. */
+  public static final String ICEBERG_REST_CREDENTIAL = "credential";
+
+  /** Iceberg REST client property for the OAuth2 token endpoint. */
+  public static final String ICEBERG_REST_OAUTH2_SERVER_URI = "oauth2-server-uri";
+
+  /** Iceberg REST client property for the OAuth2 scope. */
+  public static final String ICEBERG_REST_SCOPE = "scope";
   /** Gravitino config key for REST catalog backend HTTP connection timeout. */
   public static final String REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
       "rest-client-connection-timeout-ms";
@@ -137,9 +226,6 @@ public class IcebergConstants {
 
   /** Storage backend holding idempotency records. */
   public static final String ICEBERG_IDEMPOTENCY_STORE_TYPE = "idempotency-store-type";
-
-  /** Short name of the node-local idempotency store. */
-  public static final String ICEBERG_IDEMPOTENCY_STORE_IN_MEMORY = "in-memory";
 
   /** Capacity of the in-memory idempotency store. */
   public static final String ICEBERG_IDEMPOTENCY_MAX_ENTRIES = "idempotency-max-entries";

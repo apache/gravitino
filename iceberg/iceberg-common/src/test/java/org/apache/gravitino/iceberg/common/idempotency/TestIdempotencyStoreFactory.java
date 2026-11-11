@@ -40,9 +40,7 @@ public class TestIdempotencyStoreFactory {
   void testCreateResolvesShortName() throws IOException {
     IcebergConfig config =
         new IcebergConfig(
-            ImmutableMap.of(
-                IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE,
-                IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_IN_MEMORY));
+            ImmutableMap.of(IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE, "in-memory"));
     try (IdempotencyStore store = IdempotencyStoreFactory.create(config)) {
       Assertions.assertInstanceOf(InMemoryIdempotencyStore.class, store);
     }

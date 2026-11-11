@@ -26,6 +26,7 @@ dependencies {
   implementation(libs.commons.cli.new)
   implementation(libs.commons.csv)
   implementation(libs.guava)
+  implementation(libs.jackson.annotations)
   implementation(libs.slf4j.api)
   implementation(libs.slf4j.simple)
   implementation(project(":api"))
@@ -66,11 +67,7 @@ tasks.jar {
   manifest {
     attributes["Main-Class"] = "org.apache.gravitino.cli.Main"
   }
-  val dependencies = configurations
-    .runtimeClasspath
-    .get()
-    .map(::zipTree)
-  from(dependencies)
+  // Dependency contents and their legal resources are configured together in the root build.
   duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 

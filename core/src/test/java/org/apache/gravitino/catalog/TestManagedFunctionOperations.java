@@ -446,6 +446,56 @@ public class TestManagedFunctionOperations {
   }
 
   @Test
+  public void testLegacyUnparsedDefinitionCanBeManagedBySelectors() {
+    NameIdentifier funcIdent = getFunctionIdent("legacy_unparsed_func");
+    FunctionParam[] legacyParams =
+        new FunctionParam[] {FunctionParams.of("value", Types.UnparsedType.of("legacy_type"))};
+    FunctionParam[] nativeParams =
+        new FunctionParam[] {FunctionParams.of("value", Types.IntegerType.get())};
+    FunctionImpl sparkImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.SPARK, "com.example.LegacySparkUDF");
+    FunctionDefinition[] legacyDefinitions =
+        new FunctionDefinition[] {
+          createDefinitionWithImpls(
+              legacyParams, Types.UnparsedType.of("legacy_return"), new FunctionImpl[] {sparkImpl}),
+          createSimpleDefinition(nativeParams, Types.StringType.get())
+        };
+
+    // Seed metadata that could have been persisted before strict REST write validation.
+    functionOperations.registerFunction(
+        funcIdent, "Legacy function", FunctionType.SCALAR, true, legacyDefinitions);
+
+    FunctionImpl trinoImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.LegacyTrinoUDF");
+    Function afterAdd =
+        functionOperations.alterFunction(
+            funcIdent, FunctionChange.addImpl(legacyParams, trinoImpl));
+    Assertions.assertEquals(2, afterAdd.definitions()[0].impls().length);
+
+    FunctionImpl updatedTrinoImpl =
+        FunctionImpls.ofJava(FunctionImpl.RuntimeType.TRINO, "com.example.UpdatedTrinoUDF");
+    Function afterUpdate =
+        functionOperations.alterFunction(
+            funcIdent,
+            FunctionChange.updateImpl(
+                legacyParams, FunctionImpl.RuntimeType.TRINO, updatedTrinoImpl));
+    FunctionImpl updatedImpl = afterUpdate.definitions()[0].impls()[1];
+    Assertions.assertInstanceOf(JavaImpl.class, updatedImpl);
+    Assertions.assertEquals("com.example.UpdatedTrinoUDF", ((JavaImpl) updatedImpl).className());
+
+    Function afterRemoveImpl =
+        functionOperations.alterFunction(
+            funcIdent, FunctionChange.removeImpl(legacyParams, FunctionImpl.RuntimeType.TRINO));
+    Assertions.assertEquals(1, afterRemoveImpl.definitions()[0].impls().length);
+
+    Function afterRemoveDefinition =
+        functionOperations.alterFunction(funcIdent, FunctionChange.removeDefinition(legacyParams));
+    Assertions.assertEquals(1, afterRemoveDefinition.definitions().length);
+    Assertions.assertEquals(
+        Types.IntegerType.get(), afterRemoveDefinition.definitions()[0].parameters()[0].dataType());
+  }
+
+  @Test
   public void testAlterFunctionRemoveOnlyDefinition() {
     NameIdentifier funcIdent = getFunctionIdent("func_remove_only");
     FunctionParam[] params = new FunctionParam[] {FunctionParams.of("a", Types.IntegerType.get())};

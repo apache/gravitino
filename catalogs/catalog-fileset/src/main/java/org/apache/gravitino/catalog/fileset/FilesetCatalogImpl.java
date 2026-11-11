@@ -48,7 +48,7 @@ public class FilesetCatalogImpl extends BaseCatalog<FilesetCatalogImpl> {
 
   @Override
   protected CatalogOperations newOps(Map<String, String> config) {
-    return new FilesetCatalogOperations();
+    return new FilesetCatalogOperations(this::catalogCredentialManager);
   }
 
   @Override

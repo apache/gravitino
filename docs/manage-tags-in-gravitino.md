@@ -13,6 +13,9 @@ import TabItem from '@theme/TabItem';
 This page covers the Gravitino API for tags. For what a tag is, which object types can carry one, how inheritance
 resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 
+Policies can be associated with tags to govern objects carrying those tags. See
+[Policy-to-Tag Associations](./manage-policies-in-gravitino.md#policy-to-tag-associations).
+
 ## Tag Operations
 
 ### Create a Tag
@@ -50,6 +53,52 @@ tag = client.create_tag(
     tag_name="pii",
     comment="Personally identifiable information",
     properties={"owner": "data-governance"})
+```
+
+</TabItem>
+</Tabs>
+
+### Create a Tag With a Value Constraint
+
+A tag can accept any value, no value, or only a fixed set of values. The constraint is set at
+creation time and cannot be altered later. Omitting `allowedValues` over REST or Python creates an
+unrestricted tag; an empty list creates a tag that can only be assigned without a value.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "name": "data_domain",
+  "comment": "Business data domain",
+  "allowedValues": ["finance", "risk", "ml"]
+}' http://localhost:8090/api/metalakes/test/tags
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Tag tag = client.createTag(
+    "data_domain",
+    "Business data domain",
+    ImmutableMap.of(),
+    TagValueConstraint.ofAllowedValues("finance", "risk", "ml"));
+```
+
+Use `TagValueConstraint.anyValue()` for an unrestricted tag and
+`TagValueConstraint.noValue()` for a tag that cannot carry assignment values.
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = client.create_tag(
+    tag_name="data_domain",
+    comment="Business data domain",
+    properties={},
+    allowed_values=["finance", "risk", "ml"])
 ```
 
 </TabItem>
@@ -198,7 +247,7 @@ client.delete_tag("pii")
 
 Both happen in one request, and either list can be omitted. The object type and full name go in the
 path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
-and functions.
+functions, and [Semantic Models](./manage-semantic-model-metadata-using-gravitino.md#tags-and-policies).
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -243,10 +292,83 @@ raw_events.supports_tags().associate_tags(["pii"], None)
 </TabItem>
 </Tabs>
 
+:::note
+Column tags follow the column's internal id. For tables whose metadata is kept by an external
+catalog, such as Hive, Iceberg or JDBC catalogs, a column rename that runs concurrently with a load
+or another alter of the same table, on any Gravitino server, can be stored as a dropped column plus
+a new one. The renamed column then loses its tags. Avoid loading or altering a table while one of
+its columns is being renamed, and check the column's tags after the rename.
+:::
+
+### Assign and Remove Tag Values
+
+Tag values are updated as pairs of tag name and value. Adding a pair preserves the tag's other
+values; removing a pair removes only that value. Omit `value` to represent an assignment without a
+value. The REST operation uses the v2 media type for the request body.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v2+json" \
+  -H "Content-Type: application/vnd.gravitino.v2+json" -d '{
+  "tagsToAdd": [
+    {"name": "data_domain", "value": "finance"},
+    {"name": "data_domain", "value": "risk"},
+    {"name": "pii"}
+  ],
+  "tagsToRemove": [
+    {"name": "data_domain", "value": "old"}
+  ]
+}' http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Table customers = ...
+customers.supportsTags().associateTags(
+    new TagValue[] {
+      TagValue.of("data_domain", "finance"),
+      TagValue.of("data_domain", "risk"),
+      TagValue.noValue("pii")
+    },
+    new TagValue[] {TagValue.of("data_domain", "old")});
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+customers = ...
+customers.supports_tags().assign_tags(
+    tags_to_add=[
+        {"name": "data_domain", "value": "finance"},
+        {"name": "data_domain", "value": "risk"},
+        {"name": "pii"},
+    ],
+    tags_to_remove=[{"name": "data_domain", "value": "old"}])
+```
+
+</TabItem>
+</Tabs>
+
+The same pair can be added or removed repeatedly without changing the result. A request cannot add
+the same tag both with and without values, or include the same pair in both lists. To convert a
+valued assignment to a valueless one, remove every active value and add the valueless pair in the
+same request. Removing the last value without adding a valueless pair detaches the tag.
+
 ### List Tags on an Object
 
 The response includes tags inherited from ancestors. With `details=true` each tag carries an
-`inherited` field, which a plain name listing does not.
+`inherited` field and its `assignmentValues`, which a plain name listing does not. An empty
+`assignmentValues` array means the tag is assigned without a value. `allowedValues` is null for an
+unrestricted tag, empty for a valueless-only tag, and otherwise contains the tag's allowed values.
+Both response modes include `hasInaccessibleTags`. Gravitino resolves direct and inherited tag
+assignments before authorization filtering, so the flag also covers inaccessible inherited tags.
+The flag reveals only that at least one tag was omitted; it does not reveal the tag's name, count,
+details, or inheritance source.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -256,26 +378,81 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags?details=true"
 ```
 
+The response includes each tag's definition and assignment details:
+
+```json
+{
+  "code": 0,
+  "tags": [
+    {
+      "name": "data_domain",
+      "comment": "Business data domain",
+      "properties": {},
+      "allowedValues": ["finance", "risk", "ml"],
+      "assignmentValues": ["finance", "risk"],
+      "inherited": false
+    }
+  ],
+  "hasInaccessibleTags": false
+}
+```
+
+If every effective tag is inaccessible, the response contains an empty list and sets the flag:
+
+```json
+{
+  "code": 0,
+  "tags": [],
+  "hasInaccessibleTags": true
+}
+```
+
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
 Table customers = ...
-String[] tagNames = customers.supportsTags().listTags();
-Tag[] tags = customers.supportsTags().listTagsInfo();
+TagList<String> nameList = customers.supportsTags().listTagsWithVisibility();
+String[] tagNames = nameList.tags();
+boolean omittedTags = nameList.hasInaccessibleTags();
+
+TagList<Tag> detailList = customers.supportsTags().listTagsInfoWithVisibility();
+Tag[] tags = detailList.tags();
+boolean omittedTagDetails = detailList.hasInaccessibleTags();
+String[] values =
+    tags[0].assignment().map(assignment -> assignment.values()).orElse(new String[0]);
 ```
+
+The existing `listTags()` and `listTagsInfo()` methods continue to return only the visible arrays.
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
 customers = ...
-tag_names = customers.supports_tags().list_tags()
-tags = customers.supports_tags().list_tags_info()
+name_list = customers.supports_tags().list_tags_with_visibility()
+tag_names = name_list.tags()
+omitted_tags = name_list.has_inaccessible_tags()
+
+detail_list = customers.supports_tags().list_tags_info_with_visibility()
+tags = detail_list.tags()
+omitted_tag_details = detail_list.has_inaccessible_tags()
+values = tags[0].assignment_values()
 ```
+
+The existing `list_tags()` and `list_tags_info()` methods continue to return only the visible lists.
 
 </TabItem>
 </Tabs>
+
+Interpret the visible list and `hasInaccessibleTags` together:
+
+| Visible list | `hasInaccessibleTags` | Meaning |
+|---|---:|---|
+| Empty | `false` | The object has no effective tag assignments. |
+| Empty | `true` | All effective tag assignments are inaccessible. |
+| Non-empty | `true` | The response includes visible tags and omits at least one inaccessible tag. |
+| Non-empty | `false` | All effective tag assignments are visible. |
 
 ### Get One Tag on an Object
 
@@ -307,7 +484,8 @@ tag = customers.supports_tags().get_tag("pii")
 ### List Objects Carrying a Tag
 
 The response lists direct attachments only, so a tag attached to a catalog returns that catalog
-rather than the objects beneath it.
+rather than the objects beneath it. Pass `value` to return only direct assignments containing that
+exact, case-sensitive value. Valueless assignments do not match a value filter.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -315,6 +493,9 @@ rather than the objects beneath it.
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   http://localhost:8090/api/metalakes/test/tags/pii/objects
+
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/test/tags/data_domain/objects?value=finance"
 ```
 
 </TabItem>
@@ -324,6 +505,18 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 Tag tag = client.getTag("pii");
 MetadataObject[] objects = tag.associatedObjects().objects();
 int count = tag.associatedObjects().count();
+
+Tag domain = client.getTag("data_domain");
+MetadataObject[] financeObjects = domain.associatedObjects().objects("finance");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = client.get_tag("data_domain")
+objects = tag.associated_objects().objects()
+finance_objects = tag.associated_objects().objects(value="finance")
 ```
 
 </TabItem>

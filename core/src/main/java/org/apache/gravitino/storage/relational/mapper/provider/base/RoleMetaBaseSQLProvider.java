@@ -25,6 +25,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -40,6 +41,26 @@ public class RoleMetaBaseSQLProvider {
         + ROLE_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND role_name = #{roleName}"
         + " AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects an active role by ID. */
+  protected String selectRoleMetaById(Long roleId) {
+    return "SELECT role_id as roleId, role_name as roleName, metalake_id as metalakeId,"
+        + " properties, audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active role by ID. */
+  public String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects an active role by ID and locks it for shared access. */
+  public String selectRoleMetaByIdForShare(@Param("roleId") Long roleId) {
+    return selectRoleMetaById(roleId) + " LOCK IN SHARE MODE";
   }
 
   public String selectRoleIdByMetalakeIdAndName(
@@ -147,8 +168,10 @@ public class RoleMetaBaseSQLProvider {
         + " metalake_id = #{roleMeta.metalakeId},"
         + " properties = #{roleMeta.properties},"
         + " audit_info = #{roleMeta.auditInfo},"
-        + " current_version = #{roleMeta.currentVersion},"
-        + " last_version = #{roleMeta.lastVersion},"
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{roleMeta.deletedAt}";
   }
 
@@ -164,26 +187,25 @@ public class RoleMetaBaseSQLProvider {
         + " last_version = #{newRoleMeta.lastVersion},"
         + " deleted_at = #{newRoleMeta.deletedAt}"
         + " WHERE role_id = #{oldRoleMeta.roleId}"
-        + " AND role_name = #{oldRoleMeta.roleName}"
-        + " AND metalake_id = #{oldRoleMeta.metalakeId}"
         + " AND current_version = #{oldRoleMeta.currentVersion}"
-        + " AND last_version = #{oldRoleMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
+  public String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE role_id = #{roleId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -197,8 +219,8 @@ public class RoleMetaBaseSQLProvider {
   public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
@@ -210,7 +232,46 @@ public class RoleMetaBaseSQLProvider {
     }
     return "<script>SELECT role_id as roleId, role_name as roleName, updated_at as updatedAt FROM "
         + ROLE_TABLE_NAME
-        + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=',' close=')'>#{id}</foreach>"
-        + " AND deleted_at = 0</script>";
+        + " WHERE role_id IN <foreach item='id' collection='roleIds' open='(' separator=','"
+        + " close=')'>#{id}</foreach> AND deleted_at = 0</script>";
+  }
+  /**
+   * Returns a single-statement role and privilege snapshot by name.
+   *
+   * @param metalakeId the metalake ID
+   * @param roleName the role name
+   * @return the aggregate select SQL
+   */
+  public String selectRoleWithPrivilegesByMetalakeIdAndName(
+      @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName) {
+    return withPrivileges(selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+  }
+
+  /**
+   * Returns matching roles together with all their privileges.
+   *
+   * @param metadataObjectId the metadata object ID
+   * @param metadataObjectType the metadata object type
+   * @return the aggregate select SQL
+   */
+  public String listRolesWithPrivilegesByMetadataObjectIdAndType(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return withPrivileges(listRolesByMetadataObjectIdAndType(metadataObjectId, metadataObjectType));
+  }
+
+  private String withPrivileges(String roleSql) {
+    // Role overwrites replace their privilege rows. Resolve both from one statement snapshot,
+    // including empty roles, rather than combining a root read with a later privilege read.
+    return "SELECT r.*, p.id AS priv_relationId, p.role_id AS priv_roleId, p.metadata_object_id AS"
+        + " priv_metadataObjectId, p.type AS priv_type, p.privilege_names AS"
+        + " priv_privilegeNames, p.privilege_conditions AS priv_privilegeConditions,"
+        + " p.current_version AS priv_currentVersion, p.last_version AS priv_lastVersion,"
+        + " p.deleted_at AS priv_deletedAt FROM ("
+        + roleSql
+        + ") r LEFT JOIN "
+        + SecurableObjectMapper.SECURABLE_OBJECT_TABLE_NAME
+        + " p"
+        + " ON r.roleId = p.role_id AND p.deleted_at = 0";
   }
 }

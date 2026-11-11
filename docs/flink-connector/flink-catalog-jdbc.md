@@ -14,6 +14,7 @@ This document provides a comprehensive guide on configuring and using Apache Gra
 ### JDBC Types
 
 * MYSQL
+* POSTGRESQL
 
 ## Getting Started
 
@@ -25,11 +26,19 @@ Place the following JAR files in the lib directory of your Flink installation:
 - The Gravitino Flink connector runtime JAR that matches your Flink minor version
 - JDBC driver
 
-| Flink version | Flink JDBC connector version | Gravitino runtime artifact |
-|---------------|------------------------------|----------------------------|
-| 1.18          | `3.2.0-1.18`                 | `gravitino-flink-connector-runtime-1.18_2.12-${gravitino-version}.jar` |
+| Flink version | Flink JDBC connector version | Gravitino runtime artifact                                             |
+|---------------|------------------------------|------------------------------------------------------------------------|
 | 1.19          | `3.3.0-1.19`                 | `gravitino-flink-connector-runtime-1.19_2.12-${gravitino-version}.jar` |
 | 1.20          | `3.3.0-1.20`                 | `gravitino-flink-connector-runtime-1.20_2.12-${gravitino-version}.jar` |
+| 2.1           | `4.1.0-2.1`                  | `gravitino-flink-connector-runtime-2.1-${gravitino-version}.jar`       |
+| 2.2           | `4.1.0-2.2`                  | `gravitino-flink-connector-runtime-2.2-${gravitino-version}.jar`       |
+
+For Flink 2.x, `flink-connector-jdbc` is split into core and per-database artifacts. Place all three JARs from the matching row in the classpath instead of a single combined JAR:
+
+| Flink version | Core artifact                             | MySQL artifact                             | PostgreSQL artifact                           |
+|---------------|-------------------------------------------|--------------------------------------------|-----------------------------------------------|
+| 2.1           | `flink-connector-jdbc-core-4.1.0-2.1.jar` | `flink-connector-jdbc-mysql-4.1.0-2.1.jar` | `flink-connector-jdbc-postgres-4.1.0-2.1.jar` |
+| 2.2           | `flink-connector-jdbc-core-4.1.0-2.2.jar` | `flink-connector-jdbc-mysql-4.1.0-2.2.jar` | `flink-connector-jdbc-postgres-4.1.0-2.2.jar` |
 
 Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.default-database` property with the value of the default database name.
 
@@ -37,6 +46,14 @@ Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.defau
 ```text
 flink.bypass.default-database=db  
 ```
+
+For a PostgreSQL catalog, a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself. `flink.bypass.default-database` sets the schema Flink uses after `USE CATALOG` (for example, `public`) and falls back to `jdbc-database` when not set. The JDBC connection always targets `jdbc-database`, or the database in `jdbc-url` when `jdbc-database` is not set. `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
+
+:::note
+`flink.bypass.default-database` does not select the PostgreSQL database to connect to. If you previously set it to a PostgreSQL database name for that purpose, set `jdbc-database` instead.
+:::
+
+If Flink must reach the database through a different address than the Gravitino server, set `flink.bypass.base-url` in the form `jdbc:<dialect>://<host>:<port>` (for example, `jdbc:postgresql://127.0.0.1:5432/`). It overrides the `base-url` derived from `jdbc-url`, and Flink validates it like a `base-url` set on a Flink JDBC catalog.
 
 ### SQL Example
 
@@ -127,9 +144,10 @@ SELECT * FROM jdbc_table_a;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 
-| Gravitino catalog property name | Flink JDBC connector configuration | Description                    |
-|:--------------------------------|------------------------------------|--------------------------------|
-| `jdbc-url`                      | `base-url`                         | JDBC URL for MYSQL             |
-| `username`                      | `username`                         | Username of MySQL account      |
-| `password`                      | `password`                         | Password of the account        |
-| `flink.bypass.default-database` | `default-database`                 | Default database to connect to |
+| Gravitino catalog property name | Flink JDBC connector configuration | Description                                                                                       |
+|:--------------------------------|:-----------------------------------|:--------------------------------------------------------------------------------------------------|
+| `jdbc-url`                      | `base-url`                         | JDBC URL for the catalog. `flink.bypass.base-url` overrides the derived `base-url`.               |
+| `username`                      | `username`                         | Username of the account                                                                           |
+| `password`                      | `password`                         | Password of the account                                                                           |
+| `flink.bypass.default-database` | `default-database`                 | Default database. For PostgreSQL, the default schema; falls back to `jdbc-database`.              |
+| `jdbc-database`                 | (see above)                        | The PostgreSQL database the catalog connects to. Optional when `jdbc-url` contains the database.  |

@@ -28,7 +28,7 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 |-----------|-----------------|
 | List      | ✅ Full          |
 | Load      | ✅ Full          |
-| Alter     | Not support now |
+| Alter     | ✅ Partial       |
 | Create    | ✅ Full          |
 | Register  | ✅ Full          |
 | Drop      | ✅ Full          |
@@ -75,6 +75,8 @@ Lance uses Apache Arrow for table schemas. The following table shows type mappin
 | `Interval_year`                  | Not supported by Lance                  |
 | `Interval_day`                   | `Duration(Microsecond)`                 |
 | `External(arrow_field_json_str)` | Any Arrow Field                         |
+| `External("lance.blob")`         | Lance blob                              |
+| `External("lance.blob.legacy")`  | Lance legacy blob                       |
 
 ### External Types
 
@@ -82,7 +84,8 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 
 **Requirements:**
 - JSON must conform to Apache Arrow [Field specification](https://github.com/apache/arrow-java/blob/ed81e5981a2bee40584b3a411ed755cb4cc5b91f/vector/src/main/java/org/apache/arrow/vector/types/pojo/Field.java#L80C1-L86C68)
-- `name` attribute must match column name exactly
+- `name` attribute is ignored: the column name is authoritative and overrides the name in the JSON,
+  so a column keeps its stored JSON type after a rename
 - `nullable` attribute must match column nullability
 - `children` array:
   - Empty for primitive types
@@ -97,6 +100,46 @@ For Arrow types not natively mapped in Gravitino, use the `External(arrow_field_
 | `Large List`      | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"largelist\"},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")`                     |
 | `Fixed-Size List` | `External("{\"name\":\"col_name\",\"nullable\":true,\"type\":{\"name\":\"fixedsizelist\",\"listSize\":10},\"children\":[{\"name\":\"element\",\"nullable\":true,\"type\":{\"name\":\"int\",\"bitWidth\":32,\"isSigned\":true},\"children\":[]}]}")` |
 
+Gravitino types cannot carry Arrow field metadata. When loading a Lance table, only Lance blob metadata
+is recognized (see [Blob Types](#blob-types)); other field metadata is ignored. Blob fields nested in a
+`Struct`, `List`, `Map` or `Union` keep the container as a native Gravitino type, for example
+`List(External("lance.blob"))`. As with other list columns, the list child is written back as
+`element`, whatever name it had in the Lance dataset (Lance and pyarrow use `item`).
+
+### Blob Types
+
+Lance blob columns use a readable external type instead of Arrow JSON:
+
+| External Type Definition          | Arrow Field                                                                               | Lance File Format Version |
+|-----------------------------------|-------------------------------------------------------------------------------------------|---------------------------|
+| `External("lance.blob")`          | `Struct<data: LargeBinary, uri: Utf8>` with metadata `ARROW:extension:name=lance.blob.v2` | 2.2 or later              |
+| `External("lance.blob.legacy")`   | `LargeBinary` with metadata `lance-encoding:blob=true`                                    | 2.1 or earlier            |
+
+Use `lance.blob` for new tables. `lance.blob.legacy` is only for datasets that already use Lance's
+legacy blob encoding.
+
+When Gravitino creates a Lance dataset with blob columns, it picks the Lance file format version for
+them: 2.2 for `lance.blob` and 2.1 for `lance.blob.legacy`. A table cannot have both. Adding a blob
+column to an existing dataset fails with a clear error if the dataset's file format version does not
+support it.
+
+Only the blob marker is recognized. Other blob metadata, such as
+`lance-encoding:blob-dedicated-size-threshold`, is not shown in the Gravitino type, and columns created
+through Gravitino use Lance's defaults. A blob field in any other layout, for example a blob v2 struct
+with the optional `position` and `size` fields or a legacy blob stored as `Binary`, is returned as
+`External(arrow_field_json_str)` so that it keeps its exact definition.
+
+:::note
+Column types stored by an earlier Gravitino version are rewritten only when the table schema is
+refreshed from the Lance dataset, which depends on the catalog's
+[schema refresh mode](#schema-refresh). The default `DECLARED_AND_EMPTY` mode never refreshes a
+table that is neither declared nor empty, so such a table keeps its stored types even after the
+dataset version changes; set `lance.schema-refresh-mode` to `VERSION_CHECK` to refresh it on the next
+version change. Until a refresh happens, blob v2 columns still appear as a plain `Struct`, and legacy
+blob columns stored as `External(arrow_field_json_str)` keep that form instead of
+`External("lance.blob.legacy")`.
+:::
+
 ### Table Properties
 
 Required and optional properties for tables in a Generic Lakehouse Catalog:
@@ -105,14 +148,32 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|
 | `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                  | (none)   | Yes          |
 | `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                          | (none)   | Conditional* |
-| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                 | false    | No           |
+| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge is rejected unless the catalog enables `lance.allow-external-table-purge`. For a non-external table, dropping will drop both.                                                                                 | false    | No           |
 | `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                            | `CREATE` | No           |
-| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                          | false    | No           |
+| `lance.register`      | Whether it is a register table operation. If `true`, register an existing, readable Lance dataset without creating data. A missing dataset or plain directory is rejected. Registered tables are external. If `false`, create a dataset.                                                                                                 | false    | No           |
 | `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           |
 
 - `CREATE`: Create a new table, fail if the table already exists.
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
-- `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
+- `OVERWRITE`: For creation (`lance.register=false`), purge the existing table and its dataset before creating a replacement. An existing external table requires the catalog to enable `lance.allow-external-table-purge`; otherwise the original metadata and data are retained. For registration (`lance.register=true`), validate the replacement dataset first and replace only external-table metadata, retaining the old dataset. Registration overwrite of a managed table is rejected; explicitly dropping or purging a managed table deletes its data.
+
+Registration validation checks dataset existence and readability, not an operator-defined storage scope or authorization to purge external data.
+
+### Format boundary
+
+The Generic Catalog is format-agnostic for its general table APIs, but a Lance table operation must
+target an entity whose `format` property is `lance` (case-insensitive). Lance REST direct
+operations such as describe, drop, deregister, and alter reject a known non-Lance entity with
+HTTP `400 INVALID_INPUT`; `tableExists` presents it as absent. These checks preserve the existing
+metadata and location.
+
+For create requests dispatched to the Lance table delegator, an existing non-Lance entity remains
+a normal name conflict for `CREATE` (`409`). `EXIST_OK`, create `OVERWRITE`, and register
+`OVERWRITE` are rejected with `IllegalArgumentException` by the direct Gravitino API, which is
+returned as HTTP `400` by the Lance REST service. In particular, overwrite validation happens
+before metadata removal or a Lance dataset delete. Generic Catalog `ListTables` behavior is
+unchanged; it continues to list all formats. Format-specific listing is a separate follow-up
+concern.
 
 **Location Requirement:** Must be specified at catalog, schema, or table level. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 
@@ -135,8 +196,9 @@ Gravitino. It adds a dataset version check to every `loadTable` call.
 :::note Zero-column Lance dataset
 If a Lance dataset genuinely has no columns, `DECLARED_AND_EMPTY` mode records the checked dataset
 version (`lance.version`) on the first `loadTable` call. Subsequent loads skip opening the dataset
-as long as the stored version is unchanged. Once columns are written to the dataset, the next
-`VERSION_CHECK` load or an explicit `alterTable` will detect the change and repair the schema.
+as long as the stored version is unchanged. Before recording a new version, Lance table
+alterations recheck an empty stored schema and abort if it cannot be loaded, so incomplete column
+metadata is not associated with the latest dataset version.
 :::
 
 ### Table Operations
@@ -144,6 +206,41 @@ as long as the stored version is unchanged. Once columns are written to the data
 Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
 
 The following sections provide examples and important details for working with Lance tables. 
+
+#### Add a Column
+
+Lance tables support adding nullable, top-level columns through the Gravitino table API. New
+columns are appended to the schema, and Lance backfills existing rows with `NULL`.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "@type": "addColumn",
+      "fieldName": ["new_column"],
+      "type": "string",
+      "comment": "New nullable column",
+      "position": "default",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ]
+}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables/lance_table
+```
+
+The following add-column options are not supported:
+
+- Nested columns
+- Non-nullable columns
+- `FIRST` or `AFTER` column positions
+- Default values
+- Auto-increment columns
+
+:::note
+This operation is available through the Gravitino table API and Java client. The Lance REST
+`/add_columns` endpoint is not supported yet.
+:::
 
 #### Create a Lance Table
 
@@ -202,7 +299,17 @@ tableCatalog.createTable(
 
 #### Register External Tables
 
-Register existing Lance tables without moving or copying data:
+Register existing Lance tables without moving or copying data. A table with `lance.register=true`
+is always external, including when the request omits `external` or sets it to `false`. Dropping it
+through the Gravitino table API removes only the metadata. Explicit `purgeTable` and Lance REST
+`drop` are rejected by default, preserving metadata and data. A catalog administrator may set
+`lance.allow-external-table-purge=true` to allow both to be deleted. This setting is read only from
+catalog properties; a table property cannot enable it. Use Lance REST `deregister` to remove
+metadata while preserving data. The opt-in does not validate location ownership.
+
+Existing registrations with a missing or false stored `external` flag receive the same protection
+when dropped or deregistered. Their stored properties are not automatically migrated.
+
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="Shell">
@@ -248,7 +355,7 @@ tableCatalog.createTable(
 
 :::tip Registration vs Creation
 - **Registration** (`lance.register: true`):
-  - Links to existing Lance dataset or a path placeholder
+  - Requires an existing, readable Lance dataset; missing datasets and plain directories are rejected
   - Schema automatically detected from Lance metadata
   - Useful for importing existing datasets
 

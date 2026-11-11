@@ -43,7 +43,8 @@ public interface Capability {
     TOPIC,
     PARTITION,
     MODEL,
-    FUNCTION
+    FUNCTION,
+    SEMANTIC_MODEL
   }
 
   /**
@@ -102,6 +103,21 @@ public interface Capability {
    */
   default CapabilityResult specificationOnName(Scope scope, String name) {
     return DEFAULT.specificationOnName(scope, name);
+  }
+
+  /**
+   * Checks an existing table or schema name for deletion, or an existing column reference.
+   *
+   * <p>The default preserves the create-time restrictions. A catalog may accept additional native
+   * names only when the corresponding operations safely quote them. This does not relax creation or
+   * rename-target validation.
+   *
+   * @param scope the table, schema, or column scope
+   * @param name the existing name to check
+   * @return whether the existing name is supported
+   */
+  default CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    return specificationOnName(scope, name);
   }
 
   /**
@@ -179,7 +195,7 @@ public interface Capability {
 
     @Override
     public CapabilityResult managedStorage(Scope scope) {
-      if (scope == Scope.FUNCTION) {
+      if (scope == Scope.FUNCTION || scope == Scope.SEMANTIC_MODEL) {
         return CapabilityResult.SUPPORTED;
       }
 

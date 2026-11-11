@@ -117,6 +117,11 @@ Here `analyst` and `reader` are example role names, not keywords; only `ALL` and
 This mirrors the vocabulary users already know from Hive (`SET ROLE role | ALL | NONE`) and Snowflake
 (`USE SECONDARY ROLES ALL | NONE`).
 
+The value is read as UTF-8, and each comma-separated role name may be percent-encoded (`%XX` over its
+UTF-8 bytes). Common clients such as Apache HttpClient cannot send non-ASCII header values, so
+percent-encoding is the portable way to name a role containing non-ASCII characters, a comma, or `%`.
+Keywords are matched before decoding.
+
 `NONE` is the only way to express the *empty* active set. An absent header already means `ALL`, so
 without an explicit keyword there is no way to declare "use none of my roles" — running with only
 ownership/baseline access. That mode is genuinely useful: owner-only execution for a job or agent that
@@ -155,7 +160,9 @@ classes:
 
 - **Malformed value → `400 Bad Request`.** The value is syntactically invalid — an empty entry (e.g. a
   trailing comma `analyst,`), a reserved keyword combined with anything else (`ALL,analyst`,
-  `NONE,reader`, `ALL,NONE`), or an unrecognized keyword. `ALL` and `NONE` are exclusive: each must
+  `NONE,reader`, `ALL,NONE`), a malformed percent-escape or bytes that are not UTF-8, a role name
+  that is blank or has a control character after decoding, or an unrecognized keyword. `ALL` and
+  `NONE` are exclusive: each must
   appear alone. Surrounding whitespace is trimmed and duplicate names collapse, so `analyst, analyst `
   is fine; role names are matched exactly (case-sensitive), since that's how they're stored.
 - **Unauthorized role → `403 Forbidden`.** The value is well-formed but names a role the caller does not

@@ -19,19 +19,31 @@ from __future__ import annotations
 
 from typing import Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.model.model import Model
-from gravitino.api.tag import Tag
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_list import PolicyList
+from gravitino.api.policy.supports_policies import SupportsPolicies
+from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.tag import Tag, TagList
 from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.client.metadata_object_policy_operations import (
+    MetadataObjectPolicyOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.model_dto import ModelDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericModel(Model, SupportsTags):
+class GenericModel(Model, SupportsTags, SupportsPolicies, SupportsSecrets):
     _model_dto: ModelDTO
     """The model DTO object."""
 
@@ -44,6 +56,12 @@ class GenericModel(Model, SupportsTags):
             model_full_name, MetadataObject.Type.MODEL
         )
         self._model_tag_operations = MetadataObjectTagOperations(
+            model_ns.level(0), model_object, rest_client
+        )
+        self._model_policy_operations = MetadataObjectPolicyOperations(
+            model_ns.level(0), model_object, rest_client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             model_ns.level(0), model_object, rest_client
         )
 
@@ -74,11 +92,24 @@ class GenericModel(Model, SupportsTags):
     def list_tags(self) -> list[str]:
         return self._model_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._model_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._model_tag_operations.list_tags_info()
 
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._model_tag_operations.list_tags_info_with_visibility()
+
     def get_tag(self, name: str) -> Tag:
         return self._model_tag_operations.get_tag(name)
+
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._model_tag_operations.assign_tags(tags_to_add, tags_to_remove)
 
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
@@ -87,3 +118,27 @@ class GenericModel(Model, SupportsTags):
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def list_policies(self) -> list[str]:
+        return self._model_policy_operations.list_policies()
+
+    def list_policies_with_visibility(self) -> PolicyList[str]:
+        return self._model_policy_operations.list_policies_with_visibility()
+
+    def list_policy_infos(self) -> list[Policy]:
+        return self._model_policy_operations.list_policy_infos()
+
+    def list_policy_infos_with_visibility(self) -> PolicyList[Policy]:
+        return self._model_policy_operations.list_policy_infos_with_visibility()
+
+    def supports_policies(self) -> SupportsPolicies:
+        return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> dict:
+        return self._object_secret_operations.get_secrets()
+
+    def supports_roles(self) -> SupportsRoles:
+        raise UnsupportedOperationException("Not supported yet.")

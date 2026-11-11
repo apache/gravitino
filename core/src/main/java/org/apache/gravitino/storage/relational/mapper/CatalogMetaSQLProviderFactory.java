@@ -51,7 +51,15 @@ public class CatalogMetaSQLProviderFactory {
 
   static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}
 
-  static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {}
+  static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {
+    @Override
+    public String selectCatalogMetaByIdForShare(Long catalogId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Schema
+      // creations under one catalog therefore serialize on H2, and a slow creation can make a
+      // concurrent one hit H2's lock timeout instead of a clean conflict.
+      return selectCatalogMetaByIdForUpdate(catalogId);
+    }
+  }
 
   public static String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
     return getProvider().listCatalogPOsByMetalakeName(metalakeName);
@@ -59,6 +67,11 @@ public class CatalogMetaSQLProviderFactory {
 
   public static String listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
+  }
+
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public static String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listCatalogPOsByMetalakeIdForUpdate(metalakeId);
   }
 
   public static String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
@@ -94,6 +107,16 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().selectCatalogMetaById(catalogId);
   }
 
+  /** Builds SQL that returns and locks an active catalog by ID. */
+  public static String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
+    return getProvider().selectCatalogMetaByIdForUpdate(catalogId);
+  }
+
+  /** Returns SQL that selects and share-locks an active catalog by ID. */
+  public static String selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId) {
+    return getProvider().selectCatalogMetaByIdForShare(catalogId);
+  }
+
   public static String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return getProvider().insertCatalogMeta(catalogPO);
   }
@@ -109,12 +132,15 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
-  public static String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
+  public static String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId, currentVersion);
   }
 
-  public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteCatalogMetasByMetalakeId(metalakeId);
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public static String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return getProvider().softDeleteCatalogMetasWithVersion(catalogPOs);
   }
 
   public static String deleteCatalogMetasByLegacyTimeline(

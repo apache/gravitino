@@ -184,6 +184,22 @@ public class TestInMemoryIdempotencyStore {
   }
 
   @Test
+  void testDifferentBindingStillReturnsDuplicateWithoutReplacingOriginal() {
+    String otherBinding = "DELETE v1/cat1/namespaces/ns1/tables/t1";
+    store.reserve(KEY, BINDING, CLAIM, FAR_FUTURE_MS);
+
+    Assertions.assertEquals(
+        ReserveResult.DUPLICATE, store.reserve(KEY, otherBinding, CLAIM + 1, FAR_FUTURE_MS));
+    Assertions.assertEquals(Optional.empty(), store.load(KEY));
+
+    store.finalizeRecord(KEY, CLAIM, 201, "{}");
+    Assertions.assertEquals(
+        ReserveResult.DUPLICATE, store.reserve(KEY, otherBinding, CLAIM + 1, FAR_FUTURE_MS));
+    Assertions.assertEquals(
+        BINDING, store.load(KEY).orElseThrow(AssertionError::new).operationBinding());
+  }
+
+  @Test
   void testPurgeExpiredRemovesOnlyElapsedRecords() {
     AtomicLong now = new AtomicLong(1_000_000L);
     InMemoryIdempotencyStore clockedStore = newStore(ImmutableMap.of(), now::get);

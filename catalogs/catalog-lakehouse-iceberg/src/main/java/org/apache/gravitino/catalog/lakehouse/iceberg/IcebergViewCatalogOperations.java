@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -44,6 +45,8 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
@@ -127,7 +130,7 @@ class IcebergViewCatalogOperations {
     org.apache.iceberg.catalog.Namespace icebergNamespace =
         IcebergCatalogWrapperHelper.getIcebergNamespace(ident.namespace());
 
-    Schema schema = ConvertUtil.toIcebergSchema(columns);
+    Schema schema = ConvertUtil.toIcebergSchema(widenVarcharColumns(columns));
     List<ViewRepresentation> viewRepresentations = new ArrayList<>();
     for (Representation representation : representations) {
       viewRepresentations.add(toSqlViewRepresentation(representation));
@@ -231,6 +234,11 @@ class IcebergViewCatalogOperations {
           NameIdentifier.of(ArrayUtils.add(ident.namespace().levels(), rename.getNewName())));
     } catch (org.apache.iceberg.exceptions.NoSuchViewException e) {
       throw new NoSuchViewException(e, "Iceberg view %s does not exist", ident);
+    } catch (AlreadyExistsException e) {
+      throw new ViewAlreadyExistsException(
+          e,
+          "View %s already exists in Iceberg catalog",
+          NameIdentifier.of(ident.namespace(), rename.getNewName()));
     }
   }
 
@@ -367,7 +375,8 @@ class IcebergViewCatalogOperations {
     int newVersionId =
         currentVersion != null ? currentVersion.versionId() + 1 : INITIAL_VIEW_VERSION_ID;
 
-    Schema replacementSchema = ConvertUtil.toIcebergSchema(replace.getColumns());
+    Schema replacementSchema =
+        ConvertUtil.toIcebergSchema(widenVarcharColumns(replace.getColumns()));
     Optional<Schema> existingSchema =
         metadata.schemas().stream()
             .filter(schema -> schema.sameSchema(replacementSchema))
@@ -404,6 +413,7 @@ class IcebergViewCatalogOperations {
             .defaultNamespace(defaultNamespace)
             .representations(newRepresentations)
             .putSummary("operation", "alter")
+            .putSummary("gravitino.view-replacement-id", UUID.randomUUID().toString())
             .defaultCatalog(replace.getDefaultCatalog())
             .build();
 
@@ -442,5 +452,58 @@ class IcebergViewCatalogOperations {
 
   private static String currentUser() {
     return PrincipalUtils.getCurrentUserName();
+  }
+
+  /**
+   * Iceberg has no length-bound string type, only its single unbounded {@code string}. A view's
+   * output column, unlike a physical table column, may legitimately carry Gravitino's {@link
+   * Types.VarCharType} (e.g. {@code SELECT 'x' AS c} produces varchar(1)), since the connector
+   * layer does not apply physical-storage type restrictions to view columns. Widen it, including
+   * any occurrence nested inside a list/map/struct (e.g. {@code ARRAY['x']}), to Iceberg's string
+   * type before building the schema, or {@link ConvertUtil#toIcebergSchema} rejects it as an
+   * unsupported type.
+   */
+  private static Column[] widenVarcharColumns(Column[] columns) {
+    return Arrays.stream(columns)
+        .map(
+            col ->
+                Column.of(
+                    col.name(),
+                    widenVarchar(col.dataType()),
+                    col.comment(),
+                    col.nullable(),
+                    col.autoIncrement(),
+                    col.defaultValue()))
+        .toArray(Column[]::new);
+  }
+
+  /** Recursively widens any {@link Types.VarCharType} nested inside {@code type}. */
+  private static Type widenVarchar(Type type) {
+    if (type instanceof Types.VarCharType) {
+      return Types.StringType.get();
+    } else if (type instanceof Types.ListType) {
+      Types.ListType listType = (Types.ListType) type;
+      return Types.ListType.of(widenVarchar(listType.elementType()), listType.elementNullable());
+    } else if (type instanceof Types.MapType) {
+      Types.MapType mapType = (Types.MapType) type;
+      return Types.MapType.of(
+          widenVarchar(mapType.keyType()),
+          widenVarchar(mapType.valueType()),
+          mapType.valueNullable());
+    } else if (type instanceof Types.StructType) {
+      Types.StructType structType = (Types.StructType) type;
+      Types.StructType.Field[] fields =
+          Arrays.stream(structType.fields())
+              .map(
+                  field ->
+                      Types.StructType.Field.of(
+                          field.name(),
+                          widenVarchar(field.type()),
+                          field.nullable(),
+                          field.comment()))
+              .toArray(Types.StructType.Field[]::new);
+      return Types.StructType.of(fields);
+    }
+    return type;
   }
 }

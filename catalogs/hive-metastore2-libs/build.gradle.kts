@@ -29,12 +29,22 @@ plugins {
 // Guava and Logback are excluded because they are provided by the Gravitino runtime classpath.
 
 dependencies {
+  // Only needed to compile HiveShimV2 against the shared HiveShim base class; compileOnly keeps
+  // hive-metastore-common's own classes out of the shaded runtime jar produced by copyDepends.
+  compileOnly(project(":catalogs:hive-metastore-common"))
+
   // Force upgrades for outdated transitive dependencies pulled by Hive Metastore
   constraints {
     implementation(libs.thrift)
     implementation(libs.snappy.java)
     implementation(libs.commons.beanutils)
     implementation(libs.woodstox.core)
+    // Not a new dependency: hadoop-common, hadoop-auth, Curator and the Hive shims already bring
+    // ZooKeeper transitively, resolved to 3.6.3 (end of life). Gravitino does not use ZooKeeper; only
+    // Hadoop/Hive code paths that Gravitino does not call (HA failover, ZooKeeper token stores and
+    // discovery) reference it. This constraint only upgrades the version that is shipped.
+    implementation(libs.zookeeper)
+    implementation(libs.zookeeper.jute)
   }
 
   implementation(libs.hadoop3.common) {
@@ -56,6 +66,7 @@ dependencies {
     exclude(group = "org.slf4j")
   }
   implementation(libs.hadoop3.mapreduce.client.core) {
+    exclude(group = "ch.qos.logback")
     exclude(group = "ch.qos.reload4j")
     exclude(group = "com.github.pjfanning", module = "jersey-json")
     exclude(group = "com.github.spotbugs")

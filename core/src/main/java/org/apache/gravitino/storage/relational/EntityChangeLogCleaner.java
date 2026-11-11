@@ -49,7 +49,7 @@ public class EntityChangeLogCleaner implements AutoCloseable {
   /**
    * How many poll cycles a change record must survive at minimum. A record has to outlive more than
    * one cycle, because a node can miss cycles while it is restarting, stalled in a long GC pause,
-   * or paused retrying a failed listener.
+   * or slow to drain a large backlog.
    */
   private static final long MIN_RETENTION_POLL_CYCLES = 10;
 

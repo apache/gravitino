@@ -20,9 +20,14 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -340,7 +345,7 @@ public class TestJobEventDispatcher {
 
   @Test
   void testGetJobEvent() {
-    dispatcher.getJob("metalake", jobInfo.jobId());
+    dispatcher.getJob("metalake", jobInfo.jobId(), false);
     PreEvent preEvent = dummyEventListener.popPreEvent();
 
     Assertions.assertEquals(
@@ -437,7 +442,7 @@ public class TestJobEventDispatcher {
   void testGetJobFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
-        () -> failureDispatcher.getJob("metalake", jobInfo.jobId()));
+        () -> failureDispatcher.getJob("metalake", jobInfo.jobId(), false));
     Event event = dummyEventListener.popPostEvent();
     Assertions.assertInstanceOf(GetJobFailureEvent.class, event);
     Assertions.assertEquals(
@@ -465,6 +470,57 @@ public class TestJobEventDispatcher {
   }
 
   @Test
+  void testRunJobEventMasksSensitiveJobConf() throws NoSuchJobTemplateException {
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Collections.singletonList(listener));
+    JobOperationDispatcher delegate = mock(JobOperationDispatcher.class);
+    when(delegate.runJob(any(String.class), any(String.class), any(Map.class)))
+        .thenReturn(jobEntity);
+    JobEventDispatcher maskingDispatcher = new JobEventDispatcher(eventBus, delegate);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "catalog_name",
+            "ice",
+            "updater_options",
+            "{\"password\":\"arg-pw\",\"gravitino_uri\":\"http://localhost\"}",
+            "spark_conf",
+            "{\"spark.sql.catalog.ice.rest.auth.basic.password\":\"jdbc-pw\"}");
+
+    String templateName = jobTemplateEntity.name();
+    maskingDispatcher.runJob("metalake", templateName, conf);
+
+    verify(delegate).runJob(eq("metalake"), eq(templateName), eq(conf));
+    Map<String, String> preJobConf = ((RunJobPreEvent) listener.popPreEvent()).jobConf();
+    Map<String, String> postJobConf = ((RunJobEvent) listener.popPostEvent()).jobConf();
+    Assertions.assertEquals("ice", preJobConf.get("catalog_name"));
+    Assertions.assertFalse(preJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertFalse(preJobConf.get("spark_conf").contains("jdbc-pw"));
+    Assertions.assertFalse(postJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertTrue(conf.get("updater_options").contains("arg-pw"));
+  }
+
+  @Test
+  void testRunJobFailureEventMasksSensitiveJobConf() {
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Collections.singletonList(listener));
+    JobOperationDispatcher delegate = mock(JobOperationDispatcher.class);
+    when(delegate.runJob(any(String.class), any(String.class), any(Map.class)))
+        .thenThrow(new GravitinoRuntimeException("failed"));
+    JobEventDispatcher maskingDispatcher = new JobEventDispatcher(eventBus, delegate);
+    Map<String, String> conf =
+        ImmutableMap.of("updater_options", "{\"password\":\"arg-pw\"}", "catalog_name", "ice");
+
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> maskingDispatcher.runJob("metalake", jobTemplateEntity.name(), conf));
+
+    Map<String, String> eventJobConf = ((RunJobFailureEvent) listener.popPostEvent()).jobConf();
+    Assertions.assertEquals("ice", eventJobConf.get("catalog_name"));
+    Assertions.assertFalse(eventJobConf.get("updater_options").contains("arg-pw"));
+    Assertions.assertTrue(conf.get("updater_options").contains("arg-pw"));
+  }
+
+  @Test
   void testCancelJobFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -486,6 +542,9 @@ public class TestJobEventDispatcher {
     Assertions.assertEquals(expected.jobId(), actual.jobId());
     Assertions.assertEquals(expected.jobTemplateName(), actual.jobTemplateName());
     Assertions.assertEquals(expected.jobStatus(), actual.jobStatus());
+    Assertions.assertEquals(expected.queuedAt(), actual.queuedAt());
+    Assertions.assertEquals(expected.startedAt(), actual.startedAt());
+    Assertions.assertEquals(expected.finishedAt(), actual.finishedAt());
   }
 
   private JobOperationDispatcher mockJobDispatcher() {
@@ -506,7 +565,8 @@ public class TestJobEventDispatcher {
       // Job operations
       when(dispatcher.listJobs(any(String.class), any(Optional.class)))
           .thenReturn(Collections.singletonList(jobEntity));
-      when(dispatcher.getJob(any(String.class), any(String.class))).thenReturn(jobEntity);
+      when(dispatcher.getJob(any(String.class), any(String.class), anyBoolean(), any(), any()))
+          .thenReturn(jobEntity);
       when(dispatcher.runJob(any(String.class), any(String.class), any(Map.class)))
           .thenReturn(jobEntity);
       when(dispatcher.cancelJob(any(String.class), any(String.class))).thenReturn(jobEntity);
@@ -542,11 +602,18 @@ public class TestJobEventDispatcher {
   }
 
   private JobEntity mockJobEntity() {
+    AuditInfo auditInfo = mock(AuditInfo.class);
+    when(auditInfo.createTime()).thenReturn(Instant.ofEpochMilli(1699999000000L));
+
     JobEntity entity = mock(JobEntity.class);
     when(entity.jobTemplateName()).thenReturn("testJob");
     when(entity.name()).thenReturn("job-12345");
-    when(entity.auditInfo()).thenReturn(mock(AuditInfo.class));
+    when(entity.auditInfo()).thenReturn(auditInfo);
     when(entity.status()).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(entity.startedAt()).thenReturn(1699999500000L);
+    when(entity.startedAtAsInstant()).thenReturn(Instant.ofEpochMilli(1699999500000L));
+    when(entity.finishedAt()).thenReturn(1700000000000L);
+    when(entity.finishedAtAsInstant()).thenReturn(Instant.ofEpochMilli(1700000000000L));
 
     return entity;
   }
@@ -556,6 +623,9 @@ public class TestJobEventDispatcher {
     when(info.jobId()).thenReturn("job-12345");
     when(info.jobTemplateName()).thenReturn("testJob");
     when(info.jobStatus()).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(info.queuedAt()).thenReturn(Instant.ofEpochMilli(1699999000000L));
+    when(info.startedAt()).thenReturn(Instant.ofEpochMilli(1699999500000L));
+    when(info.finishedAt()).thenReturn(Instant.ofEpochMilli(1700000000000L));
     return info;
   }
 }

@@ -30,6 +30,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +46,11 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -54,14 +60,23 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
@@ -74,6 +89,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestTagOperations extends BaseOperationsTest {
@@ -127,10 +144,43 @@ public class TestTagOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Verifies that REST tag operations reject internal names before dispatch. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_123"})
+  public void testInternalTagEndpointsAreHidden(String name) throws Exception {
+    TagOperations operations = new TagOperations(tagManager);
+    FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
+    TagUpdatesRequest update =
+        new TagUpdatesRequest(
+            Collections.singletonList(new TagUpdateRequest.RenameTagRequest("ordinary")));
+    for (Response response :
+        new Response[] {
+          operations.getTag(metalake, name),
+          operations.alterTag(metalake, name, update),
+          operations.deleteTag(metalake, name),
+          operations.listMetadataObjectsForTag(metalake, name, null),
+          operations.listPoliciesForTag(metalake, name, false),
+          operations.addPolicyForTag(metalake, name, "policy", new PolicyTagAddRequest()),
+          operations.addPolicyForTag(
+              metalake,
+              name,
+              "policy",
+              new PolicyTagAddRequest(
+                  PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance")))),
+          operations.removePolicyFromTag(metalake, name, "policy")
+        }) {
+      try (Response result = response) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), result.getStatus());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
+  }
+
   @Test
   public void testListTags() {
     String[] tags = new String[] {"tag1", "tag2"};
-    when(tagManager.listTags(metalake)).thenReturn(tags);
+    when(tagManager.listTags(metalake))
+        .thenReturn(new String[] {"tag1", "GRAVITINO_HIDDEN_123", "tag2"});
 
     Response response =
         target(tagPath(metalake))
@@ -199,6 +249,167 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testPolicyAssociationsForTag() {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    PolicyEntity policy = mock(PolicyEntity.class);
+    when(policy.name()).thenReturn(policyName);
+    when(policy.policyType()).thenReturn(Policy.BuiltInType.CUSTOM);
+    when(policy.enabled()).thenReturn(true);
+    when(policy.content())
+        .thenReturn(
+            PolicyContents.custom(
+                Collections.emptyMap(), Collections.singleton(MetadataObject.Type.TABLE), null));
+    when(policy.auditInfo()).thenReturn(testAuditInfo1);
+    RelationalEntity<PolicyEntity> association =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            NameIdentifier.of(metalake, tagName),
+            org.apache.gravitino.Entity.EntityType.TAG,
+            policy);
+    when(tagManager.listPolicyAssociationsForTag(metalake, tagName))
+        .thenReturn(new RelationalEntity<?>[] {association});
+
+    Response listResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), listResponse.getStatus());
+    Assertions.assertArrayEquals(
+        new String[] {policyName}, listResponse.readEntity(NameListResponse.class).getNames());
+
+    Response detailsResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), detailsResponse.getStatus());
+    PolicyForTagAssociationListResponse details =
+        detailsResponse.readEntity(PolicyForTagAssociationListResponse.class);
+    details.validate();
+    Assertions.assertEquals(1, details.getAssociations().length);
+    Assertions.assertSame(
+        AllValuesSelector.get(), details.getAssociations()[0].getSelector().toSelector());
+
+    PolicyAssociationSelectorDTO selector =
+        PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get());
+    PolicyTagAddRequest request = new PolicyTagAddRequest(selector);
+    Response addResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), addResponse.getStatus());
+    PolicyTagAssociationResponse response =
+        addResponse.readEntity(PolicyTagAssociationResponse.class);
+    response.validate();
+    Assertions.assertEquals(policyName, response.getPolicy());
+    Assertions.assertEquals(tagName, response.getTag());
+    Assertions.assertEquals(AllValuesSelector.get(), response.getSelector().toSelector());
+    Mockito.verify(tagManager)
+        .addPolicyForTag(metalake, tagName, policyName, AllValuesSelector.get());
+
+    Response removeResponse =
+        target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete();
+    Assertions.assertEquals(Response.Status.NO_CONTENT.getStatusCode(), removeResponse.getStatus());
+    Mockito.verify(tagManager).removePolicyFromTag(metalake, tagName, policyName);
+  }
+
+  @Test
+  public void testAddPolicyForTagAlreadyAssociated() {
+    String tagName = "tag1";
+    String policyName = "policy1";
+    doThrow(new PolicyAlreadyAssociatedException("mock error"))
+        .when(tagManager)
+        .addPolicyForTag(
+            Mockito.eq(metalake), Mockito.eq(tagName), Mockito.eq(policyName), Mockito.any());
+
+    for (PolicyAssociationSelectorDTO selector :
+        new PolicyAssociationSelectorDTO[] {
+          PolicyAssociationSelectorDTO.fromSelector(AllValuesSelector.get()),
+          PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance"))
+        }) {
+      Response response =
+          target(tagPath(metalake) + "/" + tagName + "/policies/" + policyName)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .post(
+                  Entity.entity(
+                      new PolicyTagAddRequest(selector), MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, errorResponse.getCode());
+      Assertions.assertEquals(
+          PolicyAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"zzz", "A"})
+  void testAddPolicyForTagInvalidValue(String value) {
+    String message = "Tag tag1 value " + value + " is not in allowed values [a, b]";
+    doThrow(new IllegalArgumentException(message))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of(value));
+    try (Response response = addPolicyForTag(TagValueSelector.of(value))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(message));
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
+  }
+
+  @Test
+  void testAddPolicyForTagWithoutAllowedValues() {
+    doThrow(new IllegalArgumentException("Tag tag1 does not allow assignment values"))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
+    try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(
+          error.getMessage().contains("Tag tag1 does not allow assignment values"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "b", "engineering"})
+  void testAddPolicyForTagValidSelector(String value) {
+    PolicyAssociationSelector selector = TagValueSelector.of(value);
+    try (Response response = addPolicyForTag(selector)) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      PolicyTagAssociationResponse association =
+          response.readEntity(PolicyTagAssociationResponse.class);
+      association.validate();
+      Assertions.assertEquals(selector, association.getSelector().toSelector());
+    }
+    Mockito.verify(tagManager).addPolicyForTag(metalake, "tag1", "policy1", selector);
+  }
+
+  @Test
+  void testAddPolicyForTagMissingTag() {
+    doThrow(new NoSuchTagException("Tag tag1 does not exist"))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
+    try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), error.getType());
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
+  }
+
+  @Test
   public void testListTagsInfo() {
     TagEntity tag1 =
         TagEntity.builder()
@@ -217,7 +428,17 @@ public class TestTagOperations extends BaseOperationsTest {
             .build();
 
     Tag[] tags = new Tag[] {tag1, tag2};
-    when(tagManager.listTagsInfo(metalake)).thenReturn(tags);
+    when(tagManager.listTagsInfo(metalake))
+        .thenReturn(
+            new Tag[] {
+              tags[0],
+              TagEntity.builder()
+                  .withName("gravitino_hidden_123")
+                  .withId(123L)
+                  .withAuditInfo(testAuditInfo1)
+                  .build(),
+              tags[1]
+            });
 
     Response resp =
         target(tagPath(metalake))
@@ -270,6 +491,66 @@ public class TestTagOperations extends BaseOperationsTest {
     TagListResponse tagListResp2 = resp2.readEntity(TagListResponse.class);
     Assertions.assertEquals(0, tagListResp2.getCode());
     Assertions.assertEquals(0, tagListResp2.getTags().length);
+  }
+
+  @Test
+  public void testCreateTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testCreateTagRejectsDottedName() {
+    TagCreateRequest request = new TagCreateRequest("a.b", "comment", null);
+
+    try (Response response =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).createTag(any(), any(), any(), any(), any());
+  }
+
+  /** REST rejects internal names on creation and rename before invoking the dispatcher. */
+  @ParameterizedTest
+  @ValueSource(strings = {"gravitino_hidden_123", "GRAVITINO_HIDDEN_internal"})
+  public void testRejectsInternalTagNames(String name) {
+    TagUpdatesRequest rename =
+        new TagUpdatesRequest(
+            Lists.newArrayList(
+                new TagUpdateRequest.RenameTagRequest(name),
+                new TagUpdateRequest.RenameTagRequest("ordinary")));
+    try (Response created =
+            target(tagPath(metalake))
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .post(
+                    Entity.entity(
+                        new TagCreateRequest(name, null, null), MediaType.APPLICATION_JSON_TYPE));
+        Response renamed =
+            target(tagPath(metalake))
+                .path("tag1")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.entity(rename, MediaType.APPLICATION_JSON_TYPE))) {
+      for (Response response : Arrays.asList(created, renamed)) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        Assertions.assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            response.readEntity(ErrorResponse.class).getCode());
+      }
+    }
+    Mockito.verifyNoInteractions(tagManager);
   }
 
   @Test
@@ -399,6 +680,38 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testAlterTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .path("tag1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRenameTagRejectsDottedName() {
+    TagUpdatesRequest request =
+        new TagUpdatesRequest(
+            Collections.singletonList(new TagUpdateRequest.RenameTagRequest("a.b")));
+
+    try (Response response =
+        target(tagPath(metalake))
+            .path("tag1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).alterTag(any(), any(), any());
   }
 
   @Test
@@ -1144,7 +1457,33 @@ public class TestTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    // The deprecated route delegates to MetadataObjectTagOperations, so it inherits the same guard.
+    Response response =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
   private String tagPath(String metalake) {
     return "/metalakes/" + metalake + "/tags";
+  }
+
+  private Response addPolicyForTag(PolicyAssociationSelector selector) {
+    return target(tagPath(metalake) + "/tag1/policies/policy1")
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept("application/vnd.gravitino.v1+json")
+        .post(
+            Entity.entity(
+                new PolicyTagAddRequest(PolicyAssociationSelectorDTO.fromSelector(selector)),
+                MediaType.APPLICATION_JSON_TYPE));
   }
 }

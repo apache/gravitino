@@ -31,6 +31,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -64,6 +65,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.lance.namespace.errors.NamespaceNotFoundException;
 import org.slf4j.Logger;
@@ -129,6 +131,48 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalogOperator.loadCatalog(catalogName);
   }
 
+  Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props = copyProps(catalog.properties());
+    props.putAll(catalogSecrets(catalog.name()));
+    return props;
+  }
+
+  Map<String, String> schemaPropsWithSecrets(Catalog catalog, String schemaName) {
+    Schema schema = loadSchema(catalog, schemaName);
+    Map<String, String> props = copyProps(schema.properties());
+    props.putAll(schemaSecrets(catalog.name(), schemaName));
+    return props;
+  }
+
+  private Map<String, String> catalogSecrets(String catalogName) {
+    SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecrets(
+          NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG);
+    }
+    return loadCatalog(catalogName).supportsSecrets().getSecrets();
+  }
+
+  private Map<String, String> schemaSecrets(String catalogName, String schemaName) {
+    SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecrets(schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
+    }
+    return loadSchema(loadCatalog(catalogName), schemaName).supportsSecrets().getSecrets();
+  }
+
+  private SecretPropertyOperationDispatcher secretDispatcher() {
+    try {
+      return GravitinoEnv.getInstance().secretPropertyOperationDispatcher();
+    } catch (Exception e) {
+      return null;
+    }
+  }
+
+  private static Map<String, String> copyProps(Map<String, String> props) {
+    return new HashMap<>(props == null ? Map.of() : props);
+  }
+
   Catalog createCatalog(
       String catalogName,
       Catalog.Type type,
@@ -161,13 +205,25 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
       throw new NamespaceNotFoundException(
           "Catalog not found: " + catalogName, CommonUtil.formatCurrentStackTrace(), catalogName);
     }
+    validateLakehouseCatalog(catalogName, catalog);
+    return catalog;
+  }
+
+  /**
+   * Rejects a catalog that is not a lakehouse catalog. Lance only exposes lakehouse catalogs as
+   * namespaces, so any other catalog is reported as a missing namespace.
+   *
+   * @param catalogName the catalog name used in the error
+   * @param catalog the loaded catalog
+   * @throws NamespaceNotFoundException if the catalog is not a lakehouse catalog
+   */
+  void validateLakehouseCatalog(String catalogName, Catalog catalog) {
     if (!isLakehouseCatalog(catalog)) {
       throw new NamespaceNotFoundException(
           "Catalog is not a lakehouse catalog: " + catalogName,
           CommonUtil.formatCurrentStackTrace(),
           catalogName);
     }
-    return catalog;
   }
 
   String[] listSchemas(Catalog catalog) throws NoSuchCatalogException {

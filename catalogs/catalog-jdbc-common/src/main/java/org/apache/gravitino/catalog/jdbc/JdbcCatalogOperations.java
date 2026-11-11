@@ -18,8 +18,7 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import static org.apache.gravitino.connector.BaseCatalog.CATALOG_BYPASS_PREFIX;
-
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.sql.Connection;
@@ -34,11 +33,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.sql.DataSource;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -54,10 +54,14 @@ import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.TableOperation;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectionTimeouts;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -75,13 +79,13 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with the Jdbc catalog in Apache Gravitino. */
-public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas, TableCatalog {
+public class JdbcCatalogOperations
+    implements CatalogOperations, SupportsSchemas, TableCatalog, SupportsTableNameResolution {
 
   private static final String GRAVITINO_ATTRIBUTE_DOES_NOT_EXIST_MSG =
       "The Gravitino id attribute does not exist in properties";
@@ -102,6 +106,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
 
   private DataSource dataSource;
   private String jdbcUrl;
+  private JdbcConfig jdbcConfig;
 
   private final JdbcColumnDefaultValueConverter columnDefaultValueConverter;
 
@@ -160,18 +165,17 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     this.jdbcTablePropertiesMetadata =
         (JdbcTablePropertiesMetadata) propertiesMetadata.tablePropertiesMetadata();
 
-    // Key format like gravitino.bypass.a.b
-    Map<String, String> prefixMap = MapUtils.getPrefixMap(conf, CATALOG_BYPASS_PREFIX);
+    Map<String, String> resultConf = this.jdbcCatalogPropertiesMetadata.jdbcProperties(conf);
 
-    // Hold keys that lie in JDBC_IMMUTABLE_PROPERTIES
-    Map<String, String> gravitinoConfig =
-        this.jdbcCatalogPropertiesMetadata.transformProperties(conf);
-    Map<String, String> resultConf = Maps.newHashMap(prefixMap);
-    resultConf.putAll(gravitinoConfig);
-
-    JdbcConfig jdbcConfig = new JdbcConfig(resultConf);
+    this.jdbcConfig = new JdbcConfig(resultConf);
     this.jdbcUrl = jdbcConfig.getJdbcUrl();
     this.dataSource = DataSourceUtils.createDataSource(jdbcConfig);
+    try {
+      configureDataSource(dataSource, jdbcConfig);
+    } catch (RuntimeException e) {
+      DataSourceUtils.closeDataSource(dataSource);
+      throw e;
+    }
 
     checkJDBCDriverVersion();
     this.databaseOperation.initialize(dataSource, exceptionConverter, resultConf);
@@ -191,12 +195,36 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
     }
   }
 
+  /**
+   * Configures the validated, lazy DBCP data source before any connection is borrowed.
+   *
+   * <p>The default makes no changes. A connector whose driver does not enforce a login timeout can
+   * bound physical connection creation with {@link
+   * org.apache.gravitino.utils.BoundedConnectionDriver}:
+   *
+   * <pre>{@code
+   * ((BasicDataSource) dataSource)
+   *     .setDriver(
+   *         new BoundedConnectionDriver(
+   *             DataSourceUtils.configuredDriver(config), config.getConnectTimeoutMs()));
+   * }</pre>
+   *
+   * <p>Implementations must keep the URL, credentials and pool settings that the common JDBC
+   * factory applied. They must not borrow connections or start the pool in this hook, and must not
+   * retain or close the data source; these operations own its lifecycle. A runtime exception closes
+   * the data source and fails initialization.
+   *
+   * @param dataSource the DBCP data source created by the common JDBC factory
+   * @param config validated JDBC configuration
+   */
+  protected void configureDataSource(DataSource dataSource, JdbcConfig config) {}
+
   /** Closes the Jdbc catalog and releases the associated client pool. */
   @Override
   public void close() {
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    if (metricsSystem != null) {
+    if (metricsSystem != null && catalogMetricsSource != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
     DataSourceUtils.closeDataSource(dataSource);
@@ -213,7 +241,27 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       return null;
     }
 
-    return DriverManager.getDriver(jdbcUrl);
+    return DataSourceUtils.configuredDriver(jdbcConfig);
+  }
+
+  /**
+   * Initializes the configured driver for provider overrides that still use {@link DriverManager}.
+   *
+   * <p>The default {@link #getDriver()} instantiates the configured driver directly. Legacy
+   * overrides, such as {@link MySQLProtocolCompatibleCatalogOperations#getDriver()}, instead use
+   * DriverManager lookup, which requires drivers in catalog-specific libs to register first.
+   */
+  private void ensureDriverRegistered() {
+    String driverClassName = jdbcConfig.getJdbcDriver();
+    if (StringUtils.isBlank(driverClassName)) {
+      return;
+    }
+    try {
+      Class.forName(driverClassName, true, getClass().getClassLoader());
+    } catch (ClassNotFoundException e) {
+      // The data source already rejects a missing driver class when the catalog is initialized;
+      // leave the lookup to getDriver(), which reports its own error.
+    }
   }
 
   /**
@@ -235,19 +283,159 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
    * Performs `show databases` operation to check if the JDBC connection is valid.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
+  /**
+   * Verifies the backend is reachable using a dedicated, time-bounded one-off connection rather
+   * than a pooled one. Unlike {@link #testConnection(NameIdentifier)} (which borrows from the lazy
+   * pool, whose connections carry only a connect timeout so normal operations stay unbounded), this
+   * probe applies both the connect timeout and the socket-read (and, for PostgreSQL, login) timeout
+   * from {@link JdbcConnectionTimeouts#probeConnectionProperties}. That matters because the probe
+   * runs under the metalake write lock during catalog creation: a backend that accepts the TCP
+   * connection but never speaks the database protocol would otherwise block forever and starve the
+   * whole metalake. The connection is opened, validated and closed within this call.
+   *
+   * @param catalogIdent the identifier of the catalog being verified
+   * @throws ConnectionFailedException if the backend cannot be reached within the bounded timeout
+   */
+  /**
+   * Sets just the configuration the backend probe needs ({@link #jdbcConfig} and {@link #jdbcUrl}),
+   * without building the connection pool. For tests that exercise {@link #probeConnection} with a
+   * fake driver and no real database.
+   *
+   * @param config the resolved JDBC configuration
+   */
+  @VisibleForTesting
+  void setProbeConfigForTest(JdbcConfig config) {
+    this.jdbcConfig = config;
+    this.jdbcUrl = config.getJdbcUrl();
+  }
+
+  public void probeConnection(NameIdentifier catalogIdent) {
+    Driver driver;
+    try {
+      ensureDriverRegistered();
+      driver = getDriver();
+    } catch (SQLException e) {
+      throw new ConnectionFailedException(
+          e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
+    }
+
+    Properties properties = new Properties();
+    String user = jdbcConfig.getUsername();
+    if (user != null) {
+      properties.setProperty("user", user);
+    }
+    String password = jdbcConfig.getPassword();
+    if (password != null) {
+      properties.setProperty("password", password);
+    }
+    // Bound both the connect and the read/login timeout for this probe so an accept-but-silent
+    // backend fails fast instead of hanging under the metalake write lock.
+    JdbcConnectionTimeouts.probeConnectionProperties(jdbcConfig, jdbcUrl)
+        .forEach(properties::setProperty);
+
+    try (Connection connection = driver.connect(jdbcUrl, properties)) {
+      if (connection == null) {
+        throw new ConnectionFailedException(
+            "Failed to connect to JDBC catalog at %s: the driver did not accept the URL",
+            hostPortFromJdbcUrl(jdbcUrl));
+      }
+      // A lightweight round trip that confirms the connection is actually usable. isValid() is
+      // bounded by the same read timeout applied above.
+      connection.getMetaData().getDatabaseProductName();
+    } catch (ConnectionFailedException e) {
+      throw e;
+    } catch (SQLException e) {
+      throw new ConnectionFailedException(
+          e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
+    }
+  }
+
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    databaseOperation.listDatabases();
+  public void testConnection(NameIdentifier catalogIdent) {
+    try {
+      databaseOperation.listDatabases();
+    } catch (ConnectionFailedException e) {
+      // Already classified as a connection failure (for example a MySQL access-denied or a
+      // PostgreSQL SQLSTATE 08 error). Re-wrap it with the host context so every connection failure
+      // satisfies the documented "names the host" contract, preserving the original cause.
+      throw new ConnectionFailedException(
+          e.getCause() != null ? e.getCause() : e,
+          "Failed to connect to JDBC catalog at %s: %s",
+          hostPortFromJdbcUrl(jdbcUrl),
+          e.getMessage());
+    } catch (GravitinoRuntimeException e) {
+      if (e.getClass() == GravitinoRuntimeException.class && e.getCause() instanceof SQLException) {
+        throw new ConnectionFailedException(
+            e.getCause(),
+            "Failed to connect to JDBC catalog at %s: %s",
+            hostPortFromJdbcUrl(jdbcUrl),
+            e.getMessage());
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * A plain authority: an optional {@code user-info@}, then either a bracketed IPv6 literal or a
+   * host of letters/digits/dots/hyphens, then an optional {@code :port}. Deliberately strict so
+   * that credential-bearing forms the driver also accepts — MySQL's key-value authority {@code
+   * (host=..,password=..)} and its {@code address=(host=..)(password=..)} form — do NOT match and
+   * are reported as {@code "unknown"} instead of leaking the password.
+   */
+  private static final Pattern HOST_PORT_AUTHORITY =
+      Pattern.compile("^(?:[^@/]*@)?(\\[[0-9A-Fa-f:]+\\]|[A-Za-z0-9.\\-]+)(?::\\d+)?$");
+
+  /**
+   * Extracts {@code host:port} from a {@code jdbc:subprotocol://host:port/...} URL for use in a
+   * connection-failure message. Returns {@code "unknown"} whenever the authority is not a plain
+   * {@code host[:port]} (including a URL with no {@code ://} authority, or MySQL key-value / {@code
+   * address=(...)} host syntaxes) rather than the raw URL, because the raw URL and those
+   * alternative syntaxes can carry credentials (for example {@code jdbc:postgresql:db?password=...}
+   * or {@code jdbc:mysql://(host=h,password=s)/db}) that must not leak into the exception, the REST
+   * response, or the server logs. Any user-info is stripped. Never throws, so message formatting
+   * cannot mask the original connection failure.
+   *
+   * @param url the JDBC URL stored for this catalog
+   * @return a {@code host:port} (or {@code host}) description, or {@code "unknown"} when it is not
+   *     a plain host authority
+   */
+  static String hostPortFromJdbcUrl(String url) {
+    if (StringUtils.isBlank(url)) {
+      return "unknown";
+    }
+    int schemeEnd = url.indexOf("://");
+    if (schemeEnd < 0) {
+      return "unknown";
+    }
+    int authorityStart = schemeEnd + "://".length();
+    // The authority ends at the first '/', '?', or ';' following it.
+    int authorityEnd = url.length();
+    for (int i = authorityStart; i < url.length(); i++) {
+      char c = url.charAt(i);
+      if (c == '/' || c == '?' || c == ';') {
+        authorityEnd = i;
+        break;
+      }
+    }
+    String authority = url.substring(authorityStart, authorityEnd);
+    // Only accept a plain host[:port] authority; anything else (blank, or a credential-bearing
+    // key-value / address=(...) form) is reported as unknown rather than risking a leak.
+    if (!HOST_PORT_AUTHORITY.matcher(authority).matches()) {
+      return "unknown";
+    }
+    // Strip any user-info ("user@host:port"); keep only the host:port part.
+    int at = authority.lastIndexOf('@');
+    if (at >= 0) {
+      authority = authority.substring(at + 1);
+    }
+    return StringUtils.isBlank(authority) ? "unknown" : authority;
   }
 
   /**
@@ -398,6 +586,22 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   /**
+   * {@inheritDoc}
+   *
+   * <p>Delegates to {@link TableOperation#resolveTableName(String, String)}; the default backend
+   * implementation returns the normalized name unchanged, so this is a no-op unless a backend
+   * overrides it.
+   */
+  @Override
+  public NameIdentifier resolveTableName(NameIdentifier normalizedIdent) {
+    String databaseName = NameIdentifier.of(normalizedIdent.namespace().levels()).name();
+    String resolved = tableOperation.resolveTableName(databaseName, normalizedIdent.name());
+    return resolved.equals(normalizedIdent.name())
+        ? normalizedIdent
+        : NameIdentifier.of(normalizedIdent.namespace(), resolved);
+  }
+
+  /**
    * Apply the {@link TableChange change} to an existing Jdbc table.
    *
    * @param tableIdent The identifier of the table to alter.
@@ -418,13 +622,10 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
           Arrays.stream(changes)
               .filter(tableChange -> !(tableChange instanceof TableChange.RenameTable))
               .map(String::valueOf)
-              .collect(Collectors.joining("\n"));
+              .collect(Collectors.joining(", "));
       Preconditions.checkArgument(
           StringUtils.isEmpty(otherChange),
-          String.format(
-              "The operation to change the table name cannot be performed together with other operations."
-                  + "The list of operations that you cannot perform includes: \n %s",
-              otherChange));
+          String.format("A table rename cannot be combined with other changes: %s", otherChange));
       return renameTable(tableIdent, (TableChange.RenameTable) renameTableOptional.get());
     }
     return internalAlterTable(tableIdent, changes);
@@ -467,11 +668,13 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
     JdbcTableOperations jdbcTableOperations = (JdbcTableOperations) tableOperation;
-    if (!jdbcTableOperations.supportsTableSortOrder()) {
-      Preconditions.checkArgument(
-          null == sortOrders || sortOrders.length == 0,
-          "The current JDBC connector: %s does not support sort orders",
-          jdbcTableOperations.getClass().getName());
+    if (!jdbcTableOperations.supportsTableSortOrder()
+        && sortOrders != null
+        && sortOrders.length > 0) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Cannot create table %s: %s",
+              tableIdent, jdbcTableOperations.unsupportedTableSortOrderMessage()));
     }
 
     StringIdentifier identifier = StringIdentifier.fromProperties(properties);
@@ -568,7 +771,8 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
           metaData.getDriverMajorVersion(),
           metaData.getDriverMinorVersion());
     } catch (final SQLException se) {
-      throw exceptionConverter.toGravitinoException(se);
+      throw new ConnectionFailedException(
+          se, "Failed to connect to JDBC catalog: %s", se.getMessage());
     }
   }
 

@@ -20,34 +20,129 @@ package org.apache.gravitino.spark.connector.catalog;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Ticker;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.spark.connector.ConnectorConstants;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin;
+import org.apache.spark.SparkConf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** GravitinoCatalogManager is used to retrieve catalogs from Apache Gravitino server. */
+/**
+ * GravitinoCatalogManager is used to retrieve catalogs from Apache Gravitino server.
+ *
+ * <p>The manager itself stays a JVM-wide singleton, but the clients inside it are cached per {@link
+ * GravitinoIdentity} so that a shared Spark driver does not serve one user's catalog metadata to
+ * another. Every auth type other than {@code token} resolves to a single application-wide identity,
+ * which keeps those deployments behaving exactly as before.
+ */
 public class GravitinoCatalogManager {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoCatalogManager.class);
   private static GravitinoCatalogManager gravitinoCatalogManager;
 
   private volatile boolean isClosed = false;
-  private final Cache<String, Catalog> gravitinoCatalogs;
-  private final GravitinoClient gravitinoClient;
+  private final SparkConf sparkConf;
+  private final String authType;
+  private final List<String> principalFields;
+  private final Function<GravitinoIdentity, GravitinoClient> clientBuilder;
+  private final Cache<GravitinoIdentity, GravitinoClient> clients;
+  private final Cache<String, CachedCatalog> gravitinoCatalogs;
+  private volatile Map<String, Catalog> applicationCatalogs = ImmutableMap.of();
 
-  private GravitinoCatalogManager(Supplier<GravitinoClient> clientBuilder) {
-    this.gravitinoClient = clientBuilder.get();
-    // Will not evict catalog by default
-    this.gravitinoCatalogs = Caffeine.newBuilder().build();
+  // Resolved lazily on first access and cached for the life of this manager; Spark catalogs are
+  // initialized once, so there is no refresh path if the Iceberg REST endpoint changes later.
+  private volatile Optional<String> icebergRestUri;
+
+  private GravitinoCatalogManager(
+      SparkConf sparkConf,
+      Function<GravitinoIdentity, GravitinoClient> clientBuilder,
+      Ticker ticker) {
+    this.sparkConf = sparkConf;
+    this.clientBuilder = clientBuilder;
+    this.authType =
+        sparkConf.get(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE);
+    this.principalFields =
+        Arrays.stream(
+                sparkConf
+                    .get(
+                        GravitinoSparkConfig.GRAVITINO_TOKEN_PRINCIPAL_FIELDS,
+                        GravitinoSparkConfig.GRAVITINO_TOKEN_PRINCIPAL_FIELDS_DEFAULT)
+                    .split(ConnectorConstants.COMMA))
+            .map(String::trim)
+            .filter(field -> !field.isEmpty())
+            .collect(ImmutableList.toImmutableList());
+    this.clients =
+        Caffeine.newBuilder()
+            .ticker(ticker)
+            .maximumSize(
+                sparkConf.getInt(
+                    GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_MAX_SIZE,
+                    GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_MAX_SIZE_DEFAULT))
+            .expireAfterAccess(
+                Duration.ofSeconds(
+                    sparkConf.getLong(
+                        GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC,
+                        GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT)))
+            // An evicted client still owns an HTTP connection pool, so it must be closed.
+            .<GravitinoIdentity, GravitinoClient>removalListener(
+                (identity, client, cause) -> closeClient(identity, client))
+            .build();
+    this.gravitinoCatalogs =
+        Caffeine.newBuilder()
+            .ticker(ticker)
+            // A permission revoked in Gravitino must eventually stop being served from cache.
+            .expireAfterWrite(
+                Duration.ofSeconds(
+                    sparkConf.getLong(
+                        GravitinoSparkConfig.GRAVITINO_CATALOG_CACHE_TTL_SEC,
+                        GravitinoSparkConfig.GRAVITINO_CATALOG_CACHE_TTL_SEC_DEFAULT)))
+            .build();
   }
 
-  public static GravitinoCatalogManager create(Supplier<GravitinoClient> clientBuilder) {
+  /**
+   * Creates the singleton GravitinoCatalogManager.
+   *
+   * @param sparkConf the application Spark configuration, used to read the cache settings and, in
+   *     {@code token} mode, to resolve the bearer token of the current request
+   * @param applicationUser the user the Spark application runs as, recorded for diagnostics only
+   *     and never used to derive an identity
+   * @param clientBuilder builds a Gravitino client for a given identity
+   * @return the created GravitinoCatalogManager
+   */
+  public static GravitinoCatalogManager create(
+      SparkConf sparkConf,
+      String applicationUser,
+      Function<GravitinoIdentity, GravitinoClient> clientBuilder) {
+    return create(sparkConf, applicationUser, clientBuilder, Ticker.systemTicker());
+  }
+
+  @VisibleForTesting
+  static GravitinoCatalogManager create(
+      SparkConf sparkConf,
+      String applicationUser,
+      Function<GravitinoIdentity, GravitinoClient> clientBuilder,
+      Ticker ticker) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(clientBuilder);
+    gravitinoCatalogManager = new GravitinoCatalogManager(sparkConf, clientBuilder, ticker);
+    LOG.info(
+        "Created GravitinoCatalogManager for Spark user {} with auth type {}.",
+        applicationUser,
+        gravitinoCatalogManager.authType);
     return gravitinoCatalogManager;
   }
 
@@ -62,35 +157,169 @@ public class GravitinoCatalogManager {
   public void close() {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
-    gravitinoClient.close();
+    // Caffeine dispatches the removal listener asynchronously, so shutdown closes explicitly.
+    clients.asMap().forEach(GravitinoCatalogManager::closeClient);
+    clients.invalidateAll();
+    gravitinoCatalogs.invalidateAll();
+    applicationCatalogs = ImmutableMap.of();
     gravitinoCatalogManager = null;
   }
 
   public Catalog getGravitinoCatalogInfo(String name) {
     try {
-      return gravitinoCatalogs.get(name, catalogName -> loadCatalog(catalogName));
+      return getGravitinoCatalogInfo(currentIdentity(), name);
     } catch (Exception e) {
       LOG.error(String.format("Load catalog %s failed", name), e);
       throw new RuntimeException(e);
     }
   }
 
+  /**
+   * Returns the catalog for the given identity, loaded through that identity's current client.
+   *
+   * <p>Spark catalogs call this before every Gravitino request instead of keeping the returned
+   * catalog: the lookup resets the idle timer of the client's cache entry, and a catalog loaded
+   * through a client that has since been evicted and closed is loaded again through the current
+   * one.
+   *
+   * <p>Gravitino exceptions are thrown as is, so callers can still tell them apart.
+   *
+   * @param identity the identity the catalog is loaded for
+   * @param name the catalog name
+   * @return the catalog, bound to the identity's current client
+   */
+  Catalog getGravitinoCatalogInfo(GravitinoIdentity identity, String name) {
+    // Spark catalogs keep a reference to this manager, so fail instead of building a new client.
+    Preconditions.checkState(!isClosed, "GravitinoCatalogManager is already closed");
+    GravitinoClient client = getClient(identity);
+    String key = cacheKey(identity, name);
+    CachedCatalog cached =
+        gravitinoCatalogs.get(
+            key, k -> new CachedCatalog(client, loadCatalog(client, identity, name)));
+    if (cached.client != client) {
+      // Reload once per key: a caller that waited for another one's reload reuses its result.
+      cached =
+          gravitinoCatalogs
+              .asMap()
+              .compute(
+                  key,
+                  (k, current) ->
+                      current != null && current.client == client
+                          ? current
+                          : new CachedCatalog(client, loadCatalog(client, identity, name)));
+    }
+    return cached.catalog;
+  }
+
+  /**
+   * Loads the relational catalogs visible to the application identity. This runs at driver init,
+   * before any Spark session exists, so it never consults session state.
+   */
   public void loadRelationalCatalogs() {
-    Catalog[] catalogs = gravitinoClient.listCatalogsInfo();
-    Arrays.stream(catalogs)
-        .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
-        .forEach(catalog -> gravitinoCatalogs.put(catalog.name(), catalog));
+    GravitinoIdentity identity = applicationIdentity();
+    GravitinoClient client = getClient(identity);
+    Catalog[] catalogs = client.listCatalogsInfo();
+    Map<String, Catalog> relationalCatalogs =
+        Arrays.stream(catalogs)
+            .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
+            .collect(
+                Collectors.toMap(Catalog::name, catalog -> catalog, (first, second) -> second));
+    relationalCatalogs.forEach(
+        (name, catalog) ->
+            gravitinoCatalogs.put(cacheKey(identity, name), new CachedCatalog(client, catalog)));
+    this.applicationCatalogs = ImmutableMap.copyOf(relationalCatalogs);
   }
 
+  /**
+   * Returns the catalogs loaded by {@link #loadRelationalCatalogs()}, that is, the catalogs the
+   * application identity can see.
+   *
+   * @return the catalogs registered at driver startup, keyed by catalog name
+   */
   public Map<String, Catalog> getCatalogs() {
-    return gravitinoCatalogs.asMap();
+    return applicationCatalogs;
   }
 
-  private Catalog loadCatalog(String catalogName) {
-    Catalog catalog = gravitinoClient.loadCatalog(catalogName);
+  /**
+   * Resolves the identity of the caller. Outside {@code token} mode this is the application
+   * identity and no session state is consulted at all. In {@code token} mode the bearer token is
+   * read exactly as the request-time provider reads it, active session configuration first and
+   * application configuration second, and the identity is derived from that token alone.
+   *
+   * @return the identity of the current caller
+   */
+  GravitinoIdentity currentIdentity() {
+    if (!AuthProperties.isToken(authType)) {
+      return applicationIdentity();
+    }
+    return GravitinoIdentity.fromToken(
+        GravitinoDriverPlugin.resolveToken(sparkConf), principalFields);
+  }
+
+  @VisibleForTesting
+  GravitinoClient getClient(GravitinoIdentity identity) {
+    return clients.get(identity, clientBuilder);
+  }
+
+  private GravitinoIdentity applicationIdentity() {
+    return GravitinoIdentity.application(authType);
+  }
+
+  /**
+   * Resolves the Gravitino Iceberg REST server endpoint for this manager's metalake, if the server
+   * exposes one. The lookup is performed once and a successful response, including a response with
+   * no endpoint, is cached for the lifetime of this manager. Request failures are propagated.
+   *
+   * @return the discovered Iceberg REST endpoint, or empty if none is available
+   */
+  public Optional<String> getIcebergRestUri() {
+    if (icebergRestUri == null) {
+      synchronized (this) {
+        if (icebergRestUri == null) {
+          icebergRestUri = resolveIcebergRestUri();
+        }
+      }
+    }
+    return icebergRestUri;
+  }
+
+  private Optional<String> resolveIcebergRestUri() {
+    String metalakeName = sparkConf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
+    return getClient(applicationIdentity()).icebergRestServiceUri(metalakeName);
+  }
+
+  private static Catalog loadCatalog(
+      GravitinoClient client, GravitinoIdentity identity, String catalogName) {
+    Catalog catalog = client.loadCatalog(catalogName);
     Preconditions.checkArgument(
         Catalog.Type.RELATIONAL.equals(catalog.type()), "Only support relational catalog");
-    LOG.info("Load catalog {} from Gravitino successfully.", catalogName);
+    LOG.info("Load catalog {} from Gravitino successfully for {}.", catalogName, identity);
     return catalog;
+  }
+
+  private static String cacheKey(GravitinoIdentity identity, String catalogName) {
+    return identity.key() + ":" + catalogName;
+  }
+
+  private static void closeClient(GravitinoIdentity identity, GravitinoClient client) {
+    if (client == null) {
+      return;
+    }
+    try {
+      client.close();
+    } catch (Exception e) {
+      LOG.warn("Failed to close the Gravitino client of {}.", identity, e);
+    }
+  }
+
+  /** A catalog together with the client it was loaded through, which serves its requests. */
+  private static final class CachedCatalog {
+    private final GravitinoClient client;
+    private final Catalog catalog;
+
+    private CachedCatalog(GravitinoClient client, Catalog catalog) {
+      this.client = client;
+      this.catalog = catalog;
+    }
   }
 }

@@ -35,6 +35,8 @@ public class StatisticsUpdaterForTest implements StatisticsUpdater {
   public static final String NAME = "test-statistics-updater";
   private static final List<StatisticsUpdaterForTest> INSTANCES =
       Collections.synchronizedList(new ArrayList<>());
+  private final List<NameIdentifier> tableIdentifiers =
+      Collections.synchronizedList(new ArrayList<>());
   private final AtomicInteger tableUpdates = new AtomicInteger();
   private final AtomicInteger partitionUpdates = new AtomicInteger();
   private final AtomicInteger closeCalls = new AtomicInteger();
@@ -53,6 +55,10 @@ public class StatisticsUpdaterForTest implements StatisticsUpdater {
 
   public int tableUpdates() {
     return tableUpdates.get();
+  }
+
+  public List<NameIdentifier> tableIdentifiers() {
+    return new ArrayList<>(tableIdentifiers);
   }
 
   public int partitionUpdates() {
@@ -74,6 +80,7 @@ public class StatisticsUpdaterForTest implements StatisticsUpdater {
   @Override
   public void updateTableStatistics(
       NameIdentifier tableIdentifier, List<StatisticEntry<?>> tableStatistics) {
+    tableIdentifiers.add(tableIdentifier);
     tableUpdates.incrementAndGet();
   }
 

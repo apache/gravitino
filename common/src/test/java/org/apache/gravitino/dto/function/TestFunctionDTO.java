@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionImpl;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.json.JsonUtils;
@@ -289,5 +290,31 @@ public class TestFunctionDTO {
     Assertions.assertNull(deserialized.returnType());
     Assertions.assertEquals(2, deserialized.returnColumns().length);
     Assertions.assertEquals("id", deserialized.returnColumns()[0].name());
+  }
+
+  @Test
+  public void testLegacyUnparsedDataTypesRemainReadable() throws JsonProcessingException {
+    FunctionDTO function =
+        JsonUtils.objectMapper()
+            .readValue(
+                """
+                {
+                  "name": "legacy_function",
+                  "functionType": "SCALAR",
+                  "definitions": [{
+                    "parameters": [{"name": "input", "dataType": "legacy_parameter"}],
+                    "returnType": "legacy_return",
+                    "returnColumns": [{"name": "output", "dataType": "legacy_column"}]
+                  }]
+                }
+                """,
+                FunctionDTO.class);
+
+    FunctionDefinition definition = function.definitions()[0];
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_parameter"), definition.parameters()[0].dataType());
+    Assertions.assertEquals(Types.UnparsedType.of("legacy_return"), definition.returnType());
+    Assertions.assertEquals(
+        Types.UnparsedType.of("legacy_column"), definition.returnColumns()[0].dataType());
   }
 }

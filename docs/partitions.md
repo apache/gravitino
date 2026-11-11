@@ -62,8 +62,9 @@ arrives, which Iceberg calls hidden partitioning. There is no partition object t
 which is why Iceberg is not in the list above.
 
 Gravitino sets the spec when it creates the table. Identity, bucket, truncate, year, month, day, and
-hour transforms all convert to an Iceberg spec, with bucket limited to one field. List and range
-partitioning have no Iceberg equivalent and are rejected.
+hour transforms all convert to an Iceberg spec. Each bucket transform takes one field; a spec may
+contain multiple bucket transforms on different fields. List and range partitioning have no Iceberg
+equivalent and are rejected.
 
 After creation, partitioning is changed through the engine rather than through the Gravitino API.
 Point Spark, Trino, or another Iceberg client at the Iceberg REST catalog service, which listens on
@@ -94,8 +95,11 @@ Individual partitions are not listed, and adding or dropping one goes through th
 
 The display comes from the table itself, so it works for every relational catalog including Iceberg.
 An Iceberg table partitioned by `day(event_time)` shows that transform like any other table, because
-the partition spec is read back and presented in the same form. A count of zero means the table
-declares no partitioning rather than that partitions could not be read.
+the partition spec is read back and presented in the same form. A count of zero usually means the
+table declares no partitioning rather than that partitions could not be read. One exception is
+ClickHouse: a table whose `PARTITION BY` uses a native expression that Gravitino cannot structure
+shows zero partition fields, with the canonical expression preserved in the read-only `partition-key`
+property instead.
 
 ## Permissions
 

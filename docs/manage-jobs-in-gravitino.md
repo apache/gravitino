@@ -14,23 +14,23 @@ This page covers the Gravitino API for job templates and jobs. For what a templa
 relates to a run, and what the job statuses mean, see [Jobs](./jobs.md).
 
 Jobs run through a job executor, set with `gravitino.job.executor`. The default, `local`, launches
-the job as a process on the Gravitino server and is intended for testing. Running jobs anywhere else
-means implementing an executor. See
-[Custom job executor](./development/custom-job-executor.md).
+the job as a process on the Gravitino server and is intended for testing. The `k8s` job executor
+runs Spark jobs on Kubernetes. Running jobs anywhere else means implementing an executor. See
+[Job Executors](#job-executors).
 
 :::note
 1. The job system is still under development, so some features may not be fully
    implemented yet.
-2. The aim of the job system is not to replace the existing job executors. So, it can only
-   support running a single job at a time, and it doesn't support job scheduling for now.
+2. The aim of the job system is not to replace the existing job executors, and it doesn't
+   support job scheduling for now.
    :::
 
 ## Job Template Operations
 
 ### Register a Shell Template
 
-A shell template runs an executable. Placeholders in `arguments`, `environments`, and `customFields`
-are filled in when a job runs.
+A shell template runs an executable. Its placeholders are filled in with the job configuration when
+a job runs. See [Placeholders](#placeholders).
 
 ```json
 {
@@ -44,8 +44,36 @@ are filled in when a job runs.
 }
 ```
 
-`executable` and `scripts` must be reachable by the Gravitino server, which accepts local paths and
-HTTP, HTTPS, FTP, and FTPS URLs.
+`executable` and `scripts` are fetched by the local job executor, so they must be reachable by the
+Gravitino server, which accepts local paths and HTTP, HTTPS, FTP, and FTPS URLs.
+
+With the local job executor, each of them is fetched into the job's working directory under the
+file name of its path, so it must point to a file, and two different resources of a template must
+not share a file name: a run is rejected otherwise, instead of one file silently overwriting the
+other. The same applies to the `executable`, `jars`, `files` and `archives` of a Spark template.
+The Kubernetes job executor doesn't fetch the resources, see
+[Kubernetes Job Executor](./k8s-job-executor.md#job-resources).
+
+`executable` can also be a command name with no path, such as `python` or `bash`. Such a command is
+not fetched, it is looked up where the job runs: the `local` job executor looks it up on the `PATH`
+of the Gravitino server process, and setting `PATH` in `environments` doesn't change that. The
+scripts are still fetched next to it, into the job's working directory, so a template can run a
+script with an installed interpreter:
+
+```json
+{
+  "name": "python_report",
+  "jobType": "shell",
+  "executable": "python",
+  "arguments": ["report.py", "{{date}}"],
+  "scripts": ["https://repo.example.com/jobs/report.py"]
+}
+```
+
+A file name without a path, such as `run.sh`, is a command name too. Earlier versions fetched it as
+a file relative to the working directory of the Gravitino server; to run a file, write its absolute
+path or URI instead. To avoid running a different program than the one that was fetched, a run is
+rejected when a script has the same file name as a command-name `executable`.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -68,9 +96,13 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ### Register a Spark Template
 
-A Spark template submits an application. Running one with the local executor needs either
-`gravitino.jobExecutor.local.sparkHome` or `SPARK_HOME` set before the server starts, or the job
-fails to launch.
+A Spark template submits an application. What it needs depends on the job executor:
+
+- The local job executor needs a Spark installation on the Gravitino server, see
+  [Local Job Executor](./local-job-executor.md#requirements).
+- The Kubernetes job executor needs every resource of the template to be a URI that the cluster can
+  reach, such as `local://` for a file in the Spark image, `https://`, or `s3a://`, see
+  [Kubernetes Job Executor](./k8s-job-executor.md#job-resources).
 
 ```json
 {
@@ -83,6 +115,53 @@ fails to launch.
   "configs": {"spark.executor.memory": "4g"}
 }
 ```
+
+### Placeholders
+
+Any string in a template can contain placeholders: `executable`, `className`, the entries of
+`scripts`, `jars`, `files`, and `archives`, and the keys and values of `environments`, `configs`,
+and `customFields`. When a job runs, each placeholder is replaced with a value from the job
+configuration (`jobConf`).
+
+| Syntax              | Meaning                                                                                      |
+|---------------------|----------------------------------------------------------------------------------------------|
+| `{{name}}`          | Required. A run without a value for `name` is rejected.                                      |
+| `{{name:-default}}` | Optional. `default` is used when the job configuration has no value. It can be empty: `{{name:-}}`. |
+| `\{{`               | A literal `{{`, for example to pass `{{ds}}` to another tool. Written as `"\\{{"` in JSON.   |
+
+For example, a template with `"arguments": ["--date", "{{date}}", "--mode", "{{mode:-full}}"]` run
+with `{"date": "2026-09-22"}` passes `--date 2026-09-22 --mode full` to the job.
+
+:::caution
+Templates registered before Gravitino supported default values could pass an unresolved
+placeholder through to the job as literal text, which is how templates carried another tool's
+syntax, such as `{{ds}}` or `{{.Values.image}}`. A placeholder with no value is now a required
+parameter, so those runs are rejected. Escape such text as `\{{ds}}`, or give the parameter a
+default value.
+:::
+
+- A value in the job configuration is used as is, including an empty string `""`. A `null` value
+  counts as no value. Values are never scanned for placeholders.
+- A default declared on one occurrence of a parameter applies to all of its occurrences. A
+  template that gives the same parameter different defaults is rejected when it is registered or
+  updated.
+- A default value is used as is and can span lines, but its braces must be balanced, so the
+  placeholder ends at the first `}}` outside of them. This makes a JSON object a valid default, for
+  example `{{options:-{"k":"v"}}}`. A default with unbalanced braces, such as `{{options:-{}}`, is
+  rejected when the template is registered or updated.
+- If any required parameter has no value, the run request fails with an error that lists all the
+  missing parameters. No job is created and no file is downloaded.
+- Keys in the job configuration that the template does not use are ignored, and the server logs a
+  warning.
+- A placeholder name can contain ASCII letters, digits, `_`, `.`, and `-`. Text such as
+  `{{ name }}`, with spaces, is not a placeholder and is passed through as is.
+- Only `{{` needs escaping. A placeholder always starts with `{{`, so `}}` on its own is plain
+  text. A value that ends with a backslash right before a placeholder doubles it, as in
+  `\\{{name}}`, which keeps one backslash and still resolves the placeholder. A backslash anywhere
+  else is plain text.
+- A placeholder whose default value contains braces cannot be immediately followed by a literal
+  `}`, because it is then unclear which `}}` closes it. Put the whole structure in the default
+  value, or insert a space. A default value without braces, such as `{"k":{{v:-1}}}`, is fine.
 
 ### List, Get, and Delete Templates
 
@@ -180,6 +259,40 @@ job = client.run_job(
 </TabItem>
 </Tabs>
 
+Gravitino records a job as `QUEUED` and sets its initial owner before handing it to the job executor.
+A recovered job therefore keeps the permissions of its original submitter. If the execution id is
+not recorded within three times `gravitino.job.statusPullIntervalInMs`, another server, or the same
+server after a restart, looks the job up in the runner. A found execution is tracked, or cancelled
+if the job is `CANCELLING`. Otherwise the job is settled as `FAILED`, or `CANCELLED` if it is
+`CANCELLING`. A failed lookup is retried in the next pull. The `k8s` executor finds a job while its
+name prefix and namespace configuration remain unchanged. The local executor finds none, as the job
+state is lost with the server that submitted it.
+
+Invalid input and a rejected submission remove the job. For the `k8s` executor, a failed submission
+with an unknown outcome, such as a lost response after the runner accepted it, keeps the job as
+`CANCELLING`, so an execution found for it later is cancelled, and the job is then settled as
+`CANCELLED`. If the store cannot record the cancellation, the job is still kept and may be tracked
+as running. The error identifies the job: check it before retrying, since retrying a run request
+creates a new job. The `k8s` executor also attempts immediate cleanup, and logs a manual `kubectl`
+remedy if that fails. With a job executor that can't find a job, such as the local executor, any
+failed submission removes the job.
+
+Cancelling a job during submission persists `CANCELLING`. Once an execution is recorded, Gravitino
+cancels it and retries temporary cancellation failures during status pulls. Repeating the cancel
+request also retries cancellation without resetting its timeout. An executor that has acknowledged
+an asynchronous cancellation by reporting `CANCELLING` is monitored until it finishes.
+
+:::caution
+With several Gravitino servers, use the same `gravitino.job.statusPullIntervalInMs` and keep their
+clocks in sync. The entire registration-to-recording phase must fit within three pull intervals.
+Otherwise another server may settle the job, and cancellation of a late submission is attempted
+before its run request fails. Cancellation cannot undo completed work. If the job was already
+settled and this late cancellation fails, check the execution in the runner before retrying.
+`gravitino.job.stagingDirKeepTimeInMs` must also be longer than preparing, submitting, queueing and
+running a job of the local executor, as described in
+[Local Job Executor](./local-job-executor.md#multiple-servers-and-restarts).
+:::
+
 ### List Jobs, Get a Job, and Cancel
 
 Listing can be filtered to one template. A job is identified by its id, and cancelling is a `POST`
@@ -223,40 +336,109 @@ cancelling = client.cancel_job(job_id)
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
 
+A job carries three timestamps:
+
+- `queuedAt`: when Gravitino submitted the job to the job executor.
+- `startedAt`: when the job started executing.
+- `finishedAt`: when the job finished.
+
+Gravitino pulls job statuses from the job executor every `gravitino.job.statusPullIntervalInMs`,
+so a job's status can lag behind by up to this interval. The timestamps usually don't lag: the local
+and Kubernetes job executors report when each job actually started and finished, even for a job that
+starts and finishes between two pulls. A job executor that doesn't report these times gets the time
+Gravitino first observes the job running or finished instead. In that case, a job that finishes
+between two pulls has no `startedAt`.
+
+For the cases in which the actual times are lost, see
+[Local Job Executor](./local-job-executor.md#job-output-and-times) and
+[Kubernetes Job Executor](./k8s-job-executor.md#job-output-and-times).
+
+### Get a Job's Output
+
+A job's captured stdout/stderr can be fetched alongside its metadata by asking for it explicitly.
+Output is fetched live from the job executor on every call rather than stored in Gravitino, so it's
+only included when requested - a plain `getJob`/`get_job` call, or `listJobs`/`list_jobs`, never
+returns it.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+JobHandle job = client.getJob(jobId, true);
+List<String> stdout = job.stdout();
+List<String> stderr = job.stderr();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+job = client.get_job(job_id, include_output=True)
+stdout = job.stdout()
+stderr = job.stderr()
+```
+
+</TabItem>
+</Tabs>
+
+Output is only kept for as long as the job executor retains it: the local job executor keeps it in
+the job's staging directory, and the Kubernetes job executor reads it from the driver pod of the
+job. See [Local Job Executor](./local-job-executor.md#job-output-and-times) and
+[Kubernetes Job Executor](./k8s-job-executor.md#job-output-and-times).
+What's returned is always the tail of the output (the most recent content), capped
+by `gravitino.job.outputMaxLines` (line count) and `gravitino.job.outputMaxBytes` (byte size),
+whichever limit is hit first.
+
+The REST API also accepts `outputMaxLines`/`outputMaxBytes` query parameters to request less output
+than these global caps for a single call (e.g. a quick check that doesn't need the full 1000
+lines) - a value larger than the global cap is clamped down to it, so the global configuration
+always remains a hard upper bound:
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://localhost:8090/api/metalakes/example/jobs/runs/{job_id}?includeOutput=true&outputMaxLines=50&outputMaxBytes=8192"
+```
+
 ### Job System Configuration
 
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
-| Property name                          | Description                                                                       | Default value                 | Required |
-|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|
-| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       |
-| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
-| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
-| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
+| Property name                          | Description                                                                                                                                                                                                                    | Default value                 | Required |
+|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs. With the local job executor, it must be shared by all servers in a multi-server deployment, see [Local Job Executor](./local-job-executor.md#job-output-and-times) | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs, see [Job Executors](#job-executors)                                                                                                                                                  | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed                                                                                                                                              | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor                                                                                                                                                      | `300000` (5 minutes)          | No       |
+| `gravitino.job.outputMaxLines`         | The maximum number of lines returned when fetching a job's stdout/stderr output                                                                                                                                                | `1000`                        | No       |
+| `gravitino.job.outputMaxBytes`         | The maximum number of bytes returned from the tail of a job's stdout/stderr output                                                                                                                                             | `262144` (256KB)              | No       |
 
+## Job Executors
 
-#### Configurations for Local Job Executor
+A job executor decides where the jobs run. Set it with `gravitino.job.executor`:
 
-The local job executor is used for testing and development purposes, it runs the job in the local process.
-The following are the default configurations for the local job executor:
+| Job executor | Jobs run as                                                      | Job types    | Intended for            | Configuration                                    |
+|--------------|------------------------------------------------------------------|--------------|-------------------------|--------------------------------------------------|
+| `local`      | Processes on the Gravitino server                                | Shell, Spark | Testing and development | [Local Job Executor](./local-job-executor.md)    |
+| `k8s`        | `SparkApplication` resources of the Spark operator on Kubernetes | Spark        | Production              | [Kubernetes Job Executor](./k8s-job-executor.md) |
 
-| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+To run jobs anywhere else, implement a
+[custom job executor](./development/custom-job-executor.md).
 
 ## Future Work
 
 The job system still needs more work:
 
-1. Support modification of job templates.
-2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job
-   executor.
-3. Support more job templates, like Python, SQL, etc.
-4. Support more job executors, like Apache Airflow, Apache Livy, etc.
-5. Support uploading job template related artifacts to the Gravitino server, also support
+1. Support more job templates, like Python, SQL, etc.
+2. Support more job executors, like Apache Airflow, Apache Livy, etc.
+3. Support uploading job template related artifacts to the Gravitino server, also support
    downloading the artifacts from more distributed file systems like HDFS, S3, etc.
-6. Support job scheduling, like running jobs periodically, or based on some events.
+4. Support job scheduling, like running jobs periodically, or based on some events.

@@ -18,17 +18,5 @@
  */
 package org.apache.gravitino.spark.connector.glue;
 
-import java.util.Set;
-import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
-import org.apache.spark.sql.connector.catalog.Identifier;
-import org.apache.spark.sql.connector.catalog.Table;
-import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
-
 /** Spark 3.5 specific Gravitino Glue catalog implementation. */
-public class GravitinoGlueCatalogSpark35 extends GravitinoGlueCatalogSpark34 {
-  @Override
-  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
-      throws NoSuchTableException {
-    return loadTableForWriting(ident);
-  }
-}
+public class GravitinoGlueCatalogSpark35 extends GravitinoGlueCatalog {}

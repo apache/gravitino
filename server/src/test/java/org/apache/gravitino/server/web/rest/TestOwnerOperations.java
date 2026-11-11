@@ -50,6 +50,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -93,7 +94,12 @@ class TestOwnerOperations extends BaseOperationsTest {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "accessControlDispatcher", accessControlDispatcher, true);
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalAccessControlDispatcher",
+        accessControlDispatcher,
+        true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -117,6 +123,32 @@ class TestOwnerOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  /** Hides internal tags from owner reads and writes. */
+  @Test
+  void testInternalTagOwnershipIsHidden() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    String path = "/metalakes/metalake1/owners/tag/GRAVITINO_HIDDEN_123";
+    try (Response get =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .get();
+        Response set =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new OwnerSetRequest("user", Owner.Type.USER)))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), get.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), set.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
   }
 
   @Test
@@ -211,6 +243,41 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testGetOwnerForDisabledMetalake() throws IOException {
+    Mockito.doReturn(Optional.empty()).when(manager).getOwner(any(), any());
+    when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
+
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(false);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+
+    Response response =
+        target("/metalakes/metalake1/owners/metalake/metalake1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    OwnerResponse ownerResponse = response.readEntity(OwnerResponse.class);
+    Assertions.assertEquals(0, ownerResponse.getCode());
+    Assertions.assertNull(ownerResponse.getOwner());
+
+    Response childResponse =
+        target("/metalakes/metalake1/owners/catalog/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), childResponse.getStatus());
+    ErrorResponse errorResponse = childResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.NOT_IN_USE_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        MetalakeNotInUseException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
   void testSetOwnerForObject() throws IOException {
     when(metalakeDispatcher.metalakeExists(any())).thenReturn(true);
 
@@ -278,6 +345,17 @@ class TestOwnerOperations extends BaseOperationsTest {
             .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
     ErrorResponse errorResponse3 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse3.getCode());
+  }
+
+  @Test
+  public void testSetOwnerForObjectWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/owners/metalake/metalake1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test
