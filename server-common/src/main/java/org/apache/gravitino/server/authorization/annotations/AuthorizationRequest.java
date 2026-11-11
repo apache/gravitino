@@ -34,6 +34,8 @@ public @interface AuthorizationRequest {
     RUN_JOB,
     LINEAGE,
     LOAD_TABLE,
+    /** Loads a view with authorized existence probing. */
+    LOAD_VIEW,
     CREATE_SCHEMA,
     TEST_CATALOG_CONNECTION
   }

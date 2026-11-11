@@ -28,6 +28,7 @@ import com.azure.storage.file.datalake.models.UserDelegationKey;
 import com.azure.storage.file.datalake.sas.DataLakeServiceSasSignatureValues;
 import com.azure.storage.file.datalake.sas.PathSasPermission;
 import java.io.IOException;
+import java.net.URI;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -131,7 +132,7 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     }
 
     List<ADLSLocationUtils.ADLSLocationParts> parsedLocations =
-        paths.stream().map(ADLSLocationUtils::parseLocation).collect(Collectors.toList());
+        paths.stream().map(ADLSTokenGenerator::parseSupportedLocation).collect(Collectors.toList());
     ADLSLocationUtils.ADLSLocationParts first = parsedLocations.get(0);
     boolean hasDifferentScope =
         parsedLocations.stream()
@@ -173,6 +174,20 @@ public class ADLSTokenGenerator implements CredentialGenerator<ADLSTokenCredenti
     }
 
     return rootLocations.get(0);
+  }
+
+  private static ADLSLocationUtils.ADLSLocationParts parseSupportedLocation(String path) {
+    URI uri = URI.create(path);
+    if (!"abfs".equalsIgnoreCase(uri.getScheme()) && !"abfss".equalsIgnoreCase(uri.getScheme())) {
+      throw new IllegalArgumentException(
+          "adls-token requires an abfs or abfss location; unsupported location: " + path);
+    }
+    ADLSLocationUtils.ADLSLocationParts location = ADLSLocationUtils.parseLocation(path);
+    if (!(location.getAccountName() + "." + ADLSTokenCredential.ADLS_DOMAIN)
+        .equalsIgnoreCase(uri.getHost())) {
+      throw new IllegalArgumentException("Invalid ADLS storage account in location: " + path);
+    }
+    return location;
   }
 
   private static boolean isDescendantOf(

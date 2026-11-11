@@ -18,16 +18,26 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
 import org.apache.gravitino.maintenance.jobs.BuiltInJob;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
+import org.apache.iceberg.Snapshot;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Built-in job for expiring old snapshots from Iceberg tables.
@@ -35,11 +45,16 @@ import org.apache.spark.sql.SparkSession;
  * <p>This job leverages Iceberg's ExpireSnapshots procedure to remove snapshot metadata and
  * associated data files that are no longer needed, preventing unbounded metadata growth.
  */
-public class IcebergExpireSnapshotsJob implements BuiltInJob {
+public class IcebergExpireSnapshotsJob implements BuiltInJob, IcebergMaintenanceAction {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergExpireSnapshotsJob.class);
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-expire-snapshots";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v1";
+
+  /** Full table inventory captured before expire; used to compute S1 set-diff. */
+  @Nullable private PreExpireData preExpireData;
 
   @Override
   public SparkJobTemplate jobTemplate() {
@@ -49,7 +64,7 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         .withExecutable(resolveExecutable(IcebergExpireSnapshotsJob.class))
         .withClassName(IcebergExpireSnapshotsJob.class.getName())
         .withArguments(buildArguments())
-        .withConfigs(buildSparkConfigs())
+        .withConfigs(IcebergSparkConfigUtils.buildTemplateSparkConfigs())
         .withCustomFields(
             Collections.singletonMap(JobTemplateProvider.PROPERTY_VERSION_KEY, VERSION))
         .build();
@@ -139,7 +154,6 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         for (Map.Entry<String, String> entry : customConfigs.entrySet()) {
           sparkBuilder.config(entry.getKey(), entry.getValue());
         }
-        System.out.println("Applied custom Spark configurations: " + customConfigs);
       } catch (IllegalArgumentException e) {
         System.err.println("Error: " + e.getMessage());
         printUsage();
@@ -151,18 +165,10 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
 
     try {
-      // Build the procedure call SQL
-      String sql =
-          buildProcedureCall(catalogName, tableIdentifier, olderThan, retainLast, streamResults);
-
-      System.out.println("Executing Iceberg expire_snapshots procedure: " + sql);
-
-      // Execute the procedure
-      Row[] results = (Row[]) spark.sql(sql).collect();
-
-      // Print results
-      if (results.length > 0) {
-        Row result = results[0];
+      List<Row> results =
+          execute(spark, catalogName, tableIdentifier, olderThan, retainLast, streamResults);
+      if (!results.isEmpty()) {
+        Row result = results.get(0);
         System.out.printf(
             "Expire Snapshots Results:%n"
                 + "  Deleted data files: %d%n"
@@ -179,6 +185,84 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
     } finally {
       spark.stop();
     }
+  }
+
+  /**
+   * Runs {@code expire_snapshots} on an existing Spark session. Shared by CLI {@link #main} and TMS
+   * {@link #executeAndCollectAfter}.
+   *
+   * @return procedure result rows
+   */
+  static List<Row> execute(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      @Nullable String olderThan,
+      @Nullable String retainLast,
+      boolean streamResults) {
+    validateRetainLast(retainLast);
+    String sql =
+        buildProcedureCall(catalogName, tableIdentifier, olderThan, retainLast, streamResults);
+    LOG.info("Executing Iceberg expire_snapshots: {}", sql);
+    return spark.sql(sql).collectAsList();
+  }
+
+  @Override
+  public boolean hasBeforeMetrics() {
+    return true;
+  }
+
+  @Override
+  public TableSnapshotMetrics collectBeforeMetrics(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    long snapshotId = IcebergJobUtils.requireCurrentSnapshotId(spark, catalogName, tableIdentifier);
+    preExpireData = collectTableData(spark, catalogName, tableIdentifier);
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(
+        IcebergSnapshotExpirationContent.SNAPSHOT_NUMBER_METRIC, preExpireData.snapshotCount());
+    return TableSnapshotMetrics.of(snapshotId, metrics);
+  }
+
+  @Override
+  public boolean shouldCheckSnapshotDrift() {
+    return false;
+  }
+
+  @Override
+  public TableSnapshotMetrics executeAndCollectAfter(
+      SparkSession spark,
+      String catalogName,
+      String tableIdentifier,
+      Map<String, String> argsByName,
+      @Nullable TableSnapshotMetrics before) {
+    List<Row> results =
+        execute(
+            spark,
+            catalogName,
+            tableIdentifier,
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("older-than")),
+            IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("retain-last")),
+            parseStreamResults(
+                IcebergJobUtils.nullIfUnresolvedPlaceholder(argsByName.get("stream-results"))));
+    if (!results.isEmpty()) {
+      LOG.info(
+          "Expire snapshots deleted data/manifest/manifest-list files: {}/{}/{}",
+          results.get(0).getLong(0),
+          results.get(0).getLong(1),
+          results.get(0).getLong(2));
+    }
+    PreExpireData after = collectTableData(spark, catalogName, tableIdentifier);
+    PreExpireData beforeData = preExpireData == null ? after : preExpireData;
+    preExpireData = null;
+    Map<String, Object> metrics = new HashMap<>();
+    metrics.put(
+        IcebergSnapshotExpirationContent.EXPIRED_SNAPSHOT_NUMBER_METRIC,
+        snapshotsCleared(beforeData.snapshotIds(), after.snapshotIds()));
+    metrics.put(
+        IcebergSnapshotExpirationContent.EXPIRED_FILE_SIZE_METRIC,
+        bytesReclaimed(beforeData.fileSizesByPath(), after.fileSizesByPath()));
+    return TableSnapshotMetrics.of(
+        IcebergJobUtils.currentSnapshotIdOrEmpty(spark, catalogName, tableIdentifier), metrics);
   }
 
   /**
@@ -270,39 +354,33 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
 
   /** Print usage information. */
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergExpireSnapshotsJob [OPTIONS]\n"
-            + "\n"
-            + "Required Options:\n"
-            + "  --catalog <name>          Iceberg catalog name registered in Spark\n"
-            + "  --table <identifier>      Fully qualified table name (e.g., db.table_name)\n"
-            + "\n"
-            + "Optional Options:\n"
-            + "  --older-than <timestamp>  Expire snapshots older than this timestamp\n"
-            + "                              Example: '2024-01-01 00:00:00'\n"
-            + "                              Default: 5 days ago (Iceberg default)\n"
-            + "  --retain-last <count>     Number of most recent snapshots to retain\n"
-            + "                              Must be a positive integer (>= 1)\n"
-            + "                              Default: 1 (Iceberg default)\n"
-            + "  --stream-results [bool]   Stream intermediate delete results (true or false)\n"
-            + "                              A bare --stream-results means true\n"
-            + "  --spark-conf <json>       JSON map of custom Spark configurations\n"
-            + "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'\n"
-            + "                              Note: Overriding required catalog/extensions/app-name configs is unsupported\n"
-            + "\n"
-            + "Examples:\n"
-            + "  # Basic expire with defaults (5 days, retain 1)\n"
-            + "  --catalog iceberg_prod --table db.sample\n"
-            + "\n"
-            + "  # Expire snapshots older than a specific date\n"
-            + "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'\n"
-            + "\n"
-            + "  # Retain the last 5 snapshots\n"
-            + "  --catalog iceberg_prod --table db.sample --retain-last 5\n"
-            + "\n"
-            + "  # Expire with all options and streaming\n"
-            + "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\\n"
-            + "    --retain-last 3 --stream-results");
+    IcebergJobUtils.printCliUsage(
+        IcebergExpireSnapshotsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Fully qualified table name (e.g., db.table_name)"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --older-than <timestamp>  Expire snapshots older than this timestamp",
+            "                              Example: '2024-01-01 00:00:00'",
+            "                              Default: 5 days ago (Iceberg default)",
+            "  --retain-last <count>     Number of most recent snapshots to retain",
+            "                              Must be a positive integer (>= 1)",
+            "                              Default: 1 (Iceberg default)",
+            "  --stream-results [bool]   Stream intermediate delete results (true or false)",
+            "                              A bare --stream-results means true"),
+        ImmutableList.of(
+            "  # Basic expire with defaults (5 days, retain 1)",
+            "  --catalog iceberg_prod --table db.sample",
+            "",
+            "  # Expire snapshots older than a specific date",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-01-01 00:00:00'",
+            "",
+            "  # Retain the last 5 snapshots",
+            "  --catalog iceberg_prod --table db.sample --retain-last 5",
+            "",
+            "  # Expire with all options and streaming",
+            "  --catalog iceberg_prod --table db.sample --older-than '2024-06-01 00:00:00' \\",
+            "    --retain-last 3 --stream-results"));
   }
 
   /**
@@ -326,12 +404,111 @@ public class IcebergExpireSnapshotsJob implements BuiltInJob {
         "{{spark_conf:-}}");
   }
 
+  // -------------------------------------------------------------------------
+  // TMS metrics helpers (not used by CLI {@link #main})
+  // -------------------------------------------------------------------------
+
   /**
-   * Build Spark configuration template.
-   *
-   * @return map of Spark configuration keys to template values
+   * Full table inventory before expire (all snapshot ids and reachable files). Used with a
+   * post-expire capture to compute S1 set-diff. Concurrent commits only add ids/paths to the after
+   * set; cleared/expired count ids/paths that disappeared. File sizes stay in memory for S1 and are
+   * not reported in S0 metrics.
    */
-  private static Map<String, String> buildSparkConfigs() {
-    return IcebergSparkConfigUtils.buildTemplateSparkConfigs();
+  @VisibleForTesting
+  static final class PreExpireData {
+    private final Set<Long> snapshotIds;
+    private final Map<String, Long> fileSizesByPath;
+
+    PreExpireData(Set<Long> snapshotIds, Map<String, Long> fileSizesByPath) {
+      this.snapshotIds = Collections.unmodifiableSet(new HashSet<>(snapshotIds));
+      this.fileSizesByPath = Collections.unmodifiableMap(new HashMap<>(fileSizesByPath));
+    }
+
+    Set<Long> snapshotIds() {
+      return snapshotIds;
+    }
+
+    Map<String, Long> fileSizesByPath() {
+      return fileSizesByPath;
+    }
+
+    long snapshotCount() {
+      return snapshotIds.size();
+    }
+  }
+
+  @VisibleForTesting
+  static long snapshotsCleared(Set<Long> beforeSnapshotIds, Set<Long> afterSnapshotIds) {
+    long cleared = 0L;
+    for (Long snapshotId : beforeSnapshotIds) {
+      if (!afterSnapshotIds.contains(snapshotId)) {
+        cleared++;
+      }
+    }
+    return cleared;
+  }
+
+  @VisibleForTesting
+  static long bytesReclaimed(Map<String, Long> beforeFileSizes, Map<String, Long> afterFileSizes) {
+    long bytes = 0L;
+    for (Map.Entry<String, Long> entry : beforeFileSizes.entrySet()) {
+      if (!afterFileSizes.containsKey(entry.getKey())) {
+        bytes += entry.getValue() == null ? 0L : entry.getValue();
+      }
+    }
+    return bytes;
+  }
+
+  /**
+   * Collects full table data (snapshot ids + reachable files) for TMS set-diff. CLI entry points
+   * never call this.
+   *
+   * <p>Uses {@code all_files} metadata SQL (same style as compaction's {@code files} SQL) plus
+   * Iceberg snapshot ids.
+   */
+  @VisibleForTesting
+  static PreExpireData collectTableData(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Set<Long> snapshotIds = new HashSet<>();
+    for (Snapshot snapshot :
+        IcebergJobUtils.loadIcebergTable(spark, catalogName, tableIdentifier).snapshots()) {
+      snapshotIds.add(snapshot.snapshotId());
+    }
+    String sql = buildReachableContentFilesSql(catalogName, tableIdentifier);
+    List<Row> rows = spark.sql(sql).collectAsList();
+    Map<String, Long> fileSizesByPath = new HashMap<>(rows.size());
+    for (Row row : rows) {
+      String path = row.getAs("file-path");
+      if (path == null || path.isEmpty()) {
+        continue;
+      }
+      Number size = row.getAs("file-size");
+      fileSizesByPath.put(path, size == null ? 0L : size.longValue());
+    }
+    return new PreExpireData(snapshotIds, fileSizesByPath);
+  }
+
+  /**
+   * Distinct content files still referenced by any tracked snapshot. {@code GROUP BY file_path}
+   * avoids double-counting files that appear in multiple snapshots.
+   */
+  @VisibleForTesting
+  static String buildReachableContentFilesSql(String catalogName, String tableIdentifier) {
+    String[] levels = tableIdentifier.split("\\.");
+    if (levels.length != 2) {
+      throw new IllegalArgumentException(
+          "table_identifier must use schema.table format, but got: " + tableIdentifier);
+    }
+    String metadataTable =
+        IcebergJobUtils.escapeSqlIdentifier(catalogName)
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier(levels[0])
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier(levels[1])
+            + "."
+            + IcebergJobUtils.escapeSqlIdentifier("all_files");
+    return "SELECT file_path AS `file-path`, MAX(file_size_in_bytes) AS `file-size` FROM "
+        + metadataTable
+        + " GROUP BY file_path";
   }
 }

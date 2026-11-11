@@ -50,9 +50,11 @@ finished; Java file operations also require the calling method to handle or decl
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.semantic.DataType;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.DialectExpression;
@@ -67,10 +69,12 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
     .withMetalake("example").build()) {
-  SemanticModelCatalog models = client.loadCatalog("sales").asSemanticModelCatalog();
+  Catalog catalog = client.loadCatalog("sales");
+  SemanticModelCatalog models = catalog.asSemanticModelCatalog();
   NameIdentifier ident = NameIdentifier.of("mart", "sales_model");
 
   // Run the Java operation examples here.
@@ -98,7 +102,8 @@ from gravitino.namespace import Namespace
 
 client = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
 try:
-    models = client.load_catalog("sales").as_semantic_model_catalog()
+    catalog = client.load_catalog("sales")
+    models = catalog.as_semantic_model_catalog()
     ident = NameIdentifier.of("mart", "sales_model")
 
     # Run the Python operation examples here.
@@ -297,6 +302,90 @@ identifiers = models.list_semantic_models(Namespace.of("mart"))
 REST identifiers include the namespace `["example", "sales", "mart"]`. SDK identifiers are relative
 to the loaded catalog, such as `mart.sales_model`.
 
+### Find Semantic Model Datasets by Source
+
+A table or View can list its directly associated datasets across catalogs and schemas in the same
+metalake. The caller needs access to the source metadata. Results include only datasets from models
+the caller can load, with the same catalog and schema access requirements as loading those models.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  http://localhost:8090/api/metalakes/example/objects/table/sales.mart.orders/semantic-model-datasets
+```
+
+Use `view` instead of `table` for a View, and URL-encode the source's `catalog.schema.name` path
+component when needed. Other source types are rejected.
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+Table source = catalog.asTableCatalog().loadTable(NameIdentifier.of("mart", "orders"));
+NameIdentifier[] datasets = source.supportsSemanticModels().listSemanticModelDatasets();
+// A View returned by catalog.asViewCatalog().loadView(...) exposes the same capability.
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+source = catalog.as_table_catalog().load_table(NameIdentifier.of("mart", "orders"))
+datasets = source.supports_semantic_models().list_semantic_model_datasets()
+# A View returned by catalog.as_view_catalog().load_view(...) exposes the same capability.
+```
+
+</TabItem>
+</Tabs>
+
+All three APIs return fully qualified identifiers, including the metalake and catalog. For example:
+
+```json
+{
+  "code": 0,
+  "identifiers": [
+    {"namespace": ["example", "sales", "mart", "sales_model"], "name": "orders"}
+  ]
+}
+```
+
+* Each identifier's namespace is `[metalake, catalog, schema, semanticModel]`; `name` is the exact
+  dataset alias in the model. Several datasets in one model can reference the same source and each
+  appears separately. Preserve these components: a dataset name such as `orders.raw` is one name.
+* Results are unique and sorted by namespace components, then dataset name, comparing each component
+  case-sensitively by UTF-16 code units. Clients preserve that server order. An
+  existing source with no visible matches returns an empty array. Missing sources and failed
+  queries return errors.
+* To list models only, derive model identifiers from the dataset namespaces and remove duplicates.
+  In Java, use `NameIdentifier.of(dataset.namespace().levels())`; in Python, use
+  `NameIdentifier.of(*dataset.namespace().levels())`. Select each result's catalog before loading
+  its model through the catalog-scoped API.
+
+Associations are stored atomically with a model definition. Creating or importing a model, and
+explicitly replacing its definition, binds each dataset to the registered source ID resolved during
+source validation. A replacement refreshes the binding even if the definition text is unchanged.
+Model rename, comment, and property updates preserve existing bindings.
+
+The lookup has these limits:
+
+* **Source names can drift.** Renaming a source while preserving its registered ID retains the
+  association, but does not rewrite `Dataset.source`. Inspect and explicitly replace affected model
+  definitions when repairing references; a match does not prove that a model can execute.
+* **Source name reuse does not transfer associations.** Dropping and recreating a source gives it a
+  different ID. The new source has no inherited matches. Explicitly replace a model's definition
+  to validate and bind it to the new source, if that is the intended reference.
+* **Only current direct associations are indexed.** View dependencies are not followed, and old
+  model snapshots do not retain historical associations. Models written before this feature have
+  no indexed bindings until an authorized definition replacement; there is no automatic backfill.
+* **Source addressing uses the existing object API format.** Literal dots in source namespace
+  components have the same ambiguity as other metadata-object relationship routes. Dataset names
+  in the response do not have that restriction.
+
+For MCP usage, see the
+[`list_semantic_model_datasets` tool](./gravitino-mcp-server.md#semantic-models).
+
 ### Load a Semantic Model
 
 Load returns the stored definition, properties, comment, and audit information.
@@ -325,6 +414,144 @@ loaded = models.load_semantic_model(ident)
 
 </TabItem>
 </Tabs>
+
+### Discover Metrics in a Schema
+
+Use schema-level metric discovery to find metrics across the current definitions of Semantic
+Models in one schema. You can list identifiers or retrieve complete metric definitions without
+first listing and loading each model. These examples use the `total_revenue` metric in
+`mart.sales_model` created above, before importing any other models.
+
+#### List Metric Identifiers
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  'http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-model-metrics'
+```
+
+The default is `details=false`; only `true` (case-insensitive) enables complete metric definitions.
+If `sales_model` is the only model with metrics in this schema, the default response is:
+
+```json
+{
+  "code": 0,
+  "identifiers": [
+    {
+      "namespace": ["example", "sales", "mart", "sales_model"],
+      "name": "total_revenue"
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+NameIdentifier[] metricIdentifiers = models.listMetrics(Namespace.of("mart"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+metric_identifiers = models.list_metrics(Namespace.of("mart"))
+```
+
+</TabItem>
+</Tabs>
+
+Metric names are unique within a model. Two models can both define `total_revenue`; use the
+namespace together with the metric name to distinguish them.
+
+| Interface | Namespace in each result | Metric name |
+|-----------|--------------------------|-------------|
+| REST | `["example", "sales", "mart", "sales_model"]` | `total_revenue` |
+| Java / Python, using the loaded `sales` catalog | `["mart", "sales_model"]` | `total_revenue` |
+
+The SDK methods accept a schema namespace, such as `Namespace.of("mart")`. Do not include the
+metalake, catalog, or model in that argument.
+
+#### Retrieve Metric Definitions
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
+  'http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-model-metrics?details=true'
+```
+
+For the same model, the response is:
+
+```json
+{
+  "code": 0,
+  "metrics": [
+    {
+      "namespace": ["example", "sales", "mart", "sales_model"],
+      "metric": {
+        "name": "total_revenue",
+        "expression": {
+          "dialects": [
+            {"dialect": "ANSI_SQL", "expression": "SUM(orders.order_amount)"}
+          ]
+        },
+        "datatype": "Decimal"
+      }
+    }
+  ]
+}
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+SemanticModelMetric[] metricInfos = models.listMetricInfos(Namespace.of("mart"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+metric_infos = models.list_metric_infos(Namespace.of("mart"))
+```
+
+</TabItem>
+</Tabs>
+
+Each SDK result exposes `namespace()` and `metric()`. The metric contains its name, expression,
+and any stored data type, description, AI context, or custom extensions. To construct its identifier,
+use `NameIdentifier.of(info.namespace(), info.metric().name())` in Java or
+`NameIdentifier.builder(info.namespace(), info.metric().name())` in Python.
+
+#### Ordering, Visibility, and Updates
+
+Both listing modes sort results by the containing model's identifier and then by case-sensitive
+metric name. Models without metrics contribute no entries. If there are no visible metrics, REST
+returns an empty `identifiers` or `metrics` array and the SDKs return an empty array or list.
+
+With authorization enabled, discovery requires access to the parent catalog and schema. It
+includes metrics only from models the caller can discover through `USE_SEMANTIC_MODEL`,
+`MODIFY_SEMANTIC_MODEL`, or ownership, as described in
+[Ownership and Privileges](#ownership-and-privileges). Discovery does not revalidate access to
+source tables or views and does not grant access to source data.
+
+Discovery reflects each model's current committed definition: renaming a model changes the
+namespace returned for its metrics, replacing its definition changes the discovered metrics,
+and dropping it removes its metrics from discovery. Manage metric definitions through their
+containing Semantic Models; discovery does not provide a separate metric lifecycle or execute
+metric expressions.
+
+An empty result is a successful discovery response. Missing schemas, denied parent access, and
+unsupported operations are reported as errors. Storage or decoding failures fail the request
+instead of returning partial results. See the
+[REST API reference](./api/rest/gravitino-rest-api)
+for response and error details.
 
 ### Alter a Semantic Model
 
@@ -591,6 +818,8 @@ An authorized request for an absent model returns `false` (`dropped: false` in R
 
 The [Gravitino MCP server](./gravitino-mcp-server.md#semantic-models) provides
 `list_of_semantic_models`, `load_semantic_model`, `create_semantic_model`, `alter_semantic_model`,
-and `drop_semantic_model`. Enable the `semantic_model` tool tag when filtering tools.
+`drop_semantic_model`, `list_metrics`, `list_metric_infos`, and `list_semantic_model_datasets`.
+Enable the `semantic_model` tool tag when filtering tools. Metric discovery tools return the same
+full namespaces as REST.
 Create and alter use the native REST definition format. Use REST or the SDKs for Ossie import and
 export. The current Web UI does not provide Semantic Model workflows.

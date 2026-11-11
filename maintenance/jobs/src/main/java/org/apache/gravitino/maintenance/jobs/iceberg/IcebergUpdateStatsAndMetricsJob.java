@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -61,7 +62,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
-  private static final String VERSION = "v2";
+  private static final String VERSION = "v3";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
@@ -394,7 +395,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson, "spark-conf");
+    return IcebergJobUtils.filterCustomSparkConfigs(parseJsonOptions(sparkConfJson, "spark-conf"));
   }
 
   /**
@@ -570,28 +571,24 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\\n"
-            + "\\n"
-            + "Required Options:\\n"
-            + "  --catalog <name>                   Iceberg catalog name registered in Spark\\n"
-            + "  --table <identifier>               Table name in schema.table format\\n"
-            + "\\n"
-            + "Optional Options:\\n"
-            + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
-            + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
-            + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
-            + "  --updater-options <json>           JSON map for updater and repository settings\\n"
-            + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
-            + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\",\\n"
-            + "                                     \"auth_type\":\"basic\",\"username\":\"admin\",\"password\":\"YourSecureGravitinoPassword\"}'\\n"
-            + "  --spark-conf <json>                JSON map of custom Spark configs\\n"
-            + "                                     Must include Iceberg catalog configs for --catalog\\n"
-            + "                                     Example: '{\"spark.master\":\"local[2]\","
-            + "\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\","
-            + "\"spark.sql.catalog.rest_catalog.type\":\"rest\","
-            + "\"spark.sql.catalog.rest_catalog.uri\":\"http://localhost:9001/iceberg\"}'");
+    IcebergJobUtils.printCliUsage(
+        IcebergUpdateStatsAndMetricsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Table name in schema.table format"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --update-mode <mode>      stats | metrics | all (default: all)",
+            "                              data-file-mse target size is fixed at 134217728 (128MB)",
+            "                              small-file-number threshold is fixed at 33554432 (32MB)",
+            "  --updater-options <json>  Updater and repository settings",
+            "                              Example: '{\"gravitino_uri\":\"http://localhost:8090\",",
+            "                              \"metalake\":\"test\",\"auth_type\":\"basic\",",
+            "                              \"username\":\"admin\",\"password\":\"...\"}'"),
+        ImmutableList.of(
+            "  --catalog rest_catalog --table db.sample --update-mode all \\",
+            "    --spark-conf '{\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\",",
+            "    \"spark.sql.catalog.rest_catalog.type\":\"rest\",",
+            "    \"spark.sql.catalog.rest_catalog.uri\":\"http://localhost:9001/iceberg\"}'"));
   }
 
   enum UpdateMode {

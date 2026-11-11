@@ -23,6 +23,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -33,6 +34,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -55,6 +57,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.lance.Dataset;
 import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DeclareTableRequest;
@@ -139,10 +144,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 Table.PROPERTY_EXTERNAL,
                 "true"));
     // Registered by the admin, so neither owner below owns the table itself.
-    assertStatus(
-        200, register(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, null, location(OWNED_SCHEMA_TABLE)));
-    assertStatus(
-        200, register(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE, null, location(LONE_SCHEMA_TABLE)));
+    assertStatus(200, registerExistingTable(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE));
+    assertStatus(200, registerExistingTable(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE));
     setSchemaOwner(metalake, OWNED_SCHEMA, SCHEMA_OWNER);
     setSchemaOwner(metalake, LONE_SCHEMA, LONE_OWNER);
 
@@ -292,7 +295,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, register(READER, SCHEMA, "reader_table", null, location("reader_table")));
     assertStatus(403, declare(READER, SCHEMA, "reader_table"));
 
-    assertStatus(200, register(PROBER, WRITE_SCHEMA, PROBER_TABLE, null, location(PROBER_TABLE)));
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, PROBER_TABLE));
     // Creating assigns ownership, so the creator can read back what it created even though it
     // holds no SELECT_TABLE privilege.
     assertStatus(200, table(PROBER, WRITE_SCHEMA, PROBER_TABLE, "describe"));
@@ -336,12 +339,25 @@ public class LanceTableAuthorizationIT extends BaseIT {
     // The denied requests left the table in place.
     assertStatus(200, table(ADMIN, VISIBLE_TABLE, "describe"));
 
-    // Creating assigns ownership, so the creator may use either removal operation.
-    assertStatus(
-        200, register(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, null, location(DEREGISTER_TABLE)));
-    assertStatus(200, register(PROBER, WRITE_SCHEMA, DROP_TABLE, null, location(DROP_TABLE)));
+    // Ownership permits deregistration. Physical deletion also requires catalog permission.
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE));
+    assertStatus(200, registerExistingTable(PROBER, WRITE_SCHEMA, DROP_TABLE));
     assertStatus(200, table(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, "deregister"));
-    assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
+    assertStatus(406, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "describe"));
+    Assertions.assertTrue(Files.exists(Path.of(location(DROP_TABLE))));
+    GravitinoMetalake metalake = client.loadMetalake(getLanceRESTServerMetalakeName());
+    metalake.alterCatalog(
+        CATALOG,
+        CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
+    try {
+      assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
+      Assertions.assertFalse(Files.exists(Path.of(location(DROP_TABLE))));
+    } finally {
+      metalake.alterCatalog(
+          CATALOG,
+          CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "false"));
+    }
     assertStatus(404, table(ADMIN, WRITE_SCHEMA, DEREGISTER_TABLE, "describe"));
     assertStatus(404, table(ADMIN, WRITE_SCHEMA, DROP_TABLE, "describe"));
   }
@@ -350,8 +366,11 @@ public class LanceTableAuthorizationIT extends BaseIT {
   public void testSchemaOwnershipRemovesTablesTheOwnerDidNotCreate() throws Exception {
     // SCHEMA_OWNER_WITH_USE_CATALOG: the admin registered this table, so the only thing the caller
     // has is ownership of the schema holding it, plus USE_CATALOG.
-    assertStatus(200, table(SCHEMA_OWNER, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "drop"));
+    assertStatus(406, table(SCHEMA_OWNER, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "drop"));
+    assertStatus(200, table(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "describe"));
+    assertStatus(200, table(SCHEMA_OWNER, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "deregister"));
     assertStatus(404, table(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "describe"));
+    Assertions.assertTrue(Files.exists(Path.of(location(OWNED_SCHEMA_TABLE))));
   }
 
   @Test
@@ -372,6 +391,46 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(403, table(READER, MISSING_TABLE, "deregister"));
     assertStatus(200, table(ADMIN, HIDDEN_TABLE, "describe"));
     assertStatus(404, table(ADMIN, MISSING_TABLE, "deregister"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"register", "create"})
+  void testTableOwnerCannotPurgeAnotherSchemasData(String operation) throws Exception {
+    String victim = "purge_victim_" + operation;
+    String alias = "purge_alias_" + operation;
+    Path parent = tempDir.resolve("purge_parent_" + operation);
+    Path victimLocation = parent.resolve("victim");
+    LanceDatasetTestUtils.createDataset(victimLocation.toString());
+    assertStatus(200, register(ADMIN, SCHEMA, victim, null, victimLocation.toString()));
+    try {
+      assertStatus(403, table(PROBER, SCHEMA, victim, "describe"));
+      if ("register".equals(operation)) {
+        assertStatus(200, register(PROBER, WRITE_SCHEMA, alias, null, victimLocation.toString()));
+      } else {
+        Schema schema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+        HttpRequest create =
+            request(PROBER, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, alias) + "/create", "")
+                .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
+                .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, parent.toString())
+                .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
+                .build();
+        assertStatus(200, httpClient.send(create, HttpResponse.BodyHandlers.ofString()));
+      }
+      HttpResponse<String> rejected = table(PROBER, WRITE_SCHEMA, alias, "drop");
+      assertStatus(406, rejected);
+      Assertions.assertTrue(
+          rejected.body().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+      assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "describe"));
+      assertStatus(200, table(ADMIN, SCHEMA, victim, "describe"));
+      try (Dataset dataset = Dataset.open().uri(victimLocation.toString()).build()) {
+        Assertions.assertFalse(dataset.getSchema().getFields().isEmpty());
+      }
+      assertStatus(200, table(PROBER, WRITE_SCHEMA, alias, "deregister"));
+      Assertions.assertTrue(Files.exists(victimLocation));
+    } finally {
+      table(ADMIN, WRITE_SCHEMA, alias, "deregister");
+      table(ADMIN, SCHEMA, victim, "deregister");
+    }
   }
 
   private HttpResponse<String> dropColumns(String user, String tableName, String column)
@@ -444,7 +503,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void registerTable(String tableName) throws Exception {
-    assertStatus(200, register(ADMIN, SCHEMA, tableName, null, location(tableName)));
+    assertStatus(200, registerExistingTable(ADMIN, SCHEMA, tableName));
   }
 
   private void createTable(String schemaName, String tableName) throws Exception {
@@ -460,6 +519,12 @@ public class LanceTableAuthorizationIT extends BaseIT {
             .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
             .build();
     assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+  }
+
+  private HttpResponse<String> registerExistingTable(String user, String schema, String tableName)
+      throws Exception {
+    LanceDatasetTestUtils.createDataset(location(tableName));
+    return register(user, schema, tableName, null, location(tableName));
   }
 
   private HttpResponse<String> register(

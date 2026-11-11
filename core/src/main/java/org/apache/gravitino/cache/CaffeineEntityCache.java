@@ -100,6 +100,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    */
   private static final String NAME_LEVEL_BOUNDARY = ".";
 
+  /** Escapes {@link #NAME_LEVEL_BOUNDARY} and itself inside a level of an index key. */
+  private static final char INDEX_ESCAPE = '\u0001';
+
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
 
@@ -255,7 +258,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
             // notification removes its index entry. This is not a synchronous admission check.
             // The quiet lookup does not schedule maintenance or acquire Caffeine's eviction lock.
             if (cacheData.policy().getIfPresentQuietly(entityCacheKey) != null) {
-              cacheIndex.put(entityCacheKey.toString(), entityCacheKey);
+              cacheIndex.put(indexKey(entityCacheKey), entityCacheKey);
             }
           }
         });
@@ -305,7 +308,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
   protected void invalidateExpiredItem(EntityCacheKey key) {
     synchronized (indexLock) {
       if (cacheData.policy().getIfPresentQuietly(key) == null) {
-        cacheIndex.remove(key.toString());
+        cacheIndex.remove(indexKey(key));
       }
     }
   }
@@ -338,7 +341,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
     cacheData.invalidate(key);
     removeIndexEntryIfAbsent(key);
 
-    String identifier = key.identifier().toString();
+    String identifier = indexText(key.identifier());
     invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
     if (key.entityType() == Entity.EntityType.SCHEMA) {
       invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
@@ -357,6 +360,48 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheData.invalidate(childKey);
       removeIndexEntryIfAbsent(childKey);
     }
+  }
+
+  /**
+   * Returns the prefix-index key of a cache key: the escaped identifier text, {@code ":"}, and the
+   * entity type.
+   */
+  private static String indexKey(EntityCacheKey key) {
+    return indexText(key.identifier()) + ":" + key.entityType();
+  }
+
+  /**
+   * Joins the levels of an identifier into prefix-index text.
+   *
+   * <p>{@link NameIdentifier#toString()} is not one-to-one when a level contains {@code "."}: table
+   * {@code a.b} in schema {@code sch} and table {@code b} in schema {@code sch.a} both render as
+   * {@code sch.a.b}. Escaping {@code "."} and the escape character inside each level makes the text
+   * unique, while every real level boundary stays a bare {@code "."}, so both prefix scans in
+   * {@link #invalidateHierarchy(EntityCacheKey)} still match exactly the descendants. The schema
+   * separator can be neither {@code "."} nor the escape character (see {@link
+   * Configs#SCHEMA_SEPARATOR}), so it is kept as is.
+   */
+  private static String indexText(NameIdentifier ident) {
+    StringBuilder text = new StringBuilder();
+    for (String level : ident.namespace().levels()) {
+      appendEscaped(text, level).append(NAME_LEVEL_BOUNDARY);
+    }
+    return appendEscaped(text, ident.name()).toString();
+  }
+
+  /**
+   * Appends a level to prefix-index text, prefixing {@code "."} and the escape character with the
+   * escape character.
+   */
+  private static StringBuilder appendEscaped(StringBuilder text, String level) {
+    for (int i = 0; i < level.length(); i++) {
+      char c = level.charAt(i);
+      if (c == INDEX_ESCAPE || c == NAME_LEVEL_BOUNDARY.charAt(0)) {
+        text.append(INDEX_ESCAPE);
+      }
+      text.append(c);
+    }
+    return text;
   }
 
   /**

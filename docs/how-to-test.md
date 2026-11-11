@@ -57,6 +57,8 @@ To run one class or method, add `--tests` to its lane:
 
 If the class is not in that lane, Gradle fails with "No tests found for given includes".
 
+`coreMySQLTest` and `corePostgreSQLTest` run their test JVM with the system property `gravitino.test.db.disposableData=true`, so the MySQL and PostgreSQL containers keep their data in memory (`tmpfs`, 2 GB) and skip syncing commits to disk. No other task sets it. Other tasks run MySQL with the image's default settings and PostgreSQL with the Testcontainers module's default, `fsync=off`.
+
 #### Database reuse and reset
 
 In a database lane, each test class shares one database per backend. `@DatabaseFixture(resetStrategy = ...)` picks how much is rebuilt before each test, from cheapest to most isolated:

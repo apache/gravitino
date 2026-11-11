@@ -57,6 +57,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -68,7 +69,13 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Representation;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.View;
+import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
@@ -88,6 +95,8 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
@@ -193,6 +202,151 @@ public class SemanticModelIT extends BaseIT {
     }
   }
 
+  /** Verifies source identity, definition replacement, and model lifecycle through the Java SDK. */
+  @Test
+  public void testSourceLookupLifecycleAndIdenticalDefinitionRebinding() {
+    TableCatalog tables = catalog.asTableCatalog();
+    NameIdentifier source = NameIdentifier.of(SCHEMA_NAME, "lookup_orders");
+    NameIdentifier renamedSource = NameIdentifier.of(SCHEMA_NAME, "lookup_orders_v2");
+    NameIdentifier model = NameIdentifier.of(SCHEMA_NAME, "lookup_model");
+    NameIdentifier renamedModel = NameIdentifier.of(SCHEMA_NAME, "lookup_model_v2");
+    Column[] columns = {Column.of("id", Types.LongType.get())};
+    try {
+      SupportsSemanticModels lookup =
+          tables.createTable(source, columns, null, Map.of()).supportsSemanticModels();
+      assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
+      SemanticModelDefinition definition =
+          sourceDefinition(source.name(), "manager", "employee.raw");
+      semanticModelCatalog.createSemanticModel(model, null, definition, Map.of());
+      assertArrayEquals(
+          sourceDatasetIds(model.name(), "employee.raw", "manager"),
+          lookup.listSemanticModelDatasets());
+
+      tables.alterTable(source, TableChange.rename(renamedSource.name()));
+      assertThrows(NoSuchMetadataObjectException.class, lookup::listSemanticModelDatasets);
+      lookup = tables.loadTable(renamedSource).supportsSemanticModels();
+      assertArrayEquals(
+          sourceDatasetIds(model.name(), "employee.raw", "manager"),
+          lookup.listSemanticModelDatasets());
+      assertEquals(
+          source.name(),
+          semanticModelCatalog.loadSemanticModel(model).definition().datasets()[0].source().name());
+      semanticModelCatalog.alterSemanticModel(
+          model,
+          SemanticModelChange.rename(renamedModel.name()),
+          SemanticModelChange.updateComment("source name drift is preserved"));
+      assertArrayEquals(
+          sourceDatasetIds(renamedModel.name(), "employee.raw", "manager"),
+          lookup.listSemanticModelDatasets());
+
+      SemanticModelDefinition replacement = sourceDefinition(renamedSource.name(), "orders");
+      semanticModelCatalog.alterSemanticModel(
+          renamedModel, SemanticModelChange.replaceDefinition(replacement));
+      assertArrayEquals(
+          sourceDatasetIds(renamedModel.name(), "orders"), lookup.listSemanticModelDatasets());
+      assertThrows(
+          IllegalSemanticModelException.class,
+          () ->
+              semanticModelCatalog.alterSemanticModel(
+                  renamedModel,
+                  SemanticModelChange.replaceDefinition(
+                      sourceDefinition("missing_lookup_source", "invalid"))));
+      assertArrayEquals(
+          sourceDatasetIds(renamedModel.name(), "orders"), lookup.listSemanticModelDatasets());
+
+      tables.dropTable(renamedSource);
+      lookup = tables.createTable(renamedSource, columns, null, Map.of()).supportsSemanticModels();
+      assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
+      semanticModelCatalog.alterSemanticModel(
+          renamedModel, SemanticModelChange.setProperty("reviewed", "true"));
+      assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
+      semanticModelCatalog.alterSemanticModel(
+          renamedModel, SemanticModelChange.replaceDefinition(replacement));
+      assertArrayEquals(
+          sourceDatasetIds(renamedModel.name(), "orders"), lookup.listSemanticModelDatasets());
+      semanticModelCatalog.dropSemanticModel(renamedModel);
+      assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
+    } finally {
+      tables.dropTable(source);
+      tables.dropTable(renamedSource);
+    }
+  }
+
+  /**
+   * Verifies direct View references across catalogs and cleanup after the model catalog is dropped.
+   */
+  @Test
+  public void testViewSourceLookupAcrossCatalogs() {
+    ViewCatalog views = catalog.asViewCatalog();
+    NameIdentifier source = NameIdentifier.of(SCHEMA_NAME, "lookup_view");
+    NameIdentifier renamedSource = NameIdentifier.of(SCHEMA_NAME, "lookup_view_v2");
+    String otherCatalogName = "source_lookup_models";
+    String otherSchema = "semantic";
+    String modelName = "cross_catalog_model";
+    try {
+      View view =
+          views.createView(
+              source,
+              null,
+              new Column[] {Column.of("id", Types.LongType.get())},
+              new Representation[] {
+                SQLRepresentation.builder()
+                    .withDialect("trino")
+                    .withSql("SELECT id FROM customers")
+                    .build()
+              },
+              CATALOG_NAME,
+              SCHEMA_NAME,
+              Map.of());
+      Catalog other =
+          metalake.createCatalog(
+              otherCatalogName,
+              Catalog.Type.RELATIONAL,
+              "lakehouse-iceberg",
+              null,
+              Map.of(
+                  "catalog-backend",
+                  "jdbc",
+                  "warehouse",
+                  System.getProperty("java.io.tmpdir") + "/" + METALAKE_NAME + "_lookup",
+                  "uri",
+                  "jdbc:h2:mem:" + METALAKE_NAME + "_lookup;DB_CLOSE_DELAY=-1;MODE=MYSQL",
+                  "jdbc-driver",
+                  "org.h2.Driver",
+                  "jdbc-initialize",
+                  "true"));
+      other.asSchemas().createSchema(otherSchema, null, Map.of());
+      other
+          .asSemanticModelCatalog()
+          .createSemanticModel(
+              NameIdentifier.of(otherSchema, modelName),
+              null,
+              sourceDefinition(source.name(), "view.alias"),
+              Map.of());
+      NameIdentifier[] expected = {
+        NameIdentifier.of(METALAKE_NAME, otherCatalogName, otherSchema, modelName, "view.alias")
+      };
+      assertArrayEquals(expected, view.supportsSemanticModels().listSemanticModelDatasets());
+      // A View reference is direct: its underlying table does not inherit the model association.
+      assertArrayEquals(
+          new NameIdentifier[0],
+          catalog
+              .asTableCatalog()
+              .loadTable(NameIdentifier.of(SCHEMA_NAME, CUSTOMERS_TABLE))
+              .supportsSemanticModels()
+              .listSemanticModelDatasets());
+      views.alterView(source, ViewChange.rename(renamedSource.name()));
+      SupportsSemanticModels lookup = views.loadView(renamedSource).supportsSemanticModels();
+      assertArrayEquals(expected, lookup.listSemanticModelDatasets());
+      metalake.dropCatalog(otherCatalogName, true);
+      assertArrayEquals(new NameIdentifier[0], lookup.listSemanticModelDatasets());
+    } finally {
+      metalake.dropCatalog(otherCatalogName, true);
+      views.dropView(source);
+      views.dropView(renamedSource);
+    }
+  }
+
   @Test
   public void testSemanticModelLifecycleRoundTrip() {
     NameIdentifier modelIdent = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
@@ -268,6 +422,110 @@ public class SemanticModelIT extends BaseIT {
     assertThrows(
         NoSuchSemanticModelException.class,
         () -> semanticModelCatalog.loadSemanticModel(renamedIdent));
+  }
+
+  @Test
+  void testMetricDiscoveryPreservesCompleteMetricsAndStructuredOrdering() {
+    assertMetricDiscovery(new NameIdentifier[0]);
+    Metric revenue = initialDefinition().metrics()[0];
+    Metric upperCase =
+        Metric.builder()
+            .withName("Revenue")
+            .withExpression(expression(Dialects.ANSI_SQL, "COUNT(orders.order_id)"))
+            .build();
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "a-b"), null, metricDefinition(revenue), Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "a"), null, metricDefinition(revenue, upperCase), Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "absent"),
+        null,
+        metricDefinition((Metric[]) null),
+        Map.of());
+    semanticModelCatalog.createSemanticModel(
+        NameIdentifier.of(SCHEMA_NAME, "empty"), null, metricDefinition(), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, "a", "Revenue"),
+          NameIdentifier.of(SCHEMA_NAME, "a", "revenue"),
+          NameIdentifier.of(SCHEMA_NAME, "a-b", "revenue")
+        },
+        upperCase,
+        revenue,
+        revenue);
+  }
+
+  @Test
+  void testMetricDiscoveryTracksReplacementRenameAndRecreation() {
+    NameIdentifier model = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
+    Metric original = initialDefinition().metrics()[0];
+    semanticModelCatalog.createSemanticModel(model, null, metricDefinition(original), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, original.name())},
+        original);
+    Metric replacement =
+        Metric.builder()
+            .withName(original.name())
+            .withExpression(expression(Dialects.ANSI_SQL, "COUNT(orders.order_id)"))
+            .withDescription("Updated calculation")
+            .build();
+    Metric added =
+        Metric.builder().withName("收入.total").withExpression(original.expression()).build();
+    semanticModelCatalog.alterSemanticModel(
+        model, SemanticModelChange.replaceDefinition(metricDefinition(replacement, added)));
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, replacement.name()),
+          NameIdentifier.of(SCHEMA_NAME, MODEL_NAME, added.name())
+        },
+        replacement,
+        added);
+    semanticModelCatalog.alterSemanticModel(model, SemanticModelChange.rename(RENAMED_MODEL_NAME));
+    NameIdentifier renamed = NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME);
+    assertMetricDiscovery(
+        new NameIdentifier[] {
+          NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, replacement.name()),
+          NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, added.name())
+        },
+        replacement,
+        added);
+    semanticModelCatalog.alterSemanticModel(
+        renamed, SemanticModelChange.replaceDefinition(metricDefinition(added)));
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, added.name())},
+        added);
+    assertTrue(semanticModelCatalog.dropSemanticModel(renamed));
+    assertMetricDiscovery(new NameIdentifier[0]);
+    semanticModelCatalog.createSemanticModel(renamed, null, metricDefinition(original), Map.of());
+    assertMetricDiscovery(
+        new NameIdentifier[] {NameIdentifier.of(SCHEMA_NAME, RENAMED_MODEL_NAME, original.name())},
+        original);
+  }
+
+  @Test
+  void testMetricDiscoverySchemaIsolationAndMissingSchema() {
+    String otherSchema = "metric_discovery_other";
+    Namespace namespace = Namespace.of(otherSchema);
+    catalog.asSchemas().createSchema(otherSchema, null, Map.of());
+    try {
+      Metric metric = initialDefinition().metrics()[0];
+      semanticModelCatalog.createSemanticModel(
+          NameIdentifier.of(otherSchema, MODEL_NAME), null, metricDefinition(metric), Map.of());
+      assertMetricDiscovery(new NameIdentifier[0]);
+      assertArrayEquals(
+          new NameIdentifier[] {NameIdentifier.of(otherSchema, MODEL_NAME, metric.name())},
+          semanticModelCatalog.listMetrics(namespace));
+      SemanticModelMetric[] infos = semanticModelCatalog.listMetricInfos(namespace);
+      assertEquals(1, infos.length);
+      assertEquals(Namespace.of(otherSchema, MODEL_NAME), infos[0].namespace());
+      assertEquals(metric, infos[0].metric());
+    } finally {
+      semanticModelCatalog.dropSemanticModel(NameIdentifier.of(otherSchema, MODEL_NAME));
+      catalog.asSchemas().dropSchema(otherSchema, false);
+    }
+    assertThrows(NoSuchSchemaException.class, () -> semanticModelCatalog.listMetrics(namespace));
+    assertThrows(
+        NoSuchSchemaException.class, () -> semanticModelCatalog.listMetricInfos(namespace));
   }
 
   @Test
@@ -993,6 +1251,26 @@ public class SemanticModelIT extends BaseIT {
             .listTags());
   }
 
+  private static SemanticModelDefinition sourceDefinition(String source, String... aliases) {
+    return SemanticModelDefinition.builder()
+        .withDatasets(
+            Arrays.stream(aliases)
+                .map(
+                    alias ->
+                        Dataset.builder()
+                            .withName(alias)
+                            .withSource(NameIdentifier.of(CATALOG_NAME, SCHEMA_NAME, source))
+                            .build())
+                .toArray(Dataset[]::new))
+        .build();
+  }
+
+  private static NameIdentifier[] sourceDatasetIds(String model, String... aliases) {
+    return Arrays.stream(aliases)
+        .map(alias -> NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, model, alias))
+        .toArray(NameIdentifier[]::new);
+  }
+
   private static ObjectNode ossieModelDocument() {
     ObjectNode root = JSON_MAPPER.createObjectNode();
     root.put("version", DEFAULT_VERSION);
@@ -1234,6 +1512,29 @@ public class SemanticModelIT extends BaseIT {
             INVALID_MODEL_NAME,
             source,
             primaryKey == null ? "" : "    primary_key: [" + primaryKey + "]\n"));
+  }
+
+  private void assertMetricDiscovery(NameIdentifier[] identifiers, Metric... metrics) {
+    assertEquals(
+        identifiers.length,
+        metrics.length,
+        "Expected identifiers and metric definitions must have the same length");
+    Namespace namespace = Namespace.of(SCHEMA_NAME);
+    assertArrayEquals(identifiers, semanticModelCatalog.listMetrics(namespace));
+    SemanticModelMetric[] infos = semanticModelCatalog.listMetricInfos(namespace);
+    assertEquals(metrics.length, infos.length);
+    for (int i = 0; i < infos.length; i++) {
+      assertEquals(
+          identifiers[i], NameIdentifier.of(infos[i].namespace(), infos[i].metric().name()));
+      assertEquals(metrics[i], infos[i].metric());
+    }
+  }
+
+  private static SemanticModelDefinition metricDefinition(@Nullable Metric... metrics) {
+    return SemanticModelDefinition.builder()
+        .withDatasets(initialDefinition().datasets())
+        .withMetrics(metrics)
+        .build();
   }
 
   private static SemanticModelDefinition initialDefinition() {

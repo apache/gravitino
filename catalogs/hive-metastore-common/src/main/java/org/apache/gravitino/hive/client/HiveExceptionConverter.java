@@ -169,6 +169,19 @@ public class HiveExceptionConverter {
       return new IllegalArgumentException(cause.getMessage(), cause);
     }
 
+    if (exceptionClassName.contains("MetaException")
+        && lowerMessage.contains("type expected")
+        && lowerMessage.contains("<derived from deserializer>")) {
+      return new GravitinoRuntimeException(
+          cause,
+          "Hive Metastore cannot alter table %s while preserving its SerDe-derived storage schema. "
+              + "The HMS server's column type compatibility check cannot parse "
+              + "<derived from deserializer>. Ask the metastore administrator to evaluate "
+              + "hive.metastore.disallow.incompatible.col.type.changes=false on the HMS server; "
+              + "this disables column type compatibility checks for all tables.",
+          target.name());
+    }
+
     if (exceptionClassName.contains("MetaException")) {
       if (lowerMessage.contains("invalid partition key")) {
         return new NoSuchPartitionException(
@@ -187,6 +200,16 @@ public class HiveExceptionConverter {
         return new NonEmptySchemaException(
             cause, "Hive schema %s is not empty in Hive Metastore", target.name());
       }
+    }
+
+    // Schema-resolution messages include table names, which may contain connection keywords.
+    if (lowerMessage.startsWith(
+            "hive metastore did not resolve serde-derived column types for table ")
+        && (exceptionClassName.equals("MetaException")
+            || cause instanceof IllegalArgumentException)) {
+      return cause instanceof IllegalArgumentException
+          ? (IllegalArgumentException) cause
+          : new GravitinoRuntimeException(cause, message);
     }
 
     if (isConnectionKeyword(lowerMessage) || exceptionClassName.contains("TransportException")) {

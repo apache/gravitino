@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,10 +57,10 @@ import org.slf4j.LoggerFactory;
  *       in-use}, {@code numFiles}).
  * </ul>
  *
- * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys (except
- * credential-vending keys), and sensitive-named undeclared keys. Credential property keys are
- * recovered via {@code getCredentials()} instead. See {@code
- * org.apache.gravitino.secret.SupportsSecrets}.
+ * <p>Recovery via {@code getSecrets} covers secret-URN values, declared {@code hidden} keys that
+ * are not also {@code reserved} (reserved+hidden keys such as {@code gravitino.identifier} stay
+ * omitted), and sensitive-named undeclared keys. Credential property keys are recovered via {@code
+ * getCredentials()} instead. See {@code org.apache.gravitino.secret.SupportsSecrets}.
  *
  * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
  * placeholder is never persisted. Reserved / immutable rejection remains in {@code
@@ -129,7 +130,8 @@ public final class HiddenPropertyMaskUtils {
       boolean reserved = metadata.isReservedProperty(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
-      } else if (hidden
+      } else if (("jdbc-url".equalsIgnoreCase(key) && JdbcUrlUtils.containsCredentials(value))
+          || hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
           || (!metadata.containsProperty(key) && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);

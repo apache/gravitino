@@ -633,6 +633,15 @@ public class JobIT extends BaseIT {
         .during(STATUS_PULL_INTERVAL_IN_MS * 2, TimeUnit.MILLISECONDS)
         .atMost(STATUS_PULL_INTERVAL_IN_MS * 2 + 1000, TimeUnit.MILLISECONDS)
         .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLING);
+
+    // The other server never answers the cancellation, as it doesn't exist. After three pull
+    // intervals this server considers it gone and marks the job as CANCELLED, so the job template
+    // can be deleted.
+    Awaitility.await()
+        .atMost(STATUS_PULL_INTERVAL_IN_MS * 5, TimeUnit.MILLISECONDS)
+        .until(() -> metalake.getJob(job.name()).jobStatus() == JobHandle.Status.CANCELLED);
+    Assertions.assertNotNull(metalake.getJob(job.name()).finishedAt());
+    Assertions.assertTrue(metalake.deleteJobTemplate(template.name()));
   }
 
   @Test

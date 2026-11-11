@@ -34,6 +34,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
@@ -201,5 +202,15 @@ public interface Table extends Auditable {
   default SupportsPartitionStatistics supportsPartitionStatistics() {
     throw new UnsupportedOperationException(
         "Table does not support partition statistics operations.");
+  }
+
+  /**
+   * Returns the Semantic Model dataset lookup operations for this source.
+   *
+   * @return The source-scoped Semantic Model dataset lookup capability.
+   * @throws UnsupportedOperationException If lookup is not supported by this implementation.
+   */
+  default SupportsSemanticModels supportsSemanticModels() {
+    throw new UnsupportedOperationException("Semantic Model dataset lookup is not supported");
   }
 }
