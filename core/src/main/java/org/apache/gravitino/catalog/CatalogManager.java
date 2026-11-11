@@ -1362,14 +1362,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
-<<<<<<< HEAD
-=======
-          } catch (NoSuchEntityException ignored) {
-            // Another server deleted the catalog after it was loaded above, so a later store read
-            // such as listing its schemas no longer finds it. The drop stays idempotent.
-            // store.delete itself never reaches here: it maps a missing entity to false on its own.
-            return false;
->>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {

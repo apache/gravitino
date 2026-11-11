@@ -79,11 +79,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.exceptions.NonEmptyCatalogException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
->>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -1621,8 +1617,7 @@ public class TestCatalogManager {
     InMemoryEntityStore store = new InMemoryEntityStore();
     store.initialize(config);
     store.put(metalakeEntity, true);
-    CatalogManager manager =
-        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
 
     NameIdentifier ident = NameIdentifier.of("metalake", "refused_drop");
     Map<String, String> props =
@@ -2178,35 +2173,6 @@ public class TestCatalogManager {
         PROPERTY_KEY5_PREFIX + "1",
         "value3");
   }
-<<<<<<< HEAD
-=======
-
-  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
-    return SecretUrn.buildWriteThrough(
-        "memory",
-        Map.of(
-            SecretConstants.ATTR_ENTITY_TYPE, entityType,
-            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
-            SecretConstants.ATTR_PROPERTY_KEY, key));
-  }
-
-  private static SecretManager memorySecretManager() {
-    Config c = new Config(false) {};
-    Properties p = new Properties();
-    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,reference");
-    p.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "memory."
-            + SecretProviderRegistry.CLASS_NAME,
-        InMemorySecretsProvider.class.getName());
-    p.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
-            + "reference."
-            + SecretProviderRegistry.CLASS_NAME,
-        TestReferenceSecretsProvider.class.getName());
-    c.loadFromProperties(p);
-    return new SecretManager(c);
-  }
 
   /** Catalog operations whose backend always holds one user-created schema. */
   public static class SingleSchemaCatalogOperations extends TestCatalogOperations {
@@ -2226,5 +2192,4 @@ public class TestCatalogManager {
       return Mockito.mock(Schema.class);
     }
   }
->>>>>>> 411c1d4e1 ([#14835] fix(core): Keep a disabled catalog not in use after a refused drop (#14836))
 }
