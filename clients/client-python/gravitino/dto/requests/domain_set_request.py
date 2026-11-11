@@ -35,7 +35,7 @@ class DomainSetRequest(RESTRequest):
 
     def validate(self) -> None:
         Precondition.check_argument(
-            isinstance(self._status, Domain.Status), "status must not be None"
+            isinstance(self._status, Domain.Status), "status must be a Domain.Status"
         )
 
 
