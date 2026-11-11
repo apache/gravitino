@@ -1588,6 +1588,44 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testUnsafePartitionCastsRetainNativeExpression() throws Exception {
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement statement = connection.createStatement()) {
+      for (String[] definition :
+          new String[][] {
+            {"String", "toYYYYMM(toDate(event_time))"},
+            {"UInt32", "toYear(toDate(event_time))"},
+            {"Date32", "toYear(toDate(event_time))"},
+            {"DateTime64(0)", "toYear(toDate(event_time))"},
+            {"DateTime64(3)", "toYear(toDate(event_time))"},
+            {"DateTime('Asia/Shanghai')", "toYear(toDate(event_time))"},
+            {"Date", "toYear(toDateTime(event_time))"},
+            {"String", "toDate(event_time)"},
+            {"UInt32", "toDate(event_time)"}
+          }) {
+        String table = RandomStringUtils.randomAlphabetic(16);
+        try {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, table, definition[0], definition[1]));
+          JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), table);
+          Assertions.assertEquals(0, loaded.partitioning().length, definition[0]);
+          Assertions.assertEquals(
+              definition[1], loaded.properties().get(TableConstants.PARTITION_KEY));
+        } finally {
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, table));
+        }
+      }
+    }
+  }
+
+  @Test
   void testParsePartitioningAndIndexExpressions() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 

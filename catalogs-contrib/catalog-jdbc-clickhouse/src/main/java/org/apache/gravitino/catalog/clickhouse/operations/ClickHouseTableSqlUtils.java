@@ -355,6 +355,11 @@ final class ClickHouseTableSqlUtils {
   }
 
   static Transform[] parsePartitioning(@Nullable String partitionKey) {
+    return parsePartitioning(partitionKey, Collections.emptyMap());
+  }
+
+  static Transform[] parsePartitioning(
+      @Nullable String partitionKey, Map<String, String> nativeColumnTypes) {
     if (StringUtils.isBlank(partitionKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -371,7 +376,7 @@ final class ClickHouseTableSqlUtils {
       if (StringUtils.isBlank(expression)) {
         continue;
       }
-      Transform transform = parsePartitionExpression(expression);
+      Transform transform = parsePartitionExpression(expression, nativeColumnTypes);
       if (transform == null) {
         // A single unsupported native expression means the whole partition key cannot be
         // represented as structured transforms.
@@ -392,8 +397,8 @@ final class ClickHouseTableSqlUtils {
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case Transforms.NAME_OF_MONTH -> "toYYYYMM(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
-      // Day transforms use the integer form; legacy toDate keys remain readable but are
-      // canonicalized to toYYYYMMDD when creating another table from the loaded transform.
+        // Day transforms use the integer form; legacy toDate keys remain readable but are
+        // canonicalized to toYYYYMMDD when creating another table from the loaded transform.
       case Transforms.NAME_OF_DAY -> "toYYYYMMDD(%s)"
           .formatted(quoteIdentifier(partitionFieldName(transform)));
       case "tostartofweek" -> "toStartOfWeek(%s)"
@@ -529,30 +534,38 @@ final class ClickHouseTableSqlUtils {
   }
 
   @Nullable
-  private static Transform parsePartitionExpression(String expression) {
+  private static Transform parsePartitionExpression(
+      String expression, Map<String, String> nativeColumnTypes) {
     String trimmedExpression = StringUtils.trim(expression);
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = extractInnermostField(toYearMatcher.group(1));
+      String identifier = extractDatePartitionIdentifier(toYearMatcher.group(1), nativeColumnTypes);
       return identifier == null ? null : Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = extractInnermostField(toYYYYMMMatcher.group(1));
+      String identifier =
+          extractDatePartitionIdentifier(toYYYYMMMatcher.group(1), nativeColumnTypes);
       return identifier == null ? null : Transforms.month(identifier);
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = extractInnermostField(toDateMatcher.group(1));
+      String identifier = extractDatePartitionIdentifier(toDateMatcher.group(1), nativeColumnTypes);
+      // toDate accepts strings/numbers and narrows wider temporal ranges. Replacing those casts
+      // with toYYYYMMDD(column) would change values or fail, so retain their native expression.
+      String nativeType = identifier == null ? null : nativeColumnTypes.get(identifier);
+      if (nativeType != null && !"Date".equals(nativeType) && !"DateTime".equals(nativeType)) {
+        return null;
+      }
       return identifier == null ? null : Transforms.day(identifier);
     }
 
     Matcher toDayMatcher = TO_DAY_PATTERN.matcher(trimmedExpression);
     if (toDayMatcher.matches()) {
-      String identifier = extractInnermostField(toDayMatcher.group(1));
+      String identifier = extractDatePartitionIdentifier(toDayMatcher.group(1), nativeColumnTypes);
       return identifier == null ? null : Transforms.day(identifier);
     }
 
@@ -591,6 +604,22 @@ final class ClickHouseTableSqlUtils {
 
     String identifier = extractPartitionIdentifier(trimmedExpression);
     return identifier == null ? null : Transforms.identity(identifier);
+  }
+
+  @Nullable
+  private static String extractDatePartitionIdentifier(
+      String expression, Map<String, String> nativeColumnTypes) {
+    String identifier = extractPartitionIdentifier(expression);
+    if (identifier != null) {
+      return identifier;
+    }
+    identifier = extractInnermostField(expression);
+    // Only plain DateTime is proven safe for these unary conversions. Date32/DateTime64 may
+    // overflow when narrowed, Date may overflow toDateTime, and strings/numbers require casts.
+    // Without native type metadata, or with an explicit source timezone, keep the native key.
+    return identifier != null && "DateTime".equals(nativeColumnTypes.get(identifier))
+        ? identifier
+        : null;
   }
 
   /**

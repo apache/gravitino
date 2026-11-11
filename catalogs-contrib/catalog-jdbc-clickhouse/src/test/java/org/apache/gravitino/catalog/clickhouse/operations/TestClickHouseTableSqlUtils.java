@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.clickhouse.operations;
 
 import static org.apache.gravitino.catalog.clickhouse.operations.ClickHouseClusterUtils.escapeSingleQuotes;
 
+import java.util.Map;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -146,7 +147,9 @@ public class TestClickHouseTableSqlUtils {
 
   @Test
   void testParsePartitioningNestedToYYYYMM() {
-    Transform[] parsed = ClickHouseTableSqlUtils.parsePartitioning("toYYYYMM(toDate(dt))");
+    Transform[] parsed =
+        ClickHouseTableSqlUtils.parsePartitioning(
+            "toYYYYMM(toDate(dt))", Map.of("dt", "DateTime", "event-time", "DateTime"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals("month", parsed[0].name());
     Assertions.assertEquals("dt", ((NamedReference) parsed[0].arguments()[0]).fieldName()[0]);
@@ -154,7 +157,9 @@ public class TestClickHouseTableSqlUtils {
 
   @Test
   void testParsePartitioningNestedToYear() {
-    Transform[] parsed = ClickHouseTableSqlUtils.parsePartitioning("toYear(toDate(dt))");
+    Transform[] parsed =
+        ClickHouseTableSqlUtils.parsePartitioning(
+            "toYear(toDate(dt))", Map.of("dt", "DateTime", "event-time", "DateTime"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals("year", parsed[0].name());
     Assertions.assertEquals("dt", ((NamedReference) parsed[0].arguments()[0]).fieldName()[0]);
@@ -183,11 +188,41 @@ public class TestClickHouseTableSqlUtils {
   @Test
   void testNestedDayAndQuotedColumn() {
     Transform[] parsed =
-        ClickHouseTableSqlUtils.parsePartitioning("toYYYYMMDD(toDateTime(`event-time`))");
+        ClickHouseTableSqlUtils.parsePartitioning(
+            "toYYYYMMDD(toDateTime(`event-time`))",
+            Map.of("dt", "DateTime", "event-time", "DateTime"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals(
         "toYYYYMMDD(`event-time`)", ClickHouseTableSqlUtils.toPartitionExpression(parsed[0]));
     Assertions.assertEquals(
         "day", ClickHouseTableSqlUtils.parsePartitioning("toDate(dt)")[0].name());
+  }
+
+  @Test
+  void testNestedConversionsRequireSafeNativeColumnType() {
+    for (String type :
+        new String[] {
+          "String",
+          "UInt32",
+          "Date",
+          "Date32",
+          "DateTime64(0)",
+          "DateTime64(3)",
+          "DateTime('Asia/Shanghai')"
+        }) {
+      Assertions.assertEquals(
+          0,
+          ClickHouseTableSqlUtils.parsePartitioning("toYYYYMM(toDate(dt))", Map.of("dt", type))
+              .length,
+          type);
+    }
+    Assertions.assertEquals(
+        0, ClickHouseTableSqlUtils.parsePartitioning("toYYYYMM(toDate(dt))").length);
+    for (String type : new String[] {"String", "UInt32", "Date32", "DateTime64(3)"}) {
+      Assertions.assertEquals(
+          0,
+          ClickHouseTableSqlUtils.parsePartitioning("toDate(dt)", Map.of("dt", type)).length,
+          type);
+    }
   }
 }
