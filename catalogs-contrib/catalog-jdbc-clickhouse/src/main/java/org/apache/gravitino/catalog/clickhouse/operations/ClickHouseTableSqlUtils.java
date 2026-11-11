@@ -490,9 +490,9 @@ final class ClickHouseTableSqlUtils {
   }
 
   /**
-   * Extracts a single column through unary date/time conversions, with bounded nesting. Only
-   * toDate/toDateTime wrappers are removed: arbitrary functions can change the partition value.
-   * Explicit time zones and other multi-argument conversions remain unsupported.
+   * Extracts a single column through unary toDate conversions, with bounded nesting. Other wrappers
+   * can change the partition value and are not removed. Explicit time zones and other
+   * multi-argument conversions remain unsupported.
    */
   @Nullable
   static String extractInnermostField(@Nullable String expression) {
@@ -503,9 +503,7 @@ final class ClickHouseTableSqlUtils {
         return identifier;
       }
       Matcher matcher = FUNCTION_WRAPPER_PATTERN.matcher(current);
-      if (!matcher.matches()
-          || !(StringUtils.equalsIgnoreCase(matcher.group(1), "toDate")
-              || StringUtils.equalsIgnoreCase(matcher.group(1), "toDateTime"))) {
+      if (!matcher.matches() || !StringUtils.equalsIgnoreCase(matcher.group(1), "toDate")) {
         return null;
       }
       current = StringUtils.trim(matcher.group(2));
@@ -557,7 +555,7 @@ final class ClickHouseTableSqlUtils {
       // toDate accepts strings/numbers and narrows wider temporal ranges. Replacing those casts
       // with toYYYYMMDD(column) would change values or fail, so retain their native expression.
       String nativeType = identifier == null ? null : nativeColumnTypes.get(identifier);
-      if (nativeType != null && !"Date".equals(nativeType) && !"DateTime".equals(nativeType)) {
+      if (nativeType != null && !"Date".equals(nativeType)) {
         return null;
       }
       return identifier == null ? null : Transforms.day(identifier);
@@ -614,10 +612,10 @@ final class ClickHouseTableSqlUtils {
       return identifier;
     }
     identifier = extractInnermostField(expression);
-    // Only plain DateTime is proven safe for these unary conversions. Date32/DateTime64 may
-    // overflow when narrowed, Date may overflow toDateTime, and strings/numbers require casts.
-    // Without native type metadata, or with an explicit source timezone, keep the native key.
-    return identifier != null && "DateTime".equals(nativeColumnTypes.get(identifier))
+    // toDate is an identity only for native Date. Other input types can overflow or require
+    // casts. Even DateTime can cross the epoch boundary in a non-UTC timezone when converted
+    // to Date. Without this identity guarantee, retain the native key instead of dropping casts.
+    return identifier != null && "Date".equals(nativeColumnTypes.get(identifier))
         ? identifier
         : null;
   }

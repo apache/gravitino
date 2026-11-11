@@ -1541,18 +1541,18 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         Statement statement = connection.createStatement()) {
       for (String[] expression :
           new String[][] {
-            {"toYYYYMMDD(event_time)", "toYYYYMMDD(event_time)", "day"},
-            {"toDate(event_time)", "toYYYYMMDD(event_time)", "day"},
-            {"toYYYYMM(toDate(event_time))", "toYYYYMM(event_time)", "month"},
-            {"toYear(toDate(event_time))", "toYear(event_time)", "year"}
+            {"toYYYYMMDD(event_time)", "toYYYYMMDD(event_time)", "day", "DateTime"},
+            {"toDate(event_time)", "toYYYYMMDD(event_time)", "day", "Date"},
+            {"toYYYYMM(toDate(event_time))", "toYYYYMM(event_time)", "month", "Date"},
+            {"toYear(toDate(event_time))", "toYear(event_time)", "year", "Date"}
           }) {
         String source = RandomStringUtils.randomAlphabetic(16);
         String target = source + "_copy";
         try {
           statement.execute(
               String.format(
-                  "CREATE TABLE %s.%s (event_time DateTime) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
-                  TEST_DB_NAME, source, expression[0]));
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, source, expression[3], expression[0]));
           JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), source);
           Assertions.assertArrayEquals(
               new Transform[] {
@@ -1596,6 +1596,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                 containerSuite.getClickHouseContainer().getUsername(),
                 containerSuite.getClickHouseContainer().getPassword());
         Statement statement = connection.createStatement()) {
+      // DateTime -> Date can clamp the epoch boundary even though the source type is temporal.
+      try (ResultSet result =
+          statement.executeQuery(
+              "SELECT toYear(toDateTime(0, 'America/New_York')), "
+                  + "toYear(toDate(toDateTime(0, 'America/New_York')))")) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(1969, result.getInt(1));
+        Assertions.assertEquals(1970, result.getInt(2));
+      }
       for (String[] definition :
           new String[][] {
             {"String", "toYYYYMM(toDate(event_time))"},
@@ -1605,6 +1614,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             {"DateTime64(3)", "toYear(toDate(event_time))"},
             {"DateTime('Asia/Shanghai')", "toYear(toDate(event_time))"},
             {"Date", "toYear(toDateTime(event_time))"},
+            {"DateTime", "toYear(toDate(event_time))"},
+            {"DateTime", "toDate(event_time)"},
             {"String", "toDate(event_time)"},
             {"UInt32", "toDate(event_time)"}
           }) {

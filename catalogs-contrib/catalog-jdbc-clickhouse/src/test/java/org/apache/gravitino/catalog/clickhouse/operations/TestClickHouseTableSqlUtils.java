@@ -99,13 +99,13 @@ public class TestClickHouseTableSqlUtils {
   @Test
   void testExtractInnermostFieldNested() {
     Assertions.assertEquals(
-        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDateTime(toDate(dt))"));
+        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDate(toDate(dt))"));
   }
 
   @Test
   void testExtractInnermostFieldNestedYear() {
     Assertions.assertEquals(
-        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDate(toDateTime(dt))"));
+        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDate(toDate(toDate(dt)))"));
   }
 
   @Test
@@ -149,7 +149,7 @@ public class TestClickHouseTableSqlUtils {
   void testParsePartitioningNestedToYYYYMM() {
     Transform[] parsed =
         ClickHouseTableSqlUtils.parsePartitioning(
-            "toYYYYMM(toDate(dt))", Map.of("dt", "DateTime", "event-time", "DateTime"));
+            "toYYYYMM(toDate(dt))", Map.of("dt", "Date", "event-time", "Date"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals("month", parsed[0].name());
     Assertions.assertEquals("dt", ((NamedReference) parsed[0].arguments()[0]).fieldName()[0]);
@@ -159,7 +159,7 @@ public class TestClickHouseTableSqlUtils {
   void testParsePartitioningNestedToYear() {
     Transform[] parsed =
         ClickHouseTableSqlUtils.parsePartitioning(
-            "toYear(toDate(dt))", Map.of("dt", "DateTime", "event-time", "DateTime"));
+            "toYear(toDate(dt))", Map.of("dt", "Date", "event-time", "Date"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals("year", parsed[0].name());
     Assertions.assertEquals("dt", ((NamedReference) parsed[0].arguments()[0]).fieldName()[0]);
@@ -180,6 +180,7 @@ public class TestClickHouseTableSqlUtils {
           0, ClickHouseTableSqlUtils.parsePartitioning(expression).length, expression);
     }
     Assertions.assertNull(ClickHouseTableSqlUtils.extractInnermostField(null));
+    Assertions.assertNull(ClickHouseTableSqlUtils.extractInnermostField("toDateTime(dt)"));
     Assertions.assertNull(
         ClickHouseTableSqlUtils.extractInnermostField(
             "toDate(".repeat(10) + "dt" + ")".repeat(10)));
@@ -189,8 +190,7 @@ public class TestClickHouseTableSqlUtils {
   void testNestedDayAndQuotedColumn() {
     Transform[] parsed =
         ClickHouseTableSqlUtils.parsePartitioning(
-            "toYYYYMMDD(toDateTime(`event-time`))",
-            Map.of("dt", "DateTime", "event-time", "DateTime"));
+            "toYYYYMMDD(toDate(`event-time`))", Map.of("dt", "Date", "event-time", "Date"));
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals(
         "toYYYYMMDD(`event-time`)", ClickHouseTableSqlUtils.toPartitionExpression(parsed[0]));
@@ -204,7 +204,7 @@ public class TestClickHouseTableSqlUtils {
         new String[] {
           "String",
           "UInt32",
-          "Date",
+          "DateTime",
           "Date32",
           "DateTime64(0)",
           "DateTime64(3)",
@@ -218,7 +218,7 @@ public class TestClickHouseTableSqlUtils {
     }
     Assertions.assertEquals(
         0, ClickHouseTableSqlUtils.parsePartitioning("toYYYYMM(toDate(dt))").length);
-    for (String type : new String[] {"String", "UInt32", "Date32", "DateTime64(3)"}) {
+    for (String type : new String[] {"String", "UInt32", "DateTime", "Date32", "DateTime64(3)"}) {
       Assertions.assertEquals(
           0,
           ClickHouseTableSqlUtils.parsePartitioning("toDate(dt)", Map.of("dt", type)).length,
