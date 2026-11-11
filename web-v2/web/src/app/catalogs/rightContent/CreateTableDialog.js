@@ -76,6 +76,53 @@ import { useAppDispatch } from '@/lib/hooks/useStore'
 const { Paragraph } = Typography
 const { TextArea } = Input
 
+const normalizeColumnDefaultValue = expression => {
+  if (!expression || typeof expression !== 'object') return expression
+
+  switch (expression.type) {
+    case 'literal':
+      return {
+        type: 'literal',
+        dataType: expression.dataType || 'string',
+        value: expression.value
+      }
+
+    case 'field': {
+      const fieldName = expression.fieldName
+
+      return {
+        type: 'field',
+        fieldName: Array.isArray(fieldName) ? fieldName : [fieldName]
+      }
+    }
+
+    case 'function': {
+      const functionArgs = expression.functionArgs || expression.funcArgs || []
+
+      return {
+        type: 'function',
+        functionName: expression.functionName || expression.funcName,
+        functionArgs: functionArgs.map(normalizeColumnDefaultValue)
+      }
+    }
+
+    case 'unparsed':
+      return {
+        type: 'unparsed',
+        unparsedExpression: expression.unparsedExpression
+      }
+
+    default:
+      return expression.type
+        ? expression
+        : {
+            type: 'literal',
+            dataType: expression.dataType || 'string',
+            value: expression.value
+          }
+  }
+}
+
 export default function CreateTableDialog({ ...props }) {
   const {
     open,
@@ -620,39 +667,7 @@ export default function CreateTableDialog({ ...props }) {
                   column['autoIncrement'] = col.autoIncrement
                 }
                 if (col.defaultValue) {
-                  switch (col.defaultValue.type) {
-                    case 'field':
-                      column['defaultValue'] = {
-                        type: 'field',
-                        fieldName: [col.defaultValue?.fieldName]
-                      }
-                      break
-                    case 'function':
-                      column['defaultValue'] = {
-                        type: 'function',
-                        funcName: col.defaultValue?.funcName,
-                        funcArgs: col.defaultValue?.funcArgs.map(f => {
-                          const func = {}
-                          if (f.type === 'literal') {
-                            func['type'] = 'literal'
-                            func['dataType'] = 'string'
-                            func['value'] = f.value
-                          } else {
-                            func['type'] = 'field'
-                            func['fieldName'] = [f.fieldName]
-                          }
-
-                          return func
-                        })
-                      }
-                      break
-                    default:
-                      column['defaultValue'] = {
-                        type: 'literal',
-                        dataType: col.defaultValue?.dataType || 'string',
-                        value: col.defaultValue?.value
-                      }
-                  }
+                  column['defaultValue'] = normalizeColumnDefaultValue(col.defaultValue)
                 }
 
                 return column
@@ -963,7 +978,6 @@ export default function CreateTableDialog({ ...props }) {
                       <Switch
                         size='small'
                         disabled={
-                          !!editTable ||
                           !ColumnTypeSupportAutoIncrement.includes(values?.columns[subField.name]?.typeObj?.type)
                         }
                       />

@@ -186,6 +186,13 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
           nullable: newColumnsMap[key].nullable
         })
       }
+      if (Boolean(originalColumnsMap[key].autoIncrement) !== Boolean(newColumnsMap[key].autoIncrement)) {
+        updates.push({
+          '@type': 'updateColumnAutoIncrement',
+          fieldName: [newColumnsMap[key].name],
+          autoIncrement: Boolean(newColumnsMap[key].autoIncrement)
+        })
+      }
       if (JSON.stringify(originalColumnsMap[key].defaultValue) !== JSON.stringify(newColumnsMap[key].defaultValue)) {
         updates.push({
           '@type': 'updateColumnDefaultValue',
