@@ -93,6 +93,13 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
         getConverter(catalogPropertiesWithBypassUrl)
             .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
     Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+
+    // jdbc-url is not parsed for the base-url when flink.bypass.base-url is set.
+    catalogPropertiesWithBypassUrl.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, "jdbc:invalid");
+    properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
   }
 
   @Test

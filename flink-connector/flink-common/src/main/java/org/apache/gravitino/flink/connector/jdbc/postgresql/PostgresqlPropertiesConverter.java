@@ -52,8 +52,7 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
   /**
    * For PostgreSQL, a Flink "database" is a Gravitino schema, so 'default-database' names the
    * schema Flink starts in, while JDBC connections always target the catalog's PostgreSQL database.
-   * That database is resolved from jdbc-database, or from jdbc-url when jdbc-database is not set,
-   * and also serves as 'default-database' when that is not set.
+   * That database is resolved from jdbc-database, or from jdbc-url when jdbc-database is not set.
    */
   @Override
   public Map<String, String> toFlinkCatalogProperties(Map<String, String> gravitinoProperties) {
@@ -69,8 +68,6 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
     if (StringUtils.isNotBlank(connectionDatabase)) {
       flinkCatalogProperties.put(
           JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, connectionDatabase);
-      flinkCatalogProperties.putIfAbsent(
-          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
     }
     return flinkCatalogProperties;
   }
@@ -100,6 +97,9 @@ public class PostgresqlPropertiesConverter extends JdbcPropertiesConverter {
   }
 
   private static String getDatabaseFromJdbcUrl(String jdbcUrl) {
+    if (jdbcUrl == null) {
+      return null;
+    }
     Matcher matcher = JDBC_URL_DATABASE_PATTERN.matcher(jdbcUrl);
     return matcher.find() ? matcher.group(1) : null;
   }

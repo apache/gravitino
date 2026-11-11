@@ -121,9 +121,9 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
   }
 
   @Test
-  public void testDefaultDatabaseFromJdbcUrl() {
-    // Without jdbc-database and flink.bypass.default-database, the database in jdbc-url is both
-    // the connection database and the Flink default database.
+  public void testConnectionDatabaseFromJdbcUrl() {
+    // Without jdbc-database, the database in jdbc-url is the connection database, but not the
+    // Flink default database, which names a schema.
     Map<String, String> catalogPropertiesWithUrlDatabase = new HashMap<>(catalogProperties);
     catalogPropertiesWithUrlDatabase.remove(FLINK_BYPASS_DEFAULT_DATABASE);
     catalogPropertiesWithUrlDatabase.put(
@@ -134,8 +134,7 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
         getConverter(catalogPropertiesWithUrlDatabase)
             .toFlinkCatalogProperties(catalogPropertiesWithUrlDatabase);
 
-    Assertions.assertEquals(
-        "myDatabase",
+    Assertions.assertNull(
         flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
     Assertions.assertEquals(
         "myDatabase",

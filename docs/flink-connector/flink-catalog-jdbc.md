@@ -47,7 +47,11 @@ Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.defau
 flink.bypass.default-database=db  
 ```
 
-For a PostgreSQL catalog, a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself. `flink.bypass.default-database` sets the schema Flink uses after `USE CATALOG` (for example, `public`) and falls back to the PostgreSQL database when not set. The JDBC connection always targets `jdbc-database`, or the database in `jdbc-url` when `jdbc-database` is not set. `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
+For a PostgreSQL catalog, a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself. `flink.bypass.default-database` sets the schema Flink uses after `USE CATALOG` (for example, `public`) and falls back to `jdbc-database` when not set. The JDBC connection always targets `jdbc-database`, or the database in `jdbc-url` when `jdbc-database` is not set. `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
+
+:::note
+`flink.bypass.default-database` does not select the PostgreSQL database to connect to. If you previously set it to a PostgreSQL database name for that purpose, set `jdbc-database` instead.
+:::
 
 If Flink must reach the database through a different address than the Gravitino server, set `flink.bypass.base-url` (for example, `jdbc:postgresql://127.0.0.1:5432/`). It overrides the `base-url` derived from `jdbc-url`.
 
@@ -145,5 +149,5 @@ Gravitino Flink connector will transform below property names which are defined 
 | `jdbc-url`                      | `base-url`                         | JDBC URL for the catalog. `flink.bypass.base-url` overrides the derived `base-url`.               |
 | `username`                      | `username`                         | Username of the account                                                                           |
 | `password`                      | `password`                         | Password of the account                                                                           |
-| `flink.bypass.default-database` | `default-database`                 | Default database. For PostgreSQL, the default schema; falls back to the PostgreSQL database.      |
+| `flink.bypass.default-database` | `default-database`                 | Default database. For PostgreSQL, the default schema; falls back to `jdbc-database`.              |
 | `jdbc-database`                 | (see above)                        | The PostgreSQL database the catalog connects to. Optional when `jdbc-url` contains the database.  |

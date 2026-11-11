@@ -73,8 +73,10 @@ public abstract class JdbcPropertiesConverter
     // The URL in FlinkJdbcCatalog does not support database and other parameters. An explicit
     // flink.bypass.base-url takes precedence, so Flink clients can reach the database through a
     // different address than the Gravitino server.
-    flinkCatalogProperties.putIfAbsent(
-        JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+    if (!flinkCatalogProperties.containsKey(JdbcPropertiesConstants.FLINK_JDBC_URL)) {
+      flinkCatalogProperties.put(
+          JdbcPropertiesConstants.FLINK_JDBC_URL, getBaseUrlFromJdbcUrl(gravitinoJdbcUrl));
+    }
 
     // Default the Flink catalog's 'default-database' option from the Gravitino jdbc-database
     // property when it was not already supplied (e.g. via flink.bypass.default-database).
