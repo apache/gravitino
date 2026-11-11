@@ -47,6 +47,7 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -574,6 +575,26 @@ public class LanceRESTServiceIT extends BaseIT {
             "lance.storage.a", "value_va",
             "lance.storage.b", "value_vb");
 
+    LanceNamespaceException denied =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "overwrite"));
+    Assertions.assertTrue(
+        denied.getMessage().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertEquals(
+        location,
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA_NAME, ids.get(2)))
+            .properties()
+            .get(Table.PROPERTY_LOCATION));
+    Assertions.assertTrue(new File(location).exists());
+    Assertions.assertFalse(new File(newLocation).exists());
+    catalog =
+        metalake.alterCatalog(
+            CATALOG_NAME,
+            CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
+
     response =
         Assertions.assertDoesNotThrow(
             () -> createTable(ids, newLocation, overwriteTableProperties, body, "overwrite"));
@@ -1055,7 +1076,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testDropTable() {
-    catalog = createCatalog(CATALOG_NAME);
+    catalog = createCatalog(CATALOG_NAME, true);
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
@@ -1239,7 +1260,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testDropTableWhenLocationMissingOrNotCreated() throws IOException {
-    catalog = createCatalog(CATALOG_NAME);
+    catalog = createCatalog(CATALOG_NAME, true);
     createSchema();
 
     // Register a valid dataset, then remove its location before dropping the table
@@ -1293,9 +1314,14 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    return createCatalog(catalogName, false);
+  }
+
+  private Catalog createCatalog(String catalogName, boolean allowExternalPurge) {
     Map<String, String> catalogProperties =
         ImmutableMap.<String, String>builder()
             .putAll(properties)
+            .put("lance.allow-external-table-purge", Boolean.toString(allowExternalPurge))
             .put("lance.storage.endpoint", MINIO_ENDPOINT)
             .put("lance.storage.allow_http", "true")
             .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)

@@ -127,8 +127,21 @@ versioned metadata reads are not implemented.
 :::
 
 **DropTable vs DeregisterTable**:
-- **DropTable**: Permanently deletes metadata and data files from storage
+- **DropTable**: Permanently deletes metadata and data files when permitted by the catalog policy
 - **DeregisterTable**: Removes metadata from Gravitino but preserves Lance data files
+
+The generic catalog rejects purging external or registered Lance tables by default, before removing
+table metadata or deleting files. Lance REST reports this as HTTP `406` (`UnsupportedOperation`). Tables
+created, declared or registered through Lance REST are external, so this default also applies to them.
+Use `DeregisterTable` to remove their metadata while retaining their data.
+
+A catalog administrator can set `lance.allow-external-table-purge=true` on the `lakehouse-generic`
+catalog to permit physical deletion. This catalog-only setting also applies to create `OVERWRITE`
+when it replaces an existing external table. A table property or request header cannot enable it.
+Existing catalogs must explicitly opt in to retain their previous destructive drop/overwrite behavior.
+Enabling it permits deletion at caller-supplied locations; it does not verify storage ownership or
+provide isolation between tables. Enable it only when table owners are trusted to delete data at
+locations they can register. Underlying storage permissions still apply.
 
 
 ## Deployment
