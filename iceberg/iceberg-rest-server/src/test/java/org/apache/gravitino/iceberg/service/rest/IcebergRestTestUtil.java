@@ -38,6 +38,7 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.IcebergRequestBodyReaderInterceptor;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceEventDispatcher;
@@ -54,6 +55,7 @@ import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.iceberg.service.provider.StaticIcebergConfigProvider;
+import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.iceberg.catalog.Namespace;
@@ -87,6 +89,16 @@ public class IcebergRestTestUtil {
   public static final String RENAME_VIEW_PATH = V_1 + "/views/rename";
   public static final String REPORT_METRICS_POSTFIX = "metrics";
 
+  /** Factory for creating {@link IcebergCatalogWrapperManager} instances in tests. */
+  @FunctionalInterface
+  public interface WrapperManagerFactory {
+    IcebergCatalogWrapperManager create(
+        Map<String, String> properties,
+        IcebergConfigProvider configProvider,
+        boolean auxMode,
+        String metalakeName);
+  }
+
   public static final boolean DEBUG_SERVER_LOG_ENABLED = true;
 
   public static ResourceConfig getIcebergResourceConfig(Class c) {
@@ -95,10 +107,22 @@ public class IcebergRestTestUtil {
 
   public static ResourceConfig getIcebergResourceConfig(
       Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
+    return getIcebergResourceConfig(
+        c, bindIcebergTableOps, eventListenerPlugins, IcebergCatalogWrapperManagerForTest::new);
+  }
+
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      WrapperManagerFactory wrapperManagerFactory) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
-    resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
+    resourceConfig
+        .register(IcebergObjectMapperProvider.class)
+        .register(JacksonFeature.withoutExceptionMappers());
     resourceConfig.register(IcebergExceptionMapper.class);
+    resourceConfig.register(IcebergRequestBodyReaderInterceptor.class);
 
     if (DEBUG_SERVER_LOG_ENABLED) {
       resourceConfig.register(
@@ -140,7 +164,7 @@ public class IcebergRestTestUtil {
       configProvider.initialize(catalogConf);
       // used to override register table interface
       IcebergCatalogWrapperManager icebergCatalogWrapperManager =
-          new IcebergCatalogWrapperManagerForTest(
+          wrapperManagerFactory.create(
               catalogConf, configProvider, false, configProvider.getMetalakeName());
       IcebergRESTServerContext.create(
           configProvider, false, false, true, icebergCatalogWrapperManager);
@@ -166,6 +190,7 @@ public class IcebergRestTestUtil {
               icebergNamespaceOperationExecutor, eventBus, configProvider.getMetalakeName());
 
       IcebergMetricsManager icebergMetricsManager = new IcebergMetricsManager(new IcebergConfig());
+      IcebergReadRestrictionLoader readRestrictionLoader = IcebergReadRestrictionLoader.load();
       resourceConfig.register(
           new AbstractBinder() {
             @Override
@@ -173,6 +198,7 @@ public class IcebergRestTestUtil {
               bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(2);
               bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(2);
               bind(icebergTableEventDispatcher).to(IcebergTableOperationDispatcher.class).ranked(2);
+              bind(readRestrictionLoader).to(IcebergReadRestrictionLoader.class).ranked(2);
               bind(icebergViewEventDispatcher).to(IcebergViewOperationDispatcher.class).ranked(2);
               bind(icebergNamespaceEventDispatcher)
                   .to(IcebergNamespaceOperationDispatcher.class)
@@ -185,7 +211,7 @@ public class IcebergRestTestUtil {
 
   static HttpServletRequest createMockHttpRequest() {
     HttpServletRequest mockRequest = mock(HttpServletRequest.class);
-    when(mockRequest.getRemoteHost()).thenReturn("localhost");
+    when(mockRequest.getRemoteAddr()).thenReturn("127.0.0.1");
     when(mockRequest.getHeaderNames()).thenReturn(Collections.emptyEnumeration());
     return mockRequest;
   }

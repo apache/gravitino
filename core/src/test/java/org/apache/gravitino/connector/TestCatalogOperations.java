@@ -130,9 +130,17 @@ public class TestCatalogOperations
 
   public final Map<NameIdentifier, View> views;
 
+  private final Map<String, String> config;
+
+  private boolean reportNoColumnsOnCreate;
+
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
+
+  public static final String VALIDATE_ON_CREATE = "validate-on-create";
+
+  public static final String FAIL_INITIALIZE = "fail-initialize";
 
   private static final String SLASH = "/";
 
@@ -145,12 +153,17 @@ public class TestCatalogOperations
     modelVersions = Maps.newHashMap();
     modelAliasToVersion = Maps.newHashMap();
     views = Maps.newHashMap();
+    this.config = config == null ? ImmutableMap.of() : ImmutableMap.copyOf(config);
   }
 
   @Override
   public void initialize(
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertyMetadata)
-      throws RuntimeException {}
+      throws RuntimeException {
+    if (config != null && "true".equals(config.get(FAIL_INITIALIZE))) {
+      throw new IllegalArgumentException("Simulated: backend rejected catalog configuration");
+    }
+  }
 
   @Override
   public void close() throws IOException {}
@@ -160,6 +173,16 @@ public class TestCatalogOperations
     return tables.keySet().stream()
         .filter(testTable -> testTable.namespace().equals(namespace))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /** Makes {@link #createTable} return a table without a column list, as a broken source would. */
+  public void setReportNoColumnsOnCreate(boolean reportNoColumnsOnCreate) {
+    this.reportNoColumnsOnCreate = reportNoColumnsOnCreate;
+  }
+
+  /** Replaces a table, e.g. with one whose source reports no column list. */
+  public void replaceTable(NameIdentifier ident, TestTable table) {
+    tables.put(ident, table);
   }
 
   @Override
@@ -225,7 +248,7 @@ public class TestCatalogOperations
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
         .withAuditInfo(auditInfo)
-        .withColumns(sortedColumns)
+        .withColumns(reportNoColumnsOnCreate ? null : sortedColumns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withPartitioning(partitions)
@@ -879,6 +902,22 @@ public class TestCatalogOperations
   }
 
   @Override
+  public void testConnection(NameIdentifier catalogIdent) {
+    // Mirror a JDBC-style backend probe: fail when the catalog was created with FAIL_TEST=true.
+    if ("true".equals(config.get(FAIL_TEST))) {
+      throw new ConnectionFailedException("Connection failed");
+    }
+    // A catalog that opts into create-time verification mirrors a reachable JDBC backend: the probe
+    // succeeds. Otherwise keep the interface default (unsupported) so the standalone testConnection
+    // REST path still reports that this test catalog does not support connection testing.
+    if ("true".equals(config.get(VALIDATE_ON_CREATE))) {
+      return;
+    }
+    throw new UnsupportedOperationException(
+        String.format("Catalog %s does not support connection testing", catalogIdent));
+  }
+
+  @Override
   public void testConnection(
       NameIdentifier name,
       Catalog.Type type,
@@ -1427,6 +1466,9 @@ public class TestCatalogOperations
   }
 
   private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
+    if (columns == null) {
+      return null;
+    }
     Map<String, Column> columnMap =
         Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
 

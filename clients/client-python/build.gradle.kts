@@ -186,11 +186,22 @@ tasks {
     args = listOf("scripts/generate_version.py")
   }
 
-  val integrationTest by registering(VenvTask::class) {
-    doFirst {
+  val stopGravitinoServer by registering {
+    doLast {
+      gravitinoServer("stop")
+    }
+  }
+
+  val startGravitinoServer by registering {
+    finalizedBy(stopGravitinoServer)
+    doLast {
       gravitinoServer("start")
     }
+  }
 
+  val integrationTest by registering(VenvTask::class) {
+    dependsOn(startGravitinoServer)
+    finalizedBy(stopGravitinoServer)
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
@@ -213,9 +224,66 @@ tasks {
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
     ))
     environment = envMap
+  }
 
+  val rayIcebergPythonVersion = project.rootProject.extra["pythonVersion"].toString()
+  val rayIcebergOsDir = when {
+    org.gradle.internal.os.OperatingSystem.current().isMacOsX -> "MacOSX"
+    org.gradle.internal.os.OperatingSystem.current().isLinux -> "Linux"
+    else -> throw GradleException("Ray Iceberg IT only supports macOS and Linux")
+  }
+  val rayIcebergMiniforgeDir =
+    project.file("${project.rootDir}/.gradle/python/$rayIcebergOsDir/Miniforge3")
+  val rayIcebergCondaExecutable = rayIcebergMiniforgeDir.resolve("bin/conda")
+  val rayIcebergEnvDir =
+    project.layout.buildDirectory.dir("ray-iceberg-it-env").get().asFile
+  val rayIcebergPythonExecutable = rayIcebergEnvDir.resolve("bin/python")
+
+  val rayIcebergDependencies by registering {
+    group = "verification"
+    description = "Install the dependencies for the Ray Iceberg IT."
+    dependsOn("miniforgeSetup")
     doLast {
-      gravitinoServer("stop")
+      if (!rayIcebergPythonExecutable.exists()) {
+        project.exec {
+          executable = rayIcebergCondaExecutable.absolutePath
+          args = listOf(
+            "create", "--prefix", rayIcebergEnvDir.absolutePath,
+            "python=$rayIcebergPythonVersion", "--yes"
+          )
+        }
+      }
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        args = listOf(
+          "-m", "pip", "install", "-e", ".", "-r", "requirements-ray-iceberg.txt"
+        )
+      }
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir
+        args = listOf("scripts/generate_version.py")
+      }
+    }
+  }
+
+  register("rayIcebergIT") {
+    group = "verification"
+    description = "Run the Gravitino Iceberg REST contract test with Ray Data."
+    dependsOn(rayIcebergDependencies, startGravitinoServer)
+    finalizedBy(stopGravitinoServer)
+    doLast {
+      project.exec {
+        executable = rayIcebergPythonExecutable.absolutePath
+        workingDir = projectDir.resolve("./tests/integration")
+        environment("PROJECT_VERSION", project.version)
+        environment("GRAVITINO_HOME", project.rootDir.path + "/distribution/package")
+        environment("START_EXTERNAL_GRAVITINO", "true")
+        environment("RAY_ICEBERG_IT_REQUIRED", "true")
+        environment("PYTHONPATH", "${project.rootDir.path}/clients/client-python")
+        args = listOf("-m", "unittest", "-v", "test_ray_iceberg")
+      }
     }
   }
 

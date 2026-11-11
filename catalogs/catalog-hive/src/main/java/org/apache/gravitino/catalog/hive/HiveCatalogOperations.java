@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -71,6 +70,8 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.hive.CachedClientPool;
 import org.apache.gravitino.hive.HiveSchema;
 import org.apache.gravitino.hive.HiveTable;
+import org.apache.gravitino.hive.client.HiveClient;
+import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -84,12 +85,13 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -101,6 +103,8 @@ public class HiveCatalogOperations
   public static final Logger LOG = LoggerFactory.getLogger(HiveCatalogOperations.class);
 
   @VisibleForTesting CachedClientPool clientPool;
+
+  private volatile HiveVersion hiveVersion;
 
   @SuppressWarnings("UnusedVariable")
   private CatalogInfo info;
@@ -197,7 +201,6 @@ public class HiveCatalogOperations
       clientPool.close();
       clientPool = null;
     }
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   /**
@@ -494,7 +497,7 @@ public class HiveCatalogOperations
       return new HiveTableHandle(table, clientPool);
 
     } catch (InterruptedException e) {
-      throw new RuntimeException(
+      throw ExceptionMessages.wrap(
           "Failed to load Hive table " + tableIdent.name() + " from Hive metastore", e);
     }
   }
@@ -580,6 +583,14 @@ public class HiveCatalogOperations
 
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distributions.NONE) {
+      // NONE can also arrive as a DTO rather than the singleton used by the Java API.
+      boolean unbucketed =
+          distribution.strategy() == Strategy.NONE
+              && distribution.number() == 0
+              && distribution.expressions().length == 0;
+      Preconditions.checkArgument(
+          distribution.strategy() == Strategy.HASH || unbucketed,
+          "Hive only supports HASH distribution, or NONE with zero buckets and no expressions");
       boolean allNameReference =
           Arrays.stream(distribution.expressions())
               .allMatch(t -> t instanceof NamedReference.FieldReference);
@@ -724,6 +735,11 @@ public class HiveCatalogOperations
           TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
           updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
+          if (!currentTable.originalStorageColumns().isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot alter columns of a SerDe-derived table through Gravitino. "
+                    + "Update the schema through the table SerDe or its external schema definition.");
+          }
           applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
@@ -742,9 +758,18 @@ public class HiveCatalogOperations
               targetDatabaseName);
 
       HiveTable finalUpdatedTable = updatedTable;
+      // For property-only or comment-only changes, skip the metastore statistics recomputation so
+      // it does not access the table's storage location. This keeps such lightweight alters from
+      // hanging when the underlying filesystem (e.g. HDFS NameNode) is slow or unavailable.
+      boolean skipStatsUpdate = canSkipStatsUpdate(changes);
       clientPool.run(
           c -> {
-            c.alterTable(catalogName, schemaIdent.name(), tableIdent.name(), finalUpdatedTable);
+            c.alterTable(
+                catalogName,
+                schemaIdent.name(),
+                tableIdent.name(),
+                finalUpdatedTable,
+                skipStatsUpdate);
             return null;
           });
 
@@ -766,6 +791,29 @@ public class HiveCatalogOperations
     } catch (InterruptedException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Determines whether the metastore statistics recomputation can be skipped for the given table
+   * changes. Statistics are tied to the table data, so recomputation is only meaningful when the
+   * data layout may change. Property-only and comment-only alters never touch the data, so they can
+   * safely skip the recomputation (and the storage-location access it triggers). Any column change
+   * or rename falls back to the default behavior.
+   *
+   * @param changes The table changes to be applied.
+   * @return {@code true} if every change is a property or comment change; {@code false} otherwise.
+   */
+  @VisibleForTesting
+  static boolean canSkipStatsUpdate(TableChange[] changes) {
+    if (changes == null || changes.length == 0) {
+      return false;
+    }
+    return Arrays.stream(changes)
+        .allMatch(
+            change ->
+                change instanceof TableChange.SetProperty
+                    || change instanceof TableChange.RemoveProperty
+                    || change instanceof TableChange.UpdateComment);
   }
 
   private HiveTable buildAlteredHiveTable(
@@ -790,7 +838,9 @@ public class HiveCatalogOperations
     if (comment != null) {
       builder.withComment(comment);
     }
-    return builder.build();
+    HiveTable altered = builder.build();
+    altered.setOriginalStorageColumns(original.originalStorageColumns());
+    return altered;
   }
 
   private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {
@@ -1017,18 +1067,9 @@ public class HiveCatalogOperations
    * Performs `getAllDatabases` operation in Hive Metastore to test the connection.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       clientPool.run(c -> c.getAllDatabases(catalogName));
     } catch (ConnectionFailedException e) {
@@ -1069,6 +1110,33 @@ public class HiveCatalogOperations
 
   CachedClientPool getClientPool() {
     return clientPool;
+  }
+
+  /**
+   * Returns the version of the connected Hive Metastore. The version is resolved once from the
+   * client pool and cached, since it cannot change for the lifetime of the catalog.
+   *
+   * @return The connected Hive Metastore version.
+   */
+  HiveVersion hiveVersion() {
+    if (hiveVersion == null) {
+      synchronized (this) {
+        if (hiveVersion == null) {
+          Preconditions.checkState(
+              clientPool != null, "Hive catalog operations are not initialized");
+          try {
+            hiveVersion =
+                Preconditions.checkNotNull(
+                    clientPool.run(HiveClient::hiveVersion),
+                    "Hive client returned a null metastore version");
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw ExceptionMessages.wrap("Failed to resolve Hive Metastore version", e);
+          }
+        }
+      }
+    }
+    return hiveVersion;
   }
 
   @VisibleForTesting

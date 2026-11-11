@@ -18,9 +18,10 @@
  */
 package org.apache.gravitino.catalog.glue;
 
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import lombok.ToString;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.connector.BaseSchema;
 import org.apache.gravitino.meta.AuditInfo;
 import software.amazon.awssdk.services.glue.model.Database;
@@ -40,6 +41,7 @@ public class GlueSchema extends BaseSchema {
    *   <li>{@code Database.name()} → {@code name}
    *   <li>{@code Database.description()} → {@code comment} (nullable)
    *   <li>{@code Database.parameters()} → {@code properties}
+   *   <li>{@code Database.locationUri()} → {@code properties["location"]}
    *   <li>{@code Database.createTime()} → {@code auditInfo.createTime}
    * </ul>
    *
@@ -49,8 +51,15 @@ public class GlueSchema extends BaseSchema {
   public static GlueSchema fromGlueDatabase(Database database) {
     AuditInfo auditInfo = AuditInfo.builder().withCreateTime(database.createTime()).build();
 
-    Map<String, String> props =
-        database.parameters() != null ? database.parameters() : Collections.emptyMap();
+    Map<String, String> props = new HashMap<>();
+    if (database.parameters() != null) {
+      props.putAll(database.parameters());
+    }
+    // The database location lives in LocationUri; a "location" parameter left by earlier
+    // versions is only used when LocationUri is not set.
+    if (StringUtils.isNotBlank(database.locationUri())) {
+      props.put(GlueConstants.LOCATION, database.locationUri());
+    }
 
     return GlueSchema.builder()
         .withName(database.name())

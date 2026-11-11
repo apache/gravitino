@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.authorization.User;
@@ -31,15 +30,11 @@ import org.apache.gravitino.dto.AuditDTO;
 /** Represents a User Data Transfer Object (DTO). */
 public class UserDTO implements User {
 
+  @JsonProperty("id")
+  private Long id;
+
   @JsonProperty("name")
   private String name;
-
-  @Nullable
-  @JsonProperty("externalId")
-  private String externalId;
-
-  @JsonProperty("enabled")
-  private boolean enabled = true;
 
   @JsonProperty("audit")
   private AuditDTO audit;
@@ -53,19 +48,24 @@ public class UserDTO implements User {
   /**
    * Creates a new instance of UserDTO.
    *
+   * @param id The id of the User DTO.
    * @param name The name of the User DTO.
-   * @param externalId The external id of the User DTO.
    * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
-   * @param enabled Whether the User DTO is enabled.
    */
-  protected UserDTO(
-      String name, String externalId, List<String> roles, AuditDTO audit, boolean enabled) {
+  protected UserDTO(Long id, String name, List<String> roles, AuditDTO audit) {
+    this.id = id;
     this.name = name;
-    this.externalId = externalId;
-    this.enabled = enabled;
     this.audit = audit;
     this.roles = roles;
+  }
+
+  /**
+   * @return The id of the User DTO.
+   */
+  @Override
+  public Long id() {
+    return id;
   }
 
   /**
@@ -74,16 +74,6 @@ public class UserDTO implements User {
   @Override
   public String name() {
     return name;
-  }
-
-  @Override
-  public String externalId() {
-    return externalId;
-  }
-
-  @Override
-  public boolean enabled() {
-    return enabled;
   }
 
   /**
@@ -120,20 +110,28 @@ public class UserDTO implements User {
    */
   public static class Builder<S extends Builder> {
 
+    /** The id of the user. */
+    protected Long id;
+
     /** The name of the user. */
     protected String name;
-
-    /** The external id of the user. */
-    protected String externalId;
-
-    /** Whether the user is enabled. */
-    protected boolean enabled = true;
 
     /** The roles of the user. */
     protected List<String> roles = Collections.emptyList();
 
     /** The audit information of the user. */
     protected AuditDTO audit;
+
+    /**
+     * Sets the id of the user.
+     *
+     * @param id The id of the user.
+     * @return The builder instance.
+     */
+    public S withId(Long id) {
+      this.id = id;
+      return (S) this;
+    }
 
     /**
      * Sets the name of the user.
@@ -143,28 +141,6 @@ public class UserDTO implements User {
      */
     public S withName(String name) {
       this.name = name;
-      return (S) this;
-    }
-
-    /**
-     * Sets the external id of the user.
-     *
-     * @param externalId The external id of the user.
-     * @return The builder instance.
-     */
-    public S withExternalId(String externalId) {
-      this.externalId = externalId;
-      return (S) this;
-    }
-
-    /**
-     * Sets whether the user is enabled.
-     *
-     * @param enabled Whether the user is enabled.
-     * @return The builder instance.
-     */
-    public S withEnabled(boolean enabled) {
-      this.enabled = enabled;
       return (S) this;
     }
 
@@ -200,9 +176,10 @@ public class UserDTO implements User {
      * @throws IllegalArgumentException If the name or audit are not set.
      */
     public UserDTO build() {
+      Preconditions.checkArgument(id != null, "id cannot be null");
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
-      return new UserDTO(name, externalId, roles, audit, enabled);
+      return new UserDTO(id, name, roles, audit);
     }
   }
 }

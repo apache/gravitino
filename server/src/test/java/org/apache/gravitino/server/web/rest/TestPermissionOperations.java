@@ -22,8 +22,11 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
@@ -48,6 +51,7 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
@@ -90,6 +94,7 @@ public class TestPermissionOperations extends BaseOperationsTest {
   private static final AccessControlManager manager = mock(AccessControlManager.class);
   private static final MetalakeDispatcher metalakeDispatcher = mock(MetalakeDispatcher.class);
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+  private static final ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
   private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -111,7 +116,12 @@ public class TestPermissionOperations extends BaseOperationsTest {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "accessControlDispatcher", manager, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "metalakeDispatcher", metalakeDispatcher, true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalMetalakeDispatcher", metalakeDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalTableDispatcher", tableDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalModelDispatcher", modelDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -135,6 +145,49 @@ public class TestPermissionOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  /** Rejects internal tag privileges for grant, revoke and override operations. */
+  @Test
+  public void testInternalTagPrivilegesAreHidden() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    PrivilegeDTO privilege =
+        PrivilegeDTO.builder()
+            .withName(Privilege.Name.APPLY_TAG)
+            .withCondition(Privilege.Condition.ALLOW)
+            .build();
+    String path = "/metalakes/metalake1/permissions/roles/role1";
+    SecurableObjectDTO tag =
+        SecurableObjectDTO.builder()
+            .withFullName("GRAVITINO_HIDDEN_123")
+            .withType(MetadataObject.Type.TAG)
+            .withPrivileges(new PrivilegeDTO[] {privilege})
+            .build();
+    try (Response grant =
+            target(path + "/tag/GRAVITINO_HIDDEN_123/grant")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeGrantRequest(Lists.newArrayList(privilege))));
+        Response revoke =
+            target(path + "/tag/GRAVITINO_HIDDEN_123/revoke")
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeRevokeRequest(Lists.newArrayList(privilege))));
+        Response override =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new PrivilegeOverrideRequest(new SecurableObjectDTO[] {tag})))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), grant.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), revoke.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), override.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
   }
 
   @Test
@@ -528,6 +581,36 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testGrantPrivilegeRejectsMissingModel() throws IOException {
+    clearInvocations(manager, modelDispatcher);
+    when(modelDispatcher.modelExists(any())).thenReturn(false);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    PrivilegeGrantRequest request =
+        new PrivilegeGrantRequest(
+            Lists.newArrayList(
+                PrivilegeDTO.builder()
+                    .withName(Privilege.Name.USE_MODEL)
+                    .withCondition(Privilege.Condition.ALLOW)
+                    .build()));
+    try (Response response =
+        target("/metalakes/metalake1/permissions/roles/role1/model/catalog.schema.model/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains("catalog.schema.model"));
+    }
+    verify(modelDispatcher).modelExists(any());
+    verify(manager, never()).grantPrivilegeToRole(any(), any(), any(), any());
+  }
+
+  @Test
   public void testGrantPrivilegesToRole() throws IOException {
     RoleEntity roleEntity =
         RoleEntity.builder()
@@ -711,6 +794,24 @@ public class TestPermissionOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testOverridePrivilegesRejectsMissingAndNullOverrides() {
+    for (String json : new String[] {"{}", "{\"overrides\":null}", "{\"overrides\":[null]}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/permissions/roles/role1")
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .put(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+        Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+        Assertions.assertTrue(error.getMessage().contains("overrides"));
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).overridePrivilegesInRole(any(), any(), any());
+  }
+
+  @Test
   public void testOverridePrivileges() throws IOException {
     // Mock metalake with in-use property
     BaseMetalake metalake = mock(BaseMetalake.class);
@@ -811,5 +912,82 @@ public class TestPermissionOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testGrantRolesToUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testGrantRolesToGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/groups/group1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokeRolesFromUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokeRolesFromGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testGrantPrivilegeToRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokePrivilegeFromRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testOverrideRolePrivilegesWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 }

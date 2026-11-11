@@ -1,0 +1,185 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.trino.connector.system.storedprocedure;
+
+import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import io.trino.spi.TrinoException;
+import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Unit tests for {@link DropCatalogStoredProcedure} covering the server-side fallback path added
+ * for issue #11401.
+ */
+public class TestDropCatalogStoredProcedure {
+
+  private static final String METALAKE = "test_metalake";
+  private static final String CATALOG = "test_catalog";
+  private static final String TRINO_CATALOG = "test_metalake.test_catalog";
+
+  @Test
+  public void testMetalakeArgumentOverridesConfiguredMetalake() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake other = mock(GravitinoMetalake.class);
+    when(manager.getTrinoCatalogName("other", CATALOG)).thenReturn("other." + CATALOG);
+    when(manager.getCatalogConnector("other." + CATALOG)).thenReturn(null);
+    when(manager.getMetalake("other")).thenReturn(other);
+    when(other.dropCatalog(CATALOG, true)).thenReturn(true);
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    assertDoesNotThrow(() -> procedure.dropCatalog(CATALOG, false, "other"));
+
+    verify(other, times(1)).dropCatalog(CATALOG, true);
+    verify(manager, never()).getMetalake(METALAKE);
+  }
+
+  @Test
+  public void testTrinoNameHeldByAnotherMetalakeIsNotDropped() {
+    // With unqualified names another metalake's catalog may hold the Trino name. The lookup is by
+    // metalake, so the procedure falls back to the server for the metalake it was asked for and
+    // the other metalake is never touched.
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    CatalogConnectorContext otherContext = mock(CatalogConnectorContext.class);
+    GravitinoMetalake otherMetalake = mock(GravitinoMetalake.class);
+    GravitinoMetalake requested = mock(GravitinoMetalake.class);
+    when(manager.getTrinoCatalogName(anyString(), eq(CATALOG))).thenReturn(CATALOG);
+    when(manager.getCatalogConnector(CATALOG)).thenReturn(otherContext);
+    when(manager.getCatalogConnector("other", CATALOG)).thenReturn(otherContext);
+    when(otherContext.getMetalake()).thenReturn(otherMetalake);
+    when(manager.getMetalake(METALAKE)).thenReturn(requested);
+    when(requested.dropCatalog(CATALOG, true)).thenReturn(true);
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    assertDoesNotThrow(() -> procedure.dropCatalog(CATALOG, false, null));
+
+    verify(requested, times(1)).dropCatalog(CATALOG, true);
+    verify(otherMetalake, never()).dropCatalog(anyString(), anyBoolean());
+  }
+
+  @Test
+  public void testMetalakeArgumentRequiredWithoutConfiguredMetalake() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, null);
+
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, null));
+    assertEquals(GravitinoErrorCode.GRAVITINO_MISSING_CONFIG.toErrorCode(), error.getErrorCode());
+    assertTrue(error.getMessage().contains("METALAKE"), error.getMessage());
+    // Blank counts as not passed.
+    assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, " "));
+    verify(manager, never()).getMetalake(anyString());
+  }
+
+  @Test
+  public void testDropCatalogFallsBackToServerWhenLocalCacheMissesAndServerHasIt() {
+    // The local connector cache does not have the catalog, but the Gravitino server does.
+    // The procedure must call the server-side drop and succeed without throwing "not exists".
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+
+    when(manager.getTrinoCatalogName(METALAKE, CATALOG)).thenReturn(TRINO_CATALOG);
+    when(manager.getCatalogConnector(TRINO_CATALOG)).thenReturn(null);
+    when(manager.getMetalake(METALAKE)).thenReturn(metalake);
+    when(metalake.dropCatalog(CATALOG, true)).thenReturn(true);
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    assertDoesNotThrow(() -> procedure.dropCatalog(CATALOG, false, null));
+
+    verify(metalake, times(1)).dropCatalog(CATALOG, true);
+  }
+
+  @Test
+  public void testDropCatalogThrowsWhenAbsentEverywhereAndIgnoreNotExistFalse() {
+    // Catalog is absent from both the local cache and the server, ignoreNotExist=false.
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+
+    when(manager.getTrinoCatalogName(METALAKE, CATALOG)).thenReturn(TRINO_CATALOG);
+    when(manager.getCatalogConnector(TRINO_CATALOG)).thenReturn(null);
+    when(manager.getMetalake(METALAKE)).thenReturn(metalake);
+    when(metalake.dropCatalog(CATALOG, true)).thenReturn(false);
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, null));
+    assertTrue(
+        error.getMessage().contains("not exists"),
+        () -> "Expected message to contain 'not exists' but was: " + error.getMessage());
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS.toErrorCode(), error.getErrorCode());
+  }
+
+  @Test
+  public void testDropCatalogReturnsSilentlyWhenAbsentEverywhereAndIgnoreNotExistTrue() {
+    // Catalog is absent from both the local cache and the server, ignoreNotExist=true.
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+
+    when(manager.getTrinoCatalogName(METALAKE, CATALOG)).thenReturn(TRINO_CATALOG);
+    when(manager.getCatalogConnector(TRINO_CATALOG)).thenReturn(null);
+    when(manager.getMetalake(METALAKE)).thenReturn(metalake);
+    when(metalake.dropCatalog(CATALOG, true)).thenReturn(false);
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    assertDoesNotThrow(() -> procedure.dropCatalog(CATALOG, true, null));
+
+    // We DID consult the server, but no exception was thrown.
+    verify(metalake, times(1)).dropCatalog(CATALOG, true);
+    // Local-cache reload should NOT be triggered when the local connector was already absent.
+    verify(manager, never()).catalogConnectorExist(anyString());
+  }
+
+  @Test
+  public void testDropCatalogDeniedIsPermissionDenied() {
+    String message = "User joel is not authorized to perform operation dropCatalog";
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    when(manager.getMetalake(METALAKE)).thenReturn(metalake);
+    when(metalake.dropCatalog(CATALOG, true)).thenThrow(new ForbiddenException(message));
+
+    DropCatalogStoredProcedure procedure = new DropCatalogStoredProcedure(manager, METALAKE);
+
+    TrinoException error =
+        assertThrows(TrinoException.class, () -> procedure.dropCatalog(CATALOG, false, null));
+    assertEquals(PERMISSION_DENIED.toErrorCode(), error.getErrorCode());
+    assertEquals(message, error.getMessage());
+  }
+}

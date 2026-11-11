@@ -24,7 +24,8 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.apache.commons.lang3.ArrayUtils;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -36,6 +37,10 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listViews(Namespace)}) are
+ * assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class ViewNormalizeDispatcher implements ViewDispatcher {
 
   private final CatalogManager catalogManager;
@@ -51,8 +56,7 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listViews(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listViews(caseSensitiveNs);
   }
 
   @Override
@@ -75,6 +79,8 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
       @Nullable String defaultSchema,
       Map<String, String> properties)
       throws NoSuchSchemaException, ViewAlreadyExistsException {
+    // Check the defaults before the underlying catalog creates the view.
+    checkDefaultsLength(defaultCatalog, defaultSchema);
     return dispatcher.createView(
         normalizeNameIdentifier(ident),
         comment,
@@ -88,6 +94,12 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    for (ViewChange change : changes) {
+      if (change instanceof ViewChange.ReplaceView) {
+        ViewChange.ReplaceView replaceView = (ViewChange.ReplaceView) change;
+        checkDefaultsLength(replaceView.getDefaultCatalog(), replaceView.getDefaultSchema());
+      }
+    }
     Capability capability = getCapability(ident, catalogManager);
     return dispatcher.alterView(
         normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
@@ -108,12 +120,15 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
     return applyCaseSensitive(ident, Capability.Scope.VIEW, capabilities);
   }
 
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] idents) {
-    if (ArrayUtils.isEmpty(idents)) {
-      return idents;
-    }
-    Capability capabilities = getCapability(idents[0], catalogManager);
-    return applyCaseSensitive(idents, Capability.Scope.VIEW, capabilities);
+  private static void checkDefaultsLength(
+      @Nullable String defaultCatalog, @Nullable String defaultSchema) {
+    EntityFieldLimits.checkMaxLength(
+        defaultCatalog,
+        EntityFieldLimits.MAX_NAME_LENGTH,
+        "default catalog",
+        Entity.EntityType.VIEW);
+    EntityFieldLimits.checkMaxLength(
+        defaultSchema, EntityFieldLimits.MAX_NAME_LENGTH, "default schema", Entity.EntityType.VIEW);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {

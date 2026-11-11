@@ -19,7 +19,9 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.FunctionVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -38,53 +40,43 @@ public class FunctionVersionMetaBaseSQLProvider {
         + " #{functionVersionMeta.deletedAt})";
   }
 
-  public String insertFunctionVersionMetaOnDuplicateKeyUpdate(
-      @Param("functionVersionMeta") FunctionVersionPO functionVersionPO) {
-    return "INSERT INTO "
-        + FunctionVersionMetaMapper.TABLE_NAME
-        + " (metalake_id, catalog_id, schema_id, function_id, version,"
-        + " function_comment, definitions, audit_info, deleted_at)"
-        + " VALUES (#{functionVersionMeta.metalakeId}, #{functionVersionMeta.catalogId},"
-        + " #{functionVersionMeta.schemaId}, #{functionVersionMeta.functionId},"
-        + " #{functionVersionMeta.functionVersion}, #{functionVersionMeta.functionComment},"
-        + " #{functionVersionMeta.definitions}, #{functionVersionMeta.auditInfo},"
-        + " #{functionVersionMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " function_comment = #{functionVersionMeta.functionComment},"
-        + " definitions = #{functionVersionMeta.definitions},"
-        + " audit_info = #{functionVersionMeta.auditInfo},"
-        + " deleted_at = #{functionVersionMeta.deletedAt}";
-  }
-
   public String softDeleteFunctionVersionMetasBySchemaIds(
       @Param("schemaIds") List<Long> schemaIds) {
     return "<script>"
         + "UPDATE "
         + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        // History follows the stable entity ID, not the parent recorded in each snapshot.
+        // Include deleted roots: cascade cleanup soft-deletes roots before their versions.
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ") AND deleted_at = 0"
+        + ")) AND deleted_at = 0"
         + "</script>";
   }
 
   public String softDeleteFunctionVersionMetasByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
   }
 
   public String softDeleteFunctionVersionMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE function_id IN (SELECT function_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
   }
 
   public String deleteFunctionVersionMetasByLegacyTimeline(
@@ -110,8 +102,8 @@ public class FunctionVersionMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "UPDATE "
         + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE function_id = #{functionId} AND version <= #{versionRetentionLine}"
         + " AND deleted_at = 0 LIMIT #{limit}";
   }
@@ -119,8 +111,8 @@ public class FunctionVersionMetaBaseSQLProvider {
   public String softDeleteFunctionVersionsByFunctionId(@Param("functionId") Long functionId) {
     return "UPDATE "
         + FunctionVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE function_id = #{functionId} AND deleted_at = 0";
   }
 }

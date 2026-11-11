@@ -171,7 +171,9 @@ echo "Verified: $INPUT_TAG exists"
 DOCKER_STATE_DIR="${RELEASE_STATE_DIR:-$SELF/.release-state}/${INPUT_TAG}"
 DOCKER_STATE_FILE="${DOCKER_STATE_DIR}/${STATE_KEY}.done"
 
-if [[ "$DRY_RUN" == "false" ]] && [[ -f "$DOCKER_STATE_FILE" ]]; then
+# A dry-run marker records the preview, so it must not stand in for a real run.
+if [[ "$DRY_RUN" == "false" ]] && [[ -f "$DOCKER_STATE_FILE" ]] &&
+  ! grep -q '^dry_run=true$' "$DOCKER_STATE_FILE"; then
   echo ""
   echo "=== Stage '${STATE_KEY}' is already complete ==="
   cat "$DOCKER_STATE_FILE"

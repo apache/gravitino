@@ -20,13 +20,19 @@ package org.apache.gravitino.idp.model;
 
 import java.util.List;
 import java.util.Objects;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.idp.dto.IdpGroupDTO;
+import org.apache.gravitino.meta.AuditInfo;
 
 /** Built-in IdP group. */
-public class IdpGroup {
+public class IdpGroup implements Auditable {
 
   private final String name;
+  private final String comment;
   private final List<String> usernames;
+  private final AuditInfo auditInfo;
 
   /**
    * Creates a built-in IdP group.
@@ -35,8 +41,33 @@ public class IdpGroup {
    * @param usernames The usernames in the group.
    */
   public IdpGroup(String name, List<String> usernames) {
+    this(name, usernames, "", AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates a built-in IdP group.
+   *
+   * @param name The group name.
+   * @param usernames The usernames in the group.
+   * @param comment The group comment, or empty if none.
+   */
+  public IdpGroup(String name, List<String> usernames, String comment) {
+    this(name, usernames, comment, AuditInfo.EMPTY);
+  }
+
+  /**
+   * Creates a built-in IdP group.
+   *
+   * @param name The group name.
+   * @param usernames The usernames in the group.
+   * @param comment The group comment, or empty if none.
+   * @param auditInfo Audit information.
+   */
+  public IdpGroup(String name, List<String> usernames, String comment, AuditInfo auditInfo) {
     this.name = name;
     this.usernames = usernames;
+    this.comment = comment == null ? "" : comment;
+    this.auditInfo = auditInfo == null ? AuditInfo.EMPTY : auditInfo;
   }
 
   /** Returns the group name. */
@@ -44,9 +75,19 @@ public class IdpGroup {
     return name;
   }
 
+  /** Returns the group comment, or an empty string if none. */
+  public String comment() {
+    return comment;
+  }
+
   /** Returns the usernames in the group. */
   public List<String> usernames() {
     return usernames;
+  }
+
+  @Override
+  public Audit auditInfo() {
+    return auditInfo;
   }
 
   /**
@@ -55,7 +96,12 @@ public class IdpGroup {
    * @return the group DTO
    */
   public IdpGroupDTO toDTO() {
-    return IdpGroupDTO.builder().withName(name).withUsers(usernames).build();
+    return IdpGroupDTO.builder()
+        .withName(name)
+        .withComment(comment)
+        .withUsers(usernames)
+        .withAudit(DTOConverters.toDTO(auditInfo))
+        .build();
   }
 
   @Override
@@ -67,16 +113,27 @@ public class IdpGroup {
       return false;
     }
     IdpGroup that = (IdpGroup) other;
-    return Objects.equals(name, that.name) && Objects.equals(usernames, that.usernames);
+    return Objects.equals(name, that.name)
+        && Objects.equals(comment, that.comment)
+        && Objects.equals(usernames, that.usernames)
+        && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, usernames);
+    return Objects.hash(name, comment, usernames, auditInfo);
   }
 
   @Override
   public String toString() {
-    return "IdpGroup{name='" + name + "', usernames=" + usernames + '}';
+    return "IdpGroup{name='"
+        + name
+        + "', comment='"
+        + comment
+        + "', usernames="
+        + usernames
+        + ", auditInfo="
+        + auditInfo
+        + '}';
   }
 }

@@ -1,17 +1,18 @@
 ---
-title: "Optimizer Extension Guide"
+title: "Extension Guide"
 slug: "/table-maintenance-service/extension-guide"
-keyword: "table maintenance, optimizer, extension, provider, ServiceLoader"
+keywords:
+  - table maintenance
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Use this guide when built-in optimizer components do not match your environment and you need custom implementations.
+Use this guide when the built-in components do not match your environment and you need custom implementations.
 
 ## Extension Model
 
-Optimizer supports three loading patterns:
+The service supports three loading patterns:
 
 1. `Provider` SPI (`name()` + `initialize()`): loaded by `ServiceLoader` and selected by config value.
 2. Class-name mapping for strategy handlers and job adapters.
@@ -19,21 +20,21 @@ Optimizer supports three loading patterns:
 
 ## Extension Points and Config Keys
 
-| Area | Interface / type | Config key | Loading mode |
-| --- | --- | --- | --- |
-| Recommender statistics | `StatisticsProvider` | `gravitino.optimizer.recommender.statisticsProvider` | `Provider` SPI by `name()` |
-| Recommender strategy source | `StrategyProvider` | `gravitino.optimizer.recommender.strategyProvider` | `Provider` SPI by `name()` |
-| Recommender table metadata | `TableMetadataProvider` | `gravitino.optimizer.recommender.tableMetaProvider` | `Provider` SPI by `name()` |
-| Recommender job submission | `JobSubmitter` | `gravitino.optimizer.recommender.jobSubmitter` | `Provider` SPI by `name()` |
-| Strategy evaluation logic | `StrategyHandler` | `gravitino.optimizer.strategyHandler.<strategyType>.className` | Reflection by class name |
-| Job template adaptation | `GravitinoJobAdapter` | `gravitino.optimizer.jobAdapter.<jobTemplate>.className` | Reflection by class name |
-| Update statistics sink | `StatisticsUpdater` | `gravitino.optimizer.updater.statisticsUpdater` | `Provider` SPI by `name()` |
-| Update metrics sink | `MetricsUpdater` | `gravitino.optimizer.updater.metricsUpdater` | `Provider` SPI by `name()` |
-| Monitor metrics source | `MetricsProvider` | `gravitino.optimizer.monitor.metricsProvider` | `Provider` SPI by `name()` |
-| Monitor table-job relation | `TableJobRelationProvider` | `gravitino.optimizer.monitor.tableJobRelationProvider` | `Provider` SPI by `name()` |
-| Monitor evaluator | `MetricsEvaluator` | `gravitino.optimizer.monitor.metricsEvaluator` | Typed SPI (`ServiceLoader<MetricsEvaluator>`) |
-| Monitor callbacks | `MonitorCallback` | `gravitino.optimizer.monitor.callbacks` | `Provider` SPI by `name()` (comma-separated) |
-| CLI calculator | `StatisticsCalculator` | CLI `--calculator-name` | Typed SPI (`ServiceLoader<StatisticsCalculator>`) |
+| Area                        | Interface / type           | Config key                                                     | Loading mode                                      |
+|-----------------------------|----------------------------|----------------------------------------------------------------|---------------------------------------------------|
+| Recommender statistics      | `StatisticsProvider`       | `gravitino.optimizer.recommender.statisticsProvider`           | `Provider` SPI by `name()`                        |
+| Recommender strategy source | `StrategyProvider`         | `gravitino.optimizer.recommender.strategyProvider`             | `Provider` SPI by `name()`                        |
+| Recommender table metadata  | `TableMetadataProvider`    | `gravitino.optimizer.recommender.tableMetaProvider`            | `Provider` SPI by `name()`                        |
+| Recommender job submission  | `JobSubmitter`             | `gravitino.optimizer.recommender.jobSubmitter`                 | `Provider` SPI by `name()`                        |
+| Strategy evaluation logic   | `StrategyHandler`          | `gravitino.optimizer.strategyHandler.<strategyType>.className` | Reflection by class name                          |
+| Job template adaptation     | `GravitinoJobAdapter`      | `gravitino.optimizer.jobAdapter.<jobTemplate>.className`       | Reflection by class name                          |
+| Update statistics sink      | `StatisticsUpdater`        | `gravitino.optimizer.updater.statisticsUpdater`                | `Provider` SPI by `name()`                        |
+| Update metrics sink         | `MetricsUpdater`           | `gravitino.optimizer.updater.metricsUpdater`                   | `Provider` SPI by `name()`                        |
+| Monitor metrics source      | `MetricsProvider`          | `gravitino.optimizer.monitor.metricsProvider`                  | `Provider` SPI by `name()`                        |
+| Monitor table-job relation  | `TableJobRelationProvider` | `gravitino.optimizer.monitor.tableJobRelationProvider`         | `Provider` SPI by `name()`                        |
+| Monitor evaluator           | `MetricsEvaluator`         | `gravitino.optimizer.monitor.metricsEvaluator`                 | Typed SPI (`ServiceLoader<MetricsEvaluator>`)     |
+| Monitor callbacks           | `MonitorCallback`          | `gravitino.optimizer.monitor.callbacks`                        | `Provider` SPI by `name()` (comma-separated)      |
+| CLI calculator              | `StatisticsCalculator`     | CLI `--calculator-name`                                        | Typed SPI (`ServiceLoader<StatisticsCalculator>`) |
 
 ## Implement a Custom Provider
 
@@ -48,7 +49,7 @@ public class MyStatisticsProvider implements StatisticsProvider {
 
   @Override
   public void initialize(OptimizerEnv optimizerEnv) {
-    // Initialize clients/resources from optimizer config.
+    // Initialize clients and resources from the configuration file.
   }
 
   @Override
@@ -110,8 +111,8 @@ Notes:
 ## Package and Deploy
 
 - Build a JAR containing your classes and `META-INF/services` files.
-- Put the JAR on optimizer runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
-- Restart optimizer process before testing.
+- Put the JAR on the runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
+- Restart the process before testing.
 
 If you also extend Gravitino server job execution, see [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md).
 
@@ -124,7 +125,7 @@ If you also extend Gravitino server job execution, see [Manage jobs in Gravitino
 
 ## Related
 
-- [Table Maintenance Service (Optimizer)](./optimizer.md)
-- [Optimizer Configuration](./optimizer-configuration.md)
-- [Optimizer CLI Reference](./optimizer-cli-reference.md)
-- [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
+- [Table Maintenance Service](./optimizer.md)
+- [Configuration](./optimizer-configuration.md)
+- [CLI Reference](./optimizer-cli-reference.md)
+- [Troubleshooting](./optimizer-troubleshooting.md)

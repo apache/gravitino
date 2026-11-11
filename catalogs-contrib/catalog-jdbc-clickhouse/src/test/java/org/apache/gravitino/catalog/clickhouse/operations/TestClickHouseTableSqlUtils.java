@@ -98,13 +98,13 @@ public class TestClickHouseTableSqlUtils {
   @Test
   void testExtractInnermostFieldNested() {
     Assertions.assertEquals(
-        "dt", ClickHouseTableSqlUtils.extractInnermostField("toYYYYMM(toDate(dt))"));
+        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDateTime(toDate(dt))"));
   }
 
   @Test
   void testExtractInnermostFieldNestedYear() {
     Assertions.assertEquals(
-        "dt", ClickHouseTableSqlUtils.extractInnermostField("toYear(toDate(dt))"));
+        "dt", ClickHouseTableSqlUtils.extractInnermostField("toDate(toDateTime(dt))"));
   }
 
   @Test
@@ -158,5 +158,36 @@ public class TestClickHouseTableSqlUtils {
     Assertions.assertEquals(1, parsed.length);
     Assertions.assertEquals("year", parsed[0].name());
     Assertions.assertEquals("dt", ((NamedReference) parsed[0].arguments()[0]).fieldName()[0]);
+  }
+
+  @Test
+  void testUnsupportedNestedExpressionsRemainUnsupported() {
+    for (String expression :
+        new String[] {
+          "toYear(toString(dt))",
+          "toYYYYMM(abs(dt))",
+          "toYYYYMMDD(toYear(dt))",
+          "toDate(toDateTime(dt, 'UTC'))",
+          "toYear(dt + 1)",
+          "tuple(toYYYYMMDD(dt), toYear(abs(dt)))"
+        }) {
+      Assertions.assertEquals(
+          0, ClickHouseTableSqlUtils.parsePartitioning(expression).length, expression);
+    }
+    Assertions.assertNull(ClickHouseTableSqlUtils.extractInnermostField(null));
+    Assertions.assertNull(
+        ClickHouseTableSqlUtils.extractInnermostField(
+            "toDate(".repeat(10) + "dt" + ")".repeat(10)));
+  }
+
+  @Test
+  void testNestedDayAndQuotedColumn() {
+    Transform[] parsed =
+        ClickHouseTableSqlUtils.parsePartitioning("toYYYYMMDD(toDateTime(`event-time`))");
+    Assertions.assertEquals(1, parsed.length);
+    Assertions.assertEquals(
+        "toYYYYMMDD(`event-time`)", ClickHouseTableSqlUtils.toPartitionExpression(parsed[0]));
+    Assertions.assertEquals(
+        "day", ClickHouseTableSqlUtils.parsePartitioning("toDate(dt)")[0].name());
   }
 }

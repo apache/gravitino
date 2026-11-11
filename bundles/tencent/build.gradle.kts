@@ -43,12 +43,14 @@ dependencies {
   compileOnly(libs.hadoop3.client.api)
   compileOnly(libs.hadoop3.cos)
   compileOnly(libs.lombok)
+  compileOnly(libs.tencentcloud.sdk.sts)
 
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
   testImplementation(libs.hadoop3.cos)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
+  testImplementation(libs.tencentcloud.sdk.sts)
   testRuntimeOnly(libs.junit.jupiter.engine)
   testRuntimeOnly(libs.bundles.log4j)
 }

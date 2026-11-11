@@ -23,11 +23,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 public class PartitionOperationDispatcher extends OperationDispatcher
     implements PartitionDispatcher {
@@ -38,72 +38,52 @@ public class PartitionOperationDispatcher extends OperationDispatcher
    * @param catalogManager The CatalogManager instance to be used for partition operations.
    * @param store The EntityStore instance to be used for partition operations.
    * @param idGenerator The IdGenerator instance to be used for partition operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public PartitionOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   @Override
   public String[] listPartitionNames(NameIdentifier tableIdent) {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.READ,
-        () ->
-            doWithTable(
-                tableIdent, SupportsPartitions::listPartitionNames, NoSuchTableException.class));
+    return doWithTable(
+        tableIdent, SupportsPartitions::listPartitionNames, NoSuchTableException.class);
   }
 
   @Override
   public Partition[] listPartitions(NameIdentifier tableIdent) {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.READ,
-        () ->
-            doWithTable(
-                tableIdent, SupportsPartitions::listPartitions, NoSuchTableException.class));
+    return doWithTable(tableIdent, SupportsPartitions::listPartitions, NoSuchTableException.class);
   }
 
   @Override
   public Partition getPartition(NameIdentifier tableIdent, String partitionName)
       throws NoSuchPartitionException {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.READ,
-        () ->
-            doWithTable(
-                tableIdent, p -> p.getPartition(partitionName), NoSuchPartitionException.class));
+    return doWithTable(
+        tableIdent, p -> p.getPartition(partitionName), NoSuchPartitionException.class);
   }
 
   @Override
   public Partition addPartition(NameIdentifier tableIdent, Partition partition)
       throws PartitionAlreadyExistsException {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.WRITE,
-        () ->
-            doWithTable(
-                tableIdent, p -> p.addPartition(partition), PartitionAlreadyExistsException.class));
+    WritableDataTypeValidator.validatePartition(partition, "partition");
+    return doWithTable(
+        tableIdent, p -> p.addPartition(partition), PartitionAlreadyExistsException.class);
   }
 
   @Override
   public boolean dropPartition(NameIdentifier tableIdent, String partitionName) {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.WRITE,
-        () ->
-            doWithTable(
-                tableIdent, p -> p.dropPartition(partitionName), NoSuchPartitionException.class));
+    return doWithTable(
+        tableIdent, p -> p.dropPartition(partitionName), NoSuchPartitionException.class);
   }
 
   @Override
   public boolean purgePartition(NameIdentifier tableIdent, String partitionName)
       throws UnsupportedOperationException {
-    return TreeLockUtils.doWithTreeLock(
-        tableIdent,
-        LockType.WRITE,
-        () ->
-            doWithTable(
-                tableIdent, p -> p.purgePartition(partitionName), NoSuchPartitionException.class));
+    return doWithTable(
+        tableIdent, p -> p.purgePartition(partitionName), NoSuchPartitionException.class);
   }
 }

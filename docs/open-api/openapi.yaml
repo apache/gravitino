@@ -46,6 +46,7 @@ servers:
 security:
   - OAuth2WithJWT: [serviceAudience]
   - BasicAuth: []
+  - KerberosAuth: []
 
 paths:
   /health:
@@ -56,6 +57,9 @@ paths:
 
   /health/ready:
     $ref: "./health.yaml#/paths/~1health~1ready"
+
+  /system/iceberg-rest:
+    $ref: "./system.yaml#/paths/~1system~1iceberg-rest"
 
   /metalakes:
     # escape the path name by replacing `/` with `~1`
@@ -70,6 +74,12 @@ paths:
 
   /metalakes/{metalake}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D"
+
+  /metalakes/{metalake}/tags/{tag}/policies:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1policies"
+
+  /metalakes/{metalake}/tags/{tag}/policies/{policy}:
+    $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1policies~1%7Bpolicy%7D"
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags"
@@ -89,8 +99,8 @@ paths:
   /metalakes/{metalake}/policies/{policy}:
     $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D"
 
-  /metalakes/{metalake}/policies/{policy}/objects:
-    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1objects"
+  /metalakes/{metalake}/policies/{policy}/tags:
+    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1policies~1%7Bpolicy%7D~1tags"
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/roles:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1roles"
@@ -98,11 +108,11 @@ paths:
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/credentials:
     $ref: "./credentials.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1credentials"
 
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/secrets:
+    $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1secrets"
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1tags~1%7Btag%7D"
-
-  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}:
-    $ref: "./policies.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1policies~1%7Bpolicy%7D"
 
   /metalakes/{metalake}/tags/{tag}/objects:
     $ref: "./tags.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1tags~1%7Btag%7D~1objects"
@@ -112,6 +122,9 @@ paths:
 
   /metalakes/{metalake}/catalogs/testConnection:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1testConnection"
+
+  /metalakes/{metalake}/catalogs/{catalog}/testConnection:
+    $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1testConnection"
 
   /metalakes/{metalake}/catalogs/{catalog}:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D"
@@ -154,6 +167,24 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/{view}:
     $ref: "./views.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1views~1%7Bview%7D"
+
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/semantic-model-datasets:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1objects~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D~1semantic-model-datasets"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-model-metrics"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1ossie"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models/{semanticModel}/ossie:
+    $ref: "./semantic-models.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1semantic-models~1%7BsemanticModel%7D~1ossie"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/functions:
     $ref: "./functions.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1functions"
@@ -200,6 +231,24 @@ paths:
   /metalakes/{metalake}/roles/{role}:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
 
+  /bulk/metalakes/{metalake}/users/add:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1add"
+
+  /bulk/metalakes/{metalake}/users/remove:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1remove"
+
+  /bulk/metalakes/{metalake}/groups/add:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1groups~1add"
+
+  /bulk/metalakes/{metalake}/groups/remove:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1groups~1remove"
+
+  /bulk/metalakes/{metalake}/roles/add:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1roles~1add"
+
+  /bulk/metalakes/{metalake}/roles/remove:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1roles~1remove"
+
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
     $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 
@@ -241,6 +290,9 @@ paths:
 
   /authn/me:
     $ref: "./authn.yaml#/paths/~1authn~1me"
+
+  /metalakes/{metalake}/secrets/providers:
+    $ref: "./secrets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1secrets~1providers"
 
 components:
 
@@ -287,6 +339,14 @@ components:
           description: A human-readable message
         stack:
           type: array
+          deprecated: true
+          description: >-
+            Deprecated diagnostic stack trace. Operators should disable it with
+            gravitino.server.webserver.includeErrorStackTrace=false because it can expose internal
+            implementation details. It remains enabled by default only to avoid breaking legacy
+            clients that expect this field. See
+            [OWASP REST Security: Error handling](https://cheatsheetseries.owasp.org/cheatsheets/REST_Security_Cheat_Sheet.html#error-handling)
+            and [CWE-209](https://cwe.mitre.org/data/definitions/209.html).
           items:
             type: string
 
@@ -364,6 +424,43 @@ components:
             "type": "BadRequestException",
             "message": "Malformed request"
           }
+
+    ForbiddenErrorResponse:
+      description: >-
+        Forbidden - The caller is not allowed to perform the operation. When authorization
+        is enabled, a missing metalake or a caller who is not a member of the metalake
+        also returns 403.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          example:
+            code: 1008
+            type: ForbiddenException
+            message: Current user alice is not a member of metalake metalake1, or the metalake does not exist
+
+    NotAcceptableErrorResponse:
+      description: >-
+        Not Acceptable - The requested API version is unsupported, or the effective
+        Accept header cannot be served by this operation. When Accept has no Gravitino
+        API version, including application/json, */*, or an absent header, the server
+        uses the version from Content-Type if present, otherwise the default API version.
+        Both cases return HTTP 406 with a JSON ErrorModel response.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorModel"
+          examples:
+            UnsupportedApiVersion:
+              value:
+                code: 1001
+                type: IllegalArgumentException
+                message: Unsupported version v99 in request header
+            IncompatibleAccept:
+              value:
+                code: 1000
+                type: RESTException
+                message: HTTP 406 Not Acceptable
 
     ServerErrorResponse:
       description:
@@ -527,6 +624,14 @@ components:
       schema:
         type: string
 
+    semanticModel:
+      name: semanticModel
+      in: path
+      description: The name of the Semantic Model
+      required: true
+      schema:
+        type: string
+
     model:
       name: model
       in: path
@@ -594,10 +699,13 @@ components:
           - "CATALOG"
           - "SCHEMA"
           - "TABLE"
+          - "VIEW"
+          - "SEMANTIC_MODEL"
           - "COLUMN"
           - "FILESET"
           - "TOPIC"
           - "MODEL"
+          - "FUNCTION"
           - "ROLE"
     metadataObjectFullName:
       name: metadataObjectFullName
@@ -634,4 +742,3 @@ components:
     KerberosAuth:
       type: http
       scheme: negotiate
-

@@ -50,6 +50,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Table;
@@ -66,16 +67,16 @@ import org.mockito.Mockito;
 /**
  * Real multi-threaded reproduction of the repair-on-load optimistic-lock race behind #11891. Unlike
  * {@code TestLanceTableOperations#testLoadTableSurvivesConcurrentRepairVersionRace} (a
- * deterministic mock that throws one scripted {@code IOException}), this test drives {@link
+ * deterministic mock that throws one scripted conflict), this test drives {@link
  * LanceTableOperations#loadTable} from several threads at once against a {@link CasEntityStore}
  * that models the production relational store's compare-and-set semantics faithfully: every {@code
  * update} bumps a version guarded by the base version, so concurrent updates from the same base
  * conflict and exactly one wins per generation — just like {@code TableMetaService.updateTable}
  * ({@code UPDATE ... WHERE current_version = old}).
  *
- * <p>Before the CAS retry, the loser of the race got {@code IOException("Failed to update the
- * entity")}, rethrown as a fatal {@code RuntimeException} (HTTP 500). This test asserts every
- * concurrent load returns the repaired table instead.
+ * <p>Before the CAS retry, the loser of the race got an {@link OptimisticLockException}, rethrown
+ * as a fatal error (HTTP 500). This test asserts every concurrent load returns the repaired table
+ * instead.
  */
 public class TestLanceConcurrentRepairStress {
 
@@ -189,10 +190,10 @@ public class TestLanceConcurrentRepairStress {
   /**
    * In-memory {@link EntityStore} that reproduces the relational store's optimistic-lock CAS:
    * {@code update} reads a versioned snapshot, applies the (idempotent) updater, and commits only
-   * if the version has not advanced since the read — otherwise it throws {@code IOException("Failed
-   * to update the entity")}, exactly as {@code TableMetaService.updateTable} does when {@code
-   * UPDATE ... WHERE current_version = old} matches zero rows. Every commit bumps the version, so
-   * even a no-op update invalidates a concurrent update from the same base, matching production.
+   * if the version has not advanced since the read — otherwise it throws an {@link
+   * OptimisticLockException}, exactly as the relational table service does when {@code UPDATE ...
+   * WHERE current_version = old} matches zero rows. Every commit bumps the version, so even a no-op
+   * update invalidates a concurrent update from the same base, matching production.
    */
   private static final class CasEntityStore implements EntityStore {
 
@@ -230,7 +231,7 @@ public class TestLanceConcurrentRepairStress {
       if (ref.compareAndSet(base, next)) {
         return updated;
       }
-      throw new IOException("Failed to update the entity: " + ident);
+      throw new OptimisticLockException("mock conflict for %s", ident);
     }
 
     // --- unused surface ---------------------------------------------------

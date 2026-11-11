@@ -32,6 +32,30 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + "enablePaimonSupport";
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
+  /**
+   * Manually overrides the Gravitino Iceberg REST server endpoint that hive/jdbc backed
+   * lakehouse-iceberg catalogs are routed through; takes precedence over auto-discovery.
+   */
+  public static final String GRAVITINO_ICEBERG_REST_URI = GRAVITINO_PREFIX + "iceberg.rest-uri";
+
+  /** Whether hive/jdbc backed Iceberg catalogs are routed through Iceberg REST. */
+  public static final String GRAVITINO_ICEBERG_REST_ROUTING_ENABLED =
+      GRAVITINO_PREFIX + "iceberg.rest-routing-enabled";
+
+  /**
+   * Reuses the Gravitino OAuth2 client configuration for automatically routed Iceberg REST
+   * catalogs. Iceberg obtains and refreshes its own access token with the same client identity.
+   */
+  public static final String GRAVITINO_ICEBERG_REUSE_OAUTH2 =
+      GRAVITINO_PREFIX + "iceberg.reuseOAuth2";
+
+  /**
+   * Pass-through prefix for the Iceberg REST client config (e.g. rest.auth.type,
+   * rest.auth.basic.username), applied when a catalog is routed through the Iceberg REST server.
+   */
+  public static final String GRAVITINO_ICEBERG_REST_CONFIG_PREFIX =
+      GRAVITINO_PREFIX + "iceberg.rest.";
+
   public static final String GRAVITINO_AUTH_TYPE =
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_CLIENT_AUTH_TYPE;
   public static final String GRAVITINO_OAUTH2_URI =
@@ -48,6 +72,24 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + AuthProperties.GRAVITINO_BASIC_PASSWORD;
   public static final String GRAVITINO_KERBEROS_PRINCIPAL = "spark.kerberos.principal";
   public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH = "spark.kerberos.keytab";
+
+  public static final String GRAVITINO_TOKEN_VALUE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_VALUE;
+  public static final String GRAVITINO_TOKEN_FILE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_FILE;
+  public static final String GRAVITINO_TOKEN_PRINCIPAL_FIELDS =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_PRINCIPAL_FIELDS;
+  public static final String GRAVITINO_TOKEN_PRINCIPAL_FIELDS_DEFAULT = "sub";
+
+  public static final String GRAVITINO_CLIENT_CACHE_MAX_SIZE =
+      GRAVITINO_PREFIX + "clientCacheMaxSize";
+  public static final int GRAVITINO_CLIENT_CACHE_MAX_SIZE_DEFAULT = 100;
+  public static final String GRAVITINO_CLIENT_CACHE_TTL_SEC =
+      GRAVITINO_PREFIX + "clientCacheTtlSec";
+  public static final long GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT = 3600;
+  public static final String GRAVITINO_CATALOG_CACHE_TTL_SEC =
+      GRAVITINO_PREFIX + "catalogCacheTtlSec";
+  public static final long GRAVITINO_CATALOG_CACHE_TTL_SEC_DEFAULT = 300;
 
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";

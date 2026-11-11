@@ -21,6 +21,7 @@ package org.apache.gravitino.listener.api.event;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -391,8 +392,10 @@ public class TestFilesetEvent {
             any(NameIdentifier.class),
             any(String.class),
             any(Fileset.Type.class),
-            any(Map.class),
-            any(Map.class)))
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class)))
         .thenReturn(fileset);
     when(dispatcher.loadFileset(any(NameIdentifier.class))).thenReturn(fileset);
     when(dispatcher.dropFileset(any(NameIdentifier.class))).thenReturn(true);

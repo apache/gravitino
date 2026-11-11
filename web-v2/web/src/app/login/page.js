@@ -22,15 +22,17 @@
 import Image from 'next/image'
 import { useSearchParams } from 'next/navigation'
 import { Roboto } from 'next/font/google'
-import { Alert, Card, Flex, Typography } from 'antd'
+import { Alert, Card, Flex, Typography, Spin } from 'antd'
 import { cn } from '@/lib/utils/tailwind'
 import { useEffect, useState, Suspense } from 'react'
 
 import OidcLogin from './components/OidcLogin'
 import DefaultLogin from './components/DefaultLogin'
+import BasicLogin from './components/BasicLogin'
+import SimpleLogin from './components/SimpleLogin'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
 import { resetMetalakeStore } from '@/lib/store/metalakes'
-import { useAppDispatch } from '@/lib/hooks/useStore'
+import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 
 const fonts = Roboto({ subsets: ['latin'], weight: ['400'], display: 'swap' })
 
@@ -42,22 +44,54 @@ const LoginContent = () => {
   const maxDurationReason = searchParams.get('reason') === 'max_duration'
   const [providerType, setProviderType] = useState(null)
   const dispatch = useAppDispatch()
+  const authType = useAppSelector(state => state.auth.authType)
 
   useEffect(() => {
+    dispatch(resetMetalakeStore())
+
+    if (authType !== 'oauth') {
+      return
+    }
+
     const detectProviderType = async () => {
       try {
         const detectedType = await oauthProviderFactory.getProviderType()
         setProviderType(detectedType)
       } catch (error) {
-        setProviderType('default') // fallback to default provider
+        setProviderType('default')
       }
     }
 
-    dispatch(resetMetalakeStore())
     detectProviderType()
-  }, [])
+  }, [authType, dispatch])
 
-  const useOidcLogin = providerType === 'oidc'
+  const renderLogin = () => {
+    switch (authType) {
+      case 'basic':
+        return <BasicLogin />
+
+      case 'simple':
+        return <SimpleLogin />
+
+      case 'oauth':
+        if (providerType === null)
+          return (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+              <Spin />
+            </div>
+          )
+        if (providerType === 'oidc') return <OidcLogin />
+
+        return <DefaultLogin />
+
+      default:
+        return (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+            <Spin />
+          </div>
+        )
+    }
+  }
 
   return (
     <Flex justify='center' align='center' style={{ minHeight: 'calc(100vh - 7rem)' }}>
@@ -94,7 +128,7 @@ const LoginContent = () => {
           />
         )}
 
-        {useOidcLogin ? <OidcLogin /> : <DefaultLogin />}
+        {renderLogin()}
       </Card>
     </Flex>
   )

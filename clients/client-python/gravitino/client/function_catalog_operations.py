@@ -132,7 +132,10 @@ class FunctionCatalogOperations(FunctionCatalog):
         function_list_response = FunctionListResponse.from_json(resp.body)
         function_list_response.validate()
 
-        return [GenericFunction(func) for func in function_list_response.functions()]
+        return [
+            GenericFunction(func, self._rest_client, full_namespace)
+            for func in function_list_response.functions()
+        ]
 
     def get_function(self, ident: NameIdentifier) -> Function:
         """Get a function by NameIdentifier from the catalog.
@@ -158,7 +161,9 @@ class FunctionCatalogOperations(FunctionCatalog):
         function_response = FunctionResponse.from_json(resp.body)
         function_response.validate()
 
-        return GenericFunction(function_response.function())
+        return GenericFunction(
+            function_response.function(), self._rest_client, full_namespace
+        )
 
     def register_function(
         self,
@@ -211,7 +216,9 @@ class FunctionCatalogOperations(FunctionCatalog):
         function_response = FunctionResponse.from_json(resp.body)
         function_response.validate()
 
-        return GenericFunction(function_response.function())
+        return GenericFunction(
+            function_response.function(), self._rest_client, full_namespace
+        )
 
     def alter_function(
         self, ident: NameIdentifier, *changes: FunctionChange
@@ -250,7 +257,9 @@ class FunctionCatalogOperations(FunctionCatalog):
         function_response = FunctionResponse.from_json(resp.body)
         function_response.validate()
 
-        return GenericFunction(function_response.function())
+        return GenericFunction(
+            function_response.function(), self._rest_client, full_namespace
+        )
 
     def drop_function(self, ident: NameIdentifier) -> bool:
         """Drop a function from the catalog.

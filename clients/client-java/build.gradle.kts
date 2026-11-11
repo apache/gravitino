@@ -46,6 +46,7 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
+  testImplementation(project(":server-common", "testArtifacts"))
 
   testImplementation(libs.awaitility)
   testImplementation(libs.bundles.jersey)
@@ -53,6 +54,7 @@ dependencies {
   testImplementation(libs.nimbus.jose.jwt)
   testImplementation(libs.commons.lang3)
   testImplementation(libs.hadoop3.client)
+  testImplementation(libs.jackson.dataformat.yaml)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.minikdc)

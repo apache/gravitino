@@ -137,7 +137,7 @@ public final class KerberosAuthUtils {
     keytabFile.deleteOnExit();
     if (keytabFile.exists() && !keytabFile.delete()) {
       throw new IllegalStateException(
-          String.format("Fail to delete keytab file %s", keytabFile.getAbsolutePath()));
+          String.format("Failed to delete keytab file %s", keytabFile.getAbsolutePath()));
     }
     return fetchKeytabFromUri(keytabUri, keytabFile, timeoutSec, allowHdfsKeytabUri, hadoopConf);
   }
@@ -234,7 +234,7 @@ public final class KerberosAuthUtils {
     try {
       loginUgi.checkTGTAndReloginFromKeytab();
     } catch (Exception e) {
-      log.error("Fail to refresh ugi token: ", e);
+      log.error("Failed to refresh UGI token: ", e);
     }
   }
 

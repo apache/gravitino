@@ -82,6 +82,8 @@ public class TestUserRoleRelMapper {
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER))
         .thenReturn("org.h2.Driver");
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(20);
+    Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS))
+        .thenReturn(10);
     Mockito.when(config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS))
         .thenReturn(1000L);
 
@@ -166,7 +168,6 @@ public class TestUserRoleRelMapper {
             .withUserId(1L)
             .withUserName("user1")
             .withMetalakeId(1L)
-            .withEnabled(true)
             .withAuditInfo(auditInfo.toString())
             .withCurrentVersion(1L)
             .withLastVersion(0L)

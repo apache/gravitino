@@ -41,8 +41,11 @@ class TestSupportsStatistics(unittest.TestCase):
         """Test that a concrete implementation can be created."""
 
         class ConcreteStatisticValue(StatisticValue[int]):
+            def __init__(self, value: int = 50):
+                self._value = value
+
             def value(self) -> int:
-                return 50
+                return self._value
 
             def data_type(self) -> Types.IntegerType:
                 return Types.IntegerType.get()
@@ -69,9 +72,7 @@ class TestSupportsStatistics(unittest.TestCase):
                 return self._name
 
             def value(self) -> StatisticValue[int] | None:
-                val = ConcreteStatisticValue()
-                val._val = self._value  # pylint: disable=protected-access
-                return val
+                return ConcreteStatisticValue(self._value)
 
             def reserved(self) -> bool:
                 return False

@@ -85,7 +85,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_name, model.name())
         self.assertEqual(comment, model.comment())
         self.assertEqual(0, model.latest_version())
-        self.assertEqual(properties, model.properties())
+        self.assert_properties_equal(properties, model.properties())
 
         # Test register model without comment and properties
         model = self._catalog.as_model_catalog().register_model(
@@ -98,7 +98,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_name + "_no_comment_no_properties", model.name())
         self.assertIsNone(model.comment())
         self.assertEqual(0, model.latest_version())
-        self.assertEqual({}, model.properties())
+        self.assert_properties_equal({}, model.properties())
 
         ## Test register same name model again
         with self.assertRaises(ModelAlreadyExistsException):
@@ -119,7 +119,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_name, model.name())
         self.assertEqual(comment, model.comment())
         self.assertEqual(0, model.latest_version())
-        self.assertEqual(properties, model.properties())
+        self.assert_properties_equal(properties, model.properties())
 
         # Test get non-existent model
         with self.assertRaises(NoSuchModelException):
@@ -218,7 +218,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_name, renamed_model.name())
         self.assertEqual(comment, renamed_model.comment())
         self.assertEqual(0, renamed_model.latest_version())
-        self.assertEqual(properties, renamed_model.properties())
+        self.assert_properties_equal(properties, renamed_model.properties())
 
         changes = [ModelChange.rename(model_new_name)]
 
@@ -227,7 +227,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_new_name, renamed_model.name())
         self.assertEqual(comment, renamed_model.comment())
         self.assertEqual(0, renamed_model.latest_version())
-        self.assertEqual(properties, renamed_model.properties())
+        self.assert_properties_equal(properties, renamed_model.properties())
 
     def test_register_set_model_property(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -242,7 +242,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(origin_model.name(), model_name)
         self.assertEqual(origin_model.comment(), comment)
         self.assertEqual(origin_model.latest_version(), 0)
-        self.assertEqual(origin_model.properties(), properties)
+        self.assert_properties_equal(properties, origin_model.properties())
 
         changes = [
             ModelChange.set_property("k1", "v11"),
@@ -255,8 +255,8 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(update_property_model.name(), model_name)
         self.assertEqual(update_property_model.comment(), comment)
         self.assertEqual(update_property_model.latest_version(), 0)
-        self.assertEqual(
-            update_property_model.properties(), {"k1": "v11", "k2": "v2", "k3": "v3"}
+        self.assert_properties_equal(
+            {"k1": "v11", "k2": "v2", "k3": "v3"}, update_property_model.properties()
         )
 
     def test_register_remove_model_property(self):
@@ -272,7 +272,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(origin_model.name(), model_name)
         self.assertEqual(origin_model.comment(), comment)
         self.assertEqual(origin_model.latest_version(), 0)
-        self.assertEqual(origin_model.properties(), properties)
+        self.assert_properties_equal(properties, origin_model.properties())
 
         changes = [ModelChange.remove_property("k1")]
         self._catalog.as_model_catalog().alter_model(model_ident, *changes)
@@ -280,7 +280,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(update_property_model.name(), model_name)
         self.assertEqual(update_property_model.comment(), comment)
         self.assertEqual(update_property_model.latest_version(), 0)
-        self.assertEqual(update_property_model.properties(), {"k2": "v2"})
+        self.assert_properties_equal({"k2": "v2"}, update_property_model.properties())
 
     def test_register_update_model_comment(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -297,7 +297,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(origin_model.name(), model_name)
         self.assertEqual(origin_model.comment(), comment)
         self.assertEqual(origin_model.latest_version(), 0)
-        self.assertEqual(origin_model.properties(), properties)
+        self.assert_properties_equal(properties, origin_model.properties())
 
         # Alter model and validate the updated model
         changes = [ModelChange.update_comment(new_comment)]
@@ -306,7 +306,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(update_comment_model.name(), model_name)
         self.assertEqual(update_comment_model.comment(), new_comment)
         self.assertEqual(update_comment_model.latest_version(), 0)
-        self.assertEqual(update_comment_model.properties(), properties)
+        self.assert_properties_equal(properties, update_comment_model.properties())
 
     def test_link_update_model_version_comment(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -329,7 +329,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", model_version.uri())
         self.assertEqual(["alias1", "alias2"], model_version.aliases())
         self.assertEqual("comment", model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_version.properties()
+        )
 
         model_version = self._catalog.as_model_catalog().get_model_version_by_alias(
             model_ident, "alias1"
@@ -352,7 +354,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(0, updated_model_version.version())
         self.assertEqual("new comment", updated_model_version.comment())
         self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, updated_model_version.properties()
+        )
         self.assertEqual("uri", updated_model_version.uri())
 
     def test_link_update_model_version_property(self):
@@ -381,7 +385,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", original_model_version.uri())
         self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
         self.assertEqual("comment", original_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, original_model_version.properties()
+        )
 
         changes = [
             ModelVersionChange.set_property("k1", "v11"),
@@ -400,7 +406,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(update_property_model.uri(), "uri")
         self.assertEqual(update_property_model.comment(), comment)
         self.assertEqual(update_property_model.aliases(), aliases)
-        self.assertEqual(update_property_model.properties(), {"k1": "v11", "k3": "v3"})
+        self.assert_properties_equal(
+            {"k1": "v11", "k3": "v3"}, update_property_model.properties()
+        )
 
     def test_link_update_model_version_uri(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -427,7 +435,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", original_model_version.uri())
         self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
         self.assertEqual("comment", original_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, original_model_version.properties()
+        )
 
         changes = [ModelVersionChange.update_uri("new_uri")]
         self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
@@ -439,7 +449,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("new_uri", updated_model_version.uri())
         self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
         self.assertEqual("comment", updated_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, updated_model_version.properties()
+        )
 
     def test_link_add_model_version_uri(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -466,7 +478,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1"}, original_model_version.uris())
         self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
         self.assertEqual("comment", original_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, original_model_version.properties()
+        )
 
         changes = [ModelVersionChange.add_uri("n2", "u2")]
         self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
@@ -478,7 +492,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1", "n2": "u2"}, updated_model_version.uris())
         self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
         self.assertEqual("comment", updated_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, updated_model_version.properties()
+        )
 
     def test_link_remove_model_version_uri(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -505,7 +521,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1", "n2": "u2"}, original_model_version.uris())
         self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
         self.assertEqual("comment", original_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, original_model_version.properties()
+        )
 
         changes = [ModelVersionChange.remove_uri("n1")]
         self._catalog.as_model_catalog().alter_model_version(model_ident, 0, *changes)
@@ -517,7 +535,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n2": "u2"}, updated_model_version.uris())
         self.assertEqual(["alias1", "alias2"], updated_model_version.aliases())
         self.assertEqual("comment", updated_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, updated_model_version.properties()
+        )
 
     def test_link_update_model_version_aliases(self):
         model_name = f"model_it_model{str(randint(0, 1000))}"
@@ -544,7 +564,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", original_model_version.uri())
         self.assertEqual(["alias1", "alias2"], original_model_version.aliases())
         self.assertEqual("comment", original_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, original_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, original_model_version.properties()
+        )
 
         # todo
         changes = [
@@ -562,7 +584,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", updated_model_version.uri())
         self.assertEqual(["alias2", "alias3"], updated_model_version.aliases())
         self.assertEqual("comment", updated_model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, updated_model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, updated_model_version.properties()
+        )
 
     def test_link_update_model_version_aliases_from_empty(self):
         # Regression test for https://github.com/apache/gravitino/issues/9727:
@@ -649,7 +673,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", model_version.uri())
         self.assertEqual(["alias1", "alias2"], model_version.aliases())
         self.assertEqual("comment", model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_version.properties()
+        )
 
         model_version = self._catalog.as_model_catalog().get_model_version_by_alias(
             model_ident, "alias1"
@@ -694,7 +720,7 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual("uri", model_version.uri())
         self.assertEqual([], model_version.aliases())
         self.assertIsNone(model_version.comment())
-        self.assertEqual({}, model_version.properties())
+        self.assert_properties_equal({}, model_version.properties())
 
     def test_link_list_model_versions(self):
         model_name = "model_it_model" + str(randint(0, 1000))
@@ -770,7 +796,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual(model_versions[0].uri(), "uri1")
         self.assertEqual(model_versions[0].comment(), "comment")
         self.assertEqual(model_versions[0].aliases(), ["alias1", "alias2"])
-        self.assertEqual(model_versions[0].properties(), {"k1": "v1", "k2": "v2"})
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_versions[0].properties()
+        )
 
         self.assertTrue(
             self._catalog.as_model_catalog().delete_model_version(model_ident, 0)
@@ -807,7 +835,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1", "n2": "u2"}, model_version.uris())
         self.assertEqual(["alias1", "alias2"], model_version.aliases())
         self.assertEqual("comment", model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_version.properties()
+        )
 
         # Test get model version by alias
         model_version = self._catalog.as_model_catalog().get_model_version_by_alias(
@@ -843,7 +873,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1", "n2": "u2"}, model_versions[0].uris())
         self.assertEqual("comment", model_versions[0].comment())
         self.assertEqual(["alias1", "alias2"], model_versions[0].aliases())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, model_versions[0].properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_versions[0].properties()
+        )
 
     def test_get_model_version_uri(self):
         model_name = "model_it_model" + str(randint(0, 1000))
@@ -867,7 +899,9 @@ class TestModelCatalog(IntegrationTestEnv):
         self.assertEqual({"n1": "u1", "n2": "u2"}, model_version.uris())
         self.assertEqual(["alias1", "alias2"], model_version.aliases())
         self.assertEqual("comment", model_version.comment())
-        self.assertEqual({"k1": "v1", "k2": "v2"}, model_version.properties())
+        self.assert_properties_equal(
+            {"k1": "v1", "k2": "v2"}, model_version.properties()
+        )
 
         # Test get model version uri
         model_version_uri = self._catalog.as_model_catalog().get_model_version_uri(

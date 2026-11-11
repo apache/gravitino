@@ -34,7 +34,8 @@ import org.junit.jupiter.api.TestTemplate;
 /**
  * Shared cleanup-store test logic exercised against the same relational backend matrix as core
  * metadata service tests. {@link TestJDBCBackend} initializes H2 by default, adds MySQL and
- * PostgreSQL when {@code dockerTest=true}, and truncates all backend tables before each invocation.
+ * PostgreSQL when {@code dockerTest=true}, and empties the tables written to before each
+ * invocation.
  */
 abstract class AbstractIcebergCleanupJobStoreBackendTest extends TestJDBCBackend {
 

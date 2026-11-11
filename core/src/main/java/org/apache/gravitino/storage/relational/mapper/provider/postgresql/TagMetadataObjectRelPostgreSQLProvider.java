@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRe
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -31,16 +32,46 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetadataObjectRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseSQLProvider {
+  @Override
+  public String softDeleteTagMetadataObjectRelsByTagId(Long tagId) {
+    return "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE tag_id = #{tagId} AND deleted_at = 0";
+  }
+
+  @Override
+  public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      Long metadataObjectId, String metadataObjectType, List<TagMetadataObjectRelPO> tagRelPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND ("
+        + "<foreach item='item' collection='tagRels' separator=' OR '>"
+        + "(tag_id = #{item.tagId} AND tag_value = #{item.tagValue})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   @Override
   public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       String metalakeName, String tagName) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " te SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -53,7 +84,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " te SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE EXISTS (SELECT * FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id = #{metalakeId} AND tm.tag_id = te.tag_id"
@@ -66,16 +98,36 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
       @Param("metadataObjectType") String metadataObjectType) {
     return " UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND metadata_object_type = #{metadataObjectType}";
+  }
+
+  @Override
+  public String softDeleteTagMetadataObjectRelsByMetadataObjects(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE deleted_at = 0 AND metadata_object_type = #{metadataObjectType}"
+        + " AND metadata_object_id IN ("
+        + "<foreach collection='metadataObjectIds' item='metadataObjectId' separator=','>"
+        + "#{metadataObjectId}"
+        + "</foreach>"
+        + ")"
+        + "</script>";
   }
 
   @Override
   public String softDeleteTagMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT ct.catalog_id FROM "
         + CatalogMetaMapper.TABLE_NAME
@@ -111,6 +163,16 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -120,7 +182,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "<script>"
         + " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT st.schema_id FROM "
         + SchemaMetaMapper.TABLE_NAME
@@ -169,6 +232,22 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")"
         + "</script>";
   }
@@ -177,7 +256,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   public String softDeleteTagMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
     return " UPDATE "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " tmt SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " tmt SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE tmt.deleted_at = 0 AND EXISTS ("
         + " SELECT tat.table_id FROM "
         + TableMetaMapper.TABLE_NAME
@@ -197,7 +277,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
     return "<script>"
         + "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE tag_id IN "
         + "<foreach item='tagId' collection='tagIds' open='(' separator=',' close=')'>"
         + "#{tagId}"
@@ -210,7 +291,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   @Override
   public String listTagMetadataObjectRelsByMetalakeAndTagName(String metalakeName, String tagName) {
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
-        + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
         + " te.deleted_at as deletedAt"
         + " FROM "

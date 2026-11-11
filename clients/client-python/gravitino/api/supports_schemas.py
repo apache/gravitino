@@ -16,11 +16,16 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class SupportsSchemas(ABC):
@@ -70,6 +75,10 @@ class SupportsSchemas(ABC):
 
         Returns:
             True if the schema exists, false otherwise.
+
+        Raises:
+            SchemaAlreadyExistsException: If loading detects another existing schema's identifier.
+                The conflict is propagated instead of returning False.
         """
         try:
             self.load_schema(schema_name)
@@ -79,7 +88,12 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def create_schema(
-        self, schema_name: str, comment: str, properties: Dict[str, str]
+        self,
+        schema_name: str,
+        comment: str,
+        properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a schema in the catalog.
 
@@ -87,6 +101,8 @@ class SupportsSchemas(ABC):
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException: If the catalog does not exist.
@@ -106,6 +122,8 @@ class SupportsSchemas(ABC):
 
         Raises:
             NoSuchSchemaException: If the schema does not exist (optional).
+            SchemaAlreadyExistsException: If the source marker belongs to another existing schema.
+                Remove the copied source marker before importing an independent copy.
 
         Returns:
             A schema.
@@ -130,17 +148,21 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def drop_schema(self, schema_name: str, cascade: bool) -> bool:
-        """Drop a schema from the catalog. If cascade option is true, recursively
-        drop all objects within the schema.
+        """Drop a schema from the catalog.
+
+        Cascade support depends on the catalog. PostgreSQL refuses non-empty
+        schemas even when cascade is requested, because native cascade may
+        remove objects in other schemas.
 
         Args:
             schema_name: The name of the schema.
-            cascade: If true, recursively drop all objects within the schema.
+            cascade: Whether to request recursive deletion, subject to catalog support.
 
         Returns:
             True if the schema exists and is dropped successfully, false otherwise.
 
         Raises:
-            NonEmptySchemaException: If the schema is not empty and cascade is false.
+            NonEmptySchemaException: If the schema is non-empty and cascade is false,
+                or the catalog cannot safely cascade within the schema.
         """
         pass

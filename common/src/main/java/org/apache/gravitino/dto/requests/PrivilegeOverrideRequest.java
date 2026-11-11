@@ -61,7 +61,9 @@ public class PrivilegeOverrideRequest implements RESTRequest {
    */
   @Override
   public void validate() throws IllegalArgumentException {
+    Preconditions.checkArgument(overrides != null, "\"overrides\" field is required");
     for (SecurableObjectDTO objectDTO : overrides) {
+      Preconditions.checkArgument(objectDTO != null, "\"overrides\" cannot contain null objects");
       Preconditions.checkArgument(
           StringUtils.isNotBlank(objectDTO.name()), "\"securable object name\" cannot be blank");
       Preconditions.checkArgument(

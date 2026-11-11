@@ -36,6 +36,7 @@ dependencies {
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
   testImplementation(libs.awaitility)
+  testImplementation(libs.aws.s3)
   testImplementation(libs.bundles.jetty)
   testImplementation(libs.bundles.jersey)
   testImplementation(libs.bundles.jwt)
@@ -46,11 +47,11 @@ dependencies {
   testImplementation(libs.commons.io)
   testImplementation(libs.guava)
   testImplementation(libs.httpclient5)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(libs.ranger.intg) {
-    exclude("org.apache.hadoop", "hadoop-common")
     exclude("org.apache.hive", "hive-storage-api")
     exclude("org.apache.lucene")
     exclude("org.apache.solr")
@@ -58,7 +59,13 @@ dependencies {
     exclude("org.elasticsearch")
     exclude("org.elasticsearch.client")
     exclude("org.elasticsearch.plugin")
-    exclude("org.apache.hadoop", "hadoop-common")
+    // Keep the Hadoop, Jackson and commons-lang3 versions used by the rest of the build instead of
+    // the newer ones Ranger 2.8 asks for.
+    exclude("org.apache.hadoop")
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.fasterxml.jackson.jaxrs")
+    exclude("com.fasterxml.jackson.module")
+    exclude("org.apache.commons", "commons-lang3")
   }
   testImplementation(libs.hadoop3.client.api)
   testImplementation(libs.hadoop3.client.runtime)
@@ -78,6 +85,13 @@ val testJar by tasks.registering(Jar::class) {
 
 configurations {
   create("testArtifacts")
+}
+
+dependencies {
+  // ContainerSuite builds its MySQL and PostgreSQL containers on these Testcontainers modules, so
+  // every module that uses the test artifacts needs them at test runtime.
+  "testArtifacts"(libs.testcontainers.mysql)
+  "testArtifacts"(libs.testcontainers.postgresql)
 }
 
 artifacts {

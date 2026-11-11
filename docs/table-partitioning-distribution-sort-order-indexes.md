@@ -122,7 +122,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 ```json
  {
   "direction": "asc",
-  "nullOrder": "NULLS_LAST",
+  "nullOrdering": "nulls_last",
   "sortTerm":  {
     "type": "field",
     "fieldName": ["score"]
@@ -203,7 +203,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "sortOrders": [
     {
       "direction": "asc",
-      "nullOrder": "NULLS_LAST",
+      "nullOrdering": "nulls_last",
       "sortTerm":  {
         "type": "field",
         "fieldName": ["name"]
@@ -245,7 +245,7 @@ tableCatalog.createTable(
 
 ## Indexes
 
-To define an indexed table, you should utilize the following three components to construct a valid indexed table:
+To define an indexed table, you should utilize the following four components to construct a valid indexed table:
 
 - IndexType. Represents the type of index, such as primary key or unique key.
 
@@ -253,10 +253,13 @@ To define an indexed table, you should utilize the following three components to
 |---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|---------------------------|
 | PRIMARY_KEY   | The PRIMARY KEY is a column or set of columns that uniquely identifies each row in a table. It enforces uniqueness and ensures that no two rows have the same values in the specified columns. Additionally, the PRIMARY KEY constraint automatically creates a unique index on the specified columns. | `PRIMARY_KEY`   | `IndexType.PRIMARY_KEY`   |
 | UNIQUE_KEY    | The UNIQUE KEY constraint ensures that all values in a specified column or set of columns are unique across the entire table. Unlike the PRIMARY KEY constraint, a table can have multiple UNIQUE KEY constraints, allowing for unique values in multiple columns or sets of columns.                  | `UNIQUE_KEY`    | `IndexType.UNIQUE_KEY`    |
+| DATA_SKIPPING_VECTOR_SIMILARITY | ClickHouse HNSW index for approximate nearest-neighbor search. See the [ClickHouse catalog guide](./jdbc-clickhouse-catalog.md#table-indexes) for its properties and server-version requirement. | `DATA_SKIPPING_VECTOR_SIMILARITY` | `IndexType.DATA_SKIPPING_VECTOR_SIMILARITY` |
 
 - Name. It defines the name of the index.
 
 - FieldNames. It defines which table fields Gravitino uses to index the table.
+
+- Properties (optional). A map of extra index configuration properties (e.g., `granularity` for ClickHouse data-skipping indexes). If omitted, an empty map is used.
 
 <Tabs groupId='language' queryString>
 <TabItem value="Json" label="JSON">
@@ -265,7 +268,8 @@ To define an indexed table, you should utilize the following three components to
  {
   "indexType": "PRIMARY_KEY",
   "name": "PRIMARY",
-  "fieldNames": [["col_1"],["col_2"]]
+  "fieldNames": [["col_1"],["col_2"]],
+  "properties": {}
 }
 ```
 
@@ -319,12 +323,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     {
       "indexType": "PRIMARY_KEY",
       "name": "PRIMARY",
-      "fieldNames": [["id"]]
+      "fieldNames": [["id"]],
+      "properties": {}
     },
     {
       "indexType": "UNIQUE_KEY",
       "name": "name_age_score_uk",
-      "fieldNames": [["name"],["age"],["score]]
+      "fieldNames": [["name"],["age"],["score"]],
+      "properties": {}
     }
   ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables

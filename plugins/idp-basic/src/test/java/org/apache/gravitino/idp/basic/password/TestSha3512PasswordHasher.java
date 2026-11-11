@@ -119,6 +119,20 @@ public class TestSha3512PasswordHasher {
   }
 
   @Test
+  public void testVerifyRejectsLegacyIterations() {
+    String hashedPassword = passwordHasher.hash("test-password");
+    String legacyHash =
+        hashedPassword.replace("i=" + Sha3512Defaults.DEFAULT_ITERATIONS, "i=100000");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> passwordHasher.verify("test-password", legacyHash));
+
+    Assertions.assertEquals("Unsupported SHA3-512 hash parameters", exception.getMessage());
+  }
+
+  @Test
   public void testVerifyRejectsUnexpectedIterations() {
     String hashedPassword = passwordHasher.hash("test-password");
     String unsupportedHash =

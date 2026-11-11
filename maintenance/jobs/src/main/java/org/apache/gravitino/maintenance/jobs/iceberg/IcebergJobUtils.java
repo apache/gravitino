@@ -1,0 +1,471 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.maintenance.jobs.iceberg;
+
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Shared utility methods for Iceberg maintenance jobs.
+ *
+ * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, table/snapshot
+ * helpers, and classpath checks used by built-in Iceberg Spark jobs.
+ */
+public final class IcebergJobUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergJobUtils.class);
+
+  private static final String ICEBERG_SPARK_CATALOG = "org.apache.iceberg.spark.SparkCatalog";
+  /**
+   * Matches a job template placeholder that no job configuration value replaced, e.g. {@code
+   * {{use_caching}}}.
+   */
+  private static final Pattern UNRESOLVED_PLACEHOLDER_PATTERN = Pattern.compile("^\\{\\{[^{}]*}}$");
+
+  /**
+   * The Spark configurations that spark-submit decides. Set in the custom Spark configurations of a
+   * job, which the driver applies, they would override the submitted value, e.g. run a job in local
+   * mode inside the driver pod of a cluster.
+   *
+   * <p>Keep this and {@link #SPARK_KUBERNETES_PREFIX} aligned with the k8s job executor's {@code
+   * SparkApplicationUtils}, which ignores the same configurations of spark_conf when it submits a
+   * built-in job. The jobs jar runs in the driver without the executor plugin, so the rules can't
+   * be shared as code.
+   */
+  private static final Set<String> SUBMIT_DECIDED_CONFIGS =
+      ImmutableSet.of("spark.master", "spark.submit.deployMode");
+
+  /**
+   * The prefix of the Kubernetes configurations, which a job run may not set in its custom Spark
+   * configurations: the driver creates the executor pods from them, with their image, service
+   * account, Secrets, and volumes. Only the job executor configurations and job templates set them.
+   */
+  private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
+
+  /**
+   * Shared {@code --spark-conf} usage lines aligned with {@link #filterCustomSparkConfigs}. Catalog
+   * and Iceberg extensions are <em>not</em> blocked: CLI jobs register them through spark-conf.
+   */
+  public static final List<String> SPARK_CONF_USAGE_LINES =
+      ImmutableList.of(
+          "  --spark-conf <json>       JSON map of custom Spark configurations",
+          "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'",
+          "                              Note: Ignored when already set by spark-submit: spark.master,",
+          "                              spark.submit.deployMode. Always ignored: spark.kubernetes.*.",
+          "                              CLI jobs must pass Iceberg catalog (and usually extensions)",
+          "                              via spark-conf; those keys are not blocked.");
+
+  private IcebergJobUtils() {}
+
+  /**
+   * Prints a consistent CLI usage block to {@code System.err}.
+   *
+   * @param jobSimpleName simple class name shown after {@code Usage:}
+   * @param requiredLines required option lines (already indented)
+   * @param optionalLines optional option lines (already indented); may be empty
+   * @param exampleLines example lines; may be empty to omit the Examples section
+   */
+  public static void printCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    System.err.println(formatCliUsage(jobSimpleName, requiredLines, optionalLines, exampleLines));
+  }
+
+  @VisibleForTesting
+  static String formatCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    Preconditions.checkArgument(jobSimpleName != null && !jobSimpleName.isEmpty(), "jobSimpleName");
+    Preconditions.checkNotNull(requiredLines, "requiredLines");
+    Preconditions.checkNotNull(optionalLines, "optionalLines");
+    Preconditions.checkNotNull(exampleLines, "exampleLines");
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("Usage: ").append(jobSimpleName).append(" [OPTIONS]\n\n");
+    sb.append("Required Options:\n");
+    appendLines(sb, requiredLines);
+    if (!optionalLines.isEmpty()) {
+      sb.append("\nOptional Options:\n");
+      appendLines(sb, optionalLines);
+    }
+    if (!exampleLines.isEmpty()) {
+      sb.append("\nExamples:\n");
+      appendLines(sb, exampleLines);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Appends {@link #SPARK_CONF_USAGE_LINES} after job-specific optional option lines.
+   *
+   * @param optionalWithoutSparkConf optional lines excluding {@code --spark-conf}
+   * @return optional lines including the shared spark-conf note
+   */
+  public static List<String> withSparkConfUsage(String... optionalWithoutSparkConf) {
+    return ImmutableList.<String>builder()
+        .add(optionalWithoutSparkConf)
+        .addAll(SPARK_CONF_USAGE_LINES)
+        .build();
+  }
+
+  private static void appendLines(StringBuilder sb, List<String> lines) {
+    for (String line : lines) {
+      sb.append(line);
+      if (!line.endsWith("\n")) {
+        sb.append('\n');
+      }
+    }
+  }
+
+  /**
+   * Return the given argument value unless it is an unresolved job template placeholder.
+   *
+   * <p>Job templates declare optional parameters as {@code {{name}}} placeholders. When the caller
+   * omits a parameter, the server leaves the placeholder untouched and it reaches the job as a
+   * literal {@code "{{name}}"} argument. Treating that as a real value would forward nonsense to
+   * Iceberg, so callers use this method to map it back to "not supplied".
+   *
+   * @param value the argument value to inspect
+   * @return the value, or null if it is null or an unresolved placeholder
+   */
+  @Nullable
+  public static String nullIfUnresolvedPlaceholder(@Nullable String value) {
+    if (value == null || UNRESOLVED_PLACEHOLDER_PATTERN.matcher(value.trim()).matches()) {
+      return null;
+    }
+    return value;
+  }
+
+  /**
+   * Escape single quotes in SQL string literals by replacing ' with ''.
+   *
+   * @param value the string value to escape
+   * @return escaped string safe for use in SQL string literals
+   */
+  public static String escapeSqlString(String value) {
+    if (value == null) {
+      return null;
+    }
+    return value.replace("'", "''");
+  }
+
+  /**
+   * Escape and quote a SQL identifier with backticks.
+   *
+   * <p>Internal backticks are doubled to prevent breaking out of the quoted identifier. The result
+   * is wrapped in backticks so that identifiers containing special characters (whitespace, dots,
+   * semicolons) are treated as a single identifier token.
+   *
+   * @param identifier the SQL identifier to escape and quote
+   * @return backtick-quoted identifier safe for use in SQL, or null if input is null
+   */
+  public static String escapeSqlIdentifier(String identifier) {
+    if (identifier == null) {
+      return null;
+    }
+    String escaped = identifier.replace("`", "``");
+    return "`" + escaped + "`";
+  }
+
+  /**
+   * Parse command line arguments in --key value format.
+   *
+   * <p>Supports boolean flags (--flag without a value) by storing them with a "true" value.
+   *
+   * @param args command line arguments
+   * @return map of argument names to values
+   */
+  public static Map<String, String> parseArguments(String[] args) {
+    Map<String, String> argMap = new HashMap<>();
+
+    for (int i = 0; i < args.length; i++) {
+      if (args[i].startsWith("--")) {
+        String key = args[i].substring(2); // Remove "--" prefix
+
+        // Check if there's a value for this key (not another flag)
+        if (i + 1 < args.length && !args[i + 1].startsWith("--")) {
+          String value = args[i + 1];
+          // Only add non-empty values
+          if (value != null && !value.trim().isEmpty()) {
+            argMap.put(key, value);
+          }
+          i++; // Skip the value in next iteration
+        } else {
+          // Boolean flag with no value - treat as "true"
+          argMap.put(key, "true");
+        }
+      }
+    }
+
+    return argMap;
+  }
+
+  /**
+   * Parse named arguments with explicit values and validate supported and required names.
+   *
+   * <p>Blank values and unresolved template placeholders are normalized to null. Duplicate names,
+   * unknown names, missing values, and absent required arguments are rejected. Unlike the
+   * single-argument overload, this parser does not accept bare boolean flags.
+   *
+   * @param args command line arguments
+   * @param supported allowed argument names without the leading dashes
+   * @param requiredArguments required argument names without the leading dashes
+   * @return map of argument names to normalized values
+   * @throws IllegalArgumentException if arguments are invalid
+   */
+  public static Map<String, String> parseArguments(
+      String[] args, Set<String> supported, Set<String> requiredArguments) {
+    Map<String, String> parsed = new HashMap<>();
+    for (int i = 0; i < args.length; i += 2) {
+      String flag = args[i];
+      if (flag == null || !flag.startsWith("--") || !supported.contains(flag.substring(2))) {
+        throw new IllegalArgumentException("Unknown argument: " + flag);
+      }
+      if (i + 1 == args.length || args[i + 1] == null || args[i + 1].startsWith("--")) {
+        throw new IllegalArgumentException("Missing value for " + flag);
+      }
+      String key = flag.substring(2);
+      if (parsed.containsKey(key)) {
+        throw new IllegalArgumentException("Duplicate argument: " + flag);
+      }
+      String value = nullIfUnresolvedPlaceholder(args[i + 1].trim());
+      parsed.put(key, value == null || value.isEmpty() ? null : value);
+    }
+    for (String required : requiredArguments) {
+      if (parsed.get(required) == null) {
+        throw new IllegalArgumentException("--" + required + " is required");
+      }
+    }
+    return parsed;
+  }
+
+  /**
+   * Parse custom Spark configurations from JSON string.
+   *
+   * @param sparkConfJson JSON string containing Spark configurations
+   * @return map of Spark configuration keys to values
+   * @throws IllegalArgumentException if JSON parsing fails
+   */
+  public static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
+    return filterCustomSparkConfigs(
+        IcebergSparkConfigUtils.parseFlatJsonMap(sparkConfJson, "spark-conf"));
+  }
+
+  /**
+   * Filter the custom Spark configurations of a job, which the driver applies when it creates the
+   * SparkSession, against the configurations spark-submit has already set for the driver.
+   *
+   * <p>{@code spark.master} and {@code spark.submit.deployMode} are dropped if spark-submit has set
+   * them, as the job would otherwise run with another master than it was submitted to. The {@code
+   * spark.kubernetes.*} configurations are dropped, as whoever runs a job sets them here, while the
+   * driver creates the executor pods from them. A blank value leaves a configuration unset.
+   *
+   * @param configs the custom Spark configurations
+   * @return the custom Spark configurations to apply
+   */
+  public static Map<String, String> filterCustomSparkConfigs(Map<String, String> configs) {
+    // new SparkConf() reads the spark.* system properties on purpose: spark-submit sets the
+    // configurations it submitted the job with as system properties before it calls main().
+    return filterCustomSparkConfigs(configs, new SparkConf());
+  }
+
+  @VisibleForTesting
+  static Map<String, String> filterCustomSparkConfigs(
+      Map<String, String> configs, SparkConf submittedConf) {
+    Map<String, String> filtered = new LinkedHashMap<>();
+    configs.forEach(
+        (key, value) -> {
+          // A blank value leaves a configuration unset, as the k8s job executor does.
+          if (StringUtils.isBlank(value)) {
+            return;
+          }
+          if (key.startsWith(SPARK_KUBERNETES_PREFIX)) {
+            // The value isn't logged, as it may name a Secret.
+            LOG.warn(
+                "Ignored {} of the custom Spark configurations, as only the job executor"
+                    + " configurations and job templates may set {}*",
+                key,
+                SPARK_KUBERNETES_PREFIX);
+            return;
+          }
+          if (SUBMIT_DECIDED_CONFIGS.contains(key) && submittedConf.contains(key)) {
+            LOG.warn(
+                "Ignored {}={} of the custom Spark configurations, as the job is submitted with"
+                    + " {}={}. Set it when submitting the job instead, for a built-in job by the"
+                    + " spark_master parameter.",
+                key,
+                value,
+                key,
+                submittedConf.get(key));
+            return;
+          }
+          filtered.put(key, value);
+        });
+    return ImmutableMap.copyOf(filtered);
+  }
+
+  /**
+   * Ensures the Iceberg Spark runtime is on the current classpath.
+   *
+   * <p>Built-in templates configure {@code IcebergSparkSessionExtensions} and {@code SparkCatalog},
+   * but Spark only warns when those classes are missing and continues without Iceberg support. Call
+   * this after {@code SparkSession} creation and fail the job when the runtime is absent.
+   *
+   * @throws IllegalStateException when required Iceberg Spark classes cannot be loaded
+   */
+  public static void requireIcebergSparkRuntime() {
+    requireClass(
+        IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS, "Iceberg Spark session extensions");
+    requireClass(ICEBERG_SPARK_CATALOG, "Iceberg Spark catalog");
+  }
+
+  /**
+   * Checks the Iceberg Spark runtime after the session is created, then stops Spark and exits the
+   * process on failure.
+   *
+   * @param spark Spark session created for this job; stopped if the runtime check fails
+   */
+  public static void requireIcebergSparkRuntimeOrExit(SparkSession spark) {
+    try {
+      requireIcebergSparkRuntime();
+    } catch (IllegalStateException e) {
+      System.err.println("Error: " + e.getMessage());
+      spark.stop();
+      System.exit(1);
+      return;
+    }
+  }
+
+  /**
+   * Loads an Iceberg table via Spark.
+   *
+   * <p>Catches checked {@link Exception} (not only Spark {@code NoSuchTableException}) so the
+   * Gravitino server can load callers without Spark catalyst on the classpath.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return loaded Iceberg table
+   */
+  public static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    try {
+      // Force CatalogManager to load the named catalog first. Spark3Util.catalogAndIdentifier
+      // swallows load failures and falls back to the session catalog (spark_catalog), which then
+      // fails with REQUIRES_SINGLE_PART_NAMESPACE and hides the real REST/config error.
+      spark.sessionState().catalogManager().catalog(catalogName);
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
+    }
+  }
+
+  /**
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id
+   * @throws IllegalStateException when the table has no current snapshot
+   */
+  public static long requireCurrentSnapshotId(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    if (snapshot == null) {
+      throw new IllegalStateException(
+          "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
+    }
+    return snapshot.snapshotId();
+  }
+
+  /**
+   * After expiry/orphan, HEAD may briefly be empty; report {@code -1} in that case.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id, or {@code -1} when HEAD is empty
+   */
+  public static long currentSnapshotIdOrEmpty(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    return snapshot == null ? -1L : snapshot.snapshotId();
+  }
+
+  /** Visible for unit tests that assert the missing-class error message. */
+  static void requireClassForTest(String className, String description) {
+    requireClass(className, description);
+  }
+
+  private static void requireClass(String className, String description) {
+    ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+    ClassLoader fallbackLoader = IcebergJobUtils.class.getClassLoader();
+    try {
+      // initialize=false: only verify the class is loadable; avoid running <clinit> here and
+      // misreporting init-time LinkageError as a missing iceberg-spark-runtime jar.
+      Class.forName(className, false, contextLoader != null ? contextLoader : fallbackLoader);
+    } catch (ClassNotFoundException | LinkageError first) {
+      if (contextLoader != null && contextLoader != fallbackLoader) {
+        try {
+          Class.forName(className, false, fallbackLoader);
+          return;
+        } catch (ClassNotFoundException | LinkageError ignored) {
+          // Fall through to the user-facing error.
+        }
+      }
+      throw new IllegalStateException(
+          String.format(
+              "Missing %s (%s). Built-in Iceberg jobs need iceberg-spark-runtime on the Spark "
+                  + "classpath, for example installed into the Spark environment or the Spark "
+                  + "image. With the k8s job executor, spark.jars in spark_conf or in "
+                  + "gravitino.jobExecutor.k8s.spark.conf.* adds it too. With the local job "
+                  + "executor, spark.jars in spark_conf doesn't, as the driver applies spark_conf "
+                  + "only after it starts. A stock Spark distribution does not include it. Match "
+                  + "the artifact to your Spark, Scala, and Iceberg versions.",
+              description, className),
+          first);
+    }
+  }
+}

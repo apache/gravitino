@@ -69,6 +69,22 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
   }
 
   @Override
+  public boolean shouldValidateOnCreate() {
+    Map<String, String> properties = entity().getProperties();
+    return properties != null
+        && shouldValidateWarehouseProperty(
+            properties.get(IcebergConstants.CATALOG_BACKEND),
+            properties.get(IcebergConstants.WAREHOUSE));
+  }
+
+  // REST resolves `warehouse` as a server-side catalog selector, so validate it at create; hive and
+  // jdbc use it as a storage location and need no create-time connection.
+  static boolean shouldValidateWarehouseProperty(String backend, String warehouse) {
+    return IcebergCatalogBackend.REST.name().equalsIgnoreCase(backend)
+        && StringUtils.isNotBlank(warehouse);
+  }
+
+  @Override
   public Capability newCapability() {
     return new IcebergCatalogCapability(HierarchicalSchemaUtil.schemaSeparator());
   }
@@ -95,6 +111,18 @@ public class IcebergCatalog extends BaseCatalog<IcebergCatalog> {
     // Iceberg is security-first: disable s3:ListBucket on bare location prefix so a vended
     // credential cannot enumerate sibling keys. This is catalog-type policy, not user-configurable.
     props.put(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX, "false");
+    // super() skips addCatalogSpecificCredentialProviders when credential-providers is already
+    // set; keep jdbc listed so getCredentials can still vend JDBC credentials alongside an
+    // explicit provider list (jdbc does not conflict with path-based storage providers).
+    String catalogBackend = props.get(IcebergConstants.CATALOG_BACKEND);
+    if (catalogBackend != null
+        && IcebergCatalogBackend.JDBC.name().equalsIgnoreCase(catalogBackend)) {
+      String jdbcUser = props.get(IcebergConstants.GRAVITINO_JDBC_USER);
+      String jdbcPassword = props.get(IcebergConstants.GRAVITINO_JDBC_PASSWORD);
+      if (StringUtils.isNotBlank(jdbcUser) && jdbcPassword != null) {
+        ensureCredentialProviderListed(props, JdbcCredential.JDBC_CREDENTIAL_TYPE);
+      }
+    }
     return props;
   }
 

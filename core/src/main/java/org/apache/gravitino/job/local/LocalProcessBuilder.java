@@ -26,24 +26,39 @@ import org.apache.gravitino.job.SparkJobTemplate;
 
 public abstract class LocalProcessBuilder {
 
+  /** The name of the file that captures the job process's standard output. */
+  public static final String STDOUT_FILE_NAME = "output.log";
+
+  /** The name of the file that captures the job process's standard error. */
+  public static final String STDERR_FILE_NAME = "error.log";
+
   protected final JobTemplate jobTemplate;
 
   protected final File workingDirectory;
 
-  protected LocalProcessBuilder(JobTemplate jobTemplate, Map<String, String> configs) {
+  protected LocalProcessBuilder(
+      JobTemplate jobTemplate, File workingDirectory, Map<String, String> configs) {
     this.jobTemplate = jobTemplate;
-    // Executable should be in the working directory, so we can figure out the working directory
-    // from the executable path.
-    this.workingDirectory = new File(jobTemplate.executable()).getAbsoluteFile().getParentFile();
+    this.workingDirectory = workingDirectory;
   }
 
   public abstract Process start();
 
-  public static LocalProcessBuilder create(JobTemplate jobTemplate, Map<String, String> configs) {
+  /**
+   * Creates the process builder of a job.
+   *
+   * @param jobTemplate the localized job template of the job
+   * @param workingDirectory the working directory of the job process, where the job's resources are
+   *     localized and its output is written
+   * @param configs the local job executor configurations
+   * @return the process builder of the job
+   */
+  public static LocalProcessBuilder create(
+      JobTemplate jobTemplate, File workingDirectory, Map<String, String> configs) {
     if (jobTemplate instanceof ShellJobTemplate) {
-      return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, configs);
+      return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, workingDirectory, configs);
     } else if (jobTemplate instanceof SparkJobTemplate) {
-      return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, configs);
+      return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, workingDirectory, configs);
     } else {
       throw new IllegalArgumentException(
           "Unsupported job template type: " + jobTemplate.getClass().getName());

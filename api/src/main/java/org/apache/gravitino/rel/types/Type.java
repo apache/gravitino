@@ -79,6 +79,16 @@ public interface Type {
      */
     VARIANT,
     /**
+     * The geometry type. A geometry holds a geospatial shape (WKB-encoded) on a planar coordinate
+     * reference system.
+     */
+    GEOMETRY,
+    /**
+     * The geography type. A geography holds a geospatial shape (WKB-encoded) on a spheroidal
+     * coordinate reference system, with an edge-interpolation algorithm.
+     */
+    GEOGRAPHY,
+    /**
      * The struct type. A struct type is a complex type that contains a set of named fields, each
      * with a type, and optionally a comment.
      */

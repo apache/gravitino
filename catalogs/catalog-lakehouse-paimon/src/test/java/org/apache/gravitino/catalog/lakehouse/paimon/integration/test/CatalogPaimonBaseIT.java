@@ -160,6 +160,11 @@ public abstract class CatalogPaimonBaseIT extends BaseIT {
   protected abstract Map<String, String> initPaimonCatalogProperties();
 
   @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
+  @Test
   void testPaimonSchemaOperations() throws DatabaseNotExistException {
     SupportsSchemas schemas = catalog.asSchemas();
 

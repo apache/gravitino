@@ -19,7 +19,6 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
-import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -35,19 +34,11 @@ public interface Group extends Auditable {
   String name();
 
   /**
-   * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
-   * IAM), or null if not set.
+   * The unique id assigned by Gravitino.
    *
-   * <p>Gravitino {@link Group#name() group names} may differ from upstream ids or be unknown at
-   * sync time. External id lets integrators look up and delete groups without relying on the
-   * Gravitino group name.
-   *
-   * @return The upstream external identifier, or null if not set.
+   * @return The unique id of the group.
    */
-  @Nullable
-  default String externalId() {
-    return null;
-  }
+  Long id();
 
   /**
    * The roles of the group.

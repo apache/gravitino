@@ -356,7 +356,10 @@ public class TestGenericModelCatalog extends TestBase {
         HttpStatus.SC_OK);
 
     ModelVersion[] versions = catalog.asModelCatalog().listModelVersionInfos(modelId);
-    Assertions.assertArrayEquals(expectedVersions, versions);
+    Assertions.assertEquals(expectedVersions.length, versions.length);
+    for (int i = 0; i < expectedVersions.length; i++) {
+      compareModelVersion(expectedVersions[i], versions[i]);
+    }
 
     // Throw model not found exception
     ErrorResponse errResp =

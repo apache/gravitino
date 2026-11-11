@@ -131,6 +131,7 @@ dependencies {
   testImplementation(libs.commons.configuration2)
   testImplementation(libs.re2j)
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.prometheus.dropwizard)
@@ -185,6 +186,13 @@ tasks {
 }
 
 tasks.test {
+  // Hudi uses HiveClientClassLoader directly without depending on catalog-hive, so prepare the
+  // version-specific Hive client and shim jars before its tests run.
+  dependsOn(
+    ":catalogs:hive-metastore2-libs:jar",
+    ":catalogs:hive-metastore3-libs:jar"
+  )
+
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests

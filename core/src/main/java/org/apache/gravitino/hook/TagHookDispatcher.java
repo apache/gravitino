@@ -17,17 +17,23 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -57,10 +63,20 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-    Tag tag = dispatcher.createTag(metalake, name, comment, properties);
+    return createTag(metalake, name, comment, properties, TagValueConstraint.anyValue());
+  }
+
+  @Override
+  public Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint) {
+    Tag tag = dispatcher.createTag(metalake, name, comment, properties, valueConstraint);
 
     // Set the creator as the owner of the tag.
-    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerDispatcher != null) {
       ownerDispatcher.setOwner(
           metalake,
@@ -76,17 +92,49 @@ public class TagHookDispatcher implements TagDispatcher {
   @Override
   public Tag alterTag(String metalake, String name, TagChange... changes)
       throws IllegalArgumentException, TagAlreadyExistsException {
-    return dispatcher.alterTag(metalake, name, changes);
+    Tag alteredTag = dispatcher.alterTag(metalake, name, changes);
+    if (Arrays.stream(changes).anyMatch(change -> change instanceof TagChange.RenameTag)) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
+    }
+    return alteredTag;
   }
 
   @Override
   public boolean deleteTag(String metalake, String name) {
-    return dispatcher.deleteTag(metalake, name);
+    boolean deleted = dispatcher.deleteTag(metalake, name);
+    if (deleted) {
+      // A tag created later under the same name gets a new id, so drop the cached mapping.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
+    }
+    return deleted;
   }
 
   @Override
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name) {
     return dispatcher.listMetadataObjectsForTag(metalake, name);
+  }
+
+  @Override
+  public MetadataObject[] listMetadataObjectsForTag(String metalake, String name, String value) {
+    return dispatcher.listMetadataObjectsForTag(metalake, name, value);
+  }
+
+  @Override
+  public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    return dispatcher.listPolicyAssociationsForTag(metalake, name);
+  }
+
+  @Override
+  public void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    dispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
+  }
+
+  @Override
+  public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    dispatcher.removePolicyFromTag(metalake, tagName, policyName);
   }
 
   @Override
@@ -103,6 +151,16 @@ public class TagHookDispatcher implements TagDispatcher {
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove) {
     return dispatcher.associateTagsForMetadataObject(
+        metalake, metadataObject, tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTagValuesForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove) {
+    return dispatcher.associateTagValuesForMetadataObject(
         metalake, metadataObject, tagsToAdd, tagsToRemove);
   }
 
