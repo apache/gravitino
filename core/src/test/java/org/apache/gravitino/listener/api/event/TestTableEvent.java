@@ -20,7 +20,6 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -29,6 +28,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -118,9 +118,14 @@ public class TestTableEvent {
     DummyEventListener listener = new DummyEventListener();
     EventBus eventBus = new EventBus(Arrays.asList(listener));
     OwnerDispatcher ownerDispatcher = mock(OwnerDispatcher.class);
-    doThrow(new RuntimeException("Set owner failed"))
-        .when(ownerDispatcher)
-        .setOwner(any(), any(), any(), any());
+    when(ownerDispatcher.prepareInitialOwner(any(), any(), any()))
+        .thenReturn(
+            id -> {
+              throw new RuntimeException("Set owner failed");
+            });
+    when(table.properties())
+        .thenReturn(
+            StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(42L), ImmutableMap.of()));
     TableEventDispatcher dispatcherWithHook =
         new TableEventDispatcher(
             eventBus, new TableHookDispatcher(mockTableDispatcher(), () -> ownerDispatcher));

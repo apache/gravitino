@@ -575,6 +575,10 @@ public class RelationalEntityStore
           re, update.sourceEntityType(), update.sourceIdentifier());
     }
 
+    if (update.relationType() == Type.OWNER_REL && result.isEmpty()) {
+      return result;
+    }
+
     // Invalidate after the backend write, not before: invalidating first opens a window where a
     // concurrent read could repopulate the cache with stale pre-commit data.
     Entity.EntityType targetEntityType = relationUpdateTargetType(update.relationType());
@@ -666,6 +670,8 @@ public class RelationalEntityStore
 
   private static Entity.EntityType relationUpdateTargetType(Type relType) {
     switch (relType) {
+      case OWNER_REL:
+        return Entity.EntityType.USER;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
       case POLICY_TAG_REL:

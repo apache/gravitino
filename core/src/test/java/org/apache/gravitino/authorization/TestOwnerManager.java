@@ -65,25 +65,41 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.sorts.SortOrder;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -430,6 +446,159 @@ public class TestOwnerManager {
             NotFoundException.class,
             () -> new OwnerManager(store).setOwner(METALAKE, table, USER, Owner.Type.USER));
     Assertions.assertFalse(thrown instanceof NoSuchMetadataObjectException);
+  }
+
+  @Test
+  @Order(10)
+  void testLateCreateOwnerCannotReplaceOwnerOfNewTable() throws Exception {
+    String catalog = "initial_owner_catalog";
+    createCatalog(catalog);
+    AuditInfo audit = AuditInfo.builder().withCreator(USER).withCreateTime(Instant.now()).build();
+    SchemaEntity schema =
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("schema")
+            .withNamespace(Namespace.of(METALAKE, catalog))
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(schema, false);
+    TableEntity original = initialOwnerTable(catalog, "table", audit);
+    TableEntity replacement = initialOwnerTable(catalog, "table", audit);
+    MetadataObject object =
+        NameIdentifierUtil.toMetadataObject(original.nameIdentifier(), Entity.EntityType.TABLE);
+    Table snapshot = EntityCombinedTable.of(Mockito.mock(Table.class), original);
+    TableDispatcher tables = Mockito.mock(TableDispatcher.class);
+    Mockito.when(
+            tables.createTable(
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any(),
+                Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              entityStore.put(original, false);
+              // Delay A's create response until a drop and same-name replacement have completed.
+              Assertions.assertTrue(
+                  entityStore.delete(original.nameIdentifier(), Entity.EntityType.TABLE));
+              entityStore.put(replacement, false);
+              ownerManager.setOwner(METALAKE, object, GROUP, Owner.Type.GROUP);
+              Mockito.clearInvocations(authorizationPlugin);
+              return snapshot;
+            });
+    TableHookDispatcher hook = new TableHookDispatcher(tables, () -> ownerManager);
+    Table created =
+        PrincipalUtils.doAs(
+            new UserPrincipal(USER),
+            () ->
+                hook.createTable(
+                    original.nameIdentifier(),
+                    new Column[0],
+                    null,
+                    Collections.emptyMap(),
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    new SortOrder[0],
+                    Indexes.EMPTY_INDEXES));
+    Assertions.assertSame(snapshot, created);
+    Assertions.assertEquals(
+        replacement.id(),
+        entityStore
+            .get(original.nameIdentifier(), Entity.EntityType.TABLE, TableEntity.class)
+            .id());
+    Assertions.assertEquals(GROUP, ownerManager.getOwner(METALAKE, object).get().name());
+    Mockito.verify(authorizationPlugin, Mockito.never())
+        .onOwnerSet(Mockito.any(), Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  @Order(11)
+  void testInitialOwnerSuccessNotifiesOnceAndSkipsRepeat() throws Exception {
+    String catalog = "initial_owner_notify_catalog";
+    createCatalog(catalog);
+    AuditInfo audit = AuditInfo.builder().withCreator(USER).withCreateTime(Instant.now()).build();
+    entityStore.put(
+        SchemaEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("schema")
+            .withNamespace(Namespace.of(METALAKE, catalog))
+            .withProperties(Collections.emptyMap())
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    TableEntity table = initialOwnerTable(catalog, "table", audit);
+    entityStore.put(table, false);
+    MetadataObject object =
+        NameIdentifierUtil.toMetadataObject(table.nameIdentifier(), Entity.EntityType.TABLE);
+    Mockito.clearInvocations(authorizationPlugin);
+    ownerManager.prepareInitialOwner(METALAKE, object, USER).accept(table.id());
+    Assertions.assertEquals(USER, ownerManager.getOwner(METALAKE, object).get().name());
+    ownerManager.prepareInitialOwner(METALAKE, object, USER).accept(table.id());
+    Mockito.verify(authorizationPlugin, Mockito.times(1))
+        .onOwnerSet(Mockito.eq(object), Mockito.isNull(), Mockito.any());
+  }
+
+  @Test
+  @Order(12)
+  void testInitialOwnerFailuresRetainCauseAndDoNotNotifyPlugins() throws IOException {
+    RelationalEntityStore store = Mockito.mock(RelationalEntityStore.class);
+    SupportsRelationOperations relations = Mockito.mock(SupportsRelationOperations.class);
+    Mockito.when(store.relationOperations()).thenReturn(relations);
+    OwnerManager manager = new OwnerManager(store);
+    MetadataObject object =
+        MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE);
+    IOException storageFailure = new IOException("Storage unavailable");
+    Mockito.when(relations.updateEntityRelations(Mockito.any(RelationUpdate.class)))
+        .thenThrow(storageFailure);
+    Mockito.clearInvocations(authorizationPlugin);
+    RuntimeException thrown =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> manager.prepareInitialOwner(METALAKE, object, USER).accept(42L));
+    Assertions.assertSame(storageFailure, thrown.getCause());
+    Assertions.assertTrue(thrown.getMessage().contains(object.fullName()));
+    NoSuchEntityException missing = new NoSuchEntityException("Creator was deleted");
+    Mockito.when(relations.updateEntityRelations(Mockito.any(RelationUpdate.class)))
+        .thenThrow(missing);
+    NotFoundException notFound =
+        Assertions.assertThrows(
+            NotFoundException.class,
+            () -> manager.prepareInitialOwner(METALAKE, object, USER).accept(42L));
+    Assertions.assertSame(missing, notFound.getCause());
+    Assertions.assertTrue(notFound.getMessage().contains(USER));
+    Mockito.verifyNoInteractions(authorizationPlugin);
+  }
+
+  @Test
+  @Order(13)
+  void testInitialOwnerRejectsUnsupportedStorageBeforeCreate() {
+    EntityStore store =
+        Mockito.mock(
+            EntityStore.class,
+            Mockito.withSettings().extraInterfaces(SupportsRelationOperations.class));
+    OwnerManager manager = new OwnerManager(store);
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            manager.prepareInitialOwner(
+                METALAKE,
+                MetadataObjects.parse("catalog.schema.table", MetadataObject.Type.TABLE),
+                USER));
+  }
+
+  private static TableEntity initialOwnerTable(String catalog, String name, AuditInfo audit) {
+    return TableEntity.builder()
+        .withId(idGenerator.nextId())
+        .withName(name)
+        .withNamespace(Namespace.of(METALAKE, catalog, "schema"))
+        .withProperties(Collections.emptyMap())
+        .withColumns(Collections.emptyList())
+        .withAuditInfo(audit)
+        .build();
   }
 
   private static EntityStore storeFailingOwnerInsert() throws IOException {

@@ -29,13 +29,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -207,6 +211,88 @@ public class OwnerMetaService {
                 OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(ownerRelPO)));
   }
 
+  /**
+   * Initializes a created table's owner without resolving the table by name.
+   *
+   * <p>The metalake, exact table ID and principal are fenced in the same order as ordinary owner
+   * assignment. While the table lock serializes owner writers, a fresh read at READ_COMMITTED
+   * bypasses earlier session-cached owner results. Clearing the query cache does not release the
+   * database locks. Skips perform no relation write.
+   *
+   * @param update a table OWNER_REL initialization with an expected source ID and one user target
+   * @return the assigned user, or an empty list if the table was deleted or already has an owner
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "initializeOwner")
+  public List<UserEntity> initializeOwner(RelationUpdate update) {
+    Preconditions.checkArgument(
+        update.sourceEntityType() == Entity.EntityType.TABLE,
+        "Initial owner assignment currently supports tables only");
+    Preconditions.checkArgument(
+        update.expectedSourceId().isPresent(),
+        "Initial owner assignment requires the created entity ID");
+    RelationEdgeTarget[] targets = update.targetsToAdd();
+    Preconditions.checkArgument(
+        targets.length == 1
+            && targets[0].entityType() == Entity.EntityType.USER
+            && update.targetsToRemove().length == 0
+            && !update.hasRelationValues()
+            && !update.auditInfo().isPresent(),
+        "Initial owner assignment requires one user, no removals, values or explicit audit metadata");
+    long entityId = update.expectedSourceId().get();
+    NameIdentifier owner = targets[0].nameIdentifier();
+    String metalake = NameIdentifierUtil.getMetalake(update.sourceIdentifier());
+    Preconditions.checkArgument(
+        Objects.equals(metalake, NameIdentifierUtil.getMetalake(owner)),
+        "The table and initial owner must be in the same metalake");
+    final long metalakeId;
+    try {
+      metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
+    } catch (NoSuchEntityException missing) {
+      return Collections.emptyList();
+    }
+    AtomicReference<UserEntity> assigned = new AtomicReference<>();
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          try {
+            lockMetalakeForOwnerWrite(metalake, metalakeId, false);
+          } catch (NoSuchEntityException missing) {
+            return;
+          }
+          Long liveId =
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.selectMetadataObjectIdForUpdate(
+                          entityId, metalakeId, Entity.EntityType.TABLE));
+          if (liveId == null) {
+            return;
+          }
+          long ownerId = EntityIdService.getEntityId(owner, Entity.EntityType.USER);
+          UserPO user = lockUserForOwnerWrite(owner, ownerId, metalakeId);
+          if (SessionUtils.getWithoutCommitFresh(
+                  OwnerMetaMapper.class,
+                  mapper -> mapper.selectOwnerByMetadataObjectIdAndType(entityId, "TABLE"))
+              != null) {
+            return;
+          }
+          OwnerRelPO relation =
+              POConverters.initializeOwnerRelPOsWithVersion(
+                  metalakeId,
+                  Entity.EntityType.USER.name(),
+                  ownerId,
+                  Entity.EntityType.TABLE.name(),
+                  entityId);
+          SessionUtils.doWithoutCommit(
+              OwnerMetaMapper.class, mapper -> mapper.insertOwnerRel(relation));
+          assigned.set(
+              POConverters.fromUserPO(
+                  user, Collections.emptyList(), AuthorizationUtils.ofUserNamespace(metalake)));
+        });
+    return assigned.get() == null ? Collections.emptyList() : List.of(assigned.get());
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchSetOwner")
@@ -330,16 +416,7 @@ public class OwnerMetaService {
       NameIdentifier owner, Entity.EntityType ownerType, long ownerId, long metalakeId) {
     switch (ownerType) {
       case USER:
-        OccWriteSupport.lockParentForChildWrite(
-            owner.name(),
-            ownerType,
-            () ->
-                SessionUtils.getWithoutCommit(
-                    UserMetaMapper.class, mapper -> mapper.selectUserMetaByIdForShare(ownerId)),
-            null,
-            current ->
-                Objects.equals(current.getMetalakeId(), metalakeId)
-                    && Objects.equals(current.getUserName(), owner.name()));
+        lockUserForOwnerWrite(owner, ownerId, metalakeId);
         return;
       case GROUP:
         OccWriteSupport.lockParentForChildWrite(
@@ -356,5 +433,18 @@ public class OwnerMetaService {
       default:
         throw new IllegalArgumentException("Unsupported owner type: " + ownerType);
     }
+  }
+
+  private UserPO lockUserForOwnerWrite(NameIdentifier owner, long ownerId, long metalakeId) {
+    return OccWriteSupport.lockParentForChildWrite(
+        owner.name(),
+        Entity.EntityType.USER,
+        () ->
+            SessionUtils.getWithoutCommit(
+                UserMetaMapper.class, mapper -> mapper.selectUserMetaByIdForShare(ownerId)),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), metalakeId)
+                && Objects.equals(current.getUserName(), owner.name()));
   }
 }

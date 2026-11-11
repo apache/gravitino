@@ -848,6 +848,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     switch (update.relationType()) {
+      case OWNER_REL:
+        return (List<E>) OwnerMetaService.getInstance().initializeOwner(update);
       case TAG_METADATA_OBJECT_REL:
         return (List<E>)
             TagMetaService.getInstance()
