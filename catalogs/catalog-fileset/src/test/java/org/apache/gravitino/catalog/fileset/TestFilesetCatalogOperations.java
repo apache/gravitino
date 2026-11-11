@@ -3902,6 +3902,36 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @Test
+  void testGetFileSystemWithCacheErrorDoesNotExposeConfiguration() throws IOException {
+    String catalogPath = TEST_ROOT_PATH + "/catalog_fs_error_" + generateTestId();
+    Path path = new Path(catalogPath);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "s3-access-key-id", "DUMMY_ACCESS_KEY_ID",
+            "s3-secret-access-key", "DUMMY_SECRET_ACCESS_KEY");
+    IOException cause = new IOException("Failed to create file system");
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      ops.fileSystemCache.invalidateAll();
+      Mockito.doThrow(cause).when(ops).getFileSystem(Mockito.eq(path), Mockito.eq(conf));
+
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+
+      Assertions.assertSame(cause, e.getCause());
+      Assertions.assertTrue(e.getMessage().contains(catalogPath));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_ACCESS_KEY_ID"));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_SECRET_ACCESS_KEY"));
+    }
+  }
+
   private static Stream<Arguments> multipleLocationsArguments() {
     return Stream.of(
         // Honor the catalog location
