@@ -221,83 +221,9 @@ public class TagMetaService {
       throw e;
     }
 
-<<<<<<< HEAD
     return tagPOs.stream()
         .map(tagPO -> POConverters.fromTagPO(tagPO, NamespaceUtil.ofTag(metalake)))
         .collect(Collectors.toList());
-=======
-    return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
-  }
-
-  /**
-   * Lists direct tag assignments for metadata objects of one type in one metalake.
-   *
-   * @param objectIdentifiers source identifiers
-   * @param objectType source entity type
-   * @return tag relation edges with their source identifiers
-   */
-  public List<RelationalEntity<?>> listTagsForMetadataObjects(
-      List<NameIdentifier> objectIdentifiers, Entity.EntityType objectType) {
-    if (objectIdentifiers.isEmpty()) {
-      return new ArrayList<>();
-    }
-    String metalake = objectIdentifiers.get(0).namespace().level(0);
-    Map<Long, NameIdentifier> identifiersById = new LinkedHashMap<>();
-    Map<NameIdentifier, List<NameIdentifier>> columnsByTable = new LinkedHashMap<>();
-    for (NameIdentifier identifier : objectIdentifiers) {
-      Preconditions.checkArgument(
-          metalake.equals(identifier.namespace().level(0)),
-          "All metadata objects must belong to the same metalake");
-      if (objectType == Entity.EntityType.COLUMN) {
-        columnsByTable
-            .computeIfAbsent(
-                NameIdentifier.of(identifier.namespace().levels()), ignored -> new ArrayList<>())
-            .add(identifier);
-      } else {
-        identifiersById.put(EntityIdService.getEntityId(identifier, objectType), identifier);
-      }
-    }
-    columnsByTable.forEach(
-        (table, columns) -> {
-          Long tableId = EntityIdService.getEntityId(table, Entity.EntityType.TABLE);
-          Map<String, Long> ids =
-              TableColumnMetaService.getInstance()
-                  .getColumnIdsByTableIdAndNames(
-                      tableId,
-                      columns.stream().map(NameIdentifier::name).collect(Collectors.toList()));
-          columns.forEach(column -> identifiersById.put(ids.get(column.name()), column));
-        });
-    List<TagRelationTagPO> rows = new ArrayList<>();
-    String metadataObjectType =
-        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType)
-            .type()
-            .toString();
-    for (List<Long> batch : Lists.partition(new ArrayList<>(identifiersById.keySet()), 500)) {
-      rows.addAll(
-          SessionUtils.getWithoutCommit(
-              TagMetadataObjectRelMapper.class,
-              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(batch, metadataObjectType)));
-    }
-    Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
-    rows.forEach(
-        row ->
-            rowsByObject
-                .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
-                .add(row));
-    List<RelationalEntity<?>> result = new ArrayList<>();
-    rowsByObject.forEach(
-        (id, tagRows) ->
-            tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))
-                .forEach(
-                    tag ->
-                        result.add(
-                            new RelationalEntity<>(
-                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                identifiersById.get(id),
-                                objectType,
-                                tag))));
-    return result;
->>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
   }
 
   @Monitored(

@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +65,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -94,13 +96,9 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
-<<<<<<< HEAD
-=======
 import org.apache.gravitino.hook.TagHookDispatcher;
-import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.TagEventDispatcher;
->>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -112,6 +110,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -733,11 +732,6 @@ public class TestTagManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> dispatcher.createTag(METALAKE, "invalid.tag", null, Map.of()));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            dispatcher.createTag(
-                METALAKE, "invalid.tag", null, Map.of(), TagValueConstraint.anyValue()));
     Assertions.assertFalse(
         entityStore.exists(
             NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));

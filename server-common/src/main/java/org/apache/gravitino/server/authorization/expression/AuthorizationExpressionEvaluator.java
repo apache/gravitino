@@ -145,20 +145,8 @@ public class AuthorizationExpressionEvaluator {
     metadataNames.forEach(
         (type, entityNameIdent) -> {
           if (isMetadataType(type)) {
-<<<<<<< HEAD
             MetadataObject metadataObject =
-                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
-=======
-            MetadataObject metadataObject;
-            try {
-              metadataObject = NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
-            } catch (IllegalNameIdentifierException e) {
-              throw e;
-            } catch (IllegalArgumentException e) {
-              // Only metadata-name parsing failures are client errors, not authorizer failures.
-              throw new IllegalMetadataObjectException(e, "%s", e.getMessage());
-            }
->>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
+                NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
             ognlContext.put(type.name(), metadataObject);
           }
           ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);

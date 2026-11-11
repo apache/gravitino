@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -68,9 +69,11 @@ public class TestTagMetaService extends TestJDBCBackend {
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
 
-<<<<<<< HEAD
-=======
-  /** Legacy dotted object names remain readable by single and batch relation queries. */
+  /**
+   * Legacy dotted object names remain readable by relation queries.
+   *
+   * @throws IOException if the test entities cannot be stored
+   */
   @TestTemplate
   public void testReadTagsForLegacyDottedNames() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
@@ -89,10 +92,6 @@ public class TestTagMetaService extends TestJDBCBackend {
             policy.nameIdentifier(), Entity.EntityType.POLICY);
     for (Map.Entry<NameIdentifier, Entity.EntityType> object : objects.entrySet()) {
       assertTrue(service.listTagsForMetadataObject(object.getKey(), object.getValue()).isEmpty());
-      assertTrue(
-          service
-              .listTagsForMetadataObjects(List.of(object.getKey()), object.getValue())
-              .isEmpty());
       Assertions.assertThrows(
           NoSuchEntityException.class,
           () ->
@@ -101,160 +100,6 @@ public class TestTagMetaService extends TestJDBCBackend {
     }
   }
 
-  /** Verifies a deleted ID is rejected permanently instead of producing a retryable conflict. */
-  @TestTemplate
-  public void testOverwriteRejectsDeletedTagId() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-    TagEntity tag =
-        TagEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("deleted_tag_id")
-            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    TagMetaService service = TagMetaService.getInstance();
-    service.insertTag(tag, false);
-    assertTrue(service.deleteTag(tag.nameIdentifier()));
-    EntityAlreadyExistsException failure =
-        Assertions.assertThrows(
-            EntityAlreadyExistsException.class, () -> service.insertTag(tag, true));
-    assertTrue(failure.getMessage().contains("use a new ID"));
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> service.getTagByIdentifier(tag.nameIdentifier()));
-    TagEntity replacement =
-        TagEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(tag.name())
-            .withNamespace(tag.namespace())
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    service.insertTag(replacement, true);
-    assertEquals(replacement.id(), service.getTagByIdentifier(tag.nameIdentifier()).id());
-  }
-
-  /** Verifies an assignment ignores tags dropped or renamed after they were resolved by name. */
-  @TestTemplate
-  public void testAssignmentLockSkipsTagsDroppedOrRenamedAfterResolution() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-    TagMetaService service = TagMetaService.getInstance();
-    List<TagPO> observed = new ArrayList<>();
-    for (String name : List.of("kept_tag", "dropped_tag", "renamed_tag")) {
-      TagEntity tag =
-          TagEntity.builder()
-              .withId(RandomIdGenerator.INSTANCE.nextId())
-              .withName(name)
-              .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
-              .withAuditInfo(AUDIT_INFO)
-              .build();
-      service.insertTag(tag, false);
-      observed.add(
-          SessionUtils.getWithoutCommit(
-              TagMetaMapper.class, mapper -> mapper.selectTagByTagIdForUpdate(tag.id())));
-    }
-
-    // Both changes commit after the assignment resolved the names but before it locks the rows.
-    assertTrue(service.deleteTag(NameIdentifierUtil.ofTag(METALAKE_NAME, "dropped_tag")));
-    service.updateTag(
-        NameIdentifierUtil.ofTag(METALAKE_NAME, "renamed_tag"),
-        tag ->
-            TagEntity.builder()
-                .withId(tag.id())
-                .withName("renamed_tag_new")
-                .withNamespace(tag.namespace())
-                .withAuditInfo(AUDIT_INFO)
-                .build());
-
-    List<TagPO> locked =
-        SessionUtils.doWithCommitAndFetchResult(
-            TagMetaMapper.class, ignored -> TagMetaService.lockTagsForAssignment(observed));
-    assertEquals(
-        List.of("kept_tag"), locked.stream().map(TagPO::getTagName).collect(Collectors.toList()));
-  }
-
-  /** Verifies first-time overwrites either serialize or report a retryable insert conflict. */
-  @TestTemplate
-  public void testConcurrentOverwriteOfMissingTag() throws Exception {
-    createAndInsertMakeLake(METALAKE_NAME);
-    TagEntity first =
-        TagEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("tag_first_overwrite")
-            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    TagEntity second =
-        TagEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName(first.name())
-            .withNamespace(first.namespace())
-            .withComment("second overwrite")
-            .withAuditInfo(AUDIT_INFO)
-            .build();
-    TagMetaService service = TagMetaService.getInstance();
-    CountDownLatch firstWritten = new CountDownLatch(1);
-    CountDownLatch allowCommit = new CountDownLatch(1);
-    CountDownLatch secondStarted = new CountDownLatch(1);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    Future<Throwable> firstResult =
-        executor.submit(
-            () -> {
-              SessionUtils.beginTransaction();
-              try {
-                service.insertTag(first, true);
-                firstWritten.countDown();
-                await(allowCommit);
-                SessionUtils.commitTransaction();
-                return null;
-              } catch (Throwable failure) {
-                SessionUtils.rollbackTransaction();
-                return failure;
-              }
-            });
-    try {
-      assertTrue(firstWritten.await(30, TimeUnit.SECONDS));
-      Future<Throwable> secondResult =
-          executor.submit(
-              () -> {
-                secondStarted.countDown();
-                try {
-                  service.insertTag(second, true);
-                  return null;
-                } catch (Throwable failure) {
-                  return failure;
-                }
-              });
-      assertTrue(secondStarted.await(30, TimeUnit.SECONDS));
-      Assertions.assertThrows(
-          TimeoutException.class, () -> secondResult.get(500, TimeUnit.MILLISECONDS));
-      allowCommit.countDown();
-      Assertions.assertNull(firstResult.get(30, TimeUnit.SECONDS));
-      Throwable failure = secondResult.get(30, TimeUnit.SECONDS);
-      if (failure != null) {
-        assertTrue(
-            failure instanceof OptimisticLockException, () -> "Unexpected failure: " + failure);
-        assertEquals(first.id(), service.getTagByIdentifier(first.nameIdentifier()).id());
-        Assertions.assertNull(
-            SessionUtils.getWithoutCommit(
-                TagMetaMapper.class, mapper -> mapper.selectTagByTagId(second.id())));
-        service.insertTag(second, true);
-      }
-      TagEntity stored = service.getTagByIdentifier(first.nameIdentifier());
-      assertEquals(first.id(), stored.id());
-      assertEquals("second overwrite", stored.comment());
-      TagPO storedPO =
-          SessionUtils.getWithoutCommit(
-              TagMetaMapper.class, mapper -> mapper.selectTagByTagId(first.id()));
-      assertEquals(2L, storedPO.getCurrentVersion().longValue());
-      Assertions.assertNull(
-          SessionUtils.getWithoutCommit(
-              TagMetaMapper.class, mapper -> mapper.selectTagByTagId(second.id())));
-    } finally {
-      allowCommit.countDown();
-      executor.shutdownNow();
-    }
-  }
-
->>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);

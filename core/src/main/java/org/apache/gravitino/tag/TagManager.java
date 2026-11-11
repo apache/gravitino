@@ -109,21 +109,8 @@ public class TagManager implements TagDispatcher {
 
   public Tag createTag(String metalake, String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
-<<<<<<< HEAD
-=======
-    return createTag(metalake, name, comment, properties, TagValueConstraint.anyValue());
-  }
-
-  public Tag createTag(
-      String metalake,
-      String name,
-      String comment,
-      Map<String, String> properties,
-      TagValueConstraint valueConstraint)
-      throws TagAlreadyExistsException {
     NameIdentifierUtil.checkMetadataObjectName(
         NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
->>>>>>> 6b73de4f9 ([#14823] fix: Correct catalog authentication and metadata authorization (#14827))
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
