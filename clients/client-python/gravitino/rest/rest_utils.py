@@ -20,6 +20,18 @@ import urllib.parse
 from gravitino.exceptions.base import IllegalArgumentException
 
 
+def validate_domain_name(name: str) -> None:
+    if not isinstance(name, str) or not name.strip():
+        raise IllegalArgumentException("Domain name must not be blank")
+    if name in (".", ".."):
+        raise IllegalArgumentException(f"Unsafe domain path segment: {name}")
+
+
+def domain_path(metalake: str, name: str) -> str:
+    validate_domain_name(name)
+    return f"api/metalakes/{encode_string(metalake)}/domains/{encode_string(name)}"
+
+
 def encode_string(to_encode: str):
     if to_encode is None:
         raise IllegalArgumentException("Invalid string to encode: None")

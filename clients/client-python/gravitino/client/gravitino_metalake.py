@@ -26,6 +26,22 @@ from gravitino.api.authorization.role import Role
 from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.authorization.user import User
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.domain_change import DomainChangeVariant
+from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.tag.tag_value import TagValue
+from gravitino.client.generic_domain import GenericDomain
+from gravitino.dto.requests.domain_create_request import (
+    BackingTagCreate,
+    DomainCreateRequest,
+)
+from gravitino.dto.requests.domain_updates_request import DomainUpdatesRequest
+from gravitino.dto.responses.domain_response import (
+    DomainListResponse,
+    DomainNamesListResponse,
+    DomainResponse,
+)
+from gravitino.exceptions.handlers.domain_error_handler import DOMAIN_ERROR_HANDLER
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
@@ -137,7 +153,7 @@ from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLE
 from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import domain_path, encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -153,6 +169,7 @@ class GravitinoMetalake(
     SupportsJobs,
     SupportsRoles,
     TagOperations,
+    DomainOperations,
     PolicyOperations,
     SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors
@@ -700,6 +717,94 @@ class GravitinoMetalake(
         resp.validate()
 
         return GenericJobHandle(resp.job())
+
+    def list_domains(self) -> list[str]:
+        """List visible domain names, including subdomains."""
+        response = self.rest_client.get(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainNamesListResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return result.names()
+
+    def list_domains_info(self) -> list[Domain]:
+        """List visible domain snapshots, including subdomains."""
+        response = self.rest_client.get(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            params={"details": "true"},
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainListResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return [
+            GenericDomain(self.name(), dto, self.rest_client)
+            for dto in result.domains()
+        ]
+
+    def get_domain(self, name: str) -> Domain:
+        """Load a domain by name; hidden drafts raise NoSuchDomainException."""
+        response = self.rest_client.get(
+            domain_path(self.name(), name),
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def create_domain(
+        self,
+        name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        backing_tag: TagValue,
+        create_backing_tag: bool,
+    ) -> Domain:
+        """Create a draft top-level domain with an explicit new or existing tag."""
+        Precondition.check_argument(
+            backing_tag is not None, "backing_tag must not be None"
+        )
+        request = DomainCreateRequest(
+            name,
+            comment,
+            properties,
+            None,
+            BackingTagCreate(
+                backing_tag.name(), backing_tag.value(), create_backing_tag
+            ),
+        )
+        request.validate()
+        response = self.rest_client.post(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            json=request,
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
+        """Alter name, comment or properties; the backing tag is unchanged."""
+        request = DomainUpdatesRequest.from_changes(changes)
+        request.validate()
+        response = self.rest_client.put(
+            domain_path(self.name(), name),
+            json=request,
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def delete_domain(self, name: str) -> bool:
+        """Delete a domain, preserving tags; parents with children are rejected."""
+        response = self.rest_client.delete(
+            domain_path(self.name(), name),
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DropResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return result.dropped()
 
     #########
     # Tag operations
