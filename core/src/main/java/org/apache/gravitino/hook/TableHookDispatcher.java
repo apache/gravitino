@@ -56,7 +56,10 @@ public class TableHookDispatcher implements TableDispatcher {
   /**
    * Creates a table hook dispatcher.
    *
-   * @param dispatcher the underlying table dispatcher
+   * @param dispatcher the underlying table dispatcher. With authorization enabled, each create
+   *     result must retain the original Gravitino ID in an {@link EntityCombinedTable} snapshot or
+   *     an embedded {@link StringIdentifier} property. A missing ID fails after creation; the ID
+   *     must never be reloaded by name.
    * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
    *     disabled; authorized creation requires identity-conditional owner initialization
    */
