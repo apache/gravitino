@@ -52,7 +52,9 @@ import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -68,6 +70,25 @@ class TestNormalizedOwnerOperations extends TestJDBCBackend {
   private Object originalCatalogs;
   private Object originalAuthorizer;
   private Object originalLockManager;
+
+  // BackendTestExtension replaces the GravitinoEnv config and ID generator; restore them so later
+  // test classes in the same JVM see the original values.
+  private static Object originalEnvConfig;
+  private static Object originalEnvIdGenerator;
+
+  @BeforeAll
+  static void saveEnvConfig() throws IllegalAccessException {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    originalEnvConfig = FieldUtils.readField(env, "config", true);
+    originalEnvIdGenerator = FieldUtils.readField(env, "idGenerator", true);
+  }
+
+  @AfterAll
+  static void restoreEnvConfig() throws IllegalAccessException {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    FieldUtils.writeField(env, "config", originalEnvConfig, true);
+    FieldUtils.writeField(env, "idGenerator", originalEnvIdGenerator, true);
+  }
 
   @BeforeEach
   void setUp() throws Exception {
