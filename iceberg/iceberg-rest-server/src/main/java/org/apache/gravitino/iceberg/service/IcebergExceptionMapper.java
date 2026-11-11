@@ -74,7 +74,12 @@ public class IcebergExceptionMapper implements ExceptionMapper<Throwable> {
           .put(TokenExpiredException.class, 419)
           .put(org.apache.gravitino.exceptions.ForbiddenException.class, 403)
           .put(ForbiddenException.class, 403)
+          // javax.ws.rs.NotFoundException (JAX-RS, imported above) for an unknown REST path.
           .put(NotFoundException.class, 404)
+          // Iceberg NotFoundException is intentionally unmapped (defaults to 500). It can mean a
+          // server-side missing file (table metadata/manifest gone from storage), not only a bad
+          // client path. Request-supplied metadata-location cases convert to BadRequestException at
+          // the call site (e.g. loadTableMetadataFromLocation / registerTable / registerView).
           .put(NoSuchNamespaceException.class, 404)
           .put(NoSuchTableException.class, 404)
           .put(NoSuchIcebergTableException.class, 404)
