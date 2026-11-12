@@ -41,13 +41,15 @@ Notes:
   The dependencies compiled into the WARs are scanned through the two `pnpm-lock.yaml` files instead.
   Trivy 0.76.1 leaves out the development dependencies of pnpm lock files unless `--include-dev-deps` is
   set (`web`: 36 findings without the flag, 86 with it), so only what is shipped is gated.
-* The Python client is scanned from its requirements files, because the released `apache-gravitino`
-  package pins its dependencies with `==` (`requirements.txt` and the files of its extras). The workflow
-  merges them into one file (`scan.sh stage-requirements clients/client-python <dir>/client-python`)
-  and leaves out `requirements-dev.txt` and `requirements-ray-iceberg.txt`. The step fails when the
-  merged file has no pinned `==` line, so an empty file cannot pass as a clean scan.
-  Only the pinned packages are checked: transitive dependencies are resolved by pip at install time, so
-  there is no version for Trivy to look up.
+* The Python client is scanned as pip installs it. `scan.sh stage-python clients/client-python <dir>/client-python`
+  resolves the package with every extra except `dev` (read from the package, so new extras are covered)
+  in a throwaway virtualenv and writes the result, including transitive dependencies, as `name==version`
+  lines. This works whether the requirements files pin versions or allow ranges. The resolution is done
+  for the project's `pythonVersion` (`gradle.properties`) on the Linux runner, and it can change when a
+  dependency publishes a new release inside an allowed range; a new finding is then real for new
+  installs. `requirements-ray-iceberg.txt` is not an extra and is not part of the package. The step
+  fails when pip cannot resolve the package or no dependency is left, so an empty file cannot pass as a
+  clean scan.
 * The Docker images published by `dev/release` are not scanned yet. That is a follow-up.
 * The Trino 473 and later modules need JDK 25, which Gradle provisions through its toolchain resolver.
 
@@ -59,6 +61,18 @@ Notes:
   Scan jobs restore the cache read-only and skip all DB updates, so every report of a run uses the same DB snapshot.
 * A target fails when a HIGH or CRITICAL finding remains after the exemptions, or when Trivy did not
   produce a valid report. All targets are scanned even if one of them fails.
+* Each daily cache entry holds about 1 GB. It counts against the repository's 10 GB Actions cache, which
+  is shared with the Gradle caches of every workflow (least recently used entries are evicted first), and
+  a manual run on another branch stores its own entry. Start manual runs from the default branch and
+  avoid repeating them.
+
+## When a scheduled run fails
+
+GitHub notifies only the user who last changed the `cron` line, so the workflow keeps a tracking issue
+titled `Scheduled release artifact scan failed`. A failed scheduled run opens it, or adds a comment with
+the run and the failed jobs when it is already open. The first scheduled run that passes again adds a
+comment and closes it. Manual runs do not touch the issue. Committers triage the issue: fix the finding,
+or update the exemptions following the rules below.
 
 ## Reading the results
 
@@ -73,8 +87,9 @@ Notes:
 
 ## Running the scan locally
 
-You need Docker and `jq`. `yq` (v4) is only needed for `scan.sh unused` and `scan.sh check-exemptions`;
-both tools are preinstalled on the GitHub `ubuntu` runners.
+You need Docker and `jq`. `yq` (v4) is only needed for `scan.sh unused` and `scan.sh check-exemptions`,
+and `python3` with pip 22.2 or later plus network access for `scan.sh stage-python`. These tools are
+preinstalled on the GitHub `ubuntu` runners.
 
 ```bash
 # Build what you want to scan, for example the server packages and the AWS bundle.
@@ -108,7 +123,7 @@ There are two kinds:
 | | A: not affected (`vex.openvex.json`) | B: not analysed yet (`trivyignore.yaml`) |
 | --- | --- | --- |
 | Meaning | Gravitino does not execute the vulnerable code | Pre-existing finding that has not been triaged |
-| Evidence | Required: a `not_affected` statement with the justification `vulnerable_code_not_in_execute_path` and an `impact_statement` that cites the code or analysis, valid for the artifact where it is reported | None, but a tracking issue is required |
+| Evidence | Required: a `not_affected` statement with one of the OpenVEX justifications (usually `vulnerable_code_not_in_execute_path`) and an `impact_statement` that cites the code or analysis, valid for the artifact where it is reported | None, but a tracking issue is required |
 | Scope | The affected package URL | One entry per vulnerability id, restricted to the exact package versions found |
 | Expiry | None, reviewed like code | `expired_at`, at most 90 days ahead |
 
@@ -123,7 +138,11 @@ Rules for entries in `trivyignore.yaml`:
 `scan.sh check-exemptions` fails the `Exemptions` job when an entry has no `id`, `purls`, `expired_at` or
 `statement`, when a purl has no exact version, when `expired_at` is malformed, quoted, not in the future or
 more than 90 days ahead (UTC), or when the statement does not reference `apache/gravitino#<number>`. It also
-checks that the VEX file is OpenVEX JSON, that each statement has a `status`, that `not_affected` has a
-justification and an `impact_statement`, and that `affected` has an `action_statement`.
+checks that the VEX file is OpenVEX JSON and that every statement is `not_affected`, with one of the five
+OpenVEX justifications (`component_not_present`, `vulnerable_code_not_present`,
+`vulnerable_code_not_in_execute_path`, `vulnerable_code_cannot_be_controlled_by_adversary`,
+`inline_mitigations_already_exist`) and an `impact_statement`. Other statuses are rejected: Trivy also
+suppresses a finding marked `fixed`, which would need no evidence, and `affected` or
+`under_investigation` suppress nothing. A fixed dependency is shown by upgrading it, not by a statement.
 
 The ignore file uses a Trivy feature that is marked experimental, as are `--vex` and `--show-suppressed`.
