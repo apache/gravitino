@@ -21,19 +21,7 @@ package org.apache.gravitino.spark.connector.plugin;
 /** Returns a blank catalog class name and must be skipped. */
 public class BlankSparkCatalogExtension implements SparkCatalogExtension {
 
-<<<<<<< HEAD:spark-connector/spark-common/src/test/java/org/apache/gravitino/spark/connector/plugin/BlankSparkCatalogExtension.java
   public static final String PROVIDER = "jdbc-blank";
-=======
-import org.apache.flink.table.factories.CatalogFactory;
-import org.apache.gravitino.Catalog;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.flink.connector.PartitionConverter;
-import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.CatalogCompat;
-import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink119;
-
-public class TestGravitinoJdbcCatalogFlink119 extends TestGravitinoJdbcCatalog {
->>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802)):flink-connector/v1.19/flink/src/test/java/org/apache/gravitino/flink/connector/jdbc/TestGravitinoJdbcCatalogFlink119.java
 
   @Override
   public String provider() {
@@ -43,20 +31,5 @@ public class TestGravitinoJdbcCatalogFlink119 extends TestGravitinoJdbcCatalog {
   @Override
   public String catalogClassName() {
     return " ";
-  }
-
-  @Override
-  protected GravitinoJdbcCatalog createNativeCatalog(
-      CatalogFactory.Context context,
-      String defaultDatabase,
-      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
-      PartitionConverter partitionConverter) {
-    return new GravitinoJdbcCatalogFlink119(
-        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter) {
-      @Override
-      protected Catalog catalog() {
-        throw new NoSuchCatalogException("Catalog %s does not exist", context.getName());
-      }
-    };
   }
 }

@@ -25,226 +25,26 @@ import java.net.ServerSocket;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-<<<<<<< HEAD
-=======
-import java.util.Optional;
 import org.apache.flink.configuration.Configuration;
-import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.catalog.AbstractCatalog;
-import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
-import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
-import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.CatalogFactory;
-import org.apache.flink.table.factories.Factory;
->>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802))
+import org.apache.flink.table.factories.FactoryUtil;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
-<<<<<<< HEAD
-/** Unit tests for {@link GravitinoJdbcCatalog#applyJdbcCredential}. */
+/** Unit tests for {@link GravitinoJdbcCatalog}. */
 public class TestGravitinoJdbcCatalog {
-=======
-/**
- * Unit tests for {@link GravitinoJdbcCatalog}. Concrete Flink version modules extend this and
- * supply their own {@link CatalogCompat}, since {@link GravitinoJdbcCatalog} is abstract.
- */
-public abstract class TestGravitinoJdbcCatalog {
-
-  protected abstract CatalogCompat catalogCompat();
-
-  @Test
-  void testGetFactoryDelegatesToCatalogCompat() {
-    // GravitinoJdbcCatalog.getFactory() must return the version-appropriate JDBC dynamic table
-    // factory via catalogCompat(), not a hardcoded factory -- the JDBC factory's package moved
-    // (and, starting with Flink 2.x, the artifact was split by database) across Flink connector
-    // releases, which is exactly what the CatalogCompat abstraction exists to paper over.
-    GravitinoJdbcCatalog catalog =
-        new TestableGravitinoJdbcCatalog(catalogCompat(), "test", Collections.emptyMap());
-
-    Optional<Factory> factory = catalog.getFactory();
-
-    Assertions.assertTrue(factory.isPresent());
-    // jdbcDynamicTableFactory() constructs a new instance per call, so compare by type rather
-    // than identity.
-    Assertions.assertEquals(
-        catalogCompat().jdbcDynamicTableFactory().getClass(), factory.get().getClass());
-  }
-
-  @Test
-  void testCatalogWithoutDefaultDatabase() throws Exception {
-    TestableGravitinoJdbcCatalog catalog =
-        new TestableGravitinoJdbcCatalog(catalogCompat(), null, Collections.emptyMap());
-
-    Assertions.assertNull(catalog.getDefaultDatabase());
-    Assertions.assertDoesNotThrow(catalog::open);
-    Assertions.assertFalse(catalog.isInnerCatalogCreated());
-    Assertions.assertEquals(
-        CatalogTableStatistics.UNKNOWN,
-        catalog.getTableStatistics(ObjectPath.fromString("database.table")));
-    Assertions.assertEquals(
-        CatalogColumnStatistics.UNKNOWN,
-        catalog.getTableColumnStatistics(ObjectPath.fromString("database.table")));
-
-    CatalogException exception =
-        Assertions.assertThrows(CatalogException.class, catalog::getInnerCatalog);
-    Assertions.assertTrue(exception.getMessage().contains("No default database is configured"));
-  }
-
-  @Test
-  void testInnerCatalogUsesConnectionDatabase() {
-    Map<String, String> options = new HashMap<>();
-    options.put(JdbcPropertiesConstants.FLINK_JDBC_URL, "jdbc:postgresql://127.0.0.1:5432/");
-    options.put(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, "public");
-    options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
-    TestableGravitinoJdbcCatalog catalog =
-        new TestableGravitinoJdbcCatalog(catalogCompat(), "public", options);
-
-    Assertions.assertThrows(UnsupportedOperationException.class, catalog::open);
-
-    Map<String, String> innerOptions = catalog.getInnerCatalogOptions();
-    Assertions.assertEquals(
-        "jdbc:postgresql://127.0.0.1:5432",
-        innerOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
-    Assertions.assertEquals(
-        "gravitino", innerOptions.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
-    Assertions.assertFalse(
-        innerOptions.containsKey(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
-    Assertions.assertEquals("public", catalog.getDefaultDatabase());
-    Assertions.assertEquals(
-        "gravitino", options.get(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
-  }
-
-  @Test
-  void testNativeCatalogConnectsToConnectionDatabase() throws IOException {
-    int port;
-    try (ServerSocket socket = new ServerSocket(0)) {
-      port = socket.getLocalPort();
-    }
-    String hostUrl = "127.0.0.1:" + port;
-    Map<String, String> expectedUrls =
-        ImmutableMap.of(
-            "jdbc:postgresql://" + hostUrl + "/", "jdbc:postgresql://" + hostUrl + "/gravitino",
-            "jdbc:postgresql://" + hostUrl, "jdbc:postgresql://" + hostUrl + "/gravitino",
-            "jdbc:mysql://" + hostUrl + "/", "jdbc:mysql://" + hostUrl + "/gravitino");
-    for (Map.Entry<String, String> entry : expectedUrls.entrySet()) {
-      Map<String, String> options = new HashMap<>();
-      options.put(JdbcPropertiesConstants.FLINK_JDBC_URL, entry.getKey());
-      options.put(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, "public");
-      options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
-      options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, "user");
-      options.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, "password");
-      GravitinoJdbcCatalog catalog =
-          createNativeCatalog(
-              new MockCatalogContext("test", options),
-              "public",
-              Mockito.mock(SchemaAndTablePropertiesConverter.class),
-              Mockito.mock(PartitionConverter.class));
-
-      // Nothing listens on the port, so the native catalog fails on its first connection and
-      // reports the URL. The MySQL catalog connects when it is created, PostgreSQL in open().
-      RuntimeException exception = Assertions.assertThrows(RuntimeException.class, catalog::open);
-      Assertions.assertTrue(
-          exception instanceof ValidationException || exception instanceof CatalogException,
-          exception.toString());
-      String message = exception.getMessage();
-      Assertions.assertTrue(
-          message.contains(entry.getValue() + " via") || message.endsWith(entry.getValue() + "."),
-          message);
-    }
-  }
-
-  /**
-   * Creates the version-specific JDBC catalog that builds the native Flink JDBC catalog. The
-   * returned catalog must not look up the catalog from the Gravitino server.
-   */
-  protected abstract GravitinoJdbcCatalog createNativeCatalog(
-      CatalogFactory.Context context,
-      String defaultDatabase,
-      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
-      PartitionConverter partitionConverter);
-
-  private static class TestableGravitinoJdbcCatalog extends GravitinoJdbcCatalog {
-    private final CatalogCompat catalogCompat;
-    private boolean innerCatalogCreated;
-    private Map<String, String> innerCatalogOptions;
-
-    TestableGravitinoJdbcCatalog(
-        CatalogCompat catalogCompat, String defaultDatabase, Map<String, String> options) {
-      super(
-          new MockCatalogContext("test", options),
-          defaultDatabase,
-          Mockito.mock(SchemaAndTablePropertiesConverter.class),
-          Mockito.mock(PartitionConverter.class));
-      this.catalogCompat = catalogCompat;
-    }
-
-    @Override
-    protected CatalogCompat catalogCompat() {
-      return catalogCompat;
-    }
-
-    @Override
-    protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
-      innerCatalogCreated = true;
-      innerCatalogOptions = context.getOptions();
-      throw new UnsupportedOperationException("The inner catalog must not be created");
-    }
-
-    Map<String, String> getInnerCatalogOptions() {
-      return innerCatalogOptions;
-    }
-
-    @Override
-    protected Catalog catalog() {
-      return new PlainCatalogStub();
-    }
-
-    boolean isInnerCatalogCreated() {
-      return innerCatalogCreated;
-    }
-
-    AbstractCatalog getInnerCatalog() {
-      return realCatalog();
-    }
-  }
-
-  private static class MockCatalogContext implements CatalogFactory.Context {
-    private final String name;
-    private final Map<String, String> options;
-
-    MockCatalogContext(String name, Map<String, String> options) {
-      this.name = name;
-      this.options = options;
-    }
-
-    @Override
-    public String getName() {
-      return name;
-    }
-
-    @Override
-    public Map<String, String> getOptions() {
-      return options;
-    }
-
-    @Override
-    public ReadableConfig getConfiguration() {
-      return Configuration.fromMap(options);
-    }
-
-    @Override
-    public ClassLoader getClassLoader() {
-      return Thread.currentThread().getContextClassLoader();
-    }
-  }
->>>>>>> f4056faaa ([#14801] fix(flink-connector): Honor bypass base-url and use jdbc-database for PostgreSQL connections (#14802))
 
   private static class PlainCatalogStub implements Catalog {
     @Override
@@ -337,5 +137,103 @@ public abstract class TestGravitinoJdbcCatalog {
     Assertions.assertEquals("prop-user", options.get(JdbcPropertiesConstants.FLINK_JDBC_USER));
     Assertions.assertEquals(
         "prop-password", options.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
+  }
+
+  @Test
+  void testInnerCatalogUsesConnectionDatabase() {
+    Map<String, String> options = new HashMap<>();
+    options.put(JdbcPropertiesConstants.FLINK_JDBC_URL, "jdbc:postgresql://127.0.0.1:5432/");
+    options.put(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, "public");
+    options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
+    TestableGravitinoJdbcCatalog catalog =
+        new TestableGravitinoJdbcCatalog(catalogContext(options), "public");
+
+    Assertions.assertThrows(UnsupportedOperationException.class, catalog::open);
+
+    Map<String, String> innerOptions = catalog.getInnerCatalogOptions();
+    Assertions.assertEquals(
+        "jdbc:postgresql://127.0.0.1:5432",
+        innerOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+    Assertions.assertEquals(
+        "gravitino", innerOptions.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+    Assertions.assertFalse(
+        innerOptions.containsKey(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
+    Assertions.assertEquals("public", catalog.getDefaultDatabase());
+  }
+
+  @Test
+  void testNativeCatalogConnectsToConnectionDatabase() throws IOException {
+    int port;
+    try (ServerSocket socket = new ServerSocket(0)) {
+      port = socket.getLocalPort();
+    }
+    String hostUrl = "127.0.0.1:" + port;
+    Map<String, String> expectedUrls =
+        ImmutableMap.of(
+            "jdbc:postgresql://" + hostUrl + "/", "jdbc:postgresql://" + hostUrl + "/gravitino",
+            "jdbc:postgresql://" + hostUrl, "jdbc:postgresql://" + hostUrl + "/gravitino",
+            "jdbc:mysql://" + hostUrl + "/", "jdbc:mysql://" + hostUrl + "/gravitino");
+    for (Map.Entry<String, String> entry : expectedUrls.entrySet()) {
+      Map<String, String> options = new HashMap<>();
+      options.put(JdbcPropertiesConstants.FLINK_JDBC_URL, entry.getKey());
+      options.put(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, "public");
+      options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
+      options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, "user");
+      options.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, "password");
+      GravitinoJdbcCatalog catalog =
+          new GravitinoJdbcCatalog(
+              catalogContext(options),
+              "public",
+              Mockito.mock(SchemaAndTablePropertiesConverter.class),
+              Mockito.mock(PartitionConverter.class)) {
+            @Override
+            protected Catalog catalog() {
+              throw new NoSuchCatalogException("Catalog %s does not exist", "test");
+            }
+          };
+
+      // Nothing listens on the port, so the native catalog fails on its first connection and
+      // reports the URL. The MySQL catalog connects when it is created, PostgreSQL in open().
+      RuntimeException exception = Assertions.assertThrows(RuntimeException.class, catalog::open);
+      Assertions.assertTrue(
+          exception instanceof ValidationException || exception instanceof CatalogException,
+          exception.toString());
+      String message = exception.getMessage();
+      Assertions.assertTrue(
+          message.contains(entry.getValue() + " via") || message.endsWith(entry.getValue() + "."),
+          message);
+    }
+  }
+
+  private static CatalogFactory.Context catalogContext(Map<String, String> options) {
+    return new FactoryUtil.DefaultCatalogContext(
+        "test", options, new Configuration(), TestGravitinoJdbcCatalog.class.getClassLoader());
+  }
+
+  private static class TestableGravitinoJdbcCatalog extends GravitinoJdbcCatalog {
+    private Map<String, String> innerCatalogOptions;
+
+    TestableGravitinoJdbcCatalog(CatalogFactory.Context context, String defaultDatabase) {
+      super(
+          context,
+          defaultDatabase,
+          Mockito.mock(SchemaAndTablePropertiesConverter.class),
+          Mockito.mock(PartitionConverter.class));
+    }
+
+    @Override
+    protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+      innerCatalogOptions = context.getOptions();
+      throw new UnsupportedOperationException("The inner catalog must not be created");
+    }
+
+    @Override
+    protected Catalog catalog() {
+      return new PlainCatalogStub();
+    }
+
+    Map<String, String> getInnerCatalogOptions() {
+      return innerCatalogOptions;
+    }
   }
 }
