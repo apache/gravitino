@@ -25,6 +25,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
@@ -38,6 +39,7 @@ import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.utils.ClassUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.UnsupportedFileSystemException;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.iceberg.BaseMetadataTable;
 import org.apache.iceberg.BaseTable;
@@ -51,6 +53,7 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.TableOperations;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.Transaction;
+import org.apache.iceberg.aws.s3.S3FileIO;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
@@ -60,6 +63,7 @@ import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
 import org.apache.iceberg.exceptions.NotFoundException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.jdbc.JdbcCatalog;
@@ -240,6 +244,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    validateTableLocation(request.metadataLocation());
     try {
       return CatalogHandlers.registerTable(getCatalog(), namespace, request);
     } catch (NotFoundException e) {
@@ -265,6 +270,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   public LoadTableResponse createTable(Namespace namespace, CreateTableRequest request) {
     request.validate();
     validateTableDefinition(request);
+    validateTableLocation(request.location());
     Catalog loadedCatalog = getCatalog();
     LoadTableResponse loadTableResponse;
     try {
@@ -340,15 +346,34 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    *
    * @param metadataLocation metadata file location
    * @return parsed table metadata
-   * @throws BadRequestException if no metadata file exists at the location
+   * @throws BadRequestException if the location is missing, not a metadata file, or uses a scheme
+   *     the catalog cannot read
+   * @throws RuntimeIOException for other IO failures (storage outage, credentials, timeouts)
    */
   public TableMetadata loadTableMetadataFromLocation(String metadataLocation) {
+    validateTableLocation(metadataLocation);
+    requireMetadataFileName(metadataLocation);
     try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
-      return TableMetadataParser.read(fileIO, metadataLocation);
-    } catch (NotFoundException e) {
-      // The location comes from the request, so a missing file is a client error. 404 is reserved
-      // by the REST spec for a namespace or table that does not exist.
-      throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
+      try {
+        return TableMetadataParser.read(fileIO, metadataLocation);
+      } catch (NotFoundException e) {
+        // Request-supplied location missing: client error. 404 is for missing namespace/table.
+        LOG.info("Metadata location does not exist: {}", metadataLocation, e);
+        throw new BadRequestException("Metadata location %s does not exist", metadataLocation);
+      } catch (RuntimeIOException e) {
+        // Unsupported scheme via cause type (not message text). Walk the chain in case FileIO
+        // wraps UnsupportedFileSystemException deeper than getCause(). Other IO stays 5xx.
+        for (Throwable t = e; t != null; t = t.getCause()) {
+          if (t instanceof UnsupportedFileSystemException) {
+            LOG.info(
+                "Cannot read metadata location with unsupported scheme: {}", metadataLocation, e);
+            throw new BadRequestException(
+                "Cannot read metadata location %s: unsupported or unreadable scheme",
+                metadataLocation);
+          }
+        }
+        throw e;
+      }
     }
   }
 
@@ -432,6 +457,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    for (MetadataUpdate update : updateTableRequest.updates()) {
+      if (update instanceof MetadataUpdate.SetLocation) {
+        validateTableLocation(((MetadataUpdate.SetLocation) update).location());
+      }
+    }
     getMetadataCache().invalidate(tableIdentifier);
     validateDefaultSpecAndSortOrder(tableIdentifier, updateTableRequest);
     LoadTableResponse loadTableResponse;
@@ -448,10 +478,47 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTableResponse;
   }
 
+  /**
+   * Commits an already built table change and reloads the table metadata.
+   *
+   * <p>This method does not establish an impersonation context for the earlier table load or
+   * transaction construction. Callers that require Kerberos impersonation must build changes inside
+   * {@link #buildAndUpdateTable(Function)} on the proxied wrapper instead of building them with
+   * {@link #getCatalog()} before calling this method.
+   *
+   * @param icebergTableChange the table change to commit
+   * @return the response after committing the table change
+   */
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
     Transaction transaction = icebergTableChange.getTransaction();
-    transaction.commitTransaction();
+    try {
+      transaction.commitTransaction();
+    } finally {
+      // A load during the commit can cache old metadata, even if the commit ultimately fails.
+      getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
+    }
     return loadTable(icebergTableChange.getTableIdentifier());
+  }
+
+  /**
+   * Builds an {@link IcebergTableChange} and commits it within a single proxied call. When this
+   * wrapper is behind the {@link KerberosAwareIcebergCatalogProxy}, the entire operation, including
+   * the metadata.json read triggered by {@code loadTable()} inside the builder, runs under the
+   * impersonated user's UGI context.
+   *
+   * <p>The catalog passed to the builder is the same underlying instance returned by {@link
+   * #getCatalog()}; it is not itself proxied. The builder must execute inside this wrapper method
+   * so that table loading and transaction construction remain within the proxy's Kerberos boundary.
+   * Moving the builder call outside this method would bypass impersonation even when using the same
+   * catalog.
+   *
+   * @param builder a function that uses the underlying catalog to build an {@link
+   *     IcebergTableChange}
+   * @return the response after committing the table change
+   */
+  public LoadTableResponse buildAndUpdateTable(Function<Catalog, IcebergTableChange> builder) {
+    IcebergTableChange change = builder.apply(getCatalog());
+    return updateTable(change);
   }
 
   public LoadViewResponse createView(Namespace namespace, CreateViewRequest request) {
@@ -637,6 +704,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     }
   }
 
+  private void validateTableLocation(@Nullable String location) {
+    if (location == null || !S3FileIO.class.getName().equals(fileIOImpl())) {
+      return;
+    }
+    String[] parts = location.split("://", 2);
+    if (parts.length != 2
+        || !Set.of("s3", "s3a", "s3n").contains(parts[0])
+        || parts[1].split("/", 2)[0].isBlank()) {
+      throw new BadRequestException(
+          "Invalid table location '%s': this catalog requires an S3 location", location);
+    }
+  }
+
   /**
    * Rejects set-default-spec and set-default-sort-order updates naming an id the table does not
    * have; Iceberg applies them unchecked and then fails with a NullPointerException.
@@ -710,6 +790,29 @@ public class IcebergCatalogWrapper implements AutoCloseable {
                   "Namespace property '%s' exceeds the JDBC catalog limit of %s characters",
                   key,
                   MAX_JDBC_NAMESPACE_PROPERTY_VALUE_LENGTH));
+    }
+  }
+
+  /**
+   * Same gate as Iceberg {@code TableMetadataParser.read} → {@code Codec.fromFileName}: reject
+   * directory / non-metadata paths before reading. Iceberg itself requires the path to contain
+   * {@code .metadata.json} (including {@code .metadata.json.gz}); any metadata file Iceberg can
+   * load already passes this check, so this is not stricter than Iceberg and does not break
+   * existing registered tables. Do not catch {@link IllegalArgumentException} around {@code read()}
+   * — corrupt content / {@code fromJson} validation must not be mislabeled as a bad
+   * metadata-location.
+   */
+  private static void requireMetadataFileName(String metadataLocation) {
+    if (metadataLocation == null) {
+      throw new BadRequestException(
+          "Metadata location %s is not a valid metadata file", metadataLocation);
+    }
+    try {
+      TableMetadataParser.Codec.fromFileName(metadataLocation);
+    } catch (IllegalArgumentException e) {
+      LOG.info("Metadata location is not a valid metadata file: {}", metadataLocation, e);
+      throw new BadRequestException(
+          "Metadata location %s is not a valid metadata file", metadataLocation);
     }
   }
 }

@@ -89,6 +89,15 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY =
       "fs.gravitino.client.oauth2.scope";
 
+  /**
+   * The configuration key for the OAuth2 client authentication method.
+   *
+   * <p>Canonical values are the RFC 6749 style names {@code client_secret_post} (default) and
+   * {@code client_secret_basic} (case-insensitive).
+   */
+  public static final String FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY =
+      "fs.gravitino.client.oauth2.authenticationMethod";
+
   /** The configuration key prefix for kerberos */
   public static final String FS_GRAVITINO_CLIENT_KERBEROS_PREFIX = "fs.gravitino.client.kerberos.";
 

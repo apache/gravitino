@@ -110,6 +110,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types.BooleanType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
 import org.apache.iceberg.util.JsonUtil;
@@ -128,8 +129,10 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
   private static final Schema tableSchema =
       new Schema(NestedField.of(1, false, "foo_string", StringType.get()));
 
+  // Optional: IRC schema checks reject a new required field without an initial default even when
+  // the table has no snapshots (#14429).
   private static final Schema newTableSchema =
-      new Schema(NestedField.of(2, false, "foo_string1", StringType.get()));
+      new Schema(NestedField.of(2, true, "foo_string1", StringType.get()));
 
   private DummyEventListener dummyEventListener;
 
@@ -717,6 +720,78 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     Assertions.assertEquals(
         Status.OK.getStatusCode(),
         getTableClientBuilder(namespace, Optional.of("bad_default_tbl")).get().getStatus());
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testCreateWithInvalidTruncateReturnsBadRequest(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    for (boolean staged : new boolean[] {false, true}) {
+      for (String version : new String[] {null, "2", "3"}) {
+        for (String definition :
+            new String[] {
+              "\"partition-spec\": {\"spec-id\": 0, \"fields\": [{\"source-id\": 1,"
+                  + " \"field-id\": 1000, \"name\": \"p\", \"transform\": \"truncate[4]\"}]}",
+              "\"write-order\": {\"order-id\": 1, \"fields\": [{\"source-id\": 1,"
+                  + " \"transform\": \"truncate[4]\", \"direction\": \"asc\","
+                  + " \"null-order\": \"nulls-first\"}]}"
+            }) {
+          String request =
+              String.format(
+                  "{\"name\": \"bad_truncate_tbl\", \"schema\": {\"type\": \"struct\","
+                      + " \"schema-id\": 0, \"fields\": [{\"id\": 1, \"name\": \"b\","
+                      + " \"required\": false, \"type\": \"boolean\"}]}, %s,"
+                      + " \"stage-create\": %b, \"properties\": %s}",
+                  definition,
+                  staged,
+                  version == null ? "{}" : "{\"format-version\": \"" + version + "\"}");
+          try (Response response =
+              getTableClientBuilder(namespace, Optional.empty())
+                  .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+            assertBadRequest(response, "Cannot truncate type: boolean");
+          }
+          verifyLoadTableFail(namespace, "bad_truncate_tbl", 404);
+        }
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testInvalidTruncateAndUnknownCommitTypesDoNotChangeMetadata(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    String tableName = "bad_commit_tbl";
+    CreateTableRequest create =
+        CreateTableRequest.builder()
+            .withName(tableName)
+            .withSchema(new Schema(NestedField.optional(1, "b", BooleanType.get())))
+            .build();
+    try (Response response =
+        getTableClientBuilder(namespace, Optional.empty())
+            .post(Entity.entity(create, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Status.OK.getStatusCode(), response.getStatus());
+    }
+    String metadataLocation = getTableMeta(namespace, tableName).metadataFileLocation();
+    Assertions.assertNotNull(metadataLocation);
+    for (String request :
+        new String[] {
+          "{\"requirements\": [], \"updates\": [{\"action\": \"add-spec\", \"spec\":"
+              + " {\"spec-id\": 0, \"fields\": [{\"source-id\": 1, \"field-id\": 1000,"
+              + " \"name\": \"p\", \"transform\": \"truncate[4]\"}]}}]}",
+          "{\"requirements\": [], \"updates\": [{\"action\": \"add-sort-order\", \"sort-order\":"
+              + " {\"order-id\": 1, \"fields\": [{\"source-id\": 1, \"transform\": \"truncate[4]\","
+              + " \"direction\": \"asc\", \"null-order\": \"nulls-first\"}]}}]}",
+          "{\"requirements\": [], \"updates\": [{\"action\": \"frob\"}]}",
+          "{\"requirements\": [{\"type\": \"assert-frob\"}], \"updates\": []}"
+        }) {
+      try (Response response =
+          getTableClientBuilder(namespace, Optional.of(tableName))
+              .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+        assertBadRequest(response, null);
+      }
+      Assertions.assertEquals(
+          metadataLocation, getTableMeta(namespace, tableName).metadataFileLocation());
+    }
   }
 
   private static void assertBadRequest(Response response, String expectedInMessage) {

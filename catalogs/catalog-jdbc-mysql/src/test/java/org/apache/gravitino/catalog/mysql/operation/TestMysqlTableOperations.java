@@ -68,6 +68,48 @@ public class TestMysqlTableOperations extends TestMysql {
   private static final Type VARCHAR = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
 
+  @Test
+  void testNativeQuotedTableAndColumnLifecycle() {
+    String schema = TEST_DB_NAME.toString();
+    String tableName = "native`table ; --";
+    String columnName = "native`column\\name' ; --";
+    String renamed = "native_renamed_table";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName(columnName)
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          schema,
+          tableName,
+          new JdbcColumn[] {column},
+          null,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      Assertions.assertEquals(
+          columnName, TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.updateColumnComment(new String[] {columnName}, "changed"));
+      Assertions.assertEquals(
+          "changed", TABLE_OPERATIONS.load(schema, tableName).columns()[0].comment());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.renameColumn(new String[] {columnName}, "renamed_column"));
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.rename(schema, tableName, renamed);
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, renamed).columns()[0].name());
+      Assertions.assertTrue(TABLE_OPERATIONS.drop(schema, renamed));
+    } finally {
+      TABLE_OPERATIONS.drop(schema, tableName);
+      TABLE_OPERATIONS.drop(schema, renamed);
+    }
+  }
+
   @ParameterizedTest
   @CsvSource({
     "+00:00, 12:34:56.123456", "+08:00, 12:34:56.123456", "-07:00, 12:34:56.123456",
@@ -1340,11 +1382,22 @@ public class TestMysqlTableOperations extends TestMysql {
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
 
-    // If ifExists is set to true then the code should not throw an exception if the index doesn't
-    // exist.
+    // If ifExists is set to true and the index doesn't exist, no SQL should be generated.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
     sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex);
-    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+    Assertions.assertEquals("", sql);
+    Assertions.assertDoesNotThrow(
+        () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, deleteIndex));
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME.toString(),
+                tableName,
+                deleteIndex,
+                TableChange.updateComment("updated comment")));
+    JdbcTable altered = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertEquals("updated comment", altered.comment());
+    Assertions.assertEquals(1, altered.index().length);
 
     // The index existence check should only verify existence when ifExists is false, preventing
     // failures when dropping non-existent indexes.
@@ -1358,6 +1411,14 @@ public class TestMysqlTableOperations extends TestMysql {
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex3);
     Assertions.assertEquals("DROP INDEX `uk_2`", sql);
+
+    // Index names are matched case-insensitively.
+    TableChange.DeleteIndex deleteIndex4 = new TableChange.DeleteIndex("UK_2", true);
+    sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex4);
+    Assertions.assertEquals("DROP INDEX `UK_2`", sql);
+    TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, deleteIndex4);
+    Assertions.assertEquals(
+        0, TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName).index().length);
   }
 
   @Test

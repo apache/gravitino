@@ -29,6 +29,7 @@ import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.exceptions.NoSuchWarehouseException;
 import org.apache.iceberg.exceptions.RESTException;
 import org.slf4j.Logger;
@@ -115,13 +116,17 @@ final class IcebergBackend implements AutoCloseable {
         IcebergCatalogUtil.withGcsServiceAccountCredentials(new IcebergConfig(conf));
     try {
       IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
+      // Bootstrap the catalog before creating the proxy: initialize() creates the KerberosClient
+      // needed by doKerberosOperations(). The previous Kerberos capability check also initialized
+      // the raw catalog here. Table metadata reads happen later through the proxied wrapper.
+      // Keep eager initialization so configuration errors are reported during reload.
+      Catalog catalog = rawWrapper.getCatalog();
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(catalogConf);
       this.wrapper =
-          authenticationConfig.isKerberosAuth()
-                  && rawWrapper.getCatalog() instanceof SupportsKerberos
-              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy(icebergConfig)
+          authenticationConfig.isKerberosAuth() && catalog instanceof SupportsKerberos
+              ? new KerberosAwareIcebergCatalogProxy(rawWrapper).getProxy()
               : rawWrapper;
-      this.helper = new IcebergCatalogWrapperHelper(wrapper.getCatalog());
+      this.helper = new IcebergCatalogWrapperHelper();
       this.views = new IcebergViewCatalogOperations(wrapper);
     } catch (NoSuchWarehouseException e) {
       throw new IllegalArgumentException(

@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -30,7 +32,6 @@ import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
 import java.time.OffsetDateTime;
 import java.util.Map;
-import java.util.Optional;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Privilege;
@@ -53,7 +54,6 @@ import org.apache.spark.sql.internal.SQLConf;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -95,11 +95,6 @@ public class TestBaseCatalogAuthorization {
     converter.set(catalog, new SparkTableChangeConverter(new SparkTypeConverter()));
   }
 
-  @AfterEach
-  void clearDeniedTables() {
-    AuthorizationTable.clear();
-  }
-
   @Test
   void testLoadTablePassesSelectTablePrivilege() throws Exception {
     Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
@@ -127,12 +122,30 @@ public class TestBaseCatalogAuthorization {
 
     Table result = catalog.loadTable(identifier);
 
-    // The underlying Spark table is never loaded for a denied table; a placeholder is returned and
-    // the required privileges are collected for RequiredPrivilegesCheck to report during analysis.
+    // The underlying Spark table is never loaded for a denied table; a placeholder carrying the
+    // failure is returned for RequiredPrivilegesCheck to find in the analyzed plan.
     assertTrue(result instanceof AuthorizationTable);
-    Optional<ForbiddenException> failure = AuthorizationTable.drainFailure();
-    assertTrue(failure.isPresent());
-    assertTrue(failure.get().getMessage().contains("table_a: SELECT_TABLE"));
+    AuthorizationTable deniedTable = (AuthorizationTable) result;
+    assertEquals("null.schema.table_a", deniedTable.tableIdentifier());
+    assertEquals(ImmutableSet.of(Privilege.Name.SELECT_TABLE), deniedTable.requiredPrivileges());
+  }
+
+  @Test
+  void testDeniedWriteReportsTheWriteTarget() throws Exception {
+    Identifier identifier = Identifier.of(new String[] {"schema"}, "table_a");
+    NameIdentifier gravitinoIdentifier = NameIdentifier.of("schema", "table_a");
+    ForbiddenException original = new ForbiddenException("denied write");
+    when(gravitinoTableCatalog.loadTable(
+            eq(gravitinoIdentifier), eq(ImmutableSet.of(Privilege.Name.MODIFY_TABLE))))
+        .thenThrow(original);
+
+    ForbiddenException thrown =
+        assertThrows(ForbiddenException.class, () -> catalog.loadForWriting(identifier));
+
+    assertEquals(
+        "Missing required privileges for Spark tables: [null.schema.table_a: MODIFY_TABLE]",
+        thrown.getMessage());
+    assertSame(original, thrown.getCause());
   }
 
   @Test
@@ -310,11 +323,18 @@ public class TestBaseCatalogAuthorization {
 
   private static class TestCatalog extends BaseCatalog {
 
+    private final Catalog gravitinoCatalog;
+
     private TestCatalog(
         Catalog gravitinoCatalog,
         org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog) {
-      this.gravitinoCatalogClient = gravitinoCatalog;
+      this.gravitinoCatalog = gravitinoCatalog;
       this.sparkCatalog = sparkCatalog;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
     }
 
     private Table loadForWriting(Identifier identifier) throws Exception {

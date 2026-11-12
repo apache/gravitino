@@ -504,7 +504,7 @@ export default function CreateTableDialog({ ...props }) {
           item => !UnsupportColumnType[provider]?.includes(item)
         )
 
-        if (['jdbc-mysql', 'jdbc-clickhouse'].includes(provider)) {
+        if (['jdbc-mysql', 'jdbc-clickhouse', 'jdbc-oceanbase'].includes(provider)) {
           columnTypes = [...columnTypes, ...ColumnTypeForUnsigned]
         }
         setColumnTypes(columnTypes.sort((a, b) => a.localeCompare(b)))

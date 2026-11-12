@@ -34,6 +34,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -427,7 +428,8 @@ public class CatalogRegister {
    */
   public void registerCatalog(String name, GravitinoCatalog catalog) {
     try {
-      String catalogFileName = String.format("%s/%s.properties", catalogStoreDirectory, name);
+      String catalogFileName =
+          String.format("%s/%s.properties", catalogStoreDirectory, trinoCatalogName(name));
       File catalogFile = new File(catalogFileName);
       if (catalogFile.exists()) {
         String catalogContents = Files.readString(catalogFile.toPath());
@@ -476,12 +478,9 @@ public class CatalogRegister {
           statement.execute(showCatalogCommand);
           ResultSet rs = statement.getResultSet();
           while (rs.next()) {
-            String catalogName = rs.getString(1);
-            // In some Trino version catalog name may be quoted, so we need to check both quoted and
-            // unquoted names
-            if (name.equals(catalogName)
-                || name.equals("\"" + catalogName + "\"")
-                || ("\"" + name + "\"").equals(catalogName)) {
+            // Trino stores catalog names in lower case, and some Trino versions quote them, so
+            // the names are compared without quotes and case.
+            if (trinoCatalogName(name).equals(trinoCatalogName(rs.getString(1)))) {
               return true;
             }
           }
@@ -499,6 +498,16 @@ public class CatalogRegister {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to check if catalog exists", e);
     }
+  }
+
+  /** Returns a catalog name as Trino stores it: without surrounding quotes, in lower case. */
+  @VisibleForTesting
+  static String trinoCatalogName(String name) {
+    String unquoted =
+        name.length() >= 2 && name.startsWith("\"") && name.endsWith("\"")
+            ? name.substring(1, name.length() - 1)
+            : name;
+    return unquoted.toLowerCase(Locale.ROOT);
   }
 
   private void executeSql(String sql) {

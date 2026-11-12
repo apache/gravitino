@@ -105,6 +105,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
+        assertNameColumnWidths("schema " + versionScripts.getKey());
       }
     }
   }
@@ -138,6 +139,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
+        assertNameColumnWidths(upgradeScript.getName());
       }
     }
   }
@@ -602,6 +604,39 @@ public class TestSQLScripts extends TestJDBCBackend {
           readSchemaIndexes(Set.of("table_version_info")).stream()
               .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
           "Failed conversion must preserve the existing indexes");
+    }
+  }
+
+  /**
+   * Verifies the fileset storage location name and model version URI name columns are 256
+   * characters wide on every backend, both on a fresh install and after the 2.0.0 upgrade.
+   */
+  private void assertNameColumnWidths(String source) throws SQLException {
+    Map<String, String> columns =
+        Map.of(
+            "fileset_version_info", "storage_location_name",
+            "model_version_info", "model_version_uri_name");
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, String> entry : columns.entrySet()) {
+        String table = entry.getKey();
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        String columnName =
+            metaData.storesUpperCaseIdentifiers()
+                ? entry.getValue().toUpperCase(Locale.ROOT)
+                : entry.getValue();
+        try (ResultSet result =
+            metaData.getColumns(connection.getCatalog(), null, tableName, columnName)) {
+          Assertions.assertTrue(result.next(), "Column not found: " + table);
+          Assertions.assertEquals(
+              256,
+              result.getInt("COLUMN_SIZE"),
+              entry.getValue() + " of " + table + " must be 256 wide after " + source);
+        }
+      }
     }
   }
 

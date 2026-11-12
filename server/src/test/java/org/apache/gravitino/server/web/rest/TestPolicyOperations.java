@@ -233,8 +233,16 @@ public class TestPolicyOperations extends BaseOperationsTest {
             NameIdentifier.of(metalake, policyName),
             org.apache.gravitino.Entity.EntityType.POLICY,
             tag);
+    TagEntity hidden = mock(TagEntity.class);
+    when(hidden.name()).thenReturn("gravitino_hidden_123");
+    RelationalEntity<TagEntity> hiddenAssociation =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            NameIdentifier.of(metalake, policyName),
+            org.apache.gravitino.Entity.EntityType.POLICY,
+            hidden);
     when(policyManager.listTagAssociationsForPolicy(metalake, policyName))
-        .thenReturn(new RelationalEntity<?>[] {association});
+        .thenReturn(new RelationalEntity<?>[] {association, hiddenAssociation});
 
     Response response =
         target(policyPath(metalake) + "/" + policyName + "/tags")

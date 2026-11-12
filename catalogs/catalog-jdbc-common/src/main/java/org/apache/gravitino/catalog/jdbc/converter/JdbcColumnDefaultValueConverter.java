@@ -178,7 +178,15 @@ public class JdbcColumnDefaultValueConverter {
     return "X'" + BaseEncoding.base16().lowerCase().encode(value) + "'";
   }
 
-  private static String validateNumericLiteral(String value) {
+  /**
+   * Checks that a numeric default value is a plain number, so it can be written into the DDL
+   * without quotes.
+   *
+   * @param value the numeric default value text
+   * @return the trimmed value
+   * @throws IllegalArgumentException if the value is not a valid number
+   */
+  protected static String validateNumericLiteral(String value) {
     String trimmed = value.trim();
     try {
       new BigDecimal(trimmed);

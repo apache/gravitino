@@ -52,7 +52,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -74,6 +73,7 @@ import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import org.apache.iceberg.exceptions.RESTException;
@@ -465,12 +465,14 @@ public class IcebergCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableChange icebergTableChange =
+      NameIdentifier schemaTableIdent =
+          NameIdentifier.of(levels[levels.length - 1], tableIdent.name());
+      IcebergCatalogWrapperHelper helper = backend.helper();
+      LoadTableResponse loadTableResponse =
           backend
-              .helper()
-              .buildIcebergTableChanges(
-                  NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = backend.wrapper().updateTable(icebergTableChange);
+              .wrapper()
+              .buildAndUpdateTable(
+                  catalog -> helper.buildIcebergTableChanges(catalog, schemaTableIdent, changes));
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (ValidationException e) {
@@ -628,7 +630,7 @@ public class IcebergCatalogOperations
       return createdTable;
     } catch (AlreadyExistsException e) {
       throw new TableAlreadyExistsException(e, "Table already exists: %s", tableIdent.name());
-    } catch (ValidationException e) {
+    } catch (ValidationException | BadRequestException e) {
       throw new IllegalArgumentException(e.getMessage(), e);
     }
   }
