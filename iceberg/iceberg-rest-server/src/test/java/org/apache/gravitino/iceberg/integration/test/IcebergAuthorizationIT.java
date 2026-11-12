@@ -60,6 +60,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,7 @@ import org.slf4j.LoggerFactory;
  * user for Spark SQL, doesn't have privileges by default. You could use Spark SQL to try to do the
  * operation and use Gravitino client to grant privilege or check the test result.
  */
+@Tag("gravitino-docker-test")
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergAuthorizationIT.class);

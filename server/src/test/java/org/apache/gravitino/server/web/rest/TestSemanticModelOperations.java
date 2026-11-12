@@ -58,6 +58,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -73,6 +74,7 @@ import org.apache.gravitino.dto.semantic.DatasetDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -93,6 +95,7 @@ import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailu
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rest.RESTUtils;
@@ -110,6 +113,8 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSource;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
@@ -207,7 +212,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     tablesSupported = true;
     viewsSupported = true;
     sourceAuthorizer = new PassThroughAuthorizer();
-    Table table = mock(Table.class);
+    Table table = registeredTable();
     Column column = mock(Column.class);
     when(column.name()).thenReturn("order_id");
     when(table.columns()).thenReturn(new Column[] {column});
@@ -311,7 +316,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         message = "offline";
         break;
       case "column":
-        Table table = mock(Table.class);
+        Table table = registeredTable();
         when(table.columns()).thenReturn(new Column[0]);
         when(tables.loadTable(any())).thenReturn(table);
         message = "order_id";
@@ -398,7 +403,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales"))))
+            eq(Map.of("domain", "sales")),
+            any()))
         .thenReturn(semanticModel);
 
     Response response = post(semanticModelPath(), request);
@@ -411,13 +417,20 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     ArgumentCaptor<SemanticModelDefinition> definitionCaptor =
         ArgumentCaptor.forClass(SemanticModelDefinition.class);
+    ArgumentCaptor<SemanticModelSourceUpdate> sourceCaptor =
+        ArgumentCaptor.forClass(SemanticModelSourceUpdate.class);
     verify(dispatcher)
         .createSemanticModel(
             eq(ident),
             eq("Sales definitions"),
             definitionCaptor.capture(),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            sourceCaptor.capture());
     Assertions.assertEquals(definition, definitionCaptor.getValue());
+    Assertions.assertEquals(
+        SemanticModelSourceUpdate.replace(
+            List.of(new SemanticModelSource("orders", EntityType.TABLE, 101L))),
+        sourceCaptor.getValue());
     Assertions.assertEquals(
         "TRINO", definitionCaptor.getValue().metrics()[0].expression().dialects()[0].dialect());
     Assertions.assertEquals(DataType.DECIMAL, definitionCaptor.getValue().metrics()[0].datatype());
@@ -437,7 +450,11 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             null);
     SemanticModel semanticModel = semanticModel("sales", "Sales definitions");
     when(dispatcher.createSemanticModel(
-            eq(ident), eq("Sales definitions"), any(SemanticModelDefinition.class), eq(Map.of())))
+            eq(ident),
+            eq("Sales definitions"),
+            any(SemanticModelDefinition.class),
+            eq(Map.of()),
+            any()))
         .thenReturn(semanticModel);
 
     Response response = post(semanticModelPath(), request);
@@ -445,7 +462,11 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     verify(dispatcher)
         .createSemanticModel(
-            eq(ident), eq("Sales definitions"), any(SemanticModelDefinition.class), eq(Map.of()));
+            eq(ident),
+            eq("Sales definitions"),
+            any(SemanticModelDefinition.class),
+            eq(Map.of()),
+            any());
   }
 
   @Test
@@ -495,7 +516,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
     assertError(
         post(semanticModelPath(), request),
         Response.Status.NOT_FOUND,
@@ -509,7 +531,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
     assertError(
         post(semanticModelPath(), request),
         Response.Status.BAD_REQUEST,
@@ -523,7 +546,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
     assertError(
         post(semanticModelPath(), request),
         Response.Status.CONFLICT,
@@ -537,7 +561,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
     assertError(
         post(semanticModelPath(), request),
         Response.Status.FORBIDDEN,
@@ -551,7 +576,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
     ErrorResponse unavailable =
         assertError(
             post(semanticModelPath(), request),
@@ -584,7 +610,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(semanticModelIdentifier("sales")),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales")));
+            eq(Map.of("domain", "sales")),
+            any());
 
     assertError(
         post(semanticModelPath(), request),
@@ -607,7 +634,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
                 new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("legacy"),
                 new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
                     SemanticModelDefinitionDTO.fromDefinition(replacement))));
-    when(dispatcher.alterSemanticModel(eq(ident), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales_v2", "Updated"));
 
     Response response = put(semanticModelPath() + "/sales", request);
@@ -619,7 +646,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     ArgumentCaptor<SemanticModelChange[]> changesCaptor =
         ArgumentCaptor.forClass(SemanticModelChange[].class);
-    verify(dispatcher).alterSemanticModel(eq(ident), changesCaptor.capture());
+    verify(dispatcher).alterSemanticModel(eq(ident), any(), changesCaptor.capture());
     SemanticModelChange[] changes = changesCaptor.getValue();
     Assertions.assertEquals(5, changes.length);
     Assertions.assertInstanceOf(SemanticModelChange.RenameSemanticModel.class, changes[0]);
@@ -652,6 +679,123 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testMetadataOnlyAlterPreservesSourcesWithoutResolving() {
+    sourceAuthorizer = mock(GravitinoAuthorizer.class);
+    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("renamed", "Updated"));
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(
+                new SemanticModelUpdateRequest.RenameSemanticModelRequest("renamed"),
+                new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
+                new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "sales"),
+                new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("legacy")));
+
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(),
+        put(semanticModelPath() + "/sales", request).getStatus());
+    verify(dispatcher)
+        .alterSemanticModel(
+            eq(semanticModelIdentifier("sales")),
+            eq(SemanticModelSourceUpdate.preserve()),
+            any(SemanticModelChange[].class));
+    verifyNoInteractions(tables, views, sourceAuthorizer);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testReplacementRebindsUnchangedSources(boolean metricOnlyChange) {
+    SemanticModelDefinition original =
+        SemanticModelDefinition.builder()
+            .withDatasets(semanticModelDefinition().datasets())
+            .withMetrics(semanticModelDefinition().metrics())
+            .build();
+    when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
+        .thenReturn(semanticModel("sales", null));
+    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("sales", null));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), writeDefinition(false, original).getStatus());
+    verify(dispatcher)
+        .createSemanticModel(
+            any(),
+            any(),
+            eq(original),
+            any(),
+            eq(
+                SemanticModelSourceUpdate.replace(
+                    List.of(new SemanticModelSource("orders", EntityType.TABLE, 101L)))));
+
+    // The original table was renamed and another table now uses its previous name.
+    Table replacementTable = registeredTable(202L);
+    Column column = mock(Column.class);
+    when(column.name()).thenReturn("order_id");
+    when(replacementTable.columns()).thenReturn(new Column[] {column});
+    when(tables.loadTable(any())).thenReturn(replacementTable);
+    SemanticModelDefinition replacement = original;
+    if (metricOnlyChange) {
+      Metric metric =
+          Metric.builder()
+              .withName("order_total")
+              .withExpression(expression(Dialects.ANSI_SQL, "COUNT(orders.order_id)"))
+              .withDatatype(DataType.DECIMAL)
+              .build();
+      replacement =
+          SemanticModelDefinition.builder()
+              .withDatasets(original.datasets())
+              .withMetrics(new Metric[] {metric})
+              .build();
+    }
+
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(), writeDefinition(true, replacement).getStatus());
+    verify(dispatcher)
+        .alterSemanticModel(
+            any(),
+            eq(
+                SemanticModelSourceUpdate.replace(
+                    List.of(new SemanticModelSource("orders", EntityType.TABLE, 202L)))),
+            any(SemanticModelChange[].class));
+    verify(tables, times(2)).loadTable(NameIdentifier.of(metalake, catalog, schema, "orders"));
+  }
+
+  @Test
+  void testBatchReplacementUsesFinalDefinitionAssociations() {
+    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("sales", null));
+    SemanticModelDefinition finalDefinition =
+        SemanticModelDefinition.builder()
+            .withDatasets(
+                new Dataset[] {
+                  Dataset.builder()
+                      .withName("Final.Alias")
+                      .withSource(NameIdentifier.of(catalog, schema, "orders"))
+                      .build()
+                })
+            .build();
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(
+                new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+                    SemanticModelDefinitionDTO.fromDefinition(semanticModelDefinition())),
+                new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
+                new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+                    SemanticModelDefinitionDTO.fromDefinition(finalDefinition)),
+                new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "sales")));
+
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(),
+        put(semanticModelPath() + "/sales", request).getStatus());
+    verify(dispatcher)
+        .alterSemanticModel(
+            any(),
+            eq(
+                SemanticModelSourceUpdate.replace(
+                    List.of(new SemanticModelSource("Final.Alias", EntityType.TABLE, 101L)))),
+            any(SemanticModelChange[].class));
+  }
+
+  @Test
   void testAlterSemanticModelRejectsNullBody() {
     assertError(
         putJson(semanticModelPath() + "/sales", "null"),
@@ -671,7 +815,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     doThrow(new NoSuchSemanticModelException("sales does not exist"))
         .when(dispatcher)
-        .alterSemanticModel(eq(ident), any(SemanticModelChange[].class));
+        .alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class));
     assertError(
         put(semanticModelPath() + "/sales", request),
         Response.Status.NOT_FOUND,
@@ -681,7 +825,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     doThrow(new OptimisticLockException("sales changed in this transaction"))
         .when(dispatcher)
-        .alterSemanticModel(eq(ident), any(SemanticModelChange[].class));
+        .alterSemanticModel(eq(ident), any(), any(SemanticModelChange[].class));
     assertError(
         put(semanticModelPath() + "/sales", request),
         Response.Status.CONFLICT,
@@ -873,7 +1017,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testMissingColumnWithAuthorizationDisabled(boolean replaceDefinition) {
-    Table table = mock(Table.class);
+    Table table = registeredTable();
     when(table.columns()).thenReturn(new Column[0]);
     when(tables.loadTable(any())).thenReturn(table);
     assertError(
@@ -940,9 +1084,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       when(tables.loadTable(fullSource)).thenThrow(new NoSuchTableException("missing table"));
       when(views.loadView(fullSource)).thenThrow(new NoSuchViewException("missing view"));
     }
-    when(dispatcher.createSemanticModel(any(), any(), any(), any()))
+    when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
         .thenReturn(semanticModel("sales", null));
-    when(dispatcher.alterSemanticModel(any(), any(SemanticModelChange[].class)))
+    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
         .thenReturn(semanticModel("sales", null));
     Response response = writeDefinition(replaceDefinition, definition);
     if (segment == 0) {
@@ -950,7 +1094,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
           response,
           Response.Status.BAD_REQUEST,
           ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
-          IllegalArgumentException.class.getSimpleName(),
+          IllegalMetadataObjectException.class.getSimpleName(),
           "Metadata object full name cannot be blank");
       verifyNoModelWrites();
       verifyNoInteractions(tables, views);
@@ -960,9 +1104,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       // Characterize existing behavior: resolvable names are not rejected solely for whitespace.
       Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
       if (replaceDefinition) {
-        verify(dispatcher).alterSemanticModel(any(), any(SemanticModelChange[].class));
+        verify(dispatcher).alterSemanticModel(any(), any(), any(SemanticModelChange[].class));
       } else {
-        verify(dispatcher).createSemanticModel(any(), any(), eq(definition), any());
+        verify(dispatcher).createSemanticModel(any(), any(), eq(definition), any(), any());
       }
       verifyNoInteractions(views);
     } else {
@@ -997,9 +1141,9 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   private void verifyNoModelWrites() {
-    verify(dispatcher, never()).createSemanticModel(any(), any(), any(), any());
-    verify(dispatcher, never()).importSemanticModel(any(), any(), any(), any());
-    verify(dispatcher, never()).alterSemanticModel(any(), any(SemanticModelChange[].class));
+    verify(dispatcher, never()).createSemanticModel(any(), any(), any(), any(), any());
+    verify(dispatcher, never()).importSemanticModel(any(), any(), any(), any(), any());
+    verify(dispatcher, never()).alterSemanticModel(any(), any(), any(SemanticModelChange[].class));
   }
 
   private Response writeDefinition(boolean replaceDefinition, SemanticModelDefinition definition) {
@@ -1022,13 +1166,15 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             any(SemanticModelDefinition.class),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            any()))
         .thenReturn(semanticModel("sales", "Sales definitions"));
     when(dispatcher.importSemanticModel(
             eq(inventoryIdent),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version"))))
+            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")),
+            any()))
         .thenReturn(semanticModel("inventory", null));
 
     String yaml =
@@ -1086,7 +1232,10 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(salesIdent),
             eq("Sales definitions"),
             definitionCaptor.capture(),
-            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+            eq(Map.of("domain", "sales", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            eq(
+                SemanticModelSourceUpdate.replace(
+                    List.of(new SemanticModelSource("orders", EntityType.TABLE, 101L)))));
     Assertions.assertEquals(
         NameIdentifier.of(catalog, schema, "orders"),
         definitionCaptor.getValue().datasets()[0].source());
@@ -1098,7 +1247,10 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(inventoryIdent),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")));
+            eq(Map.of(PROPERTY_OSSIE_VERSION, "future-version")),
+            eq(
+                SemanticModelSourceUpdate.replace(
+                    List.of(new SemanticModelSource("orders", EntityType.TABLE, 101L)))));
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.json(json)), any());
     verifyNoMoreInteractions(dispatcher);
@@ -1112,7 +1264,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            any()))
         .thenReturn(semanticModel("marketing", null));
 
     String yaml =
@@ -1135,7 +1288,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            any());
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verifyNoMoreInteractions(dispatcher);
   }
@@ -1148,7 +1302,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION))))
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            any()))
         .thenReturn(semanticModel("marketing", null));
 
     String yaml =
@@ -1182,7 +1337,8 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             eq(ident),
             eq(null),
             any(SemanticModelDefinition.class),
-            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)));
+            eq(Map.of(PROPERTY_OSSIE_VERSION, DEFAULT_VERSION)),
+            any());
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verifyNoMoreInteractions(dispatcher);
   }
@@ -1294,7 +1450,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
             + "  - name: orders\n    source: sales.mart.orders\n";
     doThrow(new SemanticModelAlreadyExistsException("sales already exists"))
         .when(dispatcher)
-        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any());
+        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any(), any());
     assertError(
         postDocument(semanticModelPath() + "/ossie", yaml, "application/yaml"),
         Response.Status.CONFLICT,
@@ -1303,7 +1459,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "sales already exists");
     verify(dispatcher).importOssieDocument(eq(namespace), eq(OssieDocument.yaml(yaml)), any());
     verify(dispatcher)
-        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any());
+        .importSemanticModel(eq(semanticModelIdentifier("sales")), eq(null), any(), any(), any());
     verifyNoMoreInteractions(dispatcher);
   }
 
@@ -1344,7 +1500,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       tablesSupported = false;
       viewsSupported = false;
     }
-    when(dispatcher.importSemanticModel(any(), any(), any(), any()))
+    when(dispatcher.importSemanticModel(any(), any(), any(), any(), any()))
         .thenReturn(semanticModel("sales", null));
     String document =
         scenario.equals("invalid")
@@ -1363,7 +1519,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertInstanceOf(ImportSemanticModelPreEvent.class, events.getAllValues().get(0));
     if (status == 200) {
       Assertions.assertInstanceOf(ImportSemanticModelEvent.class, events.getAllValues().get(1));
-      verify(dispatcher).importSemanticModel(any(), any(), any(), any());
+      verify(dispatcher).importSemanticModel(any(), any(), any(), any(), any());
     } else {
       Assertions.assertInstanceOf(
           ImportSemanticModelFailureEvent.class, events.getAllValues().get(1));
@@ -1541,5 +1697,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     Assertions.assertEquals(expectedType, error.getType());
     Assertions.assertTrue(error.getMessage().contains(expectedMessageFragment));
     return error;
+  }
+
+  private static Table registeredTable() {
+    return registeredTable(101L);
+  }
+
+  private static Table registeredTable(long sourceId) {
+    EntityCombinedTable table = mock(EntityCombinedTable.class);
+    TableEntity entity = mock(TableEntity.class);
+    when(entity.id()).thenReturn(sourceId);
+    when(table.tableFromGravitino()).thenReturn(entity);
+    return table;
   }
 }

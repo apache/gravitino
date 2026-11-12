@@ -48,8 +48,8 @@ import org.junit.jupiter.api.Test;
  * Integration test for role assumption via the {@code X-Gravitino-Active-Roles} header. The test
  * user holds two roles, each granting {@code USE_CATALOG} on a different catalog, and the header
  * activates a subset of them per request. Covers the default {@code ALL}, a narrowed {@code NAMED}
- * subset (one role and several), {@code NONE}, a {@code 403} for an unheld role, and a {@code 400}
- * for a malformed header.
+ * subset (one role and several), a non-ASCII role name sent percent-encoded, {@code NONE}, a {@code
+ * 403} for an unheld role, and a {@code 400} for a malformed header.
  */
 @Tag("gravitino-docker-test")
 public class RoleAssumptionAuthorizationIT extends BaseRestApiAuthorizationIT {
@@ -59,6 +59,9 @@ public class RoleAssumptionAuthorizationIT extends BaseRestApiAuthorizationIT {
   private static final String ROLE_CATALOG1 = "role_catalog1";
   private static final String ROLE_CATALOG2 = "role_catalog2";
   private static final String UNHELD_ROLE = "role_not_held";
+  // A CJK role name; the Java client cannot send it raw, so it is activated percent-encoded.
+  private static final String ROLE_NON_ASCII = "role_角色";
+  private static final String ROLE_NON_ASCII_ENCODED = "role_%E8%A7%92%E8%89%B2";
 
   @BeforeAll
   public void startIntegrationTest() throws Exception {
@@ -75,7 +78,9 @@ public class RoleAssumptionAuthorizationIT extends BaseRestApiAuthorizationIT {
         SecurableObjects.ofCatalog(CATALOG2, ImmutableList.of(Privileges.UseCatalog.allow()));
     admin.createRole(ROLE_CATALOG1, new HashMap<>(), ImmutableList.of(useCatalog1));
     admin.createRole(ROLE_CATALOG2, new HashMap<>(), ImmutableList.of(useCatalog2));
-    admin.grantRolesToUser(ImmutableList.of(ROLE_CATALOG1, ROLE_CATALOG2), NORMAL_USER);
+    admin.createRole(ROLE_NON_ASCII, new HashMap<>(), ImmutableList.of(useCatalog1));
+    admin.grantRolesToUser(
+        ImmutableList.of(ROLE_CATALOG1, ROLE_CATALOG2, ROLE_NON_ASCII), NORMAL_USER);
   }
 
   /** Builds a client for {@link #NORMAL_USER} that sends the given active-roles header value. */
@@ -118,6 +123,14 @@ public class RoleAssumptionAuthorizationIT extends BaseRestApiAuthorizationIT {
     try (GravitinoAdminClient both =
         userClientWithActiveRoles(ROLE_CATALOG1 + "," + ROLE_CATALOG2)) {
       assertArrayEquals(new String[] {CATALOG1, CATALOG2}, sortedCatalogs(both));
+    }
+  }
+
+  @Test
+  public void testNarrowToPercentEncodedNonAsciiRole() {
+    // A percent-encoded UTF-8 role name activates the role with the decoded name.
+    try (GravitinoAdminClient nonAscii = userClientWithActiveRoles(ROLE_NON_ASCII_ENCODED)) {
+      assertArrayEquals(new String[] {CATALOG1}, sortedCatalogs(nonAscii));
     }
   }
 

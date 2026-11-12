@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.jdbc;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.flink.connector.jdbc.mysql.MysqlPropertiesConverter;
@@ -50,5 +51,34 @@ public class TestMysqlPropertiesConverter extends AbstractJdbcPropertiesConverte
         tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
     Assertions.assertEquals(
         tableName, tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME));
+  }
+
+  @Test
+  public void testToFlinkTablePropertiesWithBypassBaseUrl() {
+    // The database in the base-url is replaced by the table's database, and query parameters are
+    // kept.
+    Map<String, String> expectedTableUrls =
+        ImmutableMap.of(
+            "jdbc:mysql://127.0.0.1:13306/", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306/db0", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306/db0?useSSL=false",
+                "jdbc:mysql://127.0.0.1:13306/db1?useSSL=false");
+    for (Map.Entry<String, String> entry : expectedTableUrls.entrySet()) {
+      Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+      catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", entry.getKey());
+      Map<String, String> flinkCatalogProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+      Map<String, String> tableProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkTableProperties(
+                  flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("db1", "t"));
+
+      Assertions.assertEquals(
+          entry.getValue(),
+          tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL),
+          entry.getKey());
+    }
   }
 }

@@ -20,6 +20,7 @@ package org.apache.gravitino.integration.test.container;
 
 import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
+import static org.testcontainers.utility.MountableFile.forClasspathResource;
 
 import com.google.common.collect.ImmutableSet;
 import java.io.File;
@@ -50,6 +51,9 @@ public class HiveContainer extends BaseContainer {
   public static final String HIVE2 = "hive2"; // The Hive container default version
   public static final String HIVE3 = "hive3";
   public static final String ENABLE_SQL_BASE_AUTHORIZATION = "ENABLE_SQL_BASE_AUTHORIZATION";
+  /** Enables HMS schema resolution and metadata alters for the SerDe schema test fixtures. */
+  public static final String ENABLE_SERDE_SCHEMA_TESTS = "ENABLE_SERDE_SCHEMA_TESTS";
+
   private static final int MYSQL_PORT = 3306;
   public static final int HDFS_DEFAULTFS_PORT = 9000;
   public static final int HIVE_METASTORE_PORT = 9083;
@@ -80,6 +84,13 @@ public class HiveContainer extends BaseContainer {
   @Override
   protected void setupContainer() {
     super.setupContainer();
+    if ("true".equals(container.getEnvMap().get(ENABLE_SERDE_SCHEMA_TESTS))) {
+      container.withCopyFileToContainer(
+          forClasspathResource("hive/enable-serde-schema-tests.sh"),
+          "/tmp/enable-serde-schema-tests.sh");
+      container.withCreateContainerCmdModifier(
+          command -> command.withEntrypoint("/bin/bash", "/tmp/enable-serde-schema-tests.sh"));
+    }
     withLogConsumer(new PrintingContainerLog(format("%-14s| ", "HiveContainer-" + hostName)));
   }
 
