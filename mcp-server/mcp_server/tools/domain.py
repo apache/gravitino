@@ -17,17 +17,19 @@
 
 from fastmcp import Context, FastMCP
 
+_READONLY_TOOL_ANNOTATIONS = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+}
+
 
 def load_domain_tools(mcp: FastMCP):
     """Register only read-only domain tools."""
 
     @mcp.tool(
         tags={"domain"},
-        annotations={
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-        },
+        annotations=_READONLY_TOOL_ANNOTATIONS,
     )
     async def list_of_domains(ctx: Context, details: bool = True) -> str:
         """List domains; details includes backingTag, status, parent and audit.
@@ -40,11 +42,7 @@ def load_domain_tools(mcp: FastMCP):
 
     @mcp.tool(
         tags={"domain"},
-        annotations={
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-        },
+        annotations=_READONLY_TOOL_ANNOTATIONS,
     )
     async def get_domain_by_name(ctx: Context, domain_name: str) -> str:
         """Load a domain snapshot by name.
@@ -59,11 +57,7 @@ def load_domain_tools(mcp: FastMCP):
 
     @mcp.tool(
         tags={"domain"},
-        annotations={
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-        },
+        annotations=_READONLY_TOOL_ANNOTATIONS,
     )
     async def list_subdomains(
         ctx: Context, domain_name: str, details: bool = True
@@ -80,11 +74,7 @@ def load_domain_tools(mcp: FastMCP):
 
     @mcp.tool(
         tags={"domain"},
-        annotations={
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-        },
+        annotations=_READONLY_TOOL_ANNOTATIONS,
     )
     async def list_domain_members(
         ctx: Context,
@@ -108,11 +98,7 @@ def load_domain_tools(mcp: FastMCP):
 
     @mcp.tool(
         tags={"domain"},
-        annotations={
-            "readOnlyHint": True,
-            "destructiveHint": False,
-            "idempotentHint": True,
-        },
+        annotations=_READONLY_TOOL_ANNOTATIONS,
     )
     async def list_domains_for_metadata(
         ctx: Context,

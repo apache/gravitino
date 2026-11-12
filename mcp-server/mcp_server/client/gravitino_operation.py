@@ -173,6 +173,7 @@ class GravitinoOperation(ABC):
         """
         pass
 
+    @abstractmethod
     def as_domain_operation(self) -> DomainOperation:
         """Access the read-only domain operation interface."""
-        raise NotImplementedError
+        pass

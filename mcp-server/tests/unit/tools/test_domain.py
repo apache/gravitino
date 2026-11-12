@@ -31,6 +31,7 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 )
 from mcp_server.core import Setting
 from mcp_server.server import GravitinoMCPServer
+from tests.unit.tools import MockOperation
 
 
 class TestDomainTool(unittest.IsolatedAsyncioTestCase):
@@ -387,3 +388,28 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
             ):
                 await self._call("list_of_domains", {})
         self.assertFalse(self.requests)
+
+    async def test_mock_client_implements_domain_facet(self):
+        with patch.object(
+            RESTClientFactory, "_rest_client_class", MockOperation
+        ):
+            self.mcp = GravitinoMCPServer(
+                Setting("test_metalake", tags={"domain"})
+            ).mcp
+            for name, args in (
+                ("list_of_domains", {}),
+                ("get_domain_by_name", {"domain_name": "sales"}),
+                ("list_subdomains", {"domain_name": "sales"}),
+                ("list_domain_members", {"domain_name": "sales"}),
+                (
+                    "list_domains_for_metadata",
+                    {
+                        "metadata_type": "table",
+                        "metadata_full_name": "c.s.t",
+                    },
+                ),
+            ):
+                self.assertEqual(
+                    await self._call(name, args),
+                    {} if name == "get_domain_by_name" else [],
+                )
