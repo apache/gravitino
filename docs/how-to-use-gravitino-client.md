@@ -82,7 +82,7 @@ GravitinoAdminClient gravitinoAdminClient =
         .build();
 ```
 
-**Note:** Configuring a custom truststore with `withTrustStore()` replaces the JVM's default trust configuration for this client rather than merging with it. Certificates trusted only by the JVM's default truststore will no longer be trusted automatically. If the client needs to connect to servers using both private and public certificate authorities, the custom truststore must contain the necessary trusted certificates.
+**Note:** Configuring a custom truststore through `withTrustStore()`, `withMutualTls()`, or `builder().trustStore(...)` replaces the JVM's default trust configuration for this client rather than merging with it. Certificates trusted only by the JVM's default truststore will no longer be trusted automatically. If the client needs to connect to servers using both private and public certificate authorities, the custom truststore must contain the necessary trusted certificates.
 
 #### Mutual TLS Authentication
 
