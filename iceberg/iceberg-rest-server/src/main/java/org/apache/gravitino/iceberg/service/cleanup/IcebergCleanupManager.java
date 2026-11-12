@@ -235,8 +235,9 @@ public class IcebergCleanupManager implements AutoCloseable {
         .forEachRemaining(
             batch -> futures.add(deleteExecutor.submit(() -> deleteBatch(io, batch))));
 
-    // Drain every submitted batch before propagating a failure so runJob cannot close the FileIO
-    // while another batch is still deleting files.
+    // On deletion failures, wait for every submitted batch before propagating the error and closing
+    // the FileIO. Interruption is an exception: restoring the interrupt flag prevents further
+    // blocking waits, so runJob may close the FileIO while unfinished batches are still running.
     Tasks.foreach(futures)
         .noRetry()
         .throwFailureWhenFinished()
