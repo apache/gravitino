@@ -116,7 +116,10 @@ final class IcebergBackend implements AutoCloseable {
         IcebergCatalogUtil.withGcsServiceAccountCredentials(new IcebergConfig(conf));
     try {
       IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
-      // Initialize the catalog here so configuration errors are reported during reload.
+      // Bootstrap the catalog before creating the proxy: initialize() creates the KerberosClient
+      // needed by doKerberosOperations(). The previous Kerberos capability check also initialized
+      // the raw catalog here. Table metadata reads happen later through the proxied wrapper.
+      // Keep eager initialization so configuration errors are reported during reload.
       Catalog catalog = rawWrapper.getCatalog();
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(catalogConf);
       this.wrapper =

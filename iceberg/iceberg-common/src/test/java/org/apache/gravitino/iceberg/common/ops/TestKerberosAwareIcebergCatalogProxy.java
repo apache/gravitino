@@ -114,6 +114,12 @@ public class TestKerberosAwareIcebergCatalogProxy {
     Assertions.assertInstanceOf(CountingWrapper.class, proxy);
     Assertions.assertEquals(1, WRAPPER_CONSTRUCTIONS.get());
     Assertions.assertEquals(1, CATALOG_CONSTRUCTIONS.get());
+    // Catalog initialization bootstraps authentication before any proxied operation can use it.
+    Assertions.assertEquals(0, KERBEROS_OPERATIONS.get());
+
+    Assertions.assertSame(target.getCatalog(), proxy.getCatalog());
+    Assertions.assertEquals(1, CATALOG_CONSTRUCTIONS.get());
+    Assertions.assertEquals(1, KERBEROS_OPERATIONS.get());
   }
 
   @Test

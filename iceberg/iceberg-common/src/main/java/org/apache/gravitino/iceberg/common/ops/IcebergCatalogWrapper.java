@@ -478,10 +478,25 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     return loadTableResponse;
   }
 
+  /**
+   * Commits an already built table change and reloads the table metadata.
+   *
+   * <p>This method does not establish an impersonation context for the earlier table load or
+   * transaction construction. Callers that require Kerberos impersonation must build changes inside
+   * {@link #buildAndUpdateTable(Function)} on the proxied wrapper instead of building them with
+   * {@link #getCatalog()} before calling this method.
+   *
+   * @param icebergTableChange the table change to commit
+   * @return the response after committing the table change
+   */
   public LoadTableResponse updateTable(IcebergTableChange icebergTableChange) {
-    getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
     Transaction transaction = icebergTableChange.getTransaction();
-    transaction.commitTransaction();
+    try {
+      transaction.commitTransaction();
+    } finally {
+      // A load during the commit can cache old metadata, even if the commit ultimately fails.
+      getMetadataCache().invalidate(icebergTableChange.getTableIdentifier());
+    }
     return loadTable(icebergTableChange.getTableIdentifier());
   }
 

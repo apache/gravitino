@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
@@ -408,8 +409,8 @@ public class TestIcebergCatalogWrapper {
 
   @ParameterizedTest
   @ValueSource(booleans = {true, false})
-  void testTransactionUpdateRefreshesMetadataCache(boolean useBuilder, @TempDir Path warehouseDir)
-      throws Exception {
+  void testTransactionUpdateInvalidatesMetadataCachedDuringCommit(
+      boolean useBuilder, @TempDir Path warehouseDir) throws Exception {
     try (IcebergCatalogWrapper wrapper =
         new IcebergCatalogWrapper(new IcebergConfig(metadataConfig(warehouseDir)))) {
       Namespace namespace = Namespace.of("db");
@@ -426,26 +427,82 @@ public class TestIcebergCatalogWrapper {
       Assertions.assertFalse(
           cache.getTableMetadata(identifier).get().properties().containsKey("key"));
 
-      LoadTableResponse response;
-      if (useBuilder) {
-        response =
-            wrapper.buildAndUpdateTable(
-                catalog -> {
-                  Transaction transaction = catalog.loadTable(identifier).newTransaction();
-                  transaction.updateProperties().set("key", "value").commit();
-                  return new IcebergTableChange(identifier, transaction);
-                });
-      } else {
-        Transaction transaction = wrapper.getCatalog().loadTable(identifier).newTransaction();
-        transaction.updateProperties().set("key", "value").commit();
-        response = wrapper.updateTable(new IcebergTableChange(identifier, transaction));
-      }
+      Function<Catalog, IcebergTableChange> builder =
+          catalog -> {
+            Transaction transaction = catalog.loadTable(identifier).newTransaction();
+            transaction.updateProperties().set("key", "value").commit();
+            Transaction committingTransaction = Mockito.mock(Transaction.class);
+            Mockito.doAnswer(
+                    invocation -> {
+                      // Reproduce a concurrent load before the commit becomes visible.
+                      Assertions.assertFalse(
+                          wrapper
+                              .loadTable(identifier)
+                              .tableMetadata()
+                              .properties()
+                              .containsKey("key"));
+                      Assertions.assertTrue(cache.getTableMetadata(identifier).isPresent());
+                      transaction.commitTransaction();
+                      return null;
+                    })
+                .when(committingTransaction)
+                .commitTransaction();
+            return new IcebergTableChange(identifier, committingTransaction);
+          };
+      LoadTableResponse response =
+          useBuilder
+              ? wrapper.buildAndUpdateTable(builder)
+              : wrapper.updateTable(builder.apply(wrapper.getCatalog()));
 
       Assertions.assertEquals("value", response.tableMetadata().properties().get("key"));
       Assertions.assertEquals(
           "value", wrapper.loadTable(identifier).tableMetadata().properties().get("key"));
       Assertions.assertEquals(
           "value", cache.getTableMetadata(identifier).get().properties().get("key"));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testTransactionUpdateInvalidatesMetadataAfterCommitFailure(
+      boolean useBuilder, @TempDir Path warehouseDir) throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(metadataConfig(warehouseDir)))) {
+      Namespace namespace = Namespace.of("db");
+      TableIdentifier identifier = TableIdentifier.of(namespace, "t");
+      wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+      wrapper.createTable(
+          namespace,
+          CreateTableRequest.builder()
+              .withName("t")
+              .withSchema(new Schema(Types.NestedField.required(1, "id", Types.LongType.get())))
+              .build());
+      TableMetadataCache cache = invokeGetMetadataCache(wrapper);
+      RuntimeException failure = new RuntimeException("Commit failed");
+      Transaction transaction = Mockito.mock(Transaction.class);
+      Mockito.doAnswer(
+              invocation -> {
+                wrapper.loadTable(identifier);
+                Assertions.assertTrue(cache.getTableMetadata(identifier).isPresent());
+                throw failure;
+              })
+          .when(transaction)
+          .commitTransaction();
+      IcebergTableChange change = new IcebergTableChange(identifier, transaction);
+
+      RuntimeException actual =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> {
+                if (useBuilder) {
+                  wrapper.buildAndUpdateTable(catalog -> change);
+                } else {
+                  wrapper.updateTable(change);
+                }
+              });
+
+      Assertions.assertSame(failure, actual);
+      Assertions.assertFalse(cache.getTableMetadata(identifier).isPresent());
     }
   }
 
