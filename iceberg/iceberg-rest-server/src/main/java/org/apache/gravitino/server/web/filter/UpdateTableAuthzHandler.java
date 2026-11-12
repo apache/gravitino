@@ -18,15 +18,11 @@
  */
 package org.apache.gravitino.server.web.filter;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.REPLACE_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.WRITE_TABLE_AUTHORIZATION_EXPRESSION;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -34,43 +30,12 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
-import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
-/** Authorizes creation, metadata alterations, and data writes before Iceberg executes a commit. */
+/** Authorizes staged table creation against the schema before Iceberg executes the commit. */
 public class UpdateTableAuthzHandler implements AuthorizationHandler {
-  private static final Set<Class<? extends MetadataUpdate>> DATA_UPDATES =
-      Set.of(
-          MetadataUpdate.AddSnapshot.class,
-          MetadataUpdate.RemoveSnapshots.class,
-          MetadataUpdate.SetSnapshotRef.class,
-          MetadataUpdate.RemoveSnapshotRef.class,
-          MetadataUpdate.SetStatistics.class,
-          MetadataUpdate.RemoveStatistics.class,
-          MetadataUpdate.SetPartitionStatistics.class,
-          MetadataUpdate.RemovePartitionStatistics.class);
-
-  private static final Set<Class<? extends MetadataUpdate>> METADATA_UPDATES =
-      Set.of(
-          MetadataUpdate.AssignUUID.class,
-          MetadataUpdate.UpgradeFormatVersion.class,
-          MetadataUpdate.AddSchema.class,
-          MetadataUpdate.SetCurrentSchema.class,
-          MetadataUpdate.RemoveSchemas.class,
-          MetadataUpdate.AddPartitionSpec.class,
-          MetadataUpdate.SetDefaultPartitionSpec.class,
-          MetadataUpdate.RemovePartitionSpecs.class,
-          MetadataUpdate.AddSortOrder.class,
-          MetadataUpdate.SetDefaultSortOrder.class,
-          MetadataUpdate.SetProperties.class,
-          MetadataUpdate.RemoveProperties.class,
-          MetadataUpdate.SetLocation.class,
-          MetadataUpdate.AddEncryptionKey.class,
-          MetadataUpdate.RemoveEncryptionKey.class);
-
   private final boolean stagedCreate;
-  private final String expression;
 
   /**
    * Creates a handler using the same staged-create predicate as the table hook dispatcher.
@@ -82,47 +47,27 @@ public class UpdateTableAuthzHandler implements AuthorizationHandler {
     stagedCreate =
         request.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
-    if (stagedCreate) {
-      expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION;
-      return;
-    }
-    boolean altersMetadata = false;
-    boolean writesData = request.updates().isEmpty();
-    for (MetadataUpdate update : request.updates()) {
-      if (DATA_UPDATES.stream().anyMatch(type -> type.isInstance(update))) {
-        writesData = true;
-      } else if (METADATA_UPDATES.stream().anyMatch(type -> type.isInstance(update))) {
-        altersMetadata = true;
-      } else {
-        // An unknown update may change either schema or data. Require both until classified.
-        altersMetadata = true;
-        writesData = true;
-      }
-    }
-    expression =
-        altersMetadata && writesData
-            ? REPLACE_TABLE_AUTHORIZATION_EXPRESSION
-            : altersMetadata
-                ? ALTER_TABLE_AUTHORIZATION_EXPRESSION
-                : WRITE_TABLE_AUTHORIZATION_EXPRESSION;
   }
 
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
-    if (!new AuthorizationExpressionEvaluator(expression)
-        .evaluate(
-            nameIdentifierMap,
-            new HashMap<>(),
-            new AuthorizationRequestContext(),
-            Optional.of(entityType().name()))) {
+    if (stagedCreate
+        && !new AuthorizationExpressionEvaluator(CREATE_TABLE_AUTHORIZATION_EXPRESSION)
+            .evaluate(
+                nameIdentifierMap,
+                new HashMap<>(),
+                new AuthorizationRequestContext(),
+                Optional.of(EntityType.SCHEMA.name()))) {
       throw new ForbiddenException(
-          "Not authorized to commit table changes in '%s'", nameIdentifierMap.get(entityType()));
+          "Not authorized to create table in schema '%s'",
+          nameIdentifierMap.get(EntityType.SCHEMA));
     }
   }
 
   @Override
   public boolean authorizationCompleted() {
-    return true;
+    // Ordinary commits continue through the endpoint's existing MODIFY_TABLE expression.
+    return stagedCreate;
   }
 
   @Override

@@ -171,7 +171,7 @@ public class PartitionOperations {
   @Timed(name = "add-partitions." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "add-partitions", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response addPartitions(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -218,7 +218,7 @@ public class PartitionOperations {
   @Timed(name = "drop-partition." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-partition", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropPartition(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

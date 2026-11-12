@@ -19,7 +19,7 @@
 package org.apache.gravitino.server.web.rest;
 
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.WRITE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -140,7 +140,7 @@ public class StatisticOperations {
   @Timed(name = "update-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-stats", absolute = true)
   @AuthorizationExpression(
-      expression = WRITE_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updateStatistics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -197,7 +197,7 @@ public class StatisticOperations {
   @Timed(name = "drop-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-stats", absolute = true)
   @AuthorizationExpression(
-      expression = WRITE_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropStatistics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -340,7 +340,7 @@ public class StatisticOperations {
   @Timed(name = "update-partitions-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "update-partitions-stats", absolute = true)
   @AuthorizationExpression(
-      expression = WRITE_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response updatePartitionStatistics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -408,7 +408,7 @@ public class StatisticOperations {
   @Timed(name = "drop-partitions-stats." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-partitions-stats", absolute = true)
   @AuthorizationExpression(
-      expression = WRITE_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response dropPartitionStatistics(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

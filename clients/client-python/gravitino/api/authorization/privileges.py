@@ -225,12 +225,6 @@ class Privilege(ABC):
         MODIFY_SEMANTIC_MODEL = (0, 1 << 41)
         """The privilege to rename a Semantic Model or alter its definition and metadata."""
 
-        ALTER = (0, 1 << 42)
-        """The privilege to alter object metadata. Currently supported for tables."""
-
-        WRITE_TABLE = (0, 1 << 43)
-        """The privilege to insert, update, or delete table data."""
-
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -584,84 +578,6 @@ class ModifyTable(GenericPrivilege):
             )
 
         return ModifyTable._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.TABLE_SUPPORTED_TYPES
-
-
-class WriteTable(GenericPrivilege):
-    """The privilege to insert, update, or delete table data."""
-
-    _ALLOW_INSTANCE: Optional[WriteTable] = None
-    _DENY_INSTANCE: Optional[WriteTable] = None
-
-    @staticmethod
-    def allow() -> Privilege:
-        """
-        Retrieve the instance with allow condition of the privilege.
-
-        Returns:
-            Privilege: The instance with allow condition of the privilege.
-        """
-        if WriteTable._ALLOW_INSTANCE is None:
-            WriteTable._ALLOW_INSTANCE = WriteTable(
-                Privilege.Condition.ALLOW, Privilege.Name.WRITE_TABLE
-            )
-
-        return WriteTable._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> Privilege:
-        """
-        Retrieve the instance with deny condition of the privilege.
-
-        Returns:
-            Privilege: The instance with deny condition of the privilege.
-        """
-        if WriteTable._DENY_INSTANCE is None:
-            WriteTable._DENY_INSTANCE = WriteTable(
-                Privilege.Condition.DENY, Privilege.Name.WRITE_TABLE
-            )
-
-        return WriteTable._DENY_INSTANCE
-
-    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
-        return obj_type in Privileges.TABLE_SUPPORTED_TYPES
-
-
-class Alter(GenericPrivilege):
-    """The privilege to alter object metadata. Currently supported for tables."""
-
-    _ALLOW_INSTANCE: Optional[Alter] = None
-    _DENY_INSTANCE: Optional[Alter] = None
-
-    @staticmethod
-    def allow() -> Privilege:
-        """
-        Retrieve the instance with allow condition of the privilege.
-
-        Returns:
-            Privilege: The instance with allow condition of the privilege.
-        """
-        if Alter._ALLOW_INSTANCE is None:
-            Alter._ALLOW_INSTANCE = Alter(
-                Privilege.Condition.ALLOW, Privilege.Name.ALTER
-            )
-
-        return Alter._ALLOW_INSTANCE
-
-    @staticmethod
-    def deny() -> Privilege:
-        """
-        Retrieve the instance with deny condition of the privilege.
-
-        Returns:
-            Privilege: The instance with deny condition of the privilege.
-        """
-        if Alter._DENY_INSTANCE is None:
-            Alter._DENY_INSTANCE = Alter(Privilege.Condition.DENY, Privilege.Name.ALTER)
-
-        return Alter._DENY_INSTANCE
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
         return obj_type in Privileges.TABLE_SUPPORTED_TYPES
@@ -1975,8 +1891,6 @@ class Privileges:
         Privilege.Name.USE_SCHEMA: UseSchema,
         Privilege.Name.CREATE_TABLE: CreateTable,
         Privilege.Name.MODIFY_TABLE: ModifyTable,
-        Privilege.Name.ALTER: Alter,
-        Privilege.Name.WRITE_TABLE: WriteTable,
         Privilege.Name.SELECT_TABLE: SelectTable,
         Privilege.Name.CREATE_FILESET: CreateFileset,
         Privilege.Name.WRITE_FILESET: WriteFileset,

@@ -261,16 +261,6 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_MODIFY_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
     expression =
         expression.replaceAll(
-            "ANY_ALTER",
-            "((ANY(ALTER, METALAKE, CATALOG, SCHEMA, TABLE)) "
-                + "&& !(ANY(DENY_ALTER, METALAKE, CATALOG, SCHEMA, TABLE)))");
-    expression =
-        expression.replaceAll(
-            "ANY_WRITE_TABLE",
-            "((ANY(WRITE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
-                + "&& !(ANY(DENY_WRITE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
-    expression =
-        expression.replaceAll(
             "ANY_CREATE_TABLE",
             "((ANY(CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)) "
                 + "&& !(ANY(DENY_CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");

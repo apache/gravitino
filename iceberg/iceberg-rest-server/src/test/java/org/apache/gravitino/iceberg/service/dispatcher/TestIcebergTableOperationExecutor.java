@@ -21,9 +21,7 @@ package org.apache.gravitino.iceberg.service.dispatcher;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -32,19 +30,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
-import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
-import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
-import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
-import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.UpdateRequirement;
@@ -63,7 +54,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.MockedStatic;
 
 public class TestIcebergTableOperationExecutor {
 
@@ -85,60 +75,6 @@ public class TestIcebergTableOperationExecutor {
     when(mockContext.catalogName()).thenReturn("test_catalog");
     when(mockContext.requestCredentialVending()).thenReturn(false);
     when(mockWrapperManager.getCatalogWrapper("test_catalog")).thenReturn(mockCatalogWrapper);
-  }
-
-  @Test
-  void testVendedCredentialsFollowReadAndWritePermissions() {
-    configureCredentialVending();
-    TableIdentifier table = TableIdentifier.of("schema", "table");
-    for (CredentialPrivilege privilege : CredentialPrivilege.values()) {
-      try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class)) {
-        helper
-            .when(
-                () ->
-                    MetadataAuthzHelper.checkAccess(
-                        any(),
-                        eq(Entity.EntityType.TABLE),
-                        eq(
-                            AuthorizationExpressionConstants
-                                .FILTER_WRITE_TABLE_AUTHORIZATION_EXPRESSION)))
-            .thenReturn(privilege == CredentialPrivilege.WRITE);
-        helper
-            .when(
-                () ->
-                    MetadataAuthzHelper.checkAccess(
-                        any(),
-                        eq(Entity.EntityType.TABLE),
-                        eq(
-                            AuthorizationExpressionConstants
-                                .FILTER_READ_TABLE_AUTHORIZATION_EXPRESSION)))
-            .thenReturn(privilege == CredentialPrivilege.READ);
-        executor.loadTable(mockContext, table);
-        verify(mockCatalogWrapper).loadTable(table, true, privilege);
-        executor.getTableCredentials(mockContext, table);
-        verify(mockCatalogWrapper).getTableCredentials(table, privilege);
-      }
-    }
-  }
-
-  @Test
-  void testMetadataOnlyAccessDoesNotVendCredentials() {
-    configureCredentialVending();
-    TableIdentifier table = TableIdentifier.of("schema", "table");
-    try (MockedStatic<MetadataAuthzHelper> helper = mockStatic(MetadataAuthzHelper.class)) {
-      executor.loadTable(mockContext, table);
-      verify(mockCatalogWrapper).loadTable(table, false, CredentialPrivilege.READ);
-      Assertions.assertThrows(
-          ForbiddenException.class, () -> executor.getTableCredentials(mockContext, table));
-    }
-  }
-
-  private void configureCredentialVending() {
-    IcebergConfigProvider config = mock(IcebergConfigProvider.class);
-    when(config.getMetalakeName()).thenReturn("metalake");
-    when(config.getDefaultCatalogName()).thenReturn("test_catalog");
-    IcebergRESTServerContext.create(config, true, false, false, mockWrapperManager);
-    when(mockContext.requestCredentialVending()).thenReturn(true);
   }
 
   @Test

@@ -17,116 +17,21 @@
 
 package org.apache.gravitino.server.web.rest.authorization;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
 import ognl.OgnlException;
 import org.apache.gravitino.dto.requests.TableCreateRequest;
 import org.apache.gravitino.dto.requests.TableUpdatesRequest;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
-import org.apache.gravitino.server.web.rest.PartitionOperations;
-import org.apache.gravitino.server.web.rest.StatisticOperations;
 import org.apache.gravitino.server.web.rest.TableOperations;
 import org.junit.jupiter.api.Test;
 
 public class TestTableAuthorizationExpression {
-
-  @Test
-  void testGranularTablePrivileges() throws Exception {
-    MockAuthorizationExpressionEvaluator alter =
-        new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION);
-    MockAuthorizationExpressionEvaluator write =
-        new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.WRITE_TABLE_AUTHORIZATION_EXPRESSION);
-    MockAuthorizationExpressionEvaluator read =
-        new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.READ_TABLE_AUTHORIZATION_EXPRESSION);
-    MockAuthorizationExpressionEvaluator load =
-        new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION);
-    MockAuthorizationExpressionEvaluator filter =
-        new MockAuthorizationExpressionEvaluator(
-            AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION);
-    for (String scope : List.of("METALAKE", "CATALOG", "SCHEMA", "TABLE")) {
-      for (String privilege : List.of("ALTER", "WRITE_TABLE")) {
-        Set<String> grants =
-            new HashSet<>(
-                Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", scope + "::" + privilege));
-        assertTrue(load.getResult(grants));
-        assertTrue(filter.getResult(grants));
-        assertFalse(read.getResult(grants));
-        assertEquals(privilege.equals("ALTER"), alter.getResult(grants));
-        assertEquals(privilege.equals("WRITE_TABLE"), write.getResult(grants));
-        for (String denyScope : List.of("METALAKE", "CATALOG", "SCHEMA", "TABLE")) {
-          Set<String> denied = new HashSet<>(grants);
-          denied.add(denyScope + "::DENY_" + privilege);
-          assertFalse(alter.getResult(denied));
-          assertFalse(write.getResult(denied));
-          assertFalse(load.getResult(denied));
-          assertFalse(filter.getResult(denied));
-        }
-        grants.remove("SCHEMA::USE_SCHEMA");
-        assertFalse(alter.getResult(grants));
-        assertFalse(write.getResult(grants));
-      }
-    }
-    Set<String> legacy =
-        Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::MODIFY_TABLE");
-    assertTrue(alter.getResult(legacy));
-    assertTrue(write.getResult(legacy));
-    assertTrue(read.getResult(legacy));
-    assertFalse(
-        new MockAuthorizationExpressionEvaluator(
-                AuthorizationExpressionConstants.DROP_TABLE_AUTHORIZATION_EXPRESSION)
-            .getResult(
-                Set.of(
-                    "CATALOG::USE_CATALOG",
-                    "SCHEMA::USE_SCHEMA",
-                    "TABLE::ALTER",
-                    "TABLE::WRITE_TABLE")));
-  }
-
-  @Test
-  void testRestMutationsUseGranularPrivileges() throws Exception {
-    int checked = 0;
-    for (Class<?> operations :
-        List.of(TableOperations.class, PartitionOperations.class, StatisticOperations.class)) {
-      for (Method method : operations.getDeclaredMethods()) {
-        AuthorizationExpression annotation = method.getAnnotation(AuthorizationExpression.class);
-        if (annotation == null) {
-          continue;
-        }
-        boolean alters =
-            method.getName().equals("alterTable")
-                || method.getName().equals("addPartitions")
-                || method.getName().equals("dropPartition");
-        boolean writesStatistics =
-            operations == StatisticOperations.class
-                && (method.getName().startsWith("update") || method.getName().startsWith("drop"));
-        if (!alters && !writesStatistics) {
-          continue;
-        }
-        checked++;
-        MockAuthorizationExpressionEvaluator evaluator =
-            new MockAuthorizationExpressionEvaluator(annotation.expression());
-        Set<String> alter = Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::ALTER");
-        Set<String> write =
-            Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::WRITE_TABLE");
-        assertEquals(alters, evaluator.getResult(alter), method.getName());
-        assertEquals(writesStatistics, evaluator.getResult(write), method.getName());
-      }
-    }
-    assertEquals(7, checked);
-  }
 
   @Test
   public void testCreateTable() throws NoSuchMethodException, OgnlException {

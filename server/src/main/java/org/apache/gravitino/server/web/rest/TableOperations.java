@@ -213,7 +213,7 @@ public class TableOperations {
   @Timed(name = "alter-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-table", absolute = true)
   @AuthorizationExpression(
-      expression = AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response alterTable(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)

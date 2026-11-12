@@ -179,11 +179,7 @@ public interface Privilege {
     /** The privilege to discover a semantic model and load its definition. */
     USE_SEMANTIC_MODEL(0L, 1L << 40),
     /** The privilege to rename a semantic model or alter its definition and metadata. */
-    MODIFY_SEMANTIC_MODEL(0L, 1L << 41),
-    /** The privilege to alter object metadata. Currently supported for tables. */
-    ALTER(0L, 1L << 42),
-    /** The privilege to insert, update, or delete table data. */
-    WRITE_TABLE(0L, 1L << 43);
+    MODIFY_SEMANTIC_MODEL(0L, 1L << 41);
 
     private final long highBits;
     private final long lowBits;

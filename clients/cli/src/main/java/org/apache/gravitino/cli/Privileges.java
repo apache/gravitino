@@ -39,10 +39,6 @@ public class Privileges {
   public static final String CREATE_TABLE = "create_table";
   /** Represents the privilege to modify a table. */
   public static final String MODIFY_TABLE = "modify_table";
-  /** Represents the privilege to alter object metadata. Currently supported for tables. */
-  public static final String ALTER = "alter";
-  /** Represents the privilege to insert, update, or delete table data. */
-  public static final String WRITE_TABLE = "write_table";
   /** Represents the privilege to select from a table. */
   public static final String SELECT_TABLE = "select_table";
   /** Represents the privilege to create a fileset. */
@@ -73,8 +69,6 @@ public class Privileges {
     VALID_PRIVILEGES.add(USE_SCHEMA);
     VALID_PRIVILEGES.add(CREATE_TABLE);
     VALID_PRIVILEGES.add(MODIFY_TABLE);
-    VALID_PRIVILEGES.add(ALTER);
-    VALID_PRIVILEGES.add(WRITE_TABLE);
     VALID_PRIVILEGES.add(SELECT_TABLE);
     VALID_PRIVILEGES.add(CREATE_FILESET);
     VALID_PRIVILEGES.add(WRITE_FILESET);
@@ -117,10 +111,6 @@ public class Privileges {
         return Privilege.Name.CREATE_TABLE;
       case MODIFY_TABLE:
         return Privilege.Name.MODIFY_TABLE;
-      case ALTER:
-        return Privilege.Name.ALTER;
-      case WRITE_TABLE:
-        return Privilege.Name.WRITE_TABLE;
       case SELECT_TABLE:
         return Privilege.Name.SELECT_TABLE;
       case CREATE_FILESET:

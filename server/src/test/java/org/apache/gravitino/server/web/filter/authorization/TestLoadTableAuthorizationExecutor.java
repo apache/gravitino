@@ -41,7 +41,6 @@ import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -54,7 +53,6 @@ import org.apache.gravitino.server.authorization.annotations.AuthorizationReques
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
-import org.apache.gravitino.server.web.rest.authorization.MockAuthorizationExpressionEvaluator;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 
@@ -63,38 +61,6 @@ public class TestLoadTableAuthorizationExecutor {
       AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
   private static final String SECONDARY_EXPRESSION =
       AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
-
-  @Test
-  void testExplicitGranularPrivilegesAreAllRequired() throws Exception {
-    for (String request :
-        Set.of("ALTER", "WRITE_TABLE", "ALTER,WRITE_TABLE", "SELECT_TABLE,ALTER")) {
-      LoadTableAuthorizationExecutor executor =
-          createExecutor(request, ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES);
-      MockAuthorizationExpressionEvaluator evaluator =
-          new MockAuthorizationExpressionEvaluator(expression(executor));
-      Set<String> alter = Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::ALTER");
-      Set<String> write =
-          Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::WRITE_TABLE");
-      assertEquals(request.equals("ALTER"), evaluator.getResult(alter));
-      assertEquals(request.equals("WRITE_TABLE"), evaluator.getResult(write));
-      assertTrue(
-          evaluator.getResult(
-              Set.of(
-                  "CATALOG::USE_CATALOG",
-                  "SCHEMA::USE_SCHEMA",
-                  "TABLE::ALTER",
-                  "TABLE::WRITE_TABLE",
-                  "TABLE::SELECT_TABLE")));
-      assertTrue(
-          evaluator.getResult(
-              Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::MODIFY_TABLE")));
-    }
-    LoadTableAuthorizationExecutor reader =
-        createExecutor("SELECT_TABLE", ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES);
-    assertFalse(
-        new MockAuthorizationExpressionEvaluator(expression(reader))
-            .getResult(Set.of("CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA", "TABLE::ALTER")));
-  }
 
   @Test
   public void testUsesSecondaryExpressionForRequiredModifyPrivilege() throws Exception {
@@ -118,8 +84,7 @@ public class TestLoadTableAuthorizationExecutor {
     LoadTableAuthorizationExecutor executor =
         createExecutor("SELECT_TABLE", ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES);
 
-    assertEquals(
-        AuthorizationExpressionConstants.READ_TABLE_AUTHORIZATION_EXPRESSION, expression(executor));
+    assertEquals(PRIMARY_EXPRESSION, expression(executor));
   }
 
   @Test

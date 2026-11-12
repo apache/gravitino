@@ -52,9 +52,6 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
                   JdbcPrivilege.DELETE,
                   JdbcPrivilege.INSERT,
                   JdbcPrivilege.ALTER),
-          Privilege.Name.ALTER, Sets.newHashSet(JdbcPrivilege.ALTER),
-          Privilege.Name.WRITE_TABLE,
-              Sets.newHashSet(JdbcPrivilege.INSERT, JdbcPrivilege.UPDATE, JdbcPrivilege.DELETE),
           Privilege.Name.USE_SCHEMA, Sets.newHashSet(JdbcPrivilege.USAGE));
 
   private final Map<Privilege.Name, MetadataObject.Type> privilegeScopeMapping =
@@ -63,8 +60,6 @@ public class JdbcSecurableObjectMappingProvider implements AuthorizationPrivileg
           Privilege.Name.CREATE_SCHEMA, MetadataObject.Type.SCHEMA,
           Privilege.Name.SELECT_TABLE, MetadataObject.Type.TABLE,
           Privilege.Name.MODIFY_TABLE, MetadataObject.Type.TABLE,
-          Privilege.Name.ALTER, MetadataObject.Type.TABLE,
-          Privilege.Name.WRITE_TABLE, MetadataObject.Type.TABLE,
           Privilege.Name.USE_SCHEMA, MetadataObject.Type.SCHEMA);
 
   private final Set<AuthorizationPrivilege> ownerPrivileges = ImmutableSet.of();

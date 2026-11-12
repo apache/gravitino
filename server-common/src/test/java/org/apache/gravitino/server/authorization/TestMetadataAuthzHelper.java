@@ -88,29 +88,6 @@ public class TestMetadataAuthzHelper {
     }
   }
 
-  @ParameterizedTest
-  @EnumSource(
-      value = Privilege.Name.class,
-      names = {"ALTER", "WRITE_TABLE"})
-  void testGranularTableListShortCircuit(Privilege.Name privilege) {
-    GravitinoAuthorizer authorizer =
-        mockTableListRouteAuthorizer(Set.of(privilege), Set.of(), true);
-    withAuthorizer(
-        authorizer,
-        () -> {
-          NameIdentifier[] tables = threeTables();
-          Assertions.assertSame(
-              tables,
-              MetadataAuthzHelper.filterByExpression(
-                  "testMetalake",
-                  AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
-                  Entity.EntityType.TABLE,
-                  tables));
-          verify(authorizer, times(1))
-              .hasDenyPolicy(any(), eq("testMetalake"), eq(Set.of(privilege)), any());
-        });
-  }
-
   @Test
   public void testFilterByExpression() {
     makeCompletableFutureUseCurrentThread();
@@ -1133,15 +1110,7 @@ public class TestMetadataAuthzHelper {
   @ParameterizedTest
   @EnumSource(
       value = Privilege.Name.class,
-      names = {
-        "PROBE_TABLE_LIKE",
-        "SELECT_TABLE",
-        "MODIFY_TABLE",
-        "ALTER",
-        "WRITE_TABLE",
-        "CREATE_TABLE",
-        "CREATE_VIEW"
-      })
+      names = {"PROBE_TABLE_LIKE", "SELECT_TABLE", "MODIFY_TABLE", "CREATE_TABLE", "CREATE_VIEW"})
   public void testListTableLikeShortCircuitSupportsEveryParentPrivilege(Privilege.Name privilege) {
     GravitinoAuthorizer authorizer =
         mockTableListRouteAuthorizer(Set.of(privilege), Set.of(), true);

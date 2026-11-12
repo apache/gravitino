@@ -106,31 +106,6 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
-  void testGranularColumnChangesAndOverwrite() throws Throwable {
-    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.ALTER);
-    assertEquals(PROCEEDED, interceptor.invoke(dropColumnsInvocation(tableId())));
-    assertEquals(PROCEEDED, interceptor.invoke(alterColumnsInvocation(tableId())));
-    assertErrorResponse(
-        interceptor.invoke(createTableInvocation(tableId(), "overwrite")),
-        Response.Status.FORBIDDEN);
-    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.WRITE_TABLE);
-    assertErrorResponse(
-        interceptor.invoke(dropColumnsInvocation(tableId())), Response.Status.FORBIDDEN);
-    assertErrorResponse(
-        interceptor.invoke(alterColumnsInvocation(tableId())), Response.Status.FORBIDDEN);
-    assertErrorResponse(
-        interceptor.invoke(createTableInvocation(tableId(), "overwrite")),
-        Response.Status.FORBIDDEN);
-    allow(
-        Privilege.Name.USE_CATALOG,
-        Privilege.Name.USE_SCHEMA,
-        Privilege.Name.ALTER,
-        Privilege.Name.WRITE_TABLE);
-    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "overwrite")));
-    assertEquals(PROCEEDED, interceptor.invoke(registerTableInvocation(tableId(), "overwrite")));
-  }
-
-  @Test
   void testCreateSchemaPrivilegeAllowsProbeButNotDescribe() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
 

@@ -18,8 +18,8 @@
  */
 package org.apache.gravitino.server.web.filter;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.READ_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.REPLACE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
@@ -51,12 +51,11 @@ import org.apache.iceberg.rest.requests.RegisterTableRequest;
  * express.
  *
  * <p>Destination authorization runs first, before any metadata FileIO or catalog scan: overwrite
- * requires metadata alteration and data-write privileges on the named table; a plain register uses
- * the same create-table expression as {@code IcebergNamespaceOperations#registerTable}.
- * Authorization then completes, so the shared interceptor does not re-evaluate the method
- * expression. When the metadata file still belongs to another live table, the data-read expression
- * on that table is required so {@code CREATE_TABLE} alone cannot adopt an unreadable table's
- * metadata.
+ * uses the modify-table expression on the named table; a plain register uses the same create-table
+ * expression as {@code IcebergNamespaceOperations#registerTable}. Authorization then completes, so
+ * the shared interceptor does not re-evaluate the method expression. When the metadata file still
+ * belongs to another live table, the load-table expression on that table is required so {@code
+ * CREATE_TABLE} alone cannot adopt an unreadable table's metadata.
  */
 @SuppressWarnings("FormatStringAnnotation")
 public class RegisterTableAuthzHandler implements AuthorizationHandler {
@@ -148,8 +147,7 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
 
   private static void requireCanAccessDestination(
       Map<EntityType, NameIdentifier> nameIdentifierMap, boolean overwrite) {
-    String expression =
-        overwrite ? REPLACE_TABLE_AUTHORIZATION_EXPRESSION : CREATE_TABLE_EXPRESSION;
+    String expression = overwrite ? MODIFY_TABLE_AUTHORIZATION_EXPRESSION : CREATE_TABLE_EXPRESSION;
     EntityType accessType = overwrite ? EntityType.TABLE : EntityType.SCHEMA;
     boolean authorized =
         new AuthorizationExpressionEvaluator(expression)
@@ -200,7 +198,7 @@ public class RegisterTableAuthzHandler implements AuthorizationHandler {
         EntityType.TABLE,
         NameIdentifierUtil.ofTable(metalake, catalogName, sourceSchema, source.name()));
     boolean authorized =
-        new AuthorizationExpressionEvaluator(READ_TABLE_AUTHORIZATION_EXPRESSION)
+        new AuthorizationExpressionEvaluator(LOAD_TABLE_AUTHORIZATION_EXPRESSION)
             .evaluate(
                 identifiers,
                 new HashMap<>(),

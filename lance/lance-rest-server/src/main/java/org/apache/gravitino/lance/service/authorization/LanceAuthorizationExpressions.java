@@ -114,7 +114,7 @@ public final class LanceAuthorizationExpressions {
    *
    * <p>This expression covers the {@code create} and {@code exist_ok} modes only. The {@code
    * overwrite} mode replaces an existing table, so it is authorized against {@link
-   * #REPLACE_TABLE_AUTHORIZATION_EXPRESSION} instead and CREATE_TABLE alone never grants it.
+   * #MODIFY_TABLE_AUTHORIZATION_EXPRESSION} instead and CREATE_TABLE alone never grants it.
    */
   public static final String CREATE_TABLE_AUTHORIZATION_EXPRESSION =
       """
@@ -123,19 +123,7 @@ public final class LanceAuthorizationExpressions {
       ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE)
       """;
 
-  /** Authorizes metadata changes through ALTER, legacy MODIFY_TABLE, or ownership. */
-  public static final String ALTER_TABLE_AUTHORIZATION_EXPRESSION =
-      "entityType == 'TABLE' && ("
-          + AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION
-          + ")";
-
-  /** Authorizes replacement of table schema and data through both granular privileges. */
-  public static final String REPLACE_TABLE_AUTHORIZATION_EXPRESSION =
-      "entityType == 'TABLE' && ("
-          + AuthorizationExpressionConstants.REPLACE_TABLE_AUTHORIZATION_EXPRESSION
-          + ")";
-
-  /** Authorizes altering an existing table using the legacy privilege. */
+  /** Authorizes altering an existing table, which requires MODIFY_TABLE or ownership. */
   public static final String MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       "entityType == 'TABLE' && ("
           + AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION

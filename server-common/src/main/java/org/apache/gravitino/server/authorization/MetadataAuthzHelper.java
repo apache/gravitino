@@ -127,17 +127,13 @@ public class MetadataAuthzHelper {
                   List.of(
                       parentOwnerPath(TABLE_PARENT_SCOPES),
                       parentPrivilegePath(Privilege.Name.SELECT_TABLE, TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.ALTER, TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.WRITE_TABLE, TABLE_PARENT_SCOPES)),
+                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES)),
                   AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
                   List.of(
                       parentOwnerPath(TABLE_PARENT_SCOPES),
                       tableLikeParentPrivilegePath(Privilege.Name.PROBE_TABLE_LIKE),
                       tableLikeParentPrivilegePath(Privilege.Name.SELECT_TABLE),
                       tableLikeParentPrivilegePath(Privilege.Name.MODIFY_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.ALTER),
-                      tableLikeParentPrivilegePath(Privilege.Name.WRITE_TABLE),
                       tableLikeParentPrivilegePath(Privilege.Name.CREATE_TABLE),
                       tableLikeParentPrivilegePath(Privilege.Name.CREATE_VIEW))),
               Entity.EntityType.MODEL,

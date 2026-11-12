@@ -27,7 +27,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -175,17 +174,14 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse loadTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    Optional<CredentialPrivilege> privilege =
-        context.requestCredentialVending()
-            ? getCredentialPrivilege(context, tableIdentifier)
-            : Optional.empty();
+    CredentialPrivilege privilege = CredentialPrivilege.READ;
+    if (context.requestCredentialVending()) {
+      privilege = getCredentialPrivilege(context, tableIdentifier);
+    }
 
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .loadTable(
-            tableIdentifier,
-            context.requestCredentialVending() && privilege.isPresent(),
-            privilege.orElse(CredentialPrivilege.READ));
+        .loadTable(tableIdentifier, context.requestCredentialVending(), privilege);
   }
 
   @Override
@@ -213,18 +209,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadCredentialsResponse getTableCredentials(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
-    CredentialPrivilege privilege =
-        getCredentialPrivilege(context, tableIdentifier)
-            .orElseThrow(
-                () ->
-                    new ForbiddenException(
-                        "Table credentials require SELECT_TABLE or WRITE_TABLE"));
+    CredentialPrivilege privilege = getCredentialPrivilege(context, tableIdentifier);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .getTableCredentials(tableIdentifier, privilege);
   }
 
-  private static Optional<CredentialPrivilege> getCredentialPrivilege(
+  private static CredentialPrivilege getCredentialPrivilege(
       IcebergRequestContext context, TableIdentifier tableIdentifier) {
     String metalake = IcebergRESTServerContext.getInstance().metalakeName();
     String separator = HierarchicalSchemaUtil.schemaSeparator();
@@ -235,17 +226,9 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
         MetadataAuthzHelper.checkAccess(
             identifier,
             Entity.EntityType.TABLE,
-            AuthorizationExpressionConstants.FILTER_WRITE_TABLE_AUTHORIZATION_EXPRESSION);
+            AuthorizationExpressionConstants.FILTER_MODIFY_TABLE_AUTHORIZATION_EXPRESSION);
 
-    if (writable) {
-      return Optional.of(CredentialPrivilege.WRITE);
-    }
-    boolean readable =
-        MetadataAuthzHelper.checkAccess(
-            identifier,
-            Entity.EntityType.TABLE,
-            AuthorizationExpressionConstants.FILTER_READ_TABLE_AUTHORIZATION_EXPRESSION);
-    return readable ? Optional.of(CredentialPrivilege.READ) : Optional.empty();
+    return writable ? CredentialPrivilege.WRITE : CredentialPrivilege.READ;
   }
 
   @Override
@@ -253,17 +236,13 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       PlanTableScanRequest scanRequest) {
-    Optional<CredentialPrivilege> privilege =
-        context.requestCredentialVending()
-            ? getCredentialPrivilege(context, tableIdentifier)
-            : Optional.empty();
+    CredentialPrivilege privilege = CredentialPrivilege.READ;
+    if (context.requestCredentialVending()) {
+      privilege = getCredentialPrivilege(context, tableIdentifier);
+    }
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .planTableScan(
-            tableIdentifier,
-            scanRequest,
-            context.requestCredentialVending() && privilege.isPresent(),
-            privilege.orElse(CredentialPrivilege.READ));
+        .planTableScan(tableIdentifier, scanRequest, context.requestCredentialVending(), privilege);
   }
 
   @Override

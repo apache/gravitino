@@ -100,8 +100,6 @@ export const privilegeOptions = [
     options: [
       { label: 'Create Table', value: 'create_table' },
       { label: 'Modify Table', value: 'modify_table' },
-      { label: 'Alter', value: 'alter' },
-      { label: 'Write Table', value: 'write_table' },
       { label: 'Select Table', value: 'select_table' }
     ]
   },

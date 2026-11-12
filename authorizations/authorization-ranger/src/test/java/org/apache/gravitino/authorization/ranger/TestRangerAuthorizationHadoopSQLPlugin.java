@@ -26,15 +26,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.MetadataObjectChange;
-import org.apache.gravitino.authorization.Privilege;
-import org.apache.gravitino.authorization.Privileges;
-import org.apache.gravitino.authorization.SecurableObjects;
-import org.apache.gravitino.authorization.ranger.RangerPrivileges.RangerHadoopSQLPrivilege;
 import org.apache.gravitino.authorization.ranger.reference.RangerDefines.PolicyResource;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.apache.ranger.plugin.util.SearchFilter;
@@ -60,47 +55,6 @@ public class TestRangerAuthorizationHadoopSQLPlugin {
     Mockito.when(rangerClient.updatePolicy(anyLong(), any()))
         .thenAnswer(invocation -> invocation.getArgument(1));
     plugin.setRangerClient(rangerClient);
-  }
-
-  @Test
-  public void testAlterAndWriteTableTranslation() {
-    Assertions.assertEquals(
-        Set.of(RangerHadoopSQLPrivilege.ALTER),
-        plugin.privilegesMappingRule().get(Privilege.Name.ALTER));
-    Assertions.assertEquals(
-        Set.of(RangerHadoopSQLPrivilege.UPDATE, RangerHadoopSQLPrivilege.WRITE),
-        plugin.privilegesMappingRule().get(Privilege.Name.WRITE_TABLE));
-    for (Privilege.Name name : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
-      Assertions.assertTrue(plugin.allowPrivilegesRule().contains(name));
-      for (MetadataObject.Type type :
-          List.of(
-              MetadataObject.Type.METALAKE,
-              MetadataObject.Type.CATALOG,
-              MetadataObject.Type.SCHEMA,
-              MetadataObject.Type.TABLE)) {
-        String fullName =
-            type == MetadataObject.Type.METALAKE
-                ? "metalake"
-                : type == MetadataObject.Type.CATALOG
-                    ? "catalog"
-                    : type == MetadataObject.Type.SCHEMA
-                        ? "catalog.schema"
-                        : "catalog.schema.table";
-        for (Privilege privilege : List.of(Privileges.allow(name), Privileges.deny(name))) {
-          var translated =
-              plugin.translatePrivilege(SecurableObjects.parse(fullName, type, List.of(privilege)));
-          Assertions.assertFalse(translated.isEmpty());
-          for (var object : translated) {
-            for (var mapped : object.privileges()) {
-              Assertions.assertEquals(privilege.condition(), mapped.condition());
-              Assertions.assertTrue(
-                  plugin.privilegesMappingRule().get(name).stream()
-                      .anyMatch(expected -> expected.getName().equals(mapped.getName())));
-            }
-          }
-        }
-      }
-    }
   }
 
   @Test

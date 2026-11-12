@@ -85,10 +85,6 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
             RangerHadoopSQLPrivilege.UPDATE,
             RangerHadoopSQLPrivilege.ALTER,
             RangerHadoopSQLPrivilege.WRITE),
-        Privilege.Name.ALTER,
-        ImmutableSet.of(RangerHadoopSQLPrivilege.ALTER),
-        Privilege.Name.WRITE_TABLE,
-        ImmutableSet.of(RangerHadoopSQLPrivilege.UPDATE, RangerHadoopSQLPrivilege.WRITE),
         Privilege.Name.SELECT_TABLE,
         ImmutableSet.of(RangerHadoopSQLPrivilege.READ, RangerHadoopSQLPrivilege.SELECT));
   }
@@ -439,8 +435,6 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
         Privilege.Name.USE_SCHEMA,
         Privilege.Name.CREATE_TABLE,
         Privilege.Name.MODIFY_TABLE,
-        Privilege.Name.ALTER,
-        Privilege.Name.WRITE_TABLE,
         Privilege.Name.SELECT_TABLE);
   }
 
@@ -632,8 +626,6 @@ public class RangerAuthorizationHadoopSQLPlugin extends RangerAuthorizationPlugi
                   break;
                 case CREATE_TABLE:
                 case MODIFY_TABLE:
-                case ALTER:
-                case WRITE_TABLE:
                 case SELECT_TABLE:
                   switch (securableObject.type()) {
                     case METALAKE:

@@ -191,8 +191,6 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `CREATE_TABLE`       | Metalake, Catalog, Schema                                                   | Create tables in any schema in scope                                 |
 | `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View                                      | Probe whether a table-like object exists without reading its data    |
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read any table in scope                                              |
-| `ALTER`              | Metalake, Catalog, Schema, Table                                            | Alter table metadata, including columns, properties, partitions, and names |
-| `WRITE_TABLE`        | Metalake, Catalog, Schema, Table                                            | Insert, update, and delete table data, and update table statistics |
 | `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table                                            | Read and write to, and alter the schema of, any table in scope       |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema                                                   | Create views in any schema in scope                                  |
 | `SELECT_VIEW`        | Metalake, Catalog, Schema, View                                             | Read view metadata in scope                                          |
@@ -214,32 +212,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `USE_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
 | `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
-`ALTER` and `WRITE_TABLE` provide separate grants for schema changes and data writes in REST
-operations and the JDBC and Ranger HadoopSQL authorization plugins. `ALTER` maps to `ALTER`; `WRITE_TABLE` maps to
-`INSERT`, `UPDATE`, and `DELETE` in JDBC, and `UPDATE` and `WRITE` in Ranger. Grant `SELECT_TABLE`
-separately when reading data is needed. Existing `MODIFY_TABLE` grants remain an independent,
-backward-compatible way to authorize reads, writes, and metadata changes. For least privilege,
-use the new grants instead of granting `MODIFY_TABLE` alongside them.
-
-Iceberg REST commits that change only schema, properties, partition specifications, or sort orders
-require `ALTER`; snapshot and statistics updates require `WRITE_TABLE`. A commit containing both
-kinds of change, an unrecognized update type, or a whole-table overwrite requires both privileges.
-The legacy `MODIFY_TABLE` grant also authorizes these operations. Staged creation still requires
-`CREATE_TABLE` on the schema. Iceberg register-overwrite and Lance overwrite use the same
-combined authorization. Neither granular privilege allows dropping a table.
-
-`SELECT_TABLE`, `ALTER`, `WRITE_TABLE`, or `MODIFY_TABLE` can load and list table metadata.
-Iceberg data scans still require `SELECT_TABLE` or `MODIFY_TABLE`. Inline and refreshed storage
-credentials follow the caller's data privileges: `WRITE_TABLE` or `MODIFY_TABLE` allows write
-credentials, `SELECT_TABLE` allows read credentials, and metadata-only `ALTER` access receives no
-inline credentials and cannot refresh credentials.
-
-Native table loads with an explicit `privileges` parameter check each requested `SELECT_TABLE`,
-`MODIFY_TABLE`, `ALTER`, or `WRITE_TABLE` permission;
-requesting both `ALTER` and `WRITE_TABLE` requires both, and an explicit `SELECT_TABLE` request
-requires data-read access.
-
-Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to read table data. Topics and filesets
+Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
 view metadata, while altering or dropping a view is owner-only.
 
@@ -302,7 +275,7 @@ return only the entries the caller is entitled to see, which for a metalake owne
 |----------|---------------------|-----------------------------------------|-------------------|-------|
 | Catalog  | `CREATE_CATALOG`    | `USE_CATALOG`                           | Owner             | Owner |
 | Schema   | `CREATE_SCHEMA`     | `USE_SCHEMA`                            | Owner             | Owner |
-| Table    | `CREATE_TABLE`      | `SELECT_TABLE`, `ALTER`, `WRITE_TABLE`, or `MODIFY_TABLE` | `ALTER` or `MODIFY_TABLE` | Owner |
+| Table    | `CREATE_TABLE`      | `SELECT_TABLE` or `MODIFY_TABLE`        | `MODIFY_TABLE`    | Owner |
 | View     | `CREATE_VIEW`       | `SELECT_VIEW`                           | Owner             | Owner |
 | Topic    | `CREATE_TOPIC`      | `CONSUME_TOPIC` or `PRODUCE_TOPIC`      | `PRODUCE_TOPIC`   | Owner |
 | Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`       | `WRITE_FILESET`   | Owner |
@@ -315,8 +288,8 @@ Testing a catalog connection follows the catalog row. Testing a catalog before i
 same as loading it. Testing an existing catalog with proposed changes that are not saved takes
 ownership, the same as altering it, because the caller chooses what the server connects to.
 
-Table statistics follow the table itself: reading them requires table metadata access,
-and updating or deleting them requires `WRITE_TABLE` or `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
+Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
+writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
 alter or delete. Fetching plaintext secrets (`getSecrets`) requires owning the metalake or holding
 `USE_SECRETS`. Cloud access-key pairs are included only when the caller is the metalake owner or also
 holds `INCLUDE_CREDENTIAL_SECRETS`. Catalog credential vending (`getCredentials`) requires metadata access plus both
