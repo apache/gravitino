@@ -155,9 +155,11 @@ public interface GlossaryTerm extends Auditable {
 
   /**
    * Returns the bindings of the term. It is set only on the terms returned by {@link
-   * GlossaryOperations#matchTerms(String[], String)}, and holds at most a limited number of
-   * bindings; see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} for all
-   * of them.
+   * GlossaryOperations#matchTerms(String[], String)}.
+   *
+   * <p>The server first leaves out the objects and metrics that the caller cannot access, the same
+   * as {@link #listBindings(TermBinding.Kind)}. Then it keeps at most 20 of the remaining bindings;
+   * see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} for all of them.
    *
    * @return The bindings of the term, or an empty array if the term was not returned by a lookup.
    */
@@ -166,9 +168,11 @@ public interface GlossaryTerm extends Auditable {
   }
 
   /**
-   * Returns whether {@link #bindings()} was cut to the limit.
+   * Returns whether {@link #bindings()} was cut to the limit. Only the bindings that the caller can
+   * access count, so a binding to a hidden object never sets this flag.
    *
-   * @return True if the term has more bindings than {@link #bindings()} returns.
+   * @return True if the caller can access more bindings of the term than {@link #bindings()}
+   *     returns.
    */
   default boolean bindingsTruncated() {
     return false;

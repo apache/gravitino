@@ -20,6 +20,7 @@ package org.apache.gravitino.glossary;
 
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -103,19 +104,34 @@ public interface GlossaryOperations {
    * Drops a term, with its synonyms, relations, domain links and bindings. An {@link
    * GlossaryTerm.Status#APPROVED} term cannot be dropped; deprecate it first.
    *
+   * <p>The checks run in this order:
+   *
+   * <ol>
+   *   <li>If the term does not exist, or the caller cannot see it, nothing is dropped and the
+   *       result is false. Both cases give the same result, so a hidden term stays hidden.
+   *   <li>If the caller can see the term but may not drop it, for example a {@link
+   *       GlossaryTerm.Status#DEPRECATED} term dropped by its owner without the manage privilege, a
+   *       {@link ForbiddenException} is thrown.
+   *   <li>If the caller may drop terms but the term is {@link GlossaryTerm.Status#APPROVED}, an
+   *       {@link IllegalArgumentException} is thrown.
+   * </ol>
+   *
    * @param name The name of the term.
-   * @return True if the term was dropped, false if it does not exist.
+   * @return True if the term was dropped, false if it does not exist or is not visible to the
+   *     caller.
+   * @throws ForbiddenException If the caller can see the term but may not drop it.
    * @throws IllegalArgumentException If the term is {@link GlossaryTerm.Status#APPROVED}.
    */
-  boolean dropTerm(String name) throws IllegalArgumentException;
+  boolean dropTerm(String name) throws ForbiddenException, IllegalArgumentException;
 
   /**
    * Looks up business words, such as the words of a question to an agent. Each word is looked up on
    * its own, and its normalized key is compared with the names and synonyms of the terms. Only
    * exact matches count, so {@code customers} does not find {@code Customer}. Only {@link
    * GlossaryTerm.Status#APPROVED} terms are returned, with {@link GlossaryTerm#matchedBy()} and
-   * {@link GlossaryTerm#bindings()} set. A term is returned once, even when it matches several
-   * words.
+   * {@link GlossaryTerm#bindings()} set. The bindings only hold the objects and metrics that the
+   * caller can access, at most 20 per term; see {@link GlossaryTerm#bindings()}. A term is returned
+   * once, even when it matches several words.
    *
    * @param words The words to look up, at most 20.
    * @param domain The name of a domain to limit the lookup to its terms and those of its
