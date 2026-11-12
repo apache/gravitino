@@ -50,7 +50,13 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                                                                                                                              | `s3://bucket/lakehouse` | No       |
 | `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
-| `lance.allow-external-table-purge` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. | `false` | No |
+| `lance.allow-external-dataset-modification` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Also allow column and index changes to the datasets of registered or declared tables. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. Renamed from `lance.allow-external-table-purge`. | `false` | No |
+
+The previous name, `lance.allow-external-table-purge`, was introduced in #14870 and has not
+been released. It is no longer read. If you configured it on an unreleased build, remove it and
+explicitly set `lance.allow-external-dataset-modification=true` only if you intend to allow both
+external dataset deletion and schema/index changes to registered or declared datasets. The new
+setting defaults to `false`; the broader permission is not inferred from the old purge-only flag.
 
 #### Pluggable table location provider
 
@@ -181,7 +187,7 @@ location back would invite it to delete exactly the data the catalog just promis
 leak is recoverable and a deletion is not, so `unprovisionTableLocation` is not called when a table
 whose `external` property is true is dropped.
 
-For Lance, an external-table purge requires `lance.allow-external-table-purge=true` in the catalog.
+For Lance, an external-table purge requires `lance.allow-external-dataset-modification=true` in the catalog.
 Without it, purge fails before removing table metadata or deleting data, and the provider callback is
 not invoked.
 When allowed, purge deletes the external dataset that drop leaves alone; after successful deletion,

@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
-import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -27,12 +27,19 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.net.URI;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -47,6 +54,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.ManagedTableOperations;
 import org.apache.gravitino.connector.GenericColumn;
@@ -62,6 +70,7 @@ import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.lance.common.utils.LancePropertiesUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -234,20 +243,35 @@ public class LanceTableOperations extends ManagedTableOperations {
       }
     }
 
-    if (register) {
-      if (mode == CreationMode.CREATE) {
-        // Check metadata before accessing storage so an existing name consistently reports a
-        // conflict. The final strict insert still detects a concurrent registration.
-        try {
-          if (store().exists(ident, Entity.EntityType.TABLE)) {
-            throw new TableAlreadyExistsException("Table %s already exists", ident);
-          }
-        } catch (IOException e) {
-          throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
+    if (mode == CreationMode.CREATE) {
+      // Check metadata before accessing storage so an existing name reports a conflict without
+      // writing a dataset. The final strict insert still detects a concurrent creation.
+      try {
+        if (store().exists(ident, Entity.EntityType.TABLE)) {
+          throw new TableAlreadyExistsException("Table %s already exists", ident);
         }
+      } catch (IOException e) {
+        throw ExceptionMessages.wrap("Failed to check existence of table " + ident, e);
       }
+    }
+
+    // Before Lance dataset access, so a location that holds another table's data is never written,
+    // adopted or later deleted through this table.
+    rejectOverlappingLocation(ident, location);
+
+    if (register) {
       // Validate before OVERWRITE can remove existing metadata or managed data.
       validateExistingDatasetLocation(ident, location, properties);
+    }
+
+    if (register || isDeclaredOnly(properties)) {
+      // Gravitino does not create the dataset of a registered or declared table. Record that, so
+      // later dataset changes require the catalog opt-in. The declared flag is removed once the
+      // schema is loaded from the dataset, so it cannot serve as this record.
+      Map<String, String> adoptedProperties = new HashMap<>(properties);
+      adoptedProperties.put(LanceConstants.LANCE_TABLE_DATASET_ADOPTED, "true");
+      adoptedProperties.put(Table.PROPERTY_EXTERNAL, "true");
+      properties = adoptedProperties;
     }
 
     // Handle OVERWRITE mode - drop existing table if present
@@ -292,6 +316,14 @@ public class LanceTableOperations extends ManagedTableOperations {
               + ident
               + " because its dataset schema is not initialized or could not be loaded");
     }
+    if (isAdoptedDataset(loadedTable.properties()) && !externalDatasetModificationAllowed()) {
+      // The location of a registered or declared table may hold another table's dataset.
+      throw new UnsupportedOperationException(
+          "Changing the dataset of a registered or declared Lance table is disabled. A catalog"
+              + " administrator may enable "
+              + LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION
+              + " to allow changes to datasets that Gravitino did not create.");
+    }
     long version = handleLanceTableChange(loadedTable, changes);
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
@@ -310,12 +342,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
       boolean external = LancePropertiesUtils.isExternalTable(table.properties());
-      if (external
-          && !Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_TABLE_PURGE))) {
+      if (external && !externalDatasetModificationAllowed()) {
         throw new UnsupportedOperationException(
             "Purging external Lance tables is disabled. Use dropTable or Lance REST deregister"
                 + " to remove metadata only. A catalog administrator may enable "
-                + LANCE_ALLOW_EXTERNAL_TABLE_PURGE
+                + LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION
                 + " to allow physical deletion of external data.");
       }
 
@@ -472,8 +503,28 @@ public class LanceTableOperations extends ManagedTableOperations {
     } catch (NoSuchSchemaException e) {
       throw e;
     } catch (TableAlreadyExistsException | OptimisticLockException e) {
-      // Metadata registration failed after creating the dataset. Attempt to remove it so a retry
-      // can create it again; if cleanup fails, retain the registration error and cleanup failure.
+      // Metadata registration failed after creating the dataset. Dataset.drop removes the whole
+      // location, and an external location may be a directory that holds other datasets, so
+      // only a managed location is cleaned up. An external one keeps the new dataset.
+      if (LancePropertiesUtils.isExternalTable(properties)) {
+        LOG.warn(
+            "Metadata registration for Lance table {} failed after its dataset was created at"
+                + " external location {}. The dataset is kept and must be removed manually.",
+            ident,
+            location);
+        String message =
+            String.format(
+                "%s The dataset created for Lance table %s at external location %s has been"
+                    + " retained. Inspect it and clean up only data created by this request before"
+                    + " retrying; do not delete shared parent directories.",
+                e.getMessage(), ident, location);
+        if (e instanceof TableAlreadyExistsException) {
+          throw new TableAlreadyExistsException(e, "%s", message);
+        }
+        throw new OptimisticLockException(e, "%s", message);
+      }
+      // Attempt to remove the managed dataset so a retry can create it again; if cleanup fails,
+      // retain the registration error and cleanup failure.
       try {
         Dataset.drop(location, storageProps);
       } catch (Exception dropFailure) {
@@ -597,6 +648,282 @@ public class LanceTableOperations extends ManagedTableOperations {
         .map(mode -> mode.trim().replace('-', '_').toUpperCase())
         .map(SchemaRefreshMode::valueOf)
         .orElse(SchemaRefreshMode.DECLARED_AND_EMPTY);
+  }
+
+  /**
+   * Rejects a location that equals, contains or is inside the location of another table in the same
+   * catalog. Dataset deletion removes its whole location, so a table at a parent directory could
+   * delete the datasets of other tables, and a table at another table's location could change that
+   * table's dataset.
+   *
+   * <p>This compares stored metadata only. It does not see other catalogs, symbolic links or tables
+   * created concurrently. The other table is not named, because the caller may not be allowed to
+   * see it.
+   *
+   * @param ident the table being created; an existing table with this name is ignored, because an
+   *     overwrite replaces it
+   * @param location the requested table location
+   */
+  private void rejectOverlappingLocation(NameIdentifier ident, String location) {
+    Namespace schemaNamespace = ident.namespace();
+    if (schemaNamespace.length() < 3) {
+      // Only a metalake.catalog.schema namespace identifies the catalog to compare against.
+      return;
+    }
+    List<String> requested = locationSegments(location);
+    Namespace catalogNamespace = Namespace.of(schemaNamespace.level(0), schemaNamespace.level(1));
+    try {
+      for (SchemaEntity schema :
+          store().list(catalogNamespace, SchemaEntity.class, Entity.EntityType.SCHEMA)) {
+        Namespace tableNamespace =
+            Namespace.of(catalogNamespace.level(0), catalogNamespace.level(1), schema.name());
+        for (TableEntity table :
+            store().list(tableNamespace, TableEntity.class, Entity.EntityType.TABLE)) {
+          if (table.nameIdentifier().equals(ident) || table.properties() == null) {
+            continue;
+          }
+          String other = table.properties().get(Table.PROPERTY_LOCATION);
+          if (StringUtils.isBlank(other)) {
+            continue;
+          }
+          final List<String> existing;
+          try {
+            existing = locationSegments(other);
+          } catch (IllegalArgumentException invalid) {
+            // Fail closed without exposing the other table's name or location to its peers.
+            LOG.warn("Invalid stored Lance location for table {}", table.nameIdentifier(), invalid);
+            // Main REST can serialize exception causes by default. Keep the private URI in server
+            // logs only, not in the throwable returned to a caller of another table.
+            throw new IllegalStateException(
+                "Cannot check table locations in this catalog; ask a catalog administrator to"
+                    + " correct an existing table's invalid location");
+          }
+          if (isPrefixOrSame(requested, existing)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Location %s of Lance table %s overlaps the location of another table in"
+                        + " this catalog",
+                    location, ident));
+          }
+        }
+      }
+    } catch (IOException e) {
+      throw ExceptionMessages.wrap("Failed to check the table locations for " + ident, e);
+    }
+  }
+
+  /**
+   * Splits a location into a storage namespace and normalized path segments. Azure namespaces also
+   * carry an account, or a wildcard when the URI relies on runtime account settings. A path without
+   * a scheme is a local file path, resolved against the server working directory. File URI escapes,
+   * localhost and Lance's local-store schemes are normalized without resolving symbolic links.
+   * Remote paths retain their escapes, as in Lance's object-store providers. Segments are compared
+   * whole, so {@code s3://b/v1} does not contain {@code s3://b/v10}.
+   */
+  static List<String> locationSegments(String location) {
+    URI uri = null;
+    String candidate = location.trim();
+    int colon = candidate.indexOf(':');
+    if (colon > 0 && candidate.substring(0, colon).matches("[a-zA-Z][a-zA-Z0-9+.-]*")) {
+      try {
+        // Like Lance's URL parser, accept spaces in URI paths. Plain paths below retain literal
+        // spaces, percent signs, query characters and fragments.
+        uri = URI.create(encodeLocationUri(candidate));
+      } catch (IllegalArgumentException invalid) {
+        throw ExceptionMessages.illegalArgument(
+            "Invalid Lance location URI; encode URI characters or use a plain local path", invalid);
+      }
+    }
+    String scheme = uri == null ? "file" : uri.getScheme().toLowerCase(Locale.ROOT);
+    String authority = uri == null || uri.getRawAuthority() == null ? "" : uri.getRawAuthority();
+    String azureAccount = null;
+    String path;
+    boolean rawUriPath = uri != null;
+    if (uri == null) {
+      String local = location;
+      if (local.equals("~") || local.startsWith("~/")) {
+        String home =
+            Optional.ofNullable(System.getenv("HOME")).orElse(System.getProperty("user.home"));
+        local = home + local.substring(1);
+      }
+      path = Path.of(local).toAbsolutePath().normalize().toString();
+    } else {
+      Preconditions.checkArgument(
+          !uri.isOpaque(), "Lance location URI must have a hierarchical path");
+      Preconditions.checkArgument(uri.getPort() <= 65535, "Invalid port in Lance location URI");
+      path = uri.getRawPath();
+      if (path == null) {
+        path = uri.getRawSchemeSpecificPart();
+      }
+      if (scheme.equals("file")
+          || scheme.equals("file-object-store")
+          || scheme.equals("file+uring")) {
+        if (scheme.equals("file")) {
+          Preconditions.checkArgument(
+              uri.getRawUserInfo() == null
+                  && uri.getPort() == -1
+                  && (authority.isEmpty() || uri.getHost() != null),
+              "File location URI must not contain user information or a port");
+        }
+        // Lance's local-store schemes decode URL paths and address the same filesystem. Their
+        // authority does not select a remote filesystem.
+        path = decodeLocalUriPath(path);
+        rawUriPath = false;
+        path = path.startsWith("/") ? path : "/" + path;
+        scheme = "file";
+        authority = "";
+      } else {
+        if (scheme.equals("s3+ddb")) {
+          // DynamoDB changes the commit protocol, not the S3 bucket or object prefix.
+          scheme = "s3";
+        }
+        if (Set.of("s3", "gs", "oss", "cos").contains(scheme)) {
+          // Bucket providers select the host, not user information or a URI port. Endpoints come
+          // from storage options; retaining these ignored fields would create aliases. Use the
+          // raw authority as Java's server-host parser does not accept valid GCS underscores.
+          String bucketAuthority = authority.substring(authority.lastIndexOf('@') + 1);
+          Preconditions.checkArgument(
+              bucketAuthority.matches("[a-zA-Z0-9._-]+(:[0-9]+)?"),
+              "Invalid bucket authority in Lance location URI");
+          int port = bucketAuthority.lastIndexOf(':');
+          if (port >= 0) {
+            try {
+              Preconditions.checkArgument(
+                  Integer.parseInt(bucketAuthority.substring(port + 1)) <= 65535,
+                  "Invalid port in Lance location URI");
+            } catch (NumberFormatException invalidPort) {
+              throw new IllegalArgumentException("Invalid port in Lance location URI", invalidPort);
+            }
+            bucketAuthority = bucketAuthority.substring(0, port);
+          }
+          authority = bucketAuthority;
+        } else if (scheme.equals("az") || scheme.equals("abfss")) {
+          scheme = "az";
+          String host = uri.getHost();
+          Preconditions.checkArgument(host != null, "Azure location URI must specify a container");
+          String user = uri.getRawUserInfo();
+          if (StringUtils.isEmpty(user)) {
+            authority = host;
+            // No account in the URI: its effective account depends on runtime storage settings.
+            // Conservatively compare this container against any explicit account, rather than
+            // assume that two spellings identify different data.
+            azureAccount = "*";
+          } else {
+            Preconditions.checkArgument(
+                host.matches(
+                    "[^.]+\\.(dfs|blob)\\.(core\\.windows\\.net|fabric\\.microsoft\\.com)"),
+                "Azure location URI must use a fully qualified storage account host");
+            authority = user.split(":", 2)[0];
+            azureAccount = host.replaceFirst("\\.(dfs|blob)\\.", ".");
+          }
+        }
+      }
+    }
+    List<String> segments = new ArrayList<>(List.of(scheme, authority));
+    if (azureAccount != null) {
+      segments.add(azureAccount);
+    }
+    int namespaceSize = segments.size();
+    for (String segment : path.split("/")) {
+      if (rawUriPath) {
+        // URL parsing removes percent-encoded dot segments even for object stores. Other remote
+        // path escapes remain literal: Lance's object-store providers use the raw URL path.
+        segment =
+            switch (segment.toLowerCase(Locale.ROOT)) {
+              case "%2e" -> ".";
+              case ".%2e", "%2e.", "%2e%2e" -> "..";
+              default -> segment;
+            };
+      }
+      if (segment.isEmpty() || ".".equals(segment)) {
+        continue;
+      }
+      if ("..".equals(segment)) {
+        if (segments.size() > namespaceSize) {
+          segments.remove(segments.size() - 1);
+        }
+        continue;
+      }
+      segments.add(segment);
+    }
+    return segments;
+  }
+
+  private static String encodeLocationUri(String location) {
+    try {
+      // URI.toASCIIString normalizes Unicode to NFC, whereas Lance preserves path composition.
+      // Encode UTF-8 directly so decomposed names do not become aliases of different S3 keys.
+      ByteBuffer bytes =
+          StandardCharsets.UTF_8.newEncoder().encode(CharBuffer.wrap(location.replace(" ", "%20")));
+      StringBuilder encoded = new StringBuilder();
+      String hex = "0123456789ABCDEF";
+      while (bytes.hasRemaining()) {
+        int value = Byte.toUnsignedInt(bytes.get());
+        if (value < 128) {
+          encoded.append((char) value);
+        } else {
+          encoded.append('%').append(hex.charAt(value >> 4)).append(hex.charAt(value & 15));
+        }
+      }
+      return encoded.toString();
+    } catch (CharacterCodingException invalid) {
+      throw new IllegalArgumentException("Location URI must contain valid UTF-8", invalid);
+    }
+  }
+
+  private static String decodeLocalUriPath(String rawPath) {
+    // URI.getPath silently replaces invalid UTF-8. Lance can fall back to a literal escaped local
+    // filename instead, so reject that ambiguity before I/O rather than comparing a different path.
+    byte[] bytes = new byte[rawPath.length()];
+    int length = 0;
+    for (int i = 0; i < rawPath.length(); i++) {
+      char value = rawPath.charAt(i);
+      if (value == '%') {
+        bytes[length++] = (byte) Integer.parseInt(rawPath.substring(i + 1, i + 3), 16);
+        i += 2;
+      } else {
+        bytes[length++] = (byte) value;
+      }
+    }
+    try {
+      return StandardCharsets.UTF_8
+          .newDecoder()
+          .decode(ByteBuffer.wrap(bytes, 0, length))
+          .toString();
+    } catch (CharacterCodingException invalid) {
+      throw new IllegalArgumentException(
+          "File location URI must contain valid UTF-8 escapes", invalid);
+    }
+  }
+
+  private static boolean isPrefixOrSame(List<String> first, List<String> second) {
+    if (first.get(0).equals("az") && second.get(0).equals("az")) {
+      if (!first.get(1).equals(second.get(1))) {
+        return false;
+      }
+      String firstAccount = first.get(2);
+      String secondAccount = second.get(2);
+      if (!firstAccount.equals(secondAccount)
+          && !firstAccount.equals("*")
+          && !secondAccount.equals("*")) {
+        return false;
+      }
+      first = first.subList(3, first.size());
+      second = second.subList(3, second.size());
+    }
+    int common = Math.min(first.size(), second.size());
+    return first.subList(0, common).equals(second.subList(0, common));
+  }
+
+  private boolean externalDatasetModificationAllowed() {
+    return Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_DATASET_MODIFICATION));
+  }
+
+  private static boolean isAdoptedDataset(Map<String, String> properties) {
+    // Registrations made before the adopted flag existed carry only lance.register.
+    return Boolean.parseBoolean(properties.get(LanceConstants.LANCE_TABLE_DATASET_ADOPTED))
+        || Boolean.parseBoolean(properties.get(LANCE_TABLE_REGISTER))
+        || Boolean.parseBoolean(properties.get(LanceConstants.LANCE_TABLE_DECLARED));
   }
 
   private boolean isDeclaredOnly(Table table) {
@@ -779,6 +1106,11 @@ public class LanceTableOperations extends ManagedTableOperations {
       TableEntity tableEntity, Column[] columns, long datasetVersion) {
     Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
     updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+    if (isDeclaredOnly(tableEntity.properties())) {
+      // Preserve provenance for legacy declarations before clearing their last identifying flag.
+      updatedProperties.put(LanceConstants.LANCE_TABLE_DATASET_ADOPTED, "true");
+      updatedProperties.put(Table.PROPERTY_EXTERNAL, "true");
+    }
     updatedProperties.remove(LanceConstants.LANCE_TABLE_DECLARED);
 
     AuditInfo columnAuditInfo =

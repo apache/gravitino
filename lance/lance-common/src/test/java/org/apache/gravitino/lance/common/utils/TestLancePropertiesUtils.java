@@ -74,6 +74,22 @@ public class TestLancePropertiesUtils {
     Assertions.assertEquals(original, properties);
   }
 
+  @ParameterizedTest
+  @CsvSource({
+    "lance,lance.declared,true",
+    "LANCE,lance.dataset-adopted,true",
+    "delta,lance.declared,false",
+    "delta,lance.dataset-adopted,false"
+  })
+  void testAdoptedDatasetIsExternalRegardlessOfExplicitFlag(
+      String format, String marker, boolean expected) {
+    Map<String, String> properties = Map.of("format", format, marker, "true", "external", "false");
+    Assertions.assertEquals(expected, LancePropertiesUtils.isExternalTable(properties));
+    Map<String, String> normalized = LancePropertiesUtils.normalizeTableProperties(properties);
+    Assertions.assertEquals(Boolean.toString(expected), normalized.get("external"));
+    Assertions.assertEquals("false", properties.get("external"));
+  }
+
   @Test
   public void testGetLanceStorageOptions() {
     Map<String, String> properties =
