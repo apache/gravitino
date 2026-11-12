@@ -479,6 +479,7 @@ public class DomainManager implements DomainDispatcher {
         backingTag.name(),
         name);
     if (createBackingTag) {
+      // Convert only to validate the new tag name before writing the domain or tag.
       NameIdentifierUtil.toMetadataObject(
           NameIdentifierUtil.ofTag(metalake, backingTag.name()), Entity.EntityType.TAG);
     }
