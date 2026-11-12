@@ -39,6 +39,7 @@ export default function PolicyTag({ ...props }) {
   const { token } = theme.useToken()
   const [inputVisible, setInputVisible] = useState(false)
   const [optionList, setOptionList] = useState([])
+  const containerRef = useRef(null)
   const inputRef = useRef(null)
   const router = useRouter()
   const store = useAppSelector(state => state.policies)
@@ -49,27 +50,39 @@ export default function PolicyTag({ ...props }) {
 
   const getPolicies = async () => {
     if (isTag) {
-      const { payload } = await dispatch(getPoliciesForTag({ metalake: currentMetalake, tag: metadataObjectFullName }))
+      const result = await dispatch(getPoliciesForTag({ metalake: currentMetalake, tag: metadataObjectFullName }))
 
-      return payload || []
+      return result.meta.requestStatus === 'fulfilled' ? result.payload || [] : undefined
     }
 
-    const { payload } = await dispatch(
+    const result = await dispatch(
       getCurrentEntityPolicies({ metalake: currentMetalake, metadataObjectType, metadataObjectFullName, details: true })
     )
 
-    return payload?.policies || []
+    return result.meta.requestStatus === 'fulfilled' ? result.payload?.policies || [] : undefined
   }
 
   useEffect(() => {
     const initLoad = async () => {
       const policies = await getPolicies()
-      setPoliciesForObject(policies)
+      if (policies) setPoliciesForObject(policies)
     }
     if (currentMetalake && metadataObjectType && metadataObjectFullName) {
-      initLoad()
+      if (!isTag || typeof IntersectionObserver === 'undefined') {
+        initLoad()
+      } else {
+        const observer = new IntersectionObserver(([entry]) => {
+          if (entry.isIntersecting) {
+            observer.disconnect()
+            initLoad()
+          }
+        })
+        if (containerRef.current) observer.observe(containerRef.current)
+
+        return () => observer.disconnect()
+      }
     }
-  }, [currentMetalake, metadataObjectType, metadataObjectFullName])
+  }, [currentMetalake, metadataObjectType, metadataObjectFullName, isTag])
 
   useEffect(() => {
     if (inputVisible) {
@@ -109,10 +122,13 @@ export default function PolicyTag({ ...props }) {
 
   const handleChange = async value => {
     if (value && !policiesForObject?.map(policy => policy.name)?.includes(value)) {
+      let result
       if (isTag) {
-        await dispatch(addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value }))
+        result = await dispatch(
+          addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value })
+        )
       } else {
-        await dispatch(
+        result = await dispatch(
           associatePolicy({
             metalake: currentMetalake,
             metadataObjectType,
@@ -121,19 +137,22 @@ export default function PolicyTag({ ...props }) {
           })
         )
       }
-      const policies = await getPolicies()
-      setPoliciesForObject(policies)
+      if (result.meta.requestStatus === 'fulfilled') {
+        const policies = await getPolicies()
+        if (policies) setPoliciesForObject(policies)
+      }
     }
     setInputVisible(false)
   }
 
   const handleClose = async removedPolicy => {
+    let result
     if (isTag) {
-      await dispatch(
+      result = await dispatch(
         removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
       )
     } else {
-      await dispatch(
+      result = await dispatch(
         associatePolicy({
           metalake: currentMetalake,
           metadataObjectType,
@@ -142,8 +161,10 @@ export default function PolicyTag({ ...props }) {
         })
       )
     }
-    const policies = await getPolicies()
-    setPoliciesForObject(policies)
+    if (result.meta.requestStatus === 'fulfilled') {
+      const policies = await getPolicies()
+      if (policies) setPoliciesForObject(policies)
+    }
   }
 
   const handleBlur = () => {
@@ -161,7 +182,7 @@ export default function PolicyTag({ ...props }) {
   }
 
   return (
-    <Flex gap='4px 0' wrap>
+    <Flex ref={containerRef} gap='4px 0' wrap>
       {policiesForObject?.map((policy, index) => {
         const isLongPolicy = policy.name.length > 20
         let color = policy.enabled ? token.colorPrimary : token.colorTextDisabled

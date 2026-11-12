@@ -24,7 +24,7 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
 import metalakes from '@/lib/store/metalakes'
-import policies from '@/lib/store/policies'
+import policies, { getPoliciesForTag } from '@/lib/store/policies'
 import PolicyTag from './PolicyTag'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
@@ -35,6 +35,19 @@ vi.mock('next/navigation', () => ({
   useRouter: () => navigation,
   useSearchParams: () => new URLSearchParams({ metalake: 'demo' })
 }))
+
+it('keeps tag selectors nested under their own key', async () => {
+  defHttp.get.mockResolvedValue({
+    associations: [{ policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES', name: 'selector' } }]
+  })
+  const store = configureStore({ reducer: { policies } })
+
+  const result = await store.dispatch(getPoliciesForTag({ metalake: 'demo', tag: 'classification.sensitive' }))
+
+  expect(result.payload).toEqual([
+    { name: 'masking', enabled: true, selector: { type: 'ALL_VALUES', name: 'selector' } }
+  ])
+})
 
 let root
 let container
@@ -165,7 +178,8 @@ it('removes a tag policy when DELETE returns an empty 204 response', async () =>
 })
 
 it('handles a rejected tag policy add request', async () => {
-  defHttp.get.mockResolvedValue({ associations: [] })
+  const association = { policy: { name: 'existing', enabled: true }, selector: { type: 'ALL_VALUES' } }
+  defHttp.get.mockResolvedValue({ associations: [association] })
   defHttp.post.mockRejectedValue(new Error('add failed'))
 
   await renderTagPolicies()
@@ -177,7 +191,8 @@ it('handles a rejected tag policy add request', async () => {
     url: `${tagPoliciesUrl}/masking`,
     data: { selector: { type: 'ALL_VALUES' } }
   })
-  expect(container.textContent).toContain('No Policies')
+  expect(container.textContent).toContain('existing')
+  expect(container.textContent).not.toContain('No Policies')
 })
 
 it('handles a rejected tag policy removal request', async () => {
