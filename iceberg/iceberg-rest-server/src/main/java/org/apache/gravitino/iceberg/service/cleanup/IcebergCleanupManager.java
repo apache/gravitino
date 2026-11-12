@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.iceberg.service.cleanup;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.Iterators;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -54,6 +54,8 @@ import org.apache.iceberg.TableMetadataParser;
 import org.apache.iceberg.exceptions.NotFoundException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.io.FileIO;
+import org.apache.iceberg.io.SupportsBulkOperations;
+import org.apache.iceberg.util.Tasks;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -231,25 +233,25 @@ public class IcebergCleanupManager implements AutoCloseable {
     List<Future<?>> futures = new ArrayList<>();
     Iterators.partition(files.iterator(), deleteBatchSize)
         .forEachRemaining(
-            batch ->
-                futures.add(
-                    deleteExecutor.submit(
-                        () -> CatalogUtil.deleteFiles(io, batch, "cleanup", true))));
+            batch -> futures.add(deleteExecutor.submit(() -> deleteBatch(io, batch))));
 
-    for (Future<?> future : futures) {
-      try {
-        future.get();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        throw new RuntimeException("Interrupted during bulk delete", e);
-      } catch (ExecutionException e) {
-        if (Throwables.getCausalChain(e).stream().anyMatch(NotFoundException.class::isInstance)) {
-          LOG.debug("Ignoring already-deleted file during async cleanup", e);
-          continue;
-        }
-        throw new RuntimeException("Bulk delete batch failed", e);
-      }
-    }
+    // Drain every submitted batch before propagating a failure so runJob cannot close the FileIO
+    // while another batch is still deleting files.
+    Tasks.foreach(futures)
+        .noRetry()
+        .throwFailureWhenFinished()
+        .run(
+            future -> {
+              try {
+                future.get();
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("Interrupted during bulk delete", e);
+              } catch (ExecutionException e) {
+                throw new RuntimeException(
+                    "Failed to delete cleanup files: " + e.getCause().getMessage(), e.getCause());
+              }
+            });
   }
 
   private void workerLoop() {
@@ -356,11 +358,35 @@ public class IcebergCleanupManager implements AutoCloseable {
         } catch (NotFoundException manifestGone) {
           // Manifests are deleted after their data files, so a missing one has no data files left.
           LOG.debug("Manifest {} already gone; skipping", manifest.path());
-        } catch (Exception e) {
+        } catch (IOException e) {
           throw new RuntimeException("Failed to read manifest " + manifest.path(), e);
         }
       }
     }
+  }
+
+  // CatalogUtil.deleteFiles suppresses failures, but async cleanup must retry or fail the job.
+  private static void deleteBatch(FileIO io, List<String> batch) {
+    if (io instanceof SupportsBulkOperations) {
+      try {
+        ((SupportsBulkOperations) io).deleteFiles(batch);
+      } catch (NotFoundException alreadyGone) {
+        LOG.debug("Ignoring already-deleted files during async cleanup", alreadyGone);
+      }
+      return;
+    }
+
+    Tasks.foreach(batch)
+        .noRetry()
+        .throwFailureWhenFinished()
+        .run(
+            file -> {
+              try {
+                io.deleteFile(file);
+              } catch (NotFoundException alreadyGone) {
+                LOG.debug("Ignoring already-deleted file {} during async cleanup", file);
+              }
+            });
   }
 
   private static void awaitTermination(ExecutorService pool) {
