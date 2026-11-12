@@ -22,9 +22,9 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.ALTER_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.DROP_TABLE_AUTHORIZATION_EXPRESSION;
-import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION;
 
@@ -285,7 +285,7 @@ public class LanceTableOperations {
   @Path("/drop_columns")
   @Timed(name = "drop-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-columns", absolute = true)
-  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
+  @AuthorizationExpression(expression = ALTER_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -309,7 +309,7 @@ public class LanceTableOperations {
   @Path("/alter_columns")
   @Timed(name = "alter-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-columns", absolute = true)
-  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
+  @AuthorizationExpression(expression = ALTER_TABLE_AUTHORIZATION_EXPRESSION)
   public Response alterColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,

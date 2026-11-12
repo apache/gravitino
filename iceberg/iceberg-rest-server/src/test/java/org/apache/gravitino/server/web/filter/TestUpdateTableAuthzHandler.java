@@ -47,6 +47,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.rest.IcebergTableOperations;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -105,6 +106,102 @@ class TestUpdateTableAuthzHandler {
     authorizerProvider.close();
     authorizationUtils.close();
     principalUtils.close();
+  }
+
+  @Test
+  void testDataUpdatesRequireWriteTable() throws Throwable {
+    for (Class<? extends MetadataUpdate> type :
+        List.of(
+            MetadataUpdate.AddSnapshot.class, MetadataUpdate.RemoveSnapshots.class,
+            MetadataUpdate.SetSnapshotRef.class, MetadataUpdate.RemoveSnapshotRef.class,
+            MetadataUpdate.SetStatistics.class, MetadataUpdate.RemoveStatistics.class,
+            MetadataUpdate.SetPartitionStatistics.class,
+                MetadataUpdate.RemovePartitionStatistics.class)) {
+      UpdateTableRequest request = updateRequest(mock(type));
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.WRITE_TABLE);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)), type.getSimpleName());
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.ALTER);
+      MethodInvocation denied = updateInvocation(request);
+      assertForbidden(interceptor.invoke(denied));
+      verify(denied, never()).proceed();
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)));
+    }
+  }
+
+  @Test
+  void testMetadataUpdatesRequireAlter() throws Throwable {
+    for (Class<? extends MetadataUpdate> type :
+        List.of(
+            MetadataUpdate.AssignUUID.class,
+            MetadataUpdate.UpgradeFormatVersion.class,
+            MetadataUpdate.AddSchema.class,
+            MetadataUpdate.SetCurrentSchema.class,
+            MetadataUpdate.RemoveSchemas.class,
+            MetadataUpdate.AddPartitionSpec.class,
+            MetadataUpdate.SetDefaultPartitionSpec.class,
+            MetadataUpdate.RemovePartitionSpecs.class,
+            MetadataUpdate.AddSortOrder.class,
+            MetadataUpdate.SetDefaultSortOrder.class,
+            MetadataUpdate.SetProperties.class,
+            MetadataUpdate.RemoveProperties.class,
+            MetadataUpdate.SetLocation.class,
+            MetadataUpdate.AddEncryptionKey.class,
+            MetadataUpdate.RemoveEncryptionKey.class)) {
+      UpdateTableRequest request = updateRequest(mock(type));
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.ALTER);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)), type.getSimpleName());
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.WRITE_TABLE);
+      assertForbidden(interceptor.invoke(updateInvocation(request)));
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)));
+    }
+  }
+
+  @Test
+  void testMixedAndUnknownUpdatesRequireBothPrivileges() throws Throwable {
+    for (UpdateTableRequest request :
+        List.of(
+            updateRequest(
+                mock(MetadataUpdate.AddSchema.class), mock(MetadataUpdate.AddSnapshot.class)),
+            updateRequest(mock(MetadataUpdate.class)))) {
+      for (Privilege.Name privilege : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
+        allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, privilege);
+        assertForbidden(interceptor.invoke(updateInvocation(request)));
+      }
+      allow(
+          Privilege.Name.USE_CATALOG,
+          Privilege.Name.USE_SCHEMA,
+          Privilege.Name.ALTER,
+          Privilege.Name.WRITE_TABLE);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)));
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+      assertEquals(PROCEEDED, interceptor.invoke(updateInvocation(request)));
+    }
+  }
+
+  @Test
+  void testGranularDenialsBlockCommits() throws Throwable {
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.ALTER,
+        Privilege.Name.WRITE_TABLE);
+    for (Privilege.Name denied : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
+      doAnswer(invocation -> invocation.getArgument(3) == denied)
+          .when(authorizer)
+          .deny(any(), any(), any(), any(), any());
+      assertForbidden(
+          interceptor.invoke(
+              updateInvocation(
+                  updateRequest(
+                      mock(MetadataUpdate.AddSchema.class),
+                      mock(MetadataUpdate.AddSnapshot.class)))));
+    }
+  }
+
+  private static UpdateTableRequest updateRequest(MetadataUpdate... updates) {
+    return new UpdateTableRequest(Collections.emptyList(), List.of(updates));
   }
 
   @Test

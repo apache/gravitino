@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -69,7 +69,7 @@ public class IcebergTableRenameOperations {
   @Timed(name = "rename-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "rename-table", absolute = true)
   @AuthorizationExpression(
-      expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
+      expression = ALTER_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.TABLE)
   public Response renameTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,

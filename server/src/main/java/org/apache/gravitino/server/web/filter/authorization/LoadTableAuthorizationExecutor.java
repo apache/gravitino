@@ -20,6 +20,8 @@ import java.lang.reflect.Parameter;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
@@ -28,6 +30,7 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
 import org.apache.gravitino.server.web.filter.RequestValidation;
@@ -36,9 +39,9 @@ import org.apache.gravitino.server.web.filter.RequestValidation;
  * Authorization executor for load table operations.
  *
  * <p>This executor uses secondaryExpression and secondaryExpressionCondition from the annotation to
- * determine authorization: if the condition is met (e.g., client requests MODIFY_TABLE privilege),
- * the secondaryExpression is used for stricter authorization, otherwise the default expression is
- * used (e.g., SELECT_TABLE).
+ * determine authorization. Explicit SELECT_TABLE, ALTER, and WRITE_TABLE requests require the
+ * corresponding effective permissions; MODIFY_TABLE retains its legacy secondary expression.
+ * Multiple requested permissions must all be satisfied.
  *
  * <p><b>Security Limitation:</b> This is a trust-based model. The client declares intended
  * privileges, and the server trusts this declaration without validation. A malicious or modified
@@ -69,11 +72,29 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     }
 
     String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
-    if (containsModifyTablePrivilege(privileges)) {
+    Set<Privilege.Name> required = requiredPrivileges(privileges);
+    if (required.contains(Privilege.Name.MODIFY_TABLE)) {
       this.expression = secondaryExpression;
-      this.authorizationExpressionEvaluator =
-          new AuthorizationExpressionEvaluator(secondaryExpression);
+    } else if (required.contains(Privilege.Name.SELECT_TABLE)) {
+      this.expression = AuthorizationExpressionConstants.READ_TABLE_AUTHORIZATION_EXPRESSION;
     }
+    if (required.contains(Privilege.Name.ALTER)) {
+      this.expression =
+          "("
+              + this.expression
+              + ") && ("
+              + AuthorizationExpressionConstants.ALTER_TABLE_AUTHORIZATION_EXPRESSION
+              + ")";
+    }
+    if (required.contains(Privilege.Name.WRITE_TABLE)) {
+      this.expression =
+          "("
+              + this.expression
+              + ") && ("
+              + AuthorizationExpressionConstants.WRITE_TABLE_AUTHORIZATION_EXPRESSION
+              + ")";
+    }
+    this.authorizationExpressionEvaluator = new AuthorizationExpressionEvaluator(this.expression);
   }
 
   @Override
@@ -101,9 +122,9 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
         && secondaryExpressionCondition == ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES;
   }
 
-  private static boolean containsModifyTablePrivilege(String privileges) {
+  private static Set<Privilege.Name> requiredPrivileges(String privileges) {
     if (StringUtils.isBlank(privileges)) {
-      return false;
+      return Set.of();
     }
 
     return Arrays.stream(privileges.split(","))
@@ -114,7 +135,6 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
                 RequestValidation.parse(
                     () -> Privilege.Name.valueOf(privilege),
                     e -> new BadRequestException(e, "Invalid privilege: %s", privilege)))
-        .toList()
-        .contains(Privilege.Name.MODIFY_TABLE);
+        .collect(Collectors.toSet());
   }
 }

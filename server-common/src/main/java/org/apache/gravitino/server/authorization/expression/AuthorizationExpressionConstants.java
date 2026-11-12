@@ -52,17 +52,25 @@ public class AuthorizationExpressionConstants {
               ANY_USE_CATALOG && ANY_USE_SCHEMA && (MODEL::OWNER || ANY_USE_MODEL)
                   """;
 
-  public static final String LOAD_TABLE_AUTHORIZATION_EXPRESSION =
+  /** Authorizes reading table data; metadata-only privileges do not grant this access. */
+  public static final String READ_TABLE_AUTHORIZATION_EXPRESSION =
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
                   """;
 
+  public static final String LOAD_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE)
+                  """;
+
   public static final String PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
       """
                   ANY_USE_CATALOG && ANY_USE_SCHEMA &&
-                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE ||
                   ANY_CREATE_TABLE || ANY_CREATE_VIEW)
                   """;
 
@@ -70,7 +78,7 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA &&
-                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE ||
                   ANY_CREATE_TABLE || ANY_CREATE_VIEW)
                   """;
 
@@ -79,7 +87,7 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
-                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE || ANY_CREATE_TABLE)
                   """;
 
   /**
@@ -99,7 +107,7 @@ public class AuthorizationExpressionConstants {
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || VIEW::OWNER ||
                   ANY_CREATE_VIEW || ANY_SELECT_VIEW || ANY_SELECT_TABLE ||
-                  ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE || ANY_CREATE_TABLE)
                   """;
 
   /** Authorizes table creation on the containing schema, including staged-create commits. */
@@ -114,6 +122,28 @@ public class AuthorizationExpressionConstants {
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
                   """;
+
+  /** Authorizes table metadata changes while retaining legacy MODIFY_TABLE grants. */
+  public static final String ALTER_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+          ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE || ANY_ALTER)
+          """;
+
+  /** Authorizes table data writes while retaining legacy MODIFY_TABLE grants. */
+  public static final String WRITE_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+          ANY(OWNER, METALAKE, CATALOG) || SCHEMA_OWNER_WITH_USE_CATALOG ||
+          ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE || ANY_WRITE_TABLE)
+          """;
+
+  /** Replacing table metadata can change both schema and data, so both privileges are required. */
+  public static final String REPLACE_TABLE_AUTHORIZATION_EXPRESSION =
+      "("
+          + ALTER_TABLE_AUTHORIZATION_EXPRESSION
+          + ") && ("
+          + WRITE_TABLE_AUTHORIZATION_EXPRESSION
+          + ")";
 
   /**
    * Authorizes removing a table, whether the stored data is deleted with it or only the Gravitino
@@ -181,7 +211,7 @@ public class AuthorizationExpressionConstants {
   public static final String ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION =
       """
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  &&
-                  (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_CREATE_TABLE)
+                  (ANY_CREATE_VIEW || TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE || ANY_CREATE_TABLE)
                   """;
 
   /** Creates a view through the generic or Iceberg REST metadata API. */
@@ -219,7 +249,7 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
                   ANY_SELECT_TABLE ||
-                  ANY_MODIFY_TABLE
+                  ANY_MODIFY_TABLE || ANY_ALTER || ANY_WRITE_TABLE
                   """;
 
   /**
@@ -237,7 +267,9 @@ public class AuthorizationExpressionConstants {
       """
               ANY(OWNER, METALAKE, CATALOG, SCHEMA) ||
               ANY(SELECT_TABLE, METALAKE, CATALOG, SCHEMA) ||
-              ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA)
+              ANY(MODIFY_TABLE, METALAKE, CATALOG, SCHEMA) ||
+              ANY(ALTER, METALAKE, CATALOG, SCHEMA) ||
+              ANY(WRITE_TABLE, METALAKE, CATALOG, SCHEMA)
               """;
 
   /**
@@ -269,6 +301,14 @@ public class AuthorizationExpressionConstants {
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, VIEW) ||
                   ANY_SELECT_VIEW
                   """;
+
+  /** Table-data visibility, excluding metadata-only ALTER and write-only grants. */
+  public static final String FILTER_READ_TABLE_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) || ANY_SELECT_TABLE || ANY_MODIFY_TABLE";
+
+  /** Effective table write permission, used to restrict vended storage credentials. */
+  public static final String FILTER_WRITE_TABLE_AUTHORIZATION_EXPRESSION =
+      "ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) || ANY_MODIFY_TABLE || ANY_WRITE_TABLE";
 
   public static final String FILTER_MODIFY_TABLE_AUTHORIZATION_EXPRESSION =
       """

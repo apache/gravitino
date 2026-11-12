@@ -166,7 +166,7 @@ public class LanceMetadataAuthorizationMethodInterceptor
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
     String overwriteExpression =
         isTableOperation(method)
-            ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
+            ? LanceAuthorizationExpressions.REPLACE_TABLE_AUTHORIZATION_EXPRESSION
             : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
     return createMode(parameters, args)
         .map(

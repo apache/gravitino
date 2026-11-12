@@ -131,6 +131,31 @@ class TestRegisterTableAuthzHandler {
   }
 
   @Test
+  void testGranularOverwriteRequiresAlterAndWrite() throws Throwable {
+    for (Privilege.Name privilege : List.of(Privilege.Name.ALTER, Privilege.Name.WRITE_TABLE)) {
+      allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, privilege);
+      assertForbidden(interceptor.invoke(registerInvocation(true, TABLE, META_LOC)));
+    }
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.ALTER,
+        Privilege.Name.WRITE_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(registerInvocation(true, TABLE, META_LOC)));
+  }
+
+  @Test
+  void testAlterAloneCannotAdoptTrackedSource() throws Throwable {
+    stubCatalogWithSource(TableIdentifier.of("other", "secret"));
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.CREATE_TABLE,
+        Privilege.Name.ALTER);
+    assertForbidden(interceptor.invoke(registerInvocation(false, "copy", META_LOC)));
+  }
+
+  @Test
   void testCreateTableAloneCannotOverwrite() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
 
