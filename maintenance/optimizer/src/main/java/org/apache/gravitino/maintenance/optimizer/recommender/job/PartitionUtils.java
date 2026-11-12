@@ -285,13 +285,15 @@ public class PartitionUtils {
    * Escapes a value for a double-quoted Iceberg Spark literal that is later embedded in {@code CALL
    * ... where => '...'} via {@code IcebergJobUtils.escapeSqlString} (single-quote doubling only).
    *
-   * <p>Spark's outer single-quoted string still unescapes backslashes ({@code \\} → {@code \},
-   * {@code \"} → {@code "}). Emit twice as many backslashes as the inner double-quoted literal
-   * needs so the escapes survive that outer parse.
+   * <p>Even with {@code spark.sql.parser.escapedStringLiterals=false}, Spark still treats {@code
+   * \\} (and {@code \"} when a single backslash remains) inside the outer single-quoted {@code
+   * where} argument. Build the inner double-quoted escapes ({@code \} → {@code \\}, {@code "} →
+   * {@code \"}), then double every backslash so one outer parse leaves those inner escapes intact
+   * (e.g. raw {@code a"b\c} → {@code a\\"b\\\\c} in the where text).
    */
   private static String escapeStringLiteral(String value) {
-    // Inner needs \ → \\ and " → \"; outer then consumes one backslash layer.
-    return value.replace("\\", "\\\\\\\\").replace("\"", "\\\\\\\"");
+    // Inner: \ → \\, " → \"; then double all backslashes for outer CALL where => '...'.
+    return value.replace("\\", "\\\\\\\\").replace("\"", "\\\\\"");
   }
 
   private static String joinFieldName(String[] fieldNameParts) {

@@ -303,7 +303,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
-    Assertions.assertEquals("(region = \"a\\\\\\\"b\\\\\\\\c\")", where);
+    Assertions.assertEquals("(region = \"a\\\\\"b\\\\\\\\c\")", where);
     callRewrite(spark, table, where);
   }
 

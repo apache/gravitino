@@ -86,7 +86,7 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     // Doubled backslashes: survive CALL where => '...' outer unescape, then inner \" / \\.
-    Assertions.assertEquals("colA = \"a\\\\\\\"b\\\\\\\\c\"", where);
+    Assertions.assertEquals("colA = \"a\\\\\"b\\\\\\\\c\"", where);
   }
 
   @Test
@@ -122,7 +122,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\\\\\"x\\\\\\\\y\"", where);
+    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\\\"x\\\\\\\\y\"", where);
   }
 
   @Test

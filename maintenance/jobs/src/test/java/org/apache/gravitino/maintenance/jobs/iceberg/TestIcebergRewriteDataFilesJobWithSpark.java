@@ -90,7 +90,10 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   public static void tearDown() {
     if (spark != null) {
       spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.test_table");
-      spark.sql("DROP NAMESPACE IF EXISTS " + catalogName + ".db");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_sq");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_qb_plain");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_qb_ansi");
+      spark.sql("DROP NAMESPACE IF EXISTS " + catalogName + ".db CASCADE");
       spark.stop();
     }
   }
@@ -486,7 +489,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   public void testPartitionUtilsWhereWithQuoteAndBackslashThroughJobEscapeAndSpark() {
     String partitionValue = "a\"b\\c";
     // PartitionUtils doubles backslash escapes so outer CALL where => '...' leaves \" / \\.
-    String expectedWhere = "(region = \"a\\\\\\\"b\\\\\\\\c\")";
+    String expectedWhere = "(region = \"a\\\\\"b\\\\\\\\c\")";
     for (boolean ansi : new boolean[] {false, true}) {
       spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(ansi));
       String tableSuffix = "pu_qb_" + (ansi ? "ansi" : "plain");
