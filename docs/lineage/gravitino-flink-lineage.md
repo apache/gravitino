@@ -26,7 +26,7 @@ Gravitino offers **two plugin variants** to cover different Flink versions:
   lineage).
 - Supports Gravitino Flink Connector and non-Gravitino Flink catalogs.
 - Supports physical address resolution via DDL connector options and the Gravitino REST API
-  (populates the `symlinks` facet).
+  (populates the `symlinks` facet, Flink2 plugin only).
 - Supports job lifecycle events: START, COMPLETE, FAIL, ABORT.
 - Supports disabling checkpoint tracking to reduce excessive RUNNING events.
 - Supports the standard OpenLineage transports (`kafka`, `http`, `console`) for event delivery,
@@ -36,6 +36,8 @@ Gravitino offers **two plugin variants** to cover different Flink versions:
 
 The Gravitino OpenLineage Flink plugin transforms the Gravitino metalake name into the dataset
 namespace. The dataset name follows the format `${catalogName}.${databaseName}.${tableName}`.
+
+### SQL datasets (Flink2 plugin)
 
 When using the [Gravitino Flink Connector](../flink-connector/flink-connector.md) to access tables
 managed by Gravitino, the dataset name follows this format:
@@ -64,16 +66,35 @@ CREATE TABLE kafka_catalog.`default`.user_events (...)
 
 The lineage output will be `name = "kafka_catalog.default.user_events"` (logical name), not `raw_user_events_v2` (physical topic name).
 
-### Physical address in symlinks
+### DataStream datasets (Flink1 and Flink2 plugins)
 
-Besides the logical Gravitino identifier, the plugin also populates a `symlinks` facet with the
+DataStream connectors report a physical identifier (for example, namespace `kafka://broker1:9092`
+and name `events`) with no Flink catalog context. The plugin converts it as follows:
+
+- The connector type is inferred from the namespace scheme: `kafka://` is `kafka`, `hive://` or
+  `thrift://` is `hive`, `jdbc:` is `jdbc`, `paimon://` is `paimon`, and `iceberg://` is `iceberg`
+  (Flink1 plugin only). Any other scheme is reported as `unknown`.
+- The inferred connector type is used as the catalog name unless it is remapped with
+  `openlineage.gravitino.catalogMappings`. For DataStream datasets, the mapping keys are connector
+  types, for example `kafka:kafka_catalog`.
+- A name of the form `db.table` becomes `${catalogName}.db.table`. A single-segment name (such as a
+  Kafka topic) becomes `${catalogName}.default.${name}`.
+
+For example, with `openlineage.gravitino.catalogMappings: kafka:kafka_catalog`, the Kafka topic
+`events` is reported as `name = "kafka_catalog.default.events"`. Without the mapping it is reported
+as `kafka.default.events`.
+
+### Physical address in symlinks (Flink2 plugin only)
+
+Besides the logical Gravitino identifier, the Flink2 plugin also populates a `symlinks` facet with the
 underlying physical address (Kafka brokers, JDBC URL, Hive metastore URI, warehouse path, etc.).
 This allows downstream consumers to correlate logical Gravitino identifiers with physical cluster
 addresses for quick troubleshooting.
 
 The physical address is resolved with a fixed priority: **table-level** (from the DDL `WITH`
 options, no Gravitino server needed) > **catalog-level** (from the Gravitino REST API, reusing the
-`table.catalog-store.gravitino.*` connector configuration) > empty.
+`table.catalog-store.gravitino.*` connector configuration) > empty. The Flink1 plugin does not
+populate this facet.
 
 ```json
 "symlinks": {
@@ -91,24 +112,31 @@ options, no Gravitino server needed) > **catalog-level** (from the Gravitino RES
 
 | Connector                | Physical namespace            | Physical name | Source            |
 |--------------------------|-------------------------------|---------------|-------------------|
-| `kafka` / `upsert-kafka` | `kafka://<bootstrap.servers>` | topic name    | DDL `WITH` clause |
-| `jdbc`                   | JDBC URL                      | table-name    | DDL `WITH` clause |
+| `kafka` / `upsert-kafka` | `kafka://<first broker in properties.bootstrap.servers>` | topic name    | DDL `WITH` clause |
+| `jdbc`                   | JDBC URL (`url`)              | table-name    | DDL `WITH` clause |
 
 **Catalog-level resolution** (requires Gravitino Server):
 
-| Provider                         | Physical address source | Example                        |
-|----------------------------------|-------------------------|--------------------------------|
-| `hive`                           | `metastore.uris`        | `thrift://metastore:9083`      |
-| `jdbc-mysql` / `jdbc-postgresql` | `jdbc-url`              | `jdbc:mysql://host:3306`       |
-| `lakehouse-paimon`               | `warehouse`             | `file:///tmp/paimon-warehouse` |
-| `lakehouse-iceberg`              | `uri` or `warehouse`    | `thrift://metastore:9083`      |
+| Provider                                                           | Physical address source | Example                        |
+|--------------------------------------------------------------------|-------------------------|--------------------------------|
+| `hive`                                                             | `metastore.uris`        | `thrift://metastore:9083`      |
+| `jdbc-mysql` / `jdbc-postgresql` / `jdbc-doris` / `jdbc-oceanbase` | `jdbc-url`              | `jdbc:mysql://host:3306`       |
+| `lakehouse-paimon`                                                 | `warehouse`             | `file:///tmp/paimon-warehouse` |
+| `lakehouse-iceberg`                                                | `uri` or `warehouse`    | `thrift://metastore:9083`      |
+
+For other providers, the first available property among `uri`, `warehouse`, `metastore.uris`, and
+`jdbc-url` is used.
+
+Catalog-level resolution is enabled only when both `table.catalog-store.gravitino.gravitino.uri`
+and `table.catalog-store.gravitino.gravitino.metalake` are configured.
 
 :::note
 Catalog-level resolution is skipped for Flink's built-in `default_catalog` (it never exists in a
-Gravitino metalake). When the Gravitino server has authentication enabled, the resolver reuses the
-Gravitino Flink Connector client config (`table.catalog-store.gravitino.gravitino.client.auth.type`
-and related keys); with no `auth.type` configured it falls back to simple auth using the current
-Hadoop/JVM user, matching the connector's behavior.
+Gravitino metalake). The resolver reuses the Gravitino Flink Connector client config
+(`table.catalog-store.gravitino.gravitino.client.auth.type` and related keys). It supports `basic`
+authentication, and with any other value (including no `auth.type`) it uses simple auth with the
+current Hadoop/JVM user, matching the connector's behavior. `oauth2` is not supported: catalog-level
+symlinks are not populated in that case, while table-level symlinks and lineage are unaffected.
 :::
 
 ### Connector support matrix
@@ -215,7 +243,13 @@ env.execute("My Flink Job");
 ```yaml
 execution.job-listener.openlineage.namespace: ${metalakeName}
 execution.job-listener.openlineage.job-name: ${jobName}
+
+# Optional: map the inferred connector type to the Gravitino catalog name
+# openlineage.gravitino.catalogMappings: kafka:kafka_catalog,hive:hive_catalog
 ```
+
+If `openlineage.gravitino.metalake` and `table.catalog-store.gravitino.gravitino.metalake` are not
+set, the Flink1 plugin uses `execution.job-listener.openlineage.namespace` as the metalake name.
 
 4. Set `OPENLINEAGE_CONFIG` environment variable pointing to `openlineage.yml` (same format as Flink2).
 
@@ -224,6 +258,11 @@ execution.job-listener.openlineage.job-name: ${jobName}
 - **No SQL lineage**: Only DataStream API jobs produce lineage events.
 - **Requires code change**: Must call `env.registerJobListener(...)`.
 - **No automatic connector detection**: Only connectors with explicit Visitor implementations.
+- **No physical address symlinks**: The `symlinks` facet is not populated with Gravitino-resolved
+  physical addresses.
+- **Connector-type catalog names**: Dataset names are derived from the physical identifier, so the
+  catalog name is the inferred connector type unless remapped with
+  `openlineage.gravitino.catalogMappings`.
 
 ## Configuration Reference
 
@@ -233,9 +272,9 @@ The configurations are grouped by purpose. Unless noted otherwise, they apply to
 
 | Configuration item                             | Description                                                                                                                                                                                                                                                                                                                                                    | Default value | Required | Since Version |
 |------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `openlineage.gravitino.metalake`               | The Gravitino metalake name used as the dataset namespace. If not set, falls back to `table.catalog-store.gravitino.gravitino.metalake`.                                                                                                                                                                                                                       | None          | Yes      | 2.0.0         |
+| `openlineage.gravitino.metalake`               | The Gravitino metalake name used as the dataset namespace. If not set, falls back to `table.catalog-store.gravitino.gravitino.metalake`; the Flink1 plugin then falls back to `execution.job-listener.openlineage.namespace`. If none is set, Gravitino identifier conversion is skipped.                                                                                                                                                                                                                       | None          | Yes, unless a fallback is set | 2.0.0         |
 | `openlineage.gravitino.useGravitinoIdentifier` | Whether to transform the dataset identifier to the Gravitino format. When `false`, the original OpenLineage identifier is used (e.g. `kafka://broker:9092` as the namespace for Kafka tables); note that for the Paimon/Hive/JDBC SQL path the original namespace is empty, since the Flink Planner does not populate physical addresses for these connectors. | `true`        | No       | 2.0.0         |
-| `openlineage.gravitino.catalogMappings`        | Catalog name mapping rules when the Flink catalog registration name differs from the Gravitino catalog name. Format: `origin1:gravitino1,origin2:gravitino2`.                                                                                                                                                                                                  | None          | No       | 2.0.0         |
+| `openlineage.gravitino.catalogMappings`        | Catalog name mapping rules. For SQL datasets (Flink2), the keys are Flink catalog names and are used when the Flink catalog registration name differs from the Gravitino catalog name. For DataStream datasets, the keys are the inferred connector types (such as `kafka`, `hive`, `jdbc`, `paimon`). Format: `origin1:gravitino1,origin2:gravitino2`.                                                                                                                                                                                                  | None          | No       | 2.0.0         |
 
 ### Flink2 plugin configuration
 
@@ -367,7 +406,8 @@ The run ID (`run.runId`) is derived deterministically from the Flink Job ID. Thi
 
 ## Fault Tolerance
 
-Lineage collection is best-effort and is designed to **never break the user's Flink job**:
+Lineage collection is best-effort and is designed to **never break the user's Flink job**. The
+following behaviors apply to the Flink2 plugin only; the Flink1 plugin does not provide them:
 
 - If the listener fails to initialize (for example, an invalid transport configuration), it
   degrades to a no-op listener and the job continues; a `LINEAGE DISABLED` error is logged.
@@ -399,6 +439,7 @@ JobManager) with the `io.openlineage.flink` logger set to `DEBUG`.
   `SIGKILL`, an OOM kill, or a pod eviction), the terminal `COMPLETE`/`FAIL` event may not be
   emitted. Downstream consumers that need to detect such cases can rely on a timeout since the last
   `START` event.
-- **Physical address (symlinks)**: Catalog-level resolution requires `GravitinoCatalogStore`
-  configuration. If the Gravitino server is unreachable or the catalog does not exist, symlinks will
-  be empty but lineage collection continues.
+- **Physical address (symlinks, Flink2 plugin only)**: Catalog-level resolution requires
+  `GravitinoCatalogStore` configuration (`gravitino.uri` and `gravitino.metalake`) and does not
+  support `oauth2` authentication. If the Gravitino server is unreachable or the catalog does not
+  exist, symlinks will be empty but lineage collection continues.
