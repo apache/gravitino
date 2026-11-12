@@ -42,7 +42,9 @@ from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericSemanticModel(SemanticModel, SupportsTags, SupportsDomains, SupportsPolicies):
+class GenericSemanticModel(
+    SemanticModel, SupportsTags, SupportsDomains, SupportsPolicies
+):  # pylint: disable=too-many-instance-attributes
     """An immutable client-side Semantic Model returned by the Gravitino REST API."""
 
     def __init__(

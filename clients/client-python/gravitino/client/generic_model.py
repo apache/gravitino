@@ -48,7 +48,9 @@ from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericModel(Model, SupportsTags, SupportsDomains, SupportsPolicies, SupportsSecrets):
+class GenericModel(
+    Model, SupportsTags, SupportsDomains, SupportsPolicies, SupportsSecrets
+):
     _model_dto: ModelDTO
     """The model DTO object."""
 

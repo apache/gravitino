@@ -125,6 +125,8 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/DomainResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
         "403":
           description: The caller lacks the required domain, object or backing-tag permission.
           content:
@@ -250,6 +252,8 @@ paths:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "#/components/schemas/DomainDropResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
         "403":
           description: The caller lacks the required domain, object or backing-tag permission.
           content:
@@ -428,6 +432,8 @@ paths:
                 oneOf:
                   - $ref: "#/components/schemas/DomainNameListResponse"
                   - $ref: "#/components/schemas/DomainListResponse"
+        "400":
+          $ref: "#/components/responses/BadRequestResponse"
         "403":
           description: The caller lacks the required domain, object or backing-tag permission.
           content:
