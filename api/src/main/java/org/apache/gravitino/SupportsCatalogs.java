@@ -172,10 +172,11 @@ public interface SupportsCatalogs {
    * @param changes the changes to apply to the catalog.
    * @return The altered catalog.
    * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws CatalogAlreadyExistsException If the new name is already used by another catalog.
    * @throws IllegalArgumentException If the changes cannot be applied to the catalog.
    */
   Catalog alterCatalog(String catalogName, CatalogChange... changes)
-      throws NoSuchCatalogException, IllegalArgumentException;
+      throws NoSuchCatalogException, CatalogAlreadyExistsException, IllegalArgumentException;
 
   /**
    * Drop a catalog with specified name. Please make sure:

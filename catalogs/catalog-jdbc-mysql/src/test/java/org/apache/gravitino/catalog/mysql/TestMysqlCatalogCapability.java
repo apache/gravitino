@@ -203,4 +203,34 @@ public class TestMysqlCatalogCapability {
         capability.specificationOnName(Capability.Scope.TABLE, "test_table-with$mixed/chars=ok");
     Assertions.assertTrue(result.supported());
   }
+
+  @Test
+  void testExistingColumnNamesUseSafeNativeReferences() {
+    var capability = new MysqlCatalogCapability();
+    for (String name : new String[] {"native column", "native.column", "col`name", "col\"name"}) {
+      Assertions.assertTrue(
+          capability.specificationOnExistingName(Capability.Scope.COLUMN, name).supported());
+    }
+    for (String invalid : new String[] {"", "bad\0name", "*"}) {
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(Capability.Scope.COLUMN, invalid).supported());
+    }
+  }
+
+  @Test
+  void testExistingQuotedTableNamesDoNotRelaxCreationOrSchemaRules() {
+    var capability = new MysqlCatalogCapability();
+    Assertions.assertTrue(
+        capability.specificationOnExistingName(Capability.Scope.TABLE, "native table").supported());
+    Assertions.assertFalse(
+        capability.specificationOnName(Capability.Scope.TABLE, "native.table").supported());
+    Assertions.assertFalse(
+        capability
+            .specificationOnExistingName(Capability.Scope.SCHEMA, "native schema")
+            .supported());
+    for (String invalid : new String[] {"", "native.table", "bad\0name", "*"}) {
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(Capability.Scope.TABLE, invalid).supported());
+    }
+  }
 }

@@ -83,7 +83,6 @@ export default function AddUserDialog({ ...props }) {
         confirmLoading={confirmLoading}
         onCancel={handleCancel}
       >
-        <Paragraph type='secondary'>Add a user.</Paragraph>
         <Form
           form={form}
           initialValues={defaultValues}

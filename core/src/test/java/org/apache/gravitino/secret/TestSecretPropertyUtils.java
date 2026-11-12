@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.secret;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
+
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
@@ -251,6 +253,36 @@ public class TestSecretPropertyUtils {
       Assertions.assertFalse(
           secrets.containsKey("undeclared-access-key"),
           "undeclared keys still require a sensitive keyword match");
+    }
+  }
+
+  @Test
+  void testBuildSecretsOmitsReservedHiddenProperties() {
+    try (SecretManager sm = memorySecretManager()) {
+      PropertiesMetadata metadata =
+          new PropertiesMetadata() {
+            @Override
+            public Map<String, PropertyEntry<?>> propertyEntries() {
+              return ImmutableMap.of(
+                  ID_KEY,
+                  PropertyEntry.stringReservedPropertyEntry(
+                      ID_KEY, "internal entity identifier", true),
+                  "jdbc-password",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "jdbc-password", "password", false, null, true));
+            }
+          };
+      Map<String, String> entityProps =
+          Map.of(ID_KEY, "gravitino.v1.uid123", "jdbc-password", "s3cr3t");
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps, metadata);
+      Assertions.assertEquals("s3cr3t", secrets.get("jdbc-password"));
+      Assertions.assertFalse(
+          secrets.containsKey(ID_KEY),
+          "reserved+hidden gravitino.identifier must not appear in getSecrets");
+      Assertions.assertFalse(
+          SecretPropertyUtils.shouldRecoverSensitiveNamedSecret(ID_KEY, metadata));
+      Assertions.assertTrue(
+          SecretPropertyUtils.shouldRecoverSensitiveNamedSecret("jdbc-password", metadata));
     }
   }
 

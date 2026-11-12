@@ -20,8 +20,10 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
@@ -45,8 +47,17 @@ import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelPreEv
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourcePreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricInfosPreEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelPreEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
@@ -57,6 +68,8 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -81,6 +94,24 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
+  public NameIdentifier[] listSemanticModelDatasets(
+      NameIdentifier source, Entity.EntityType sourceType) {
+    String user = PrincipalUtils.getCurrentUserName();
+    MetadataObject.Type type = MetadataObject.Type.valueOf(sourceType.name());
+    eventBus.dispatchEvent(new ListSemanticModelDatasetsBySourcePreEvent(user, source, type));
+    try {
+      NameIdentifier[] datasets = dispatcher.listSemanticModelDatasets(source, sourceType);
+      eventBus.dispatchEvent(
+          new ListSemanticModelDatasetsBySourceEvent(user, source, type, datasets.length));
+      return datasets;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListSemanticModelDatasetsBySourceFailureEvent(user, source, type, e));
+      throw e;
+    }
+  }
+
+  @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
     String user = PrincipalUtils.getCurrentUserName();
     eventBus.dispatchEvent(new ListSemanticModelPreEvent(user, namespace));
@@ -92,6 +123,37 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       return identifiers;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListSemanticModelFailureEvent(user, namespace, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListSemanticModelMetricPreEvent(user, namespace));
+    try {
+      NameIdentifier[] metrics = dispatcher.listMetrics(namespace);
+      eventBus.dispatchEvent(
+          new ListSemanticModelMetricEvent(user, namespace, metrics != null ? metrics.length : -1));
+      return metrics;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListSemanticModelMetricFailureEvent(user, namespace, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
+    String user = PrincipalUtils.getCurrentUserName();
+    eventBus.dispatchEvent(new ListSemanticModelMetricInfosPreEvent(user, namespace));
+    try {
+      SemanticModelMetric[] metrics = dispatcher.listMetricInfos(namespace);
+      eventBus.dispatchEvent(
+          new ListSemanticModelMetricInfosEvent(
+              user, namespace, metrics != null ? metrics.length : -1));
+      return metrics;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListSemanticModelMetricInfosFailureEvent(user, namespace, e));
       throw e;
     }
   }
@@ -121,7 +183,8 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     String user = PrincipalUtils.getCurrentUserName();
@@ -130,7 +193,7 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
     eventBus.dispatchEvent(new CreateSemanticModelPreEvent(user, ident, createRequest));
     try {
       SemanticModel semanticModel =
-          dispatcher.createSemanticModel(ident, comment, definition, properties);
+          dispatcher.createSemanticModel(ident, comment, definition, properties, sourceUpdate);
       eventBus.dispatchEvent(
           new CreateSemanticModelEvent(user, ident, new SemanticModelInfo(semanticModel)));
       return semanticModel;
@@ -144,7 +207,7 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   public SemanticModel importOssieDocument(
       Namespace namespace,
       OssieDocument document,
-      Consumer<SemanticModelDefinition> sourceValidator) {
+      Function<SemanticModelDefinition, SemanticModelSourceUpdate> sourceValidator) {
     String user = PrincipalUtils.getCurrentUserName();
     OssieFormat format = document == null ? null : document.format();
     try {
@@ -169,7 +232,8 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
     throw new UnsupportedOperationException(
         "Parsed imports are internal; use importOssieDocument with a source validator");
   }
@@ -189,13 +253,14 @@ public class SemanticModelEventDispatcher implements SemanticModelDispatcher {
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     String user = PrincipalUtils.getCurrentUserName();
     eventBus.dispatchEvent(new AlterSemanticModelPreEvent(user, ident, changes));
     try {
-      SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, changes);
+      SemanticModel semanticModel = dispatcher.alterSemanticModel(ident, sourceUpdate, changes);
       eventBus.dispatchEvent(
           new AlterSemanticModelEvent(user, ident, changes, new SemanticModelInfo(semanticModel)));
       return semanticModel;

@@ -88,6 +88,7 @@ class DTOConverters {
         .withComment(metalake.comment())
         .withProperties(metalake.properties())
         .withAudit((AuditDTO) metalake.auditInfo())
+        .withOwner(metalake.owner())
         .withRestClient(client)
         .build();
   }
@@ -286,6 +287,9 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.UpdateFilesetComment) {
       return new FilesetUpdateRequest.UpdateFilesetCommentRequest(
           ((FilesetChange.UpdateFilesetComment) change).getNewComment());
+    } else if (change instanceof FilesetChange.UpdateFilesetType) {
+      return new FilesetUpdateRequest.UpdateFilesetTypeRequest(
+          ((FilesetChange.UpdateFilesetType) change).getNewType());
     } else if (change instanceof FilesetChange.RemoveComment) {
       return new FilesetUpdateRequest.RemoveFilesetCommentRequest();
     } else if (change instanceof FilesetChange.SetProperty) {
