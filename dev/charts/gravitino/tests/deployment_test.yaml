@@ -278,6 +278,64 @@ tests:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
           pattern: "psql -h gravitino-postgresql"
 
+  - it: uses postgresql.auth.existingSecret for init when Bitnami chart is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        auth:
+          existingSecret: gravitino-pg-credentials
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-pg-credentials
+                key: password
+          any: true
+
+  - it: derives GRAVITINO_DB from entity.jdbcUrl for external PostgreSQL
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          host: pg.example.ci.local
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: GRAVITINO_DB
+            value: gravitino_meta
+          any: true
+
+  - it: fails when external PostgreSQL entity.jdbcUrl has no database path
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          host: pg.example.ci.local
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/
+    asserts:
+      - failedTemplate:
+          errorMessage: "could not parse database name from entity.jdbcUrl for init-postgresql; use jdbc:postgresql://<host>:<port>/<database>"
+
   - it: renders custom PostgreSQL init secret and host when postgresql.init is set
     template: deployment.yaml
     release:

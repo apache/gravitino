@@ -149,10 +149,30 @@ Secret name for init-postgresql POSTGRES_PASSWORD secretKeyRef.
 {{- define "gravitino.postgresqlInitSecretName" -}}
 {{- if .Values.postgresql.init.existingSecret -}}
 {{- .Values.postgresql.init.existingSecret -}}
+{{- else if and .Values.postgresql.enabled .Values.postgresql.auth.existingSecret -}}
+{{- .Values.postgresql.auth.existingSecret -}}
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" .Release.Name -}}
 {{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
 {{- fail "postgresql.init.existingSecret is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Database name segment from entity.jdbcUrl (postgresql JDBC URLs only).
+*/}}
+{{- define "gravitino.entityJdbcDatabaseFromUrl" -}}
+{{- $url := .Values.entity.jdbcUrl | default "" -}}
+{{- if hasPrefix "jdbc:postgresql://" $url -}}
+{{- $path := trimPrefix "jdbc:postgresql://" $url -}}
+{{- $parts := splitList "/" $path -}}
+{{- if ge (len $parts) 2 -}}
+{{- $dbPart := index $parts 1 -}}
+{{- $db := splitList "?" $dbPart | first -}}
+{{- if $db -}}
+{{- $db -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 
@@ -171,5 +191,14 @@ Application user for init-postgresql POSTGRES_USER.
 Database name for init-postgresql GRAVITINO_DB.
 */}}
 {{- define "gravitino.postgresqlInitDatabase" -}}
+{{- if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
+{{- $fromUrl := include "gravitino.entityJdbcDatabaseFromUrl" . | trim -}}
+{{- if $fromUrl -}}
+{{- $fromUrl -}}
+{{- else -}}
+{{- fail "could not parse database name from entity.jdbcUrl for init-postgresql; use jdbc:postgresql://<host>:<port>/<database>" -}}
+{{- end -}}
+{{- else -}}
 {{- .Values.postgresql.auth.database | default "gravitino" -}}
+{{- end -}}
 {{- end -}}
