@@ -265,6 +265,110 @@ tests:
             name: GRAVITINO_DB
             value: gravitino
           any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-postgresql
+                key: password
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "psql -h gravitino-postgresql"
+
+  - it: renders custom PostgreSQL init secret and host when postgresql.init is set
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        init:
+          host: gravitino-cnpg-rw
+          existingSecret: gravitino-cnpg-secret
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-cnpg-secret
+                key: password
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "psql -h gravitino-cnpg-rw"
+
+  - it: renders init-postgresql for external PostgreSQL entity store
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          host: gravitino-cnpg-rw.gravitino.svc
+          existingSecret: gravitino-cnpg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://gravitino-cnpg-rw.gravitino.svc:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+        jdbcPassword: ignored-in-configmap
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_USER
+            value: gravitino_app
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-cnpg-secret
+                key: password
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "psql -h gravitino-cnpg-rw.gravitino.svc"
+
+  - it: fails when external PostgreSQL entity store lacks postgresql.init.host
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://gravitino-cnpg-rw:5432/gravitino
+    asserts:
+      - failedTemplate:
+          errorMessage: "postgresql.init.host is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)"
+
+  - it: fails when external PostgreSQL entity store lacks postgresql.init.existingSecret
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          host: gravitino-cnpg-rw
+      entity:
+        jdbcUrl: jdbc:postgresql://gravitino-cnpg-rw:5432/gravitino
+    asserts:
+      - failedTemplate:
+          errorMessage: "postgresql.init.existingSecret is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)"
 
   - it: renders topologySpreadConstraints when set
     template: deployment.yaml
