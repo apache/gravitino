@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -315,6 +316,15 @@ class TestDomainMembershipResolver {
       assertEquals(0, resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter).length);
       assertEquals(0, listDomains(METALAKE, childTable, new DomainEntity[] {finance}).length);
     }
+  }
+
+  @Test
+  void testUnknownScopesReturnEmptyWithoutEnumeratingMembers() {
+    DomainEntity finance = domain(1, "Finance", null, 10L, "finance");
+    DomainMemberFilter filter =
+        DomainMemberFilter.builder().withDomains("unknown", "Secret").build();
+    assertEquals(0, resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter).length);
+    verifyNoInteractions(relations);
   }
 
   @Test

@@ -84,6 +84,7 @@ import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateValidationDispatcher;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
+import org.apache.gravitino.listener.DomainEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
@@ -1212,8 +1213,9 @@ public class GravitinoEnv {
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(internalPolicyDispatcher);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
 
-    // Domain audit events are added separately from lifecycle hooks.
-    this.domainDispatcher = new DomainHookDispatcher(internalDomainDispatcher);
+    // Keep events outside lifecycle hooks so hook failures are audited as well.
+    this.domainDispatcher =
+        new DomainEventDispatcher(eventBus, new DomainHookDispatcher(internalDomainDispatcher));
   }
 
   private static final class MetadataOperations {
