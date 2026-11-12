@@ -46,6 +46,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -64,6 +65,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -94,6 +96,9 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.TagHookDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -105,6 +110,7 @@ import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -718,6 +724,45 @@ public class TestTagManager {
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
   }
 
+  /** Invalid create/rename requests must never leave a persisted dotted name. */
+  @Test
+  public void testRejectDottedNameBeforeWrite() throws IOException {
+    TagDispatcher dispatcher =
+        new TagEventDispatcher(new EventBus(List.of()), new TagHookDispatcher(tagManager));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.createTag(METALAKE, "invalid.tag", null, Map.of()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));
+    Tag original = tagManager.createTag(METALAKE, "valid_tag", null, Map.of());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.alterTag(METALAKE, original.name(), TagChange.rename("invalid.tag")));
+    Assertions.assertEquals(original, tagManager.getTag(METALAKE, original.name()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));
+  }
+
+  /** A legacy dotted tag remains readable and removable through the manager. */
+  @Test
+  public void testLegacyDottedTagRecovery() throws IOException {
+    TagEntity legacy =
+        TagEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("legacy.tag")
+            .withNamespace(NameIdentifierUtil.ofTag(METALAKE, "legacy.tag").namespace())
+            .withProperties(Map.of())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(legacy, false);
+    Assertions.assertEquals(legacy.name(), tagManager.getTag(METALAKE, legacy.name()).name());
+    Assertions.assertTrue(Arrays.asList(tagManager.listTags(METALAKE)).contains(legacy.name()));
+    Assertions.assertTrue(tagManager.deleteTag(METALAKE, legacy.name()));
+  }
+
   @Test
   public void testAlterTag() {
     String tagComment = "tag comment";
@@ -869,6 +914,20 @@ public class TestTagManager {
             NoSuchMetalakeException.class,
             () -> tagManager.deleteTag("non_existent_metalake", "tag1"));
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
+  }
+
+  /** Tag/policy objects cannot reach metadata tag-association writes through the manager. */
+  @Test
+  public void testTagAndPolicyAssociationTargetsAreRejected() {
+    for (MetadataObject.Type type :
+        new MetadataObject.Type[] {MetadataObject.Type.TAG, MetadataObject.Type.POLICY}) {
+      MetadataObject object = MetadataObjects.of(null, "legacy.with.dot", type);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, object, new String[] {"tag"}, new String[0]));
+    }
   }
 
   @Test

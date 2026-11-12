@@ -143,6 +143,8 @@ public class PolicyManager implements PolicyDispatcher {
       boolean enabled,
       PolicyContent content)
       throws PolicyAlreadyExistsException {
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
     NameIdentifier metalakeIdent = NameIdentifierUtil.ofMetalake(metalake);
     checkMetalake(metalakeIdent, entityStore);
     return TreeLockUtils.doWithTreeLock(
@@ -515,6 +517,8 @@ public class PolicyManager implements PolicyDispatcher {
     for (PolicyChange change : changes) {
       if (change instanceof PolicyChange.RenamePolicy) {
         newName = ((PolicyChange.RenamePolicy) change).getNewName();
+        NameIdentifierUtil.checkMetadataObjectName(
+            NameIdentifier.of(policyEntity.namespace(), newName), Entity.EntityType.POLICY);
       } else if (change instanceof PolicyChange.UpdatePolicyComment) {
         newComment = ((PolicyChange.UpdatePolicyComment) change).getNewComment();
       } else if (change instanceof PolicyChange.UpdateContent) {

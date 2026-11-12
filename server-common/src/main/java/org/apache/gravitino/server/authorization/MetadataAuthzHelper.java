@@ -358,7 +358,11 @@ public class MetadataAuthzHelper {
     if (!enableAuthorization() || nameIdentifiers.length == 0) {
       return entities;
     }
-    if (isMetadataObject) {
+    // Preserve legacy tag/policy names for normal authorization and cleanup. These are
+    // single-level metadata objects; their full names are never split into parent scopes.
+    if (isMetadataObject
+        && entityType != Entity.EntityType.TAG
+        && entityType != Entity.EntityType.POLICY) {
       Arrays.stream(nameIdentifiers)
           .forEach(
               identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));

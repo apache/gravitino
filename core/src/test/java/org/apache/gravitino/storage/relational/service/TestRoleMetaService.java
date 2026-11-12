@@ -52,8 +52,10 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -65,6 +67,7 @@ import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.CollectionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -558,6 +561,31 @@ class TestRoleMetaService extends TestJDBCBackend {
         roleMetaService.listRolesByMetadataObject(catalog.nameIdentifier(), catalog.type(), true);
     roleEntities.sort(Comparator.comparing(RoleEntity::name));
     assertEquals(Lists.newArrayList(role1, role2), roleEntities);
+  }
+
+  /** Reading roles for existing dotted names does not invoke strict write-name conversion. */
+  @TestTemplate
+  void testListRolesForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    for (boolean allFields : new boolean[] {false, true}) {
+      assertTrue(
+          RoleMetaService.getInstance()
+              .listRolesByMetadataObject(tag.nameIdentifier(), Entity.EntityType.TAG, allFields)
+              .isEmpty());
+      assertTrue(
+          RoleMetaService.getInstance()
+              .listRolesByMetadataObject(
+                  policy.nameIdentifier(), Entity.EntityType.POLICY, allFields)
+              .isEmpty());
+    }
   }
 
   @TestTemplate

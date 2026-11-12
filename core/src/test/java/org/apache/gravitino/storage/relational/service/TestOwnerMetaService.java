@@ -42,15 +42,18 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
@@ -64,6 +67,52 @@ class TestOwnerMetaService extends TestJDBCBackend {
   private static final String TABLE_NAME = "table_for_owner_test";
   private static final String FILESET_NAME = "fileset_for_owner_test";
   private static final String TOPIC_NAME = "topic_for_owner_test";
+
+  /** Existing dotted tag/policy names support owner lookup and single/batch owner changes. */
+  @TestTemplate
+  void testOwnersForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "legacy_owner",
+            AUDIT_INFO);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
+            "legacy_group",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    backend.insert(group, false);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    OwnerMetaService service = OwnerMetaService.getInstance();
+    Map<NameIdentifier, Entity.EntityType> objects =
+        Map.of(
+            tag.nameIdentifier(), Entity.EntityType.TAG,
+            policy.nameIdentifier(), Entity.EntityType.POLICY);
+    for (Map.Entry<NameIdentifier, Entity.EntityType> object : objects.entrySet()) {
+      service.setOwner(object.getKey(), object.getValue(), user.nameIdentifier(), user.type());
+      UserEntity loadedUser =
+          (UserEntity) service.getOwner(object.getKey(), object.getValue()).orElseThrow();
+      Assertions.assertEquals(user.id(), loadedUser.id());
+      service.batchSetOwners(
+          List.of(object.getKey()), object.getValue(), group.nameIdentifier(), group.type());
+      GroupEntity loadedGroup =
+          (GroupEntity) service.getOwner(object.getKey(), object.getValue()).orElseThrow();
+      Assertions.assertEquals(group.id(), loadedGroup.id());
+      Assertions.assertEquals(
+          1, service.batchGetOwner(List.of(object.getKey()), object.getValue()).size());
+    }
+  }
 
   @TestTemplate
   void testDifferentOwners() throws IOException {

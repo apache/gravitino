@@ -146,6 +146,38 @@ public class TestMetadataAuthzHelper {
         exception.getMessage());
   }
 
+  /** Dotted legacy names cannot poison the list or bypass its ordinary authorization. */
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"TAG", "POLICY"})
+  public void testFilterLegacyDottedTagAndPolicyNames(Entity.EntityType type) {
+    NameIdentifier[] identifiers = {
+      type == Entity.EntityType.TAG
+          ? NameIdentifierUtil.ofTag("testMetalake", "valid")
+          : NameIdentifierUtil.ofPolicy("testMetalake", "valid"),
+      type == Entity.EntityType.TAG
+          ? NameIdentifierUtil.ofTag("testMetalake", "legacy.with.dot")
+          : NameIdentifierUtil.ofPolicy("testMetalake", "legacy.with.dot")
+    };
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    withAuthorizer(
+        authorizer,
+        () -> {
+          Assertions.assertArrayEquals(
+              identifiers,
+              MetadataAuthzHelper.filterByExpression(
+                  "testMetalake", "ANY(OWNER, METALAKE)", type, identifiers));
+          when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(false);
+          Assertions.assertEquals(
+              0,
+              MetadataAuthzHelper.filterByExpression(
+                      "testMetalake", "ANY(OWNER, METALAKE)", type, identifiers)
+                  .length);
+        });
+  }
+
   @Test
   public void testFilterPreservesDottedExternalObjectNameWithoutAuthorization() {
     Config config = gravitinoEnv.config();

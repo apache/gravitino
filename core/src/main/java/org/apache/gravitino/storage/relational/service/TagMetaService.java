@@ -202,7 +202,8 @@ public class TagMetaService {
   public List<TagEntity> listTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchTagException, IOException {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
 
     List<TagPO> tagPOs = null;
@@ -231,7 +232,8 @@ public class TagMetaService {
   public TagEntity getTagForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
       throws NoSuchEntityException, IOException {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
 
     TagPO tagPO = null;

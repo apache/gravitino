@@ -32,6 +32,7 @@ import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.File;
@@ -44,12 +45,15 @@ import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestSqlSession {
@@ -143,6 +147,29 @@ public class TestSqlSession {
     SqlSessions.closeSqlSession();
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  /** An unsuccessful fresh-read acquisition cannot release the caller's existing session. */
+  @Test
+  public void testFreshReadAcquisitionFailurePreservesOuterSession() {
+    SqlSession outer = SqlSessions.getSqlSession();
+    ThreadLocal<SqlSession> context = SqlSessions.getSessions();
+    IllegalStateException failure = new IllegalStateException("session acquisition failed");
+    try (MockedStatic<SqlSessions> sessions = Mockito.mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::getSqlSession).thenThrow(failure);
+      sessions.when(SqlSessions::closeSqlSession).thenCallRealMethod();
+      sessions.when(SqlSessions::getSessionCount).thenCallRealMethod();
+      assertSame(
+          failure,
+          assertThrows(
+              IllegalStateException.class,
+              () -> SessionUtils.getWithoutCommitFresh(CatalogMetaMapper.class, mapper -> null)));
+      assertSame(outer, context.get());
+      assertEquals(1, SqlSessions.getSessionCount());
+      sessions.verify(SqlSessions::closeSqlSession, Mockito.never());
+    } finally {
+      SqlSessions.rollbackAndCloseSqlSession();
+    }
   }
 
   @Test

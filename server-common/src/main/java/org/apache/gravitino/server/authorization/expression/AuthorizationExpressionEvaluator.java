@@ -146,7 +146,7 @@ public class AuthorizationExpressionEvaluator {
         (type, entityNameIdent) -> {
           if (isMetadataType(type)) {
             MetadataObject metadataObject =
-                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+                NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
             ognlContext.put(type.name(), metadataObject);
           }
           ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);

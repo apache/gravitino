@@ -46,6 +46,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -67,6 +68,37 @@ public class TestTagMetaService extends TestJDBCBackend {
   private static final String METALAKE_NAME = "metalake_for_tag_test";
 
   private final Map<String, String> props = ImmutableMap.of("k1", "v1");
+
+  /**
+   * Legacy dotted object names remain readable by relation queries.
+   *
+   * @throws IOException if the test entities cannot be stored
+   */
+  @TestTemplate
+  public void testReadTagsForLegacyDottedNames() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("legacy.tag", "", METALAKE_NAME);
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "legacy.policy",
+            AUDIT_INFO);
+    backend.insert(policy, false);
+    TagMetaService service = TagMetaService.getInstance();
+    Map<NameIdentifier, Entity.EntityType> objects =
+        Map.of(
+            tag.nameIdentifier(), Entity.EntityType.TAG,
+            policy.nameIdentifier(), Entity.EntityType.POLICY);
+    for (Map.Entry<NameIdentifier, Entity.EntityType> object : objects.entrySet()) {
+      assertTrue(service.listTagsForMetadataObject(object.getKey(), object.getValue()).isEmpty());
+      Assertions.assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              service.getTagForMetadataObject(
+                  object.getKey(), object.getValue(), tag.nameIdentifier()));
+    }
+  }
 
   @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
