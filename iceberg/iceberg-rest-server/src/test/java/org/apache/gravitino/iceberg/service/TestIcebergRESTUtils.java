@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +40,7 @@ import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerConte
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
@@ -54,6 +56,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -61,6 +64,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 @SuppressWarnings("deprecation")
@@ -497,5 +502,67 @@ public class TestIcebergRESTUtils {
 
     RESTRequest valid = () -> {};
     Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.validateRequest(valid, "X"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "boolean",
+        "float",
+        "double",
+        "date",
+        "time",
+        "timestamp",
+        "timestamptz",
+        "uuid",
+        "fixed[16]",
+        "timestamp_ns",
+        "timestamptz_ns"
+      })
+  void testValidateRequestRejectsInvalidTruncate(String type) throws IOException {
+    for (boolean nested : new boolean[] {false, true}) {
+      for (boolean sort : new boolean[] {false, true}) {
+        CreateTableRequest request = truncateRequest(type, nested, sort);
+        BadRequestException error =
+            Assertions.assertThrows(
+                BadRequestException.class,
+                () -> IcebergRESTUtils.validateRequest(request, "CreateTableRequest"));
+        Assertions.assertTrue(error.getMessage().contains("Invalid CreateTableRequest"));
+        Assertions.assertTrue(error.getMessage().contains("Cannot truncate type: " + type));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"int", "long", "decimal(9, 2)", "string", "binary"})
+  void testValidateRequestAcceptsValidTruncate(String type) throws IOException {
+    for (boolean nested : new boolean[] {false, true}) {
+      for (boolean sort : new boolean[] {false, true}) {
+        CreateTableRequest request = truncateRequest(type, nested, sort);
+        Assertions.assertDoesNotThrow(
+            () -> IcebergRESTUtils.validateRequest(request, "CreateTableRequest"));
+      }
+    }
+  }
+
+  private static CreateTableRequest truncateRequest(String type, boolean nested, boolean sort)
+      throws IOException {
+    NestedField field = NestedField.optional(1, "c", Types.fromPrimitiveString(type));
+    Schema schema =
+        nested
+            ? new Schema(NestedField.optional(2, "parent", Types.StructType.of(field)))
+            : new Schema(field);
+    String definition =
+        sort
+            ? "\"write-order\": {\"order-id\": 1, \"fields\": [{\"source-id\": 1,"
+                + " \"transform\": \"truncate[4]\", \"direction\": \"asc\","
+                + " \"null-order\": \"nulls-first\"}]}"
+            : "\"partition-spec\": {\"spec-id\": 0, \"fields\": [{\"source-id\": 1,"
+                + " \"field-id\": 1000, \"name\": \"p\", \"transform\": \"truncate[4]\"}]}";
+    return IcebergObjectMapper.getInstance()
+        .readValue(
+            String.format(
+                "{\"name\": \"t\", \"schema\": %s, %s}", SchemaParser.toJson(schema), definition),
+            CreateTableRequest.class);
   }
 }
