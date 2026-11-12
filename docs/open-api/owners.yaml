@@ -102,8 +102,8 @@ components:
         type:
           type: string
           enum:
-            - USER
-            - GROUP
+            - user
+            - group
           description: The type of the owner
 
     OwnerSetRequest:
@@ -118,8 +118,8 @@ components:
         type:
           type: string
           enum:
-            - USER
-            - GROUP
+            - user
+            - group
           description: The type of the owner
 
   responses:
@@ -139,7 +139,7 @@ components:
     OwnerSetRequest:
       value: {
         "name": "user1",
-        "type": "USER"
+        "type": "user"
       }
 
     OwnerResponse:
@@ -147,7 +147,7 @@ components:
         "code": 0,
         "owner": {
           "name": "user1",
-          "type": "USER",
+          "type": "user",
         }
       }
 

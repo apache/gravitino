@@ -41,6 +41,13 @@ public class JdbcPropertiesConstants {
   public static final String FLINK_JDBC_TABLE_DATABASE_URL = "url";
   public static final String FLINK_JDBC_TABLE_NAME = "table-name";
 
+  /**
+   * Internal Flink catalog option holding the database that JDBC connections target, when it
+   * differs from the Flink {@code default-database}. It is not a Flink JDBC catalog option, so it
+   * is removed before the inner Flink JDBC catalog is created.
+   */
+  public static final String GRAVITINO_CONNECTION_DATABASE = "gravitino.connection-database";
+
   public static Map<String, String> flinkToGravitinoMap = new HashMap<>();
   public static Map<String, String> gravitinoToFlinkMap = new HashMap<>();
 

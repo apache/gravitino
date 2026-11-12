@@ -641,6 +641,9 @@ public class NameIdentifierUtil {
    * Convert the given {@link NameIdentifier} and {@link Entity.EntityType} to {@link
    * MetadataObject}.
    *
+   * <p>All object types reject dots in their names. Use {@link #toMetadataObjectForRead} when
+   * addressing an existing tag or policy with a legacy dotted name.
+   *
    * @param ident The identifier
    * @param entityType The entity type
    * @return The converted {@link MetadataObject}
@@ -732,6 +735,34 @@ public class NameIdentifierUtil {
       default:
         throw new IllegalArgumentException(
             "Entity type " + entityType + " is not supported to convert to MetadataObject");
+    }
+  }
+
+  /**
+   * Converts an existing identifier for reads, authorization, and cleanup.
+   *
+   * <p>Only tag and policy names accept legacy dots: these are single-level metadata objects with
+   * no parent scope. Namespace checks still apply, and all other types use strict conversion. New
+   * names and rename targets must use {@link #toMetadataObject} instead.
+   *
+   * @param ident the existing metadata object's identifier
+   * @param entityType the entity type
+   * @return the converted metadata object
+   * @throws IllegalArgumentException if the identifier or type is invalid
+   */
+  public static MetadataObject toMetadataObjectForRead(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Preconditions.checkArgument(
+        ident != null && entityType != null, "The identifier and entity type must not be null");
+    switch (entityType) {
+      case TAG:
+        checkTag(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.TAG);
+      case POLICY:
+        checkPolicy(ident);
+        return MetadataObjects.of(null, ident.name(), MetadataObject.Type.POLICY);
+      default:
+        return toMetadataObject(ident, entityType);
     }
   }
 

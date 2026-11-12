@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.net.URLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -197,12 +198,19 @@ public final class HiveClientClassLoader extends URLClassLoader {
   private Class<?> loadBarrierClass(String name) throws ClassNotFoundException {
     LOG.debug("Classloader {} loading barrier class {}", getName(), name);
     String classFileName = name.replace(".", "/") + ".class";
-    try (InputStream is = baseClassLoader.getResourceAsStream(classFileName)) {
-      if (is == null) {
-        throw new ClassNotFoundException("Cannot load barrier class: " + name);
+    URL resource = baseClassLoader.getResource(classFileName);
+    if (resource == null) {
+      throw new ClassNotFoundException("Cannot load barrier class: " + name);
+    }
+    try {
+      URLConnection connection = resource.openConnection();
+      // Another catalog loader can close the same cached JarFile during catalog replacement.
+      // Keep this read independent, and release its JAR handle when the stream closes.
+      connection.setUseCaches(false);
+      try (InputStream is = connection.getInputStream()) {
+        byte[] bytes = is.readAllBytes();
+        return defineClass(name, bytes, 0, bytes.length);
       }
-      byte[] bytes = is.readAllBytes();
-      return defineClass(name, bytes, 0, bytes.length);
     } catch (IOException e) {
       throw new ClassNotFoundException("Failed to load barrier class: " + name, e);
     }

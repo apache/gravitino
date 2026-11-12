@@ -111,7 +111,7 @@ public class TestLancePropertiesUtils {
   }
 
   @Test
-  public void testResolveLanceStorageOptionsPrefersTableProperties() {
+  public void testResolveLanceStorageOptionsKeepsCatalogValues() {
     Map<String, String> catalogProperties =
         ImmutableMap.of(
             "lance.storage.endpoint", "http://catalog:9000",
@@ -125,7 +125,8 @@ public class TestLancePropertiesUtils {
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, tableProperties);
 
     Assertions.assertEquals(3, storageOptions.size());
-    Assertions.assertEquals("http://table:9000", storageOptions.get("endpoint"));
+    // The table cannot redirect the catalog credentials to another endpoint.
+    Assertions.assertEquals("http://catalog:9000", storageOptions.get("endpoint"));
     Assertions.assertEquals("us-east-1", storageOptions.get("region"));
     Assertions.assertEquals("table-ak", storageOptions.get("access_key_id"));
     Assertions.assertEquals(

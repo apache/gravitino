@@ -1202,8 +1202,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           + locationName);
                 }
               } catch (IOException e) {
-                throw ExceptionMessages.wrap(
-                    "Failed to check if fileset catalog location exists: " + v, e);
+                // REST responses can include the cause chain. Keep backend diagnostics in the log.
+                LOG.warn(
+                    "Failed to check {} for Fileset catalog {}.{}",
+                    k,
+                    catalogInfo.namespace(),
+                    catalogInfo.name(),
+                    e);
+                throw new ConnectionFailedException(
+                    "Failed to check Fileset catalog storage at %s (%s)", k, failureCategory(e));
               }
             }
 
@@ -1471,7 +1478,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             return getFileSystem(path, conf);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+                e, "Failed to get FileSystem for fileset: path: %s", path);
           }
         });
   }

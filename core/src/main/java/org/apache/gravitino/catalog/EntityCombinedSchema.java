@@ -85,6 +85,10 @@ public final class EntityCombinedSchema implements Schema {
     return this;
   }
 
+  MaskAndOmitKeys hiddenProperties() {
+    return MaskAndOmitKeys.of(keysToMask, keysToOmit);
+  }
+
   @Override
   public String name() {
     return schema.name();

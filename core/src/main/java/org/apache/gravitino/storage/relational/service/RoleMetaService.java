@@ -127,16 +127,19 @@ public class RoleMetaService {
       NameIdentifier metadataObjectIdent, Entity.EntityType metadataObjectType, boolean allFields) {
     String metalake = NameIdentifierUtil.getMetalake(metadataObjectIdent);
     MetadataObject metadataObject =
-        NameIdentifierUtil.toMetadataObject(metadataObjectIdent, metadataObjectType);
+        NameIdentifierUtil.toMetadataObjectForRead(metadataObjectIdent, metadataObjectType);
     long metadataObjectId = EntityIdService.getEntityId(metadataObjectIdent, metadataObjectType);
     List<RolePO> rolePOs =
-        SessionUtils.getWithoutCommit(
-            RoleMetaMapper.class,
-            mapper ->
-                allFields
-                    ? mapper.listRolesWithPrivilegesByMetadataObjectIdAndType(
-                        metadataObjectId, metadataObject.type().name())
-                    : mapper.listRolesByMetadataObjectIdAndType(
+        allFields
+            ? SessionUtils.getWithoutCommitFresh(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesWithPrivilegesByMetadataObjectIdAndType(
+                        metadataObjectId, metadataObject.type().name()))
+            : SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper ->
+                    mapper.listRolesByMetadataObjectIdAndType(
                         metadataObjectId, metadataObject.type().name()));
     return rolePOs.stream()
         .map(
@@ -549,12 +552,13 @@ public class RoleMetaService {
   private static RolePO getRolePOByMetalakeIdAndName(
       Long metalakeId, String roleName, boolean withPrivileges) {
     RolePO rolePO =
-        SessionUtils.getWithoutCommit(
-            RoleMetaMapper.class,
-            mapper ->
-                withPrivileges
-                    ? mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName)
-                    : mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
+        withPrivileges
+            ? SessionUtils.getWithoutCommitFresh(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleWithPrivilegesByMetalakeIdAndName(metalakeId, roleName))
+            : SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleMetaByMetalakeIdAndName(metalakeId, roleName));
 
     if (rolePO == null) {
       throw new NoSuchEntityException(
