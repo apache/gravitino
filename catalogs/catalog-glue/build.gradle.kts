@@ -24,10 +24,15 @@ plugins {
   id("idea")
 }
 
-// Keeps the Jackson line brought in by Iceberg on its latest patch release. The BOM sits in a
-// dedicated configuration so that it only applies to this module and is not exported to the
-// modules that depend on it.
+// Keeps the Jackson line brought in by Iceberg on its latest patch release and the Netty artifacts
+// brought in by the AWS SDK on the single version of the catalog. The BOMs sit in dedicated
+// configurations so that they only apply to this module and are not exported to the modules that
+// depend on it.
 val jacksonBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+val nettyBom: Configuration by configurations.creating {
   isCanBeConsumed = false
   isCanBeResolved = false
 }
@@ -37,15 +42,20 @@ listOf(
   "testCompileClasspath",
   "testRuntimeClasspath"
 ).forEach {
-  configurations.named(it) { extendsFrom(jacksonBom) }
+  configurations.named(it) { extendsFrom(jacksonBom, nettyBom) }
 }
 dependencies {
   jacksonBom(platform(libs.jackson.bom.v221))
+  nettyBom(platform(libs.netty.bom))
   compileOnly(project(":api"))
   compileOnly(project(":common"))
   compileOnly(project(":core"))
 
   compileOnly(libs.aws.dynamodb)
+  // GlueCatalog implements Configurable<Configuration>, which subclasses need only to compile.
+  compileOnly(libs.hadoop3.common) {
+    exclude("*")
+  }
   compileOnly(libs.lombok)
 
   implementation(project(":catalogs:catalog-common")) {
@@ -70,6 +80,9 @@ dependencies {
   testImplementation(project(":common"))
   testImplementation(project(":core"))
 
+  testImplementation(libs.hadoop3.common) {
+    exclude("*")
+  }
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.mockito.core)
   testImplementation(libs.slf4j.api)

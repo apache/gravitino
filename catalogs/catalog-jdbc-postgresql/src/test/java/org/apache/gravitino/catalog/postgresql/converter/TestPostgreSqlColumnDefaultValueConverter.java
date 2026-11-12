@@ -18,8 +18,13 @@
  */
 package org.apache.gravitino.catalog.postgresql.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
+
 import com.google.common.io.BaseEncoding;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -45,6 +50,108 @@ public class TestPostgreSqlColumnDefaultValueConverter {
   }
 
   @Test
+  void testUnprefixedBinaryDefaultKeepsProviderInterpretation() {
+    // Shared DTO decoder must not reject unprefixed binary strings; PostgreSQL quotes them.
+    LiteralDTO dto =
+        LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("AB").build();
+    Assertions.assertEquals("'AB'", converter.fromGravitino(DTOConverters.fromFunctionArg(dto)));
+  }
+
+  @Test
+  void testNullDefaultsAllowNativeCastsWithoutSwallowingExpressions() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("uuid");
+    for (String sql :
+        new String[] {"NULL", "NULL::uuid", "NULL::integer[]", "NULL::\"schema\".\"domain\""}) {
+      Assertions.assertEquals(Literals.NULL, converter.toGravitino(type, sql, false, true));
+    }
+    String expression = "NULL::uuid IS NULL";
+    Assertions.assertEquals(
+        UnparsedExpression.of(expression), converter.toGravitino(type, expression, false, true));
+  }
+
+  @Test
+  void testBackslashNormalizationDoesNotRewriteExpressions() {
+    String literal = "'a\\\\b'::text";
+    Assertions.assertEquals(
+        "E" + literal, PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(literal));
+    for (String expression :
+        new String[] {
+          null,
+          "'plain'::text",
+          "E'a\\\\b'::text",
+          "upper('a\\\\b'::text)",
+          "'a\\\\b'::text || 'tail'::text"
+        }) {
+      Assertions.assertEquals(
+          expression,
+          PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(expression));
+    }
+  }
+
+  @Test
+  void testExpressionsAreNotMistakenForLiterals() {
+    JdbcTypeConverter.JdbcTypeBean text = new JdbcTypeConverter.JdbcTypeBean("text");
+    for (String sql :
+        new String[] {
+          "upper('x'::text)", "concat('a'::text, 'b'::text)", "'a'::text || 'b'::text",
+          "md5(random()::text)", "('x'::text)::character varying(1)", "NULL::text || 'x'::text"
+        }) {
+      Assertions.assertEquals(
+          UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
+    }
+    String condition = "(random() > 0.5)";
+    Assertions.assertEquals(
+        UnparsedExpression.of(condition),
+        converter.toGravitino(new JdbcTypeConverter.JdbcTypeBean("bool"), condition, false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("NULL::text"),
+        converter.toGravitino(text, "'NULL::text'::text", false, true));
+    Assertions.assertEquals(Literals.NULL, converter.toGravitino(text, "NULL::text", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("plain"), converter.toGravitino(text, "'plain'", false, true));
+  }
+
+  @Test
+  void testStringColumnConstantsAndFunctionsKeepTheirMeaning() {
+    JdbcTypeConverter.JdbcTypeBean varchar = new JdbcTypeConverter.JdbcTypeBean("varchar");
+    varchar.setColumnSize(20);
+    JdbcTypeConverter.JdbcTypeBean text = new JdbcTypeConverter.JdbcTypeBean("text");
+    // PostgreSQL shows `varchar(20) DEFAULT (10)` as 10; the stored value is the text '10'.
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "10"), converter.toGravitino(varchar, "10", false, true));
+    Assertions.assertEquals(
+        Literals.stringLiteral("1.50"), converter.toGravitino(text, "1.50", false, true));
+    // PostgreSQL shows `text DEFAULT true` as true; the stored value is the text 'true'.
+    Assertions.assertEquals(
+        Literals.stringLiteral("true"), converter.toGravitino(text, "true", false, true));
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "false"), converter.toGravitino(varchar, "false", false, true));
+    // Forms that PostgreSQL never shows this way, or whose stored text could differ, are not
+    // guessed.
+    for (String sql : new String[] {"1e3", ".5", "10 + 1", "TRUE", "TRUE AND false"}) {
+      Assertions.assertEquals(
+          UnparsedExpression.of(sql), converter.toGravitino(text, sql, false, true), sql);
+    }
+    Assertions.assertEquals(
+        UnparsedExpression.of("CURRENT_DATE"),
+        converter.toGravitino(varchar, "CURRENT_DATE", false, true));
+    Assertions.assertEquals(
+        DEFAULT_VALUE_OF_CURRENT_TIMESTAMP,
+        converter.toGravitino(varchar, "CURRENT_TIMESTAMP", false, true));
+    Assertions.assertEquals(
+        Literals.varcharLiteral(20, "CURRENT_TIMESTAMP"),
+        converter.toGravitino(varchar, "'CURRENT_TIMESTAMP'::character varying", false, true));
+  }
+
+  @Test
+  void testOtherEscapeStringSyntaxIsPreservedAsExpression() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("text");
+    String sql = "E'line\\n'::text";
+    Assertions.assertEquals(
+        UnparsedExpression.of(sql), converter.toGravitino(type, sql, false, true));
+  }
+
+  @Test
   void testNulStringDefaultIsRejectedBeforeDdl() {
     IllegalArgumentException error =
         Assertions.assertThrows(
@@ -53,7 +160,7 @@ public class TestPostgreSqlColumnDefaultValueConverter {
     Assertions.assertTrue(error.getMessage().contains("default"));
     Assertions.assertTrue(error.getMessage().contains("U+0000"));
     Assertions.assertEquals(
-        "'before\\u0000after'",
+        "E'before\\\\u0000after'",
         converter.fromGravitino(Literals.stringLiteral("before\\u0000after")));
     Assertions.assertEquals("NULL", converter.fromGravitino(Literals.NULL));
   }
@@ -72,7 +179,7 @@ public class TestPostgreSqlColumnDefaultValueConverter {
   @Test
   public void testStringLiteralDoublesQuotesOnly() {
     Assertions.assertEquals(
-        "'O''Brien \\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
+        "E'O''Brien \\\\path'", converter.fromGravitino(Literals.stringLiteral("O'Brien \\path")));
   }
 
   @Test

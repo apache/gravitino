@@ -32,6 +32,7 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
@@ -47,6 +48,9 @@ from gravitino.client.metadata_object_role_operations import (
 )
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
+)
+from gravitino.client.metadata_object_semantic_model_operations import (
+    MetadataObjectSemanticModelOperations,
 )
 from gravitino.client.metadata_object_statistics_operations import (
     MetadataObjectStatisticsOperations,
@@ -89,6 +93,9 @@ class RelationalTable(
         table_object = MetadataObjects.parse(
             RelationalTable.table_full_name(namespace, table_dto.name()),
             MetadataObject.Type.TABLE,
+        )
+        self._object_semantic_model_operations = MetadataObjectSemanticModelOperations(
+            namespace.level(0), table_object, rest_client
         )
         self._object_tag_operations = MetadataObjectTagOperations(
             namespace.level(0), table_object, rest_client
@@ -296,6 +303,9 @@ class RelationalTable(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_semantic_models(self) -> SupportsSemanticModels:
+        return self._object_semantic_model_operations
 
     def supports_tags(self) -> SupportsTags:
         return self

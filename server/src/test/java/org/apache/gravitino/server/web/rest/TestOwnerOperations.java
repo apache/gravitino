@@ -125,6 +125,32 @@ class TestOwnerOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Hides internal tags from owner reads and writes. */
+  @Test
+  void testInternalTagOwnershipIsHidden() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    String path = "/metalakes/metalake1/owners/tag/GRAVITINO_HIDDEN_123";
+    try (Response get =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .get();
+        Response set =
+            target(path)
+                .request(MediaType.APPLICATION_JSON_TYPE)
+                .accept("application/vnd.gravitino.v1+json")
+                .put(Entity.json(new OwnerSetRequest("user", Owner.Type.USER)))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), get.getStatus());
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), set.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
   @Test
   void testGetOwnerForObject() throws IOException {
     Owner owner =

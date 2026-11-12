@@ -53,9 +53,10 @@ public interface Statistic extends Auditable {
 
   /**
    * The statistic is predefined by Gravitino if the value is true. The statistic is defined by
-   * users if the value is false. For example, the statistic "row_count" is a reserved statistic, A
-   * custom statistic name must start with "custom." prefix to avoid name conflict with reserved
-   * statistics. Because Gravitino may add more reserved statistics in the future.
+   * users if the value is false. For example, the statistic "row_count" is a reserved statistic. A
+   * custom statistic name must start with {@link #CUSTOM_PREFIX} to avoid conflicts with statistics
+   * that Gravitino may reserve in the future. Statistic names must not exceed {@link
+   * #MAX_NAME_LENGTH} characters, including the prefix.
    *
    * @return The type of the statistic.
    */

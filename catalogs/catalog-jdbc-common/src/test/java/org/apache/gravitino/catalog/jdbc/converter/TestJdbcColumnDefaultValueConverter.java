@@ -23,8 +23,12 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import com.google.common.io.BaseEncoding;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import org.apache.gravitino.dto.rel.expressions.LiteralDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.rel.expressions.FunctionExpression;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.Assertions;
@@ -94,6 +98,22 @@ public class TestJdbcColumnDefaultValueConverter {
         "X'00ff'", converter.fromGravitino(Literals.of("0x00FF", Types.BinaryType.get())));
   }
 
+  @Test
+  void testSharedDtoBinaryDecodeStillRendersJdbcSql() {
+    // Shared DTOConverters decodes 0x-prefixed binary for every catalog (#14609 / Iceberg load).
+    // JDBC must still emit dialect binary SQL for that path, and keep unprefixed strings as
+    // provider-specific quoted literals (e.g. PostgreSQL DEFAULT 'AB').
+    Expression fromHex =
+        DTOConverters.fromFunctionArg(
+            LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("0x4142").build());
+    Assertions.assertEquals("X'4142'", converter.fromGravitino(fromHex));
+
+    Expression fromUnprefixed =
+        DTOConverters.fromFunctionArg(
+            LiteralDTO.builder().withDataType(Types.BinaryType.get()).withValue("AB").build());
+    Assertions.assertEquals("'AB'", converter.fromGravitino(fromUnprefixed));
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"0x0", "0xzz", "0x41'); DROP TABLE t; --"})
   void testMalformedBinaryDefaultsAreRejected(String value) {
@@ -105,6 +125,75 @@ public class TestJdbcColumnDefaultValueConverter {
         "Invalid binary column default value: use 0x followed by hexadecimal byte pairs",
         exception.getMessage());
     Assertions.assertNotNull(exception.getCause());
+  }
+
+  @Test
+  void testFunctionArgumentsAreRenderedAsSqlLiterals() {
+    Assertions.assertEquals(
+        "(abs(-3))",
+        converter.fromGravitino(FunctionExpression.of("abs", Literals.integerLiteral(-3))));
+    Assertions.assertEquals(
+        "(pg_catalog.abs(-3))",
+        converter.fromGravitino(
+            FunctionExpression.of("pg_catalog.abs", Literals.integerLiteral(-3))));
+    Assertions.assertEquals(
+        "(coalesce(NULL, 'O''Brien'))",
+        converter.fromGravitino(
+            FunctionExpression.of("coalesce", Literals.NULL, Literals.stringLiteral("O'Brien"))));
+    Assertions.assertEquals(
+        "(date_trunc('day', (now())))",
+        converter.fromGravitino(
+            FunctionExpression.of(
+                "date_trunc", Literals.stringLiteral("day"), FunctionExpression.of("now"))));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "abs(1)); CREATE TABLE injected_marker(id int); --",
+        "abs, extra int",
+        "abs/*comment*/",
+        "abs--comment",
+        "abs()",
+        "",
+        "pg_catalog..abs"
+      })
+  void testFunctionNameMustBeAnIdentifier(String name) {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> converter.fromGravitino(FunctionExpression.of(name)));
+  }
+
+  @Test
+  void testDeeplyQualifiedFunctionNameIsRejected() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("schema.".repeat(10000) + "abs")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> converter.fromGravitino(FunctionExpression.of(null)));
+  }
+
+  @Test
+  void testFunctionArgumentsMustBeRenderableValues() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            converter.fromGravitino(
+                FunctionExpression.of(
+                    "abs", UnparsedExpression.of("1); CREATE TABLE injected_marker(id int); --"))));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", DEFAULT_VALUE_NOT_SET)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", new Expression[] {null})));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> converter.fromGravitino(FunctionExpression.of("abs", (Expression[]) null)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            converter.fromGravitino(
+                FunctionExpression.of("CURRENT_TIMESTAMP", Literals.integerLiteral(1))));
   }
 
   @Test

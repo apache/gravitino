@@ -85,6 +85,24 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
   }
 
   @Test
+  public void testToJdbcCatalogPropertiesWithBypassBaseUrl() {
+    String bypassBaseUrl = "jdbc:mysql://127.0.0.1:13306/";
+    Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+    catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", bypassBaseUrl);
+    Map<String, String> properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+
+    // jdbc-url is not parsed for the base-url when flink.bypass.base-url is set.
+    catalogPropertiesWithBypassUrl.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, "jdbc:invalid");
+    properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+  }
+
+  @Test
   public void testToJdbcCatalogPropertiesUsingDomainUrl() {
     Map<String, String> catalogPropertiesWithDomainUrl = new HashMap<>(catalogProperties);
     catalogPropertiesWithDomainUrl.put(
@@ -172,11 +190,13 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
 
   @Test
   public void testInjectedTableOptionsDoNotBecomeGravitinoTableProperties() {
-    JdbcPropertiesConverter converter = getConverter(catalogProperties);
+    Map<String, String> catalogPropertiesWithDatabase = new HashMap<>(catalogProperties);
+    catalogPropertiesWithDatabase.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "db");
+    JdbcPropertiesConverter converter = getConverter(catalogPropertiesWithDatabase);
     Map<String, String> flinkTableOptions =
         new HashMap<>(
             converter.toFlinkTableProperties(
-                converter.toFlinkCatalogProperties(catalogProperties),
+                converter.toFlinkCatalogProperties(catalogPropertiesWithDatabase),
                 ImmutableMap.of(),
                 new ObjectPath("db", "source_table")));
     // CREATE TABLE ... LIKE copies the scan options alongside the user's own options.

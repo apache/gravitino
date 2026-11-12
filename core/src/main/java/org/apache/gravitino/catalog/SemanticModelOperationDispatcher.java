@@ -23,17 +23,28 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION;
 
 import com.google.common.base.Preconditions;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.meta.SemanticModelDatasetListing;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieDocumentConverter;
@@ -43,7 +54,10 @@ import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelPropertiesMetadata;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Dispatches always-managed Semantic Model operations to Gravitino's EntityStore. */
 public class SemanticModelOperationDispatcher extends OperationDispatcher
@@ -82,6 +96,48 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
+  public NameIdentifier[] listSemanticModelDatasets(
+      NameIdentifier source, Entity.EntityType sourceType) {
+    Preconditions.checkArgument(
+        sourceType == Entity.EntityType.TABLE || sourceType == Entity.EntityType.VIEW,
+        "Source must be a table or View");
+    MetadataObjectUtil.checkMetadataObject(
+        source.namespace().level(0), NameIdentifierUtil.toMetadataObject(source, sourceType));
+    try {
+      List<SemanticModelDatasetListing> models =
+          store
+              .relationOperations()
+              .listEntitiesByRelation(
+                  RelationQuery.of(
+                      SupportsRelationOperations.Type.SEMANTIC_MODEL_SOURCE_REL,
+                      source,
+                      sourceType,
+                      false,
+                      null));
+      return models.stream()
+          .flatMap(
+              model ->
+                  model.datasets().stream()
+                      .map(
+                          dataset ->
+                              NameIdentifier.of(
+                                  Namespace.of(
+                                      ArrayUtils.add(model.namespace().levels(), model.name())),
+                                  dataset)))
+          .distinct()
+          .sorted(
+              Comparator.comparing(
+                      (NameIdentifier ident) -> ident.namespace().levels(), Arrays::compare)
+                  .thenComparing(NameIdentifier::name))
+          .toArray(NameIdentifier[]::new);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchMetadataObjectException(e, "Source %s does not exist", source);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list Semantic Model datasets for source " + source, e);
+    }
+  }
+
+  @Override
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
     checkRelationalCatalog(namespace);
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
@@ -117,7 +173,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(properties != null, "Properties must not be null");
@@ -130,7 +187,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     schemaDispatcher.loadSchema(schemaIdent);
-    return managedOperations.createSemanticModel(ident, comment, definition, effectiveProperties);
+    return managedOperations.createSemanticModel(
+        ident, comment, definition, effectiveProperties, sourceUpdate);
   }
 
   @Override
@@ -138,8 +196,9 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties) {
-    return createSemanticModel(ident, comment, definition, properties);
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate) {
+    return createSemanticModel(ident, comment, definition, properties, sourceUpdate);
   }
 
   /** {@inheritDoc} */
@@ -149,7 +208,8 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   }
 
   @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     if (changes == null || changes.length == 0) {
@@ -161,7 +221,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-    return managedOperations.alterSemanticModel(ident, changes);
+    return managedOperations.alterSemanticModel(ident, sourceUpdate, changes);
   }
 
   @Override
