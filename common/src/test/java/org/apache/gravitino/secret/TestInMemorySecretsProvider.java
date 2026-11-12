@@ -88,4 +88,24 @@ public class TestInMemorySecretsProvider {
     provider.close();
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
   }
+
+  @Test
+  public void testWriteSecretVersionKeepsCurrentUntilPromote() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String oldVersion = provider.currentSecretVersion(urn);
+
+    SecretVersion pending = provider.writeSecretVersion("new", writeAttributes());
+    Assertions.assertEquals(urn, pending.urn());
+    Assertions.assertEquals("old", provider.readSecret(urn));
+    Assertions.assertEquals(oldVersion, provider.currentSecretVersion(urn));
+
+    provider.promoteSecretVersion(urn, pending.version());
+    Assertions.assertEquals("new", provider.readSecret(urn));
+
+    provider.deleteSecretVersion(urn, oldVersion);
+    Assertions.assertEquals("new", provider.readSecret(urn));
+    provider.close();
+  }
 }

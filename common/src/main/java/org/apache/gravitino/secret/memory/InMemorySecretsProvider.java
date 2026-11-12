@@ -22,24 +22,26 @@ package org.apache.gravitino.secret.memory;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.SecretVersion;
 
 /**
  * In-memory secret provider for development and unit tests only.
  *
  * <p>Secrets are stored in process memory only and are lost on restart. Values are Base64-encoded
- * for opaque storage, which is <strong>not</strong> encryption. {@link #close()} clears map
- * references but does not securely zero heap contents ({@link String} is not wipeable); that is
- * acceptable only because this backend is test-oriented. Production providers should store wipeable
- * {@code byte[]}/{@code char[]} and explicitly zero them on delete/close. Do not use this provider
- * in production.
+ * for opaque storage, which is <strong>not</strong> encryption. Each URN keeps multiple versions;
+ * {@link #readSecret} returns the current version. {@link #close()} clears map references but does
+ * not securely zero heap contents ({@link String} is not wipeable); that is acceptable only because
+ * this backend is test-oriented. Production providers should store wipeable {@code byte[]}/{@code
+ * char[]} and explicitly zero them on delete/close. Do not use this provider in production.
  */
 public class InMemorySecretsProvider implements SecretProvider {
 
-  private final ConcurrentHashMap<String, String> secrets = new ConcurrentHashMap<>();
+  private final ConcurrentHashMap<String, VersionedSecret> secrets = new ConcurrentHashMap<>();
   private String providerName;
 
   @Override
@@ -57,18 +59,74 @@ public class InMemorySecretsProvider implements SecretProvider {
 
   @Override
   public SecretUrn writeSecret(String plaintext, Map<String, String> attributes) {
+    SecretVersion written = writeSecretVersion(plaintext, attributes);
+    promoteSecretVersion(written.urn(), written.version());
+    return written.urn();
+  }
+
+  @Override
+  public SecretVersion writeSecretVersion(String plaintext, Map<String, String> attributes) {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
+    }
+    if (attributes == null) {
+      throw new IllegalArgumentException("attributes must not be null");
     }
     if (providerName == null) {
       throw new IllegalStateException("InMemorySecretsProvider is not initialized");
     }
 
     SecretUrn urn = SecretUrn.buildWriteThrough(providerName, attributes);
-    secrets.put(
+    String version = UUID.randomUUID().toString();
+    String encoded = Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8));
+    secrets.compute(
         urn.toString(),
-        Base64.getEncoder().encodeToString(plaintext.getBytes(StandardCharsets.UTF_8)));
-    return urn;
+        (key, existing) -> {
+          VersionedSecret entry = existing == null ? new VersionedSecret() : existing;
+          entry.versions.put(version, encoded);
+          if (entry.currentVersion == null) {
+            entry.currentVersion = version;
+          }
+          return entry;
+        });
+    return new SecretVersion(urn, version);
+  }
+
+  @Override
+  public void promoteSecretVersion(SecretUrn urn, String version) {
+    requireUrnAndVersion(urn, version);
+    VersionedSecret entry = secrets.get(urn.toString());
+    if (entry == null || !entry.versions.containsKey(version)) {
+      throw new IllegalArgumentException(
+          "Secret version not found for URN: " + urn + ", version: " + version);
+    }
+    entry.currentVersion = version;
+  }
+
+  @Override
+  public void deleteSecretVersion(SecretUrn urn, String version) {
+    requireUrnAndVersion(urn, version);
+    secrets.computeIfPresent(
+        urn.toString(),
+        (key, entry) -> {
+          entry.versions.remove(version);
+          if (version.equals(entry.currentVersion)) {
+            entry.currentVersion = null;
+          }
+          return entry.versions.isEmpty() ? null : entry;
+        });
+  }
+
+  @Override
+  public String currentSecretVersion(SecretUrn urn) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    VersionedSecret entry = secrets.get(urn.toString());
+    if (entry == null || entry.currentVersion == null) {
+      throw new IllegalArgumentException("Secret not found for URN: " + urn);
+    }
+    return entry.currentVersion;
   }
 
   @Override
@@ -76,7 +134,11 @@ public class InMemorySecretsProvider implements SecretProvider {
     if (urn == null) {
       throw new IllegalArgumentException("urn must not be null");
     }
-    String encoded = secrets.get(urn.toString());
+    VersionedSecret entry = secrets.get(urn.toString());
+    if (entry == null || entry.currentVersion == null) {
+      throw new IllegalArgumentException("Secret not found for URN: " + urn);
+    }
+    String encoded = entry.versions.get(entry.currentVersion);
     if (encoded == null) {
       throw new IllegalArgumentException("Secret not found for URN: " + urn);
     }
@@ -94,5 +156,19 @@ public class InMemorySecretsProvider implements SecretProvider {
   @Override
   public void close() {
     secrets.clear();
+  }
+
+  private static void requireUrnAndVersion(SecretUrn urn, String version) {
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
+    if (StringUtils.isBlank(version)) {
+      throw new IllegalArgumentException("version must not be blank");
+    }
+  }
+
+  private static final class VersionedSecret {
+    private final ConcurrentHashMap<String, String> versions = new ConcurrentHashMap<>();
+    private volatile String currentVersion;
   }
 }

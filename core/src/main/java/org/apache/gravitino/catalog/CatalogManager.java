@@ -1347,10 +1347,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         },
                         IllegalArgumentException.class);
 
-                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                Pair<CatalogChange[], SecretMaterialsHolder> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
+                writtenSecretMaterials.copyFrom(secretResult.getRight());
                 return updateEntity(
                         newCatalogBuilder(ident.namespace(), existing),
                         new HashMap<>(currentProperties),
@@ -1358,12 +1358,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build();
               });
       alterCommitted = true;
+      writtenSecretMaterials.commit(secretManager);
       return updatedCatalog;
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        writtenSecretMaterials.rollback(secretManager);
       }
     }
   }

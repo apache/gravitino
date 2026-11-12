@@ -33,7 +33,8 @@ import org.apache.gravitino.file.FilesetChange;
 /**
  * Rewrites entity alter changes that involve secrets into plain setProperty / removeProperty.
  *
- * <p>Rolls back any written materials if preparation fails.
+ * <p>Rolls back any written materials if preparation fails. Replaced secrets are deleted only after
+ * the caller commits the entity update.
  */
 public final class SecretAlterChanges {
 
@@ -46,9 +47,9 @@ public final class SecretAlterChanges {
    * @param currentProperties current catalog properties (may be null)
    * @param entityId catalog entity id
    * @param changes catalog changes
-   * @return effective changes and written write-through materials
+   * @return effective changes and a holder with written / pending / replaced secrets
    */
-  public static Pair<CatalogChange[], List<SecretMaterial>> prepareCatalogChanges(
+  public static Pair<CatalogChange[], SecretMaterialsHolder> prepareCatalogChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
       long entityId,
@@ -57,36 +58,57 @@ public final class SecretAlterChanges {
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<CatalogChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
+    List<SecretVersion> pendingVersions = new ArrayList<>();
+    List<SecretVersion> replacedVersions = new ArrayList<>();
+    List<SecretUrn> replacedUrns = new ArrayList<>();
     try {
       for (CatalogChange change : changes) {
         if (change instanceof CatalogChange.SetSecretBinding) {
           CatalogChange.SetSecretBinding c = (CatalogChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  properties, "catalog", entityId, c.getProperty(), c.getBinding(), written);
+                  properties,
+                  "catalog",
+                  entityId,
+                  c.getProperty(),
+                  c.getBinding(),
+                  written,
+                  pendingVersions,
+                  replacedVersions,
+                  replacedUrns);
           out.add(CatalogChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof CatalogChange.SetSecretReference) {
           CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  properties, "catalog", entityId, c.getProperty(), c.getReference());
+                  properties, "catalog", entityId, c.getProperty(), c.getReference(), replacedUrns);
           out.add(CatalogChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof CatalogChange.SetProperty) {
           CatalogChange.SetProperty c = (CatalogChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "catalog", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "catalog",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  pendingVersions,
+                  replacedVersions);
           out.add(CatalogChange.setProperty(c.getProperty(), value));
         } else if (change instanceof CatalogChange.RemoveProperty) {
           CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "catalog", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(
+              properties, "catalog", entityId, c.getProperty(), replacedVersions);
           out.add(change);
         } else {
           out.add(change);
         }
       }
-      return Pair.of(out.toArray(new CatalogChange[0]), List.copyOf(written));
+      return Pair.of(
+          out.toArray(new CatalogChange[0]),
+          toHolder(written, pendingVersions, replacedVersions, replacedUrns));
     } catch (RuntimeException e) {
+      secretManager.rollbackSecretVersions(pendingVersions);
       secretManager.rollbackSecrets(written);
       throw e;
     }
@@ -151,9 +173,9 @@ public final class SecretAlterChanges {
    * @param currentProperties current schema properties (may be null)
    * @param entityId schema entity id
    * @param changes schema changes
-   * @return effective changes and written write-through materials
+   * @return effective changes and a holder with written / pending / replaced secrets
    */
-  public static Pair<SchemaChange[], List<SecretMaterial>> prepareSchemaChanges(
+  public static Pair<SchemaChange[], SecretMaterialsHolder> prepareSchemaChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
       long entityId,
@@ -162,36 +184,57 @@ public final class SecretAlterChanges {
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<SchemaChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
+    List<SecretVersion> pendingVersions = new ArrayList<>();
+    List<SecretVersion> replacedVersions = new ArrayList<>();
+    List<SecretUrn> replacedUrns = new ArrayList<>();
     try {
       for (SchemaChange change : changes) {
         if (change instanceof SchemaChange.SetSecretBinding) {
           SchemaChange.SetSecretBinding c = (SchemaChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  properties, "schema", entityId, c.getProperty(), c.getBinding(), written);
+                  properties,
+                  "schema",
+                  entityId,
+                  c.getProperty(),
+                  c.getBinding(),
+                  written,
+                  pendingVersions,
+                  replacedVersions,
+                  replacedUrns);
           out.add(SchemaChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof SchemaChange.SetSecretReference) {
           SchemaChange.SetSecretReference c = (SchemaChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  properties, "schema", entityId, c.getProperty(), c.getReference());
+                  properties, "schema", entityId, c.getProperty(), c.getReference(), replacedUrns);
           out.add(SchemaChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof SchemaChange.SetProperty) {
           SchemaChange.SetProperty c = (SchemaChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "schema", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "schema",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  pendingVersions,
+                  replacedVersions);
           out.add(SchemaChange.setProperty(c.getProperty(), value));
         } else if (change instanceof SchemaChange.RemoveProperty) {
           SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "schema", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(
+              properties, "schema", entityId, c.getProperty(), replacedVersions);
           out.add(change);
         } else {
           out.add(change);
         }
       }
-      return Pair.of(out.toArray(new SchemaChange[0]), List.copyOf(written));
+      return Pair.of(
+          out.toArray(new SchemaChange[0]),
+          toHolder(written, pendingVersions, replacedVersions, replacedUrns));
     } catch (RuntimeException e) {
+      secretManager.rollbackSecretVersions(pendingVersions);
       secretManager.rollbackSecrets(written);
       throw e;
     }
@@ -204,9 +247,9 @@ public final class SecretAlterChanges {
    * @param currentProperties current fileset properties (may be null)
    * @param entityId fileset entity id
    * @param changes fileset changes
-   * @return effective changes and written write-through materials
+   * @return effective changes and a holder with written / pending / replaced secrets
    */
-  public static Pair<FilesetChange[], List<SecretMaterial>> prepareFilesetChanges(
+  public static Pair<FilesetChange[], SecretMaterialsHolder> prepareFilesetChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
       long entityId,
@@ -215,38 +258,72 @@ public final class SecretAlterChanges {
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<FilesetChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
+    List<SecretVersion> pendingVersions = new ArrayList<>();
+    List<SecretVersion> replacedVersions = new ArrayList<>();
+    List<SecretUrn> replacedUrns = new ArrayList<>();
     try {
       for (FilesetChange change : changes) {
         if (change instanceof FilesetChange.SetSecretBinding) {
           FilesetChange.SetSecretBinding c = (FilesetChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  properties, "fileset", entityId, c.getProperty(), c.getBinding(), written);
+                  properties,
+                  "fileset",
+                  entityId,
+                  c.getProperty(),
+                  c.getBinding(),
+                  written,
+                  pendingVersions,
+                  replacedVersions,
+                  replacedUrns);
           out.add(FilesetChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof FilesetChange.SetSecretReference) {
           FilesetChange.SetSecretReference c = (FilesetChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  properties, "fileset", entityId, c.getProperty(), c.getReference());
+                  properties, "fileset", entityId, c.getProperty(), c.getReference(), replacedUrns);
           out.add(FilesetChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof FilesetChange.SetProperty) {
           FilesetChange.SetProperty c = (FilesetChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  properties, "fileset", entityId, c.getProperty(), c.getValue());
+                  properties,
+                  "fileset",
+                  entityId,
+                  c.getProperty(),
+                  c.getValue(),
+                  pendingVersions,
+                  replacedVersions);
           out.add(FilesetChange.setProperty(c.getProperty(), value));
         } else if (change instanceof FilesetChange.RemoveProperty) {
           FilesetChange.RemoveProperty c = (FilesetChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "fileset", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(
+              properties, "fileset", entityId, c.getProperty(), replacedVersions);
           out.add(change);
         } else {
           out.add(change);
         }
       }
-      return Pair.of(out.toArray(new FilesetChange[0]), List.copyOf(written));
+      return Pair.of(
+          out.toArray(new FilesetChange[0]),
+          toHolder(written, pendingVersions, replacedVersions, replacedUrns));
     } catch (RuntimeException e) {
+      secretManager.rollbackSecretVersions(pendingVersions);
       secretManager.rollbackSecrets(written);
       throw e;
     }
+  }
+
+  private static SecretMaterialsHolder toHolder(
+      List<SecretMaterial> written,
+      List<SecretVersion> pendingVersions,
+      List<SecretVersion> replacedVersions,
+      List<SecretUrn> replacedUrns) {
+    SecretMaterialsHolder holder = new SecretMaterialsHolder();
+    holder.set(List.copyOf(written));
+    holder.setPendingVersions(List.copyOf(pendingVersions));
+    holder.setReplacedVersions(List.copyOf(replacedVersions));
+    holder.setReplacedUrns(List.copyOf(replacedUrns));
+    return holder;
   }
 }

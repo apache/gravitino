@@ -53,11 +53,66 @@ public interface SecretProvider {
    * SecretConstants#ATTR_ENTITY_TYPE}, {@link SecretConstants#ATTR_ENTITY_ID}, and {@link
    * SecretConstants#ATTR_PROPERTY_KEY}.
    *
+   * <p>For versioned providers this creates a new version and makes it the current readable value
+   * (create path). Prefer {@link #writeSecretVersion} when an alter must keep the previous current
+   * value readable until commit.
+   *
    * @param plaintext the secret plaintext
    * @param attributes provider-specific write attributes
    * @return the secret URN
    */
   SecretUrn writeSecret(String plaintext, Map<String, String> attributes);
+
+  /**
+   * Writes a new secret version under the URN built from {@code attributes} without changing the
+   * currently readable value when material already exists.
+   *
+   * <p>Aligns with multi-version secret stores (Vault KV v2, AWS Secrets Manager, GCP Secret
+   * Manager): the logical name / URN stays fixed; each write allocates a version id. When the URN
+   * has no material yet, the new version becomes current.
+   *
+   * @param plaintext the secret plaintext
+   * @param attributes provider-specific write attributes
+   * @return the URN and the new version id
+   * @throws UnsupportedOperationException if this provider does not support versions
+   */
+  default SecretVersion writeSecretVersion(String plaintext, Map<String, String> attributes) {
+    throw new UnsupportedOperationException(type() + " does not support secret versions");
+  }
+
+  /**
+   * Makes {@code version} the currently readable value for {@code urn}.
+   *
+   * @param urn the secret URN
+   * @param version the version id returned by {@link #writeSecretVersion}
+   * @throws UnsupportedOperationException if this provider does not support versions
+   */
+  default void promoteSecretVersion(SecretUrn urn, String version) {
+    throw new UnsupportedOperationException(type() + " does not support secret versions");
+  }
+
+  /**
+   * Deletes one version of {@code urn} without removing other versions.
+   *
+   * @param urn the secret URN
+   * @param version the version id to delete
+   * @throws UnsupportedOperationException if this provider does not support versions
+   */
+  default void deleteSecretVersion(SecretUrn urn, String version) {
+    throw new UnsupportedOperationException(type() + " does not support secret versions");
+  }
+
+  /**
+   * Returns the currently readable version id for {@code urn}.
+   *
+   * @param urn the secret URN
+   * @return the current version id
+   * @throws IllegalArgumentException if the secret is missing
+   * @throws UnsupportedOperationException if this provider does not support versions
+   */
+  default String currentSecretVersion(SecretUrn urn) {
+    throw new UnsupportedOperationException(type() + " does not support secret versions");
+  }
 
   /**
    * Reads a secret by URN.
@@ -68,7 +123,7 @@ public interface SecretProvider {
   String readSecret(SecretUrn urn);
 
   /**
-   * Deletes a secret by URN.
+   * Deletes a secret by URN (all versions when the provider is versioned).
    *
    * @param urn the secret URN
    */

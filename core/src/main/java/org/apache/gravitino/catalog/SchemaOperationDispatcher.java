@@ -471,14 +471,15 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     existing.properties() == null
                         ? new HashMap<>()
                         : new HashMap<>(existing.properties());
-                Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+                Pair<SchemaChange[], SecretMaterialsHolder> secretResult =
                     SecretAlterChanges.prepareSchemaChanges(
                         secretManager, currentProperties, existing.id(), changes);
-                writtenSecretMaterials.set(secretResult.getRight());
+                writtenSecretMaterials.copyFrom(secretResult.getRight());
                 effectiveChangesHolder[0] = secretResult.getLeft();
                 return SchemaEntityChanges.apply(ident, existing, secretResult.getLeft());
               });
       alterCommitted = true;
+      writtenSecretMaterials.commit(secretManager);
       Schema alteredSchema =
           ManagedSchemaOperations.ManagedSchema.builder()
               .withName(ident.name())
@@ -493,7 +494,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       throw new RuntimeException("Failed to alter schema " + ident, e);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        writtenSecretMaterials.rollback(secretManager);
       }
     }
   }
@@ -539,10 +540,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+      Pair<SchemaChange[], SecretMaterialsHolder> secretResult =
           SecretAlterChanges.prepareSchemaChanges(
               secretManager, currentProperties, entityIdForSecrets, changes);
-      writtenSecretMaterials.set(secretResult.getRight());
+      writtenSecretMaterials.copyFrom(secretResult.getRight());
       SchemaChange[] effectiveChanges = secretResult.getLeft();
 
       Schema alteredSchema =
@@ -551,10 +552,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
               NoSuchSchemaException.class);
       alterCommitted = true;
+      writtenSecretMaterials.commit(secretManager);
       return Pair.of(alteredSchema, effectiveChanges);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+        writtenSecretMaterials.rollback(secretManager);
       }
     }
   }

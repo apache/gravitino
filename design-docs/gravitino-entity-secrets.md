@@ -232,7 +232,12 @@ urn:gravitino-secret:memory:fileset:30019:s3-secret-access-key
 ```
 
 The property key from `SecretWriteContext` is the last segment (not an opaque ordinal).
-Re-writing the same property key overwrites that URN / map entry (no ordinal allocation).
+The URN stays fixed across rotates. Providers that support versions (in-memory; Vault KV v2, AWS
+Secrets Manager, GCP Secret Manager) allocate a new **version** under that URN on alter
+`setSecretBinding` / write-through `setProperty`. The previous current value stays readable until
+the entity alter commits and the new version is promoted; replaced versions are deleted only after
+commit (and by version id, so a concurrent rebind of the same URN is not wiped). Create still
+writes a current version in one step.
 
 Write-through URNs (including in-memory) embed `<entityType>:<entityId>:<propertyKey>` so drop
 can decide whether to call `deleteSecret` (§5.5.2 C). External-ref identifier layouts are defined
