@@ -103,12 +103,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   protected TableCatalog sparkCatalog;
   protected PropertiesConverter propertiesConverter;
   protected SparkTransformConverter sparkTransformConverter;
-  // The Gravitino catalog client to do schema operations.
-  protected Catalog gravitinoCatalogClient;
   private SparkTypeConverter sparkTypeConverter;
   private SparkTableChangeConverter sparkTableChangeConverter;
 
   private String catalogName;
+  // The identity this Spark catalog was initialized for, resolved from its session.
+  private GravitinoIdentity identity;
   private final GravitinoCatalogManager gravitinoCatalogManager;
 
   protected BaseCatalog() {
@@ -199,11 +199,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public void initialize(String name, CaseInsensitiveStringMap options) {
     this.catalogName = name;
-    this.gravitinoCatalogClient = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
-    String provider = gravitinoCatalogClient.provider();
+    this.identity = gravitinoCatalogManager.currentIdentity();
+    Catalog gravitinoCatalog = gravitinoCatalogManager.getGravitinoCatalogInfo(name);
+    String provider = gravitinoCatalog.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalogClient);
+    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalog);
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
@@ -216,12 +217,28 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return catalogName;
   }
 
+  /**
+   * Returns the Gravitino catalog that serves schema, table and function requests. Look it up for
+   * each request instead of keeping it: the lookup resets the idle timer of the Gravitino client in
+   * the manager's cache, and returns a catalog bound to a live client after the cache has evicted
+   * and closed an earlier one.
+   *
+   * <p>The lookup does not keep the client alive for the rest of the request. If the cache evicts
+   * it while the request runs, by size or by idle time, that request can fail and the next lookup
+   * returns a catalog bound to a new client.
+   *
+   * @return the Gravitino catalog for this Spark catalog's name and identity
+   */
+  protected Catalog gravitinoCatalog() {
+    return gravitinoCatalogManager.getGravitinoCatalogInfo(identity, catalogName);
+  }
+
   @Override
   public Identifier[] listTables(String[] namespace) throws NoSuchNamespaceException {
     String gravitinoNamespace = getDatabase(namespace);
     try {
       NameIdentifier[] identifiers =
-          gravitinoCatalogClient.asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
+          gravitinoCatalog().asTableCatalog().listTables(Namespace.of(gravitinoNamespace));
       return Arrays.stream(identifiers)
           .map(
               identifier ->
@@ -287,7 +304,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     org.apache.gravitino.rel.expressions.transforms.Transform[] partitionings =
         sparkTransformConverter.toGravitinoPartitionings(transforms);
 
-    return gravitinoCatalogClient
+    return gravitinoCatalog()
         .asTableCatalog()
         .createTable(
             gravitinoIdentifier,
@@ -356,7 +373,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                                         || change instanceof TableChange.RenameColumn
                                         || change instanceof TableChange.UpdateColumnType),
                         "Timestamp, date, and string defaults cannot be combined with column schema changes");
-                    return gravitinoCatalogClient
+                    return gravitinoCatalog()
                         .asTableCatalog()
                         .loadTable(NameIdentifier.of(getDatabase(ident), ident.name()))
                         .columns();
@@ -369,7 +386,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               .toArray(org.apache.gravitino.rel.TableChange[]::new);
       invalidateTable(ident);
       org.apache.gravitino.rel.Table gravitinoTable =
-          gravitinoCatalogClient
+          gravitinoCatalog()
               .asTableCatalog()
               .alterTable(
                   NameIdentifier.of(getDatabase(ident), ident.name()), gravitinoTableChanges);
@@ -390,7 +407,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public boolean dropTable(Identifier ident) {
     invalidateTable(ident);
-    return gravitinoCatalogClient
+    return gravitinoCatalog()
         .asTableCatalog()
         .dropTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
@@ -398,7 +415,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public boolean purgeTable(Identifier ident) {
     invalidateTable(ident);
-    return gravitinoCatalogClient
+    return gravitinoCatalog()
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }
@@ -420,7 +437,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       return false;
     }
     try {
-      return gravitinoCatalogClient
+      return gravitinoCatalog()
           .asViewCatalog()
           .viewExists(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (UnsupportedOperationException e) {
@@ -443,7 +460,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         org.apache.gravitino.rel.TableChange.rename(newIdent.name());
     try {
       invalidateTable(oldIdent);
-      gravitinoCatalogClient
+      gravitinoCatalog()
           .asTableCatalog()
           .alterTable(NameIdentifier.of(getDatabase(oldIdent), oldIdent.name()), rename);
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
@@ -453,7 +470,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public String[][] listNamespaces() throws NoSuchNamespaceException {
-    String[] schemas = gravitinoCatalogClient.asSchemas().listSchemas();
+    String[] schemas = gravitinoCatalog().asSchemas().listSchemas();
     return Arrays.stream(schemas).map(schema -> new String[] {schema}).toArray(String[][]::new);
   }
 
@@ -470,7 +487,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchNamespaceException {
     validateNamespace(namespace);
     try {
-      Schema schema = gravitinoCatalogClient.asSchemas().loadSchema(namespace[0]);
+      Schema schema = gravitinoCatalog().asSchemas().loadSchema(namespace[0]);
       String comment = schema.comment();
       Map<String, String> properties = schema.properties();
       if (comment != null) {
@@ -492,7 +509,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     Map<String, String> properties = new HashMap<>(metadata);
     String comment = properties.remove(SupportsNamespaces.PROP_COMMENT);
     try {
-      gravitinoCatalogClient.asSchemas().createSchema(namespace[0], comment, properties);
+      gravitinoCatalog().asSchemas().createSchema(namespace[0], comment, properties);
     } catch (SchemaAlreadyExistsException e) {
       throw new NamespaceAlreadyExistsException(namespace);
     }
@@ -517,7 +534,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                 })
             .toArray(SchemaChange[]::new);
     try {
-      gravitinoCatalogClient.asSchemas().alterSchema(namespace[0], schemaChanges);
+      gravitinoCatalog().asSchemas().alterSchema(namespace[0], schemaChanges);
     } catch (NoSuchSchemaException e) {
       throw new NoSuchNamespaceException(namespace);
     }
@@ -528,7 +545,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchNamespaceException, NonEmptyNamespaceException {
     validateNamespace(namespace);
     try {
-      return gravitinoCatalogClient.asSchemas().dropSchema(namespace[0], cascade);
+      return gravitinoCatalog().asSchemas().dropSchema(namespace[0], cascade);
     } catch (NonEmptySchemaException e) {
       // Without cascade, Spark expects NonEmptyNamespaceException so the user knows to retry with
       // cascade. With cascade the user already asked to drop the contents, so a refusal means a
@@ -553,7 +570,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     View gravitinoView;
     try {
       gravitinoView =
-          gravitinoCatalogClient
+          gravitinoCatalog()
               .asViewCatalog()
               .loadView(NameIdentifier.of(getDatabase(ident), ident.name()));
     } catch (NoSuchViewException | UnsupportedOperationException | ForbiddenException e) {
@@ -584,7 +601,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
-      return gravitinoCatalogClient
+      return gravitinoCatalog()
           .asTableCatalog()
           .loadTable(
               NameIdentifier.of(database, ident.name()),
@@ -598,7 +615,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       throws NoSuchTableException {
     try {
       String database = getDatabase(ident);
-      return gravitinoCatalogClient
+      return gravitinoCatalog()
           .asTableCatalog()
           .loadTable(
               NameIdentifier.of(database, ident.name()),
@@ -631,7 +648,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String gravitinoNamespace = getDatabase(namespace);
     try {
       Function[] functions =
-          gravitinoCatalogClient
+          gravitinoCatalog()
               .asFunctionCatalog()
               .listFunctionInfos(Namespace.of(gravitinoNamespace));
       // Only list functions that loadFunction can load
@@ -655,8 +672,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
     NameIdentifier gravitinoIdentifier = NameIdentifier.of(getDatabase(ident), ident.name());
     try {
-      Function function =
-          gravitinoCatalogClient.asFunctionCatalog().getFunction(gravitinoIdentifier);
+      Function function = gravitinoCatalog().asFunctionCatalog().getFunction(gravitinoIdentifier);
       for (FunctionDefinition definition : function.definitions()) {
         for (FunctionImpl impl : definition.impls()) {
           if (!isSparkJavaImplementation(impl)) {
@@ -684,18 +700,17 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       // Do not load the underlying Spark table here: that load bypasses Gravitino authorization,
       // which the caller is precisely missing.
       //
-      // Unlike the read path, a write command targets a single table, so there is nothing to
-      // aggregate across relations. Returning an empty-schema placeholder here would let Spark's
-      // ResolveOutputRelation reject the write with a column-arity error before
-      // RequiredPrivilegesCheck runs, surfacing the wrong failure and leaving the recorded denial
-      // on the thread to leak into later queries. Record the denial and surface the aggregated
-      // authorization failure immediately, which also clears the per-thread collector.
-      AuthorizationTable.deny(
-          ident.name(),
-          String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
-          Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
-          e);
-      throw AuthorizationTable.drainFailure().orElse(e);
+      // Returning an empty-schema placeholder here would let Spark's ResolveOutputRelation reject
+      // the write with a column-arity error before RequiredPrivilegesCheck runs, surfacing the
+      // wrong failure. Fail now; the error lists only the write target.
+      AuthorizationTable denied =
+          (AuthorizationTable)
+              AuthorizationTable.deny(
+                  ident.name(),
+                  String.format("%s.%s.%s", catalogName, getDatabase(ident), ident.name()),
+                  Sets.newHashSet(Privilege.Name.MODIFY_TABLE),
+                  e);
+      throw AuthorizationTable.aggregateFailure(Collections.singletonList(denied)).orElse(e);
     }
     org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident);
     // Will create a catalog specific table

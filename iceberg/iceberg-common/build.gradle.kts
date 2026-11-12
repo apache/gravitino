@@ -59,6 +59,8 @@ dependencies {
     exclude("org.ow2.asm")
   }
   implementation(libs.asm)
+  // Create cglib proxies without running the wrapped class constructors
+  implementation(libs.objenesis)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)

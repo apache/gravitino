@@ -366,7 +366,9 @@ components:
     ColumnDefaultValue:
       allOf:
         - $ref: "./expression.yaml#/components/schemas/FunctionArg"
-      description: The default value of the column
+      description: >
+        A column default expression. See Column.defaultValue and
+        Column.initialDefaultValue for the two public meanings.
 
     Column:
       type: object
@@ -389,7 +391,22 @@ components:
           nullable: true
           default: true
         defaultValue:
-          $ref: "#/components/schemas/ColumnDefaultValue"
+          allOf:
+            - $ref: "#/components/schemas/ColumnDefaultValue"
+          description: >
+            Default used for new records that omit this column. Unset when the
+            catalog does not support column defaults. For example, for Iceberg
+            format-version 3 this maps to write-default.
+        initialDefaultValue:
+          allOf:
+            - $ref: "#/components/schemas/ColumnDefaultValue"
+          description: >
+            Default used when reading stored records that lack this column, such
+            as records written before the column was added. Unset when the catalog
+            does not distinguish an initial default. Setting this through create
+            or alter is not supported yet; it is exposed on load when the catalog
+            provides it. For example, for Iceberg format-version 3 this maps to
+            initial-default.
         autoIncrement:
           type: boolean
           description: Whether the column is auto increment

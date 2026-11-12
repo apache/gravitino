@@ -21,6 +21,7 @@ package org.apache.gravitino.tag;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
@@ -72,12 +73,9 @@ public class TagManager implements TagDispatcher {
 
   private static final Logger LOG = LoggerFactory.getLogger(TagManager.class);
 
-  private final IdGenerator idGenerator;
-
-  private final EntityStore entityStore;
-
-  private static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
-      Sets.newHashSet(
+  /** Metadata object types that support tag assignments. */
+  public static final Set<MetadataObject.Type> SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS =
+      ImmutableSet.of(
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE,
@@ -88,6 +86,10 @@ public class TagManager implements TagDispatcher {
           MetadataObject.Type.MODEL,
           MetadataObject.Type.FUNCTION,
           MetadataObject.Type.SEMANTIC_MODEL);
+
+  private final IdGenerator idGenerator;
+
+  private final EntityStore entityStore;
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;
@@ -123,6 +125,8 @@ public class TagManager implements TagDispatcher {
       Map<String, String> properties,
       TagValueConstraint valueConstraint)
       throws TagAlreadyExistsException {
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
     Map<String, String> tagProperties = properties == null ? Collections.emptyMap() : properties;
     checkMetalake(NameIdentifier.of(metalake), entityStore);
     TagEntity tagEntity =
@@ -577,6 +581,8 @@ public class TagManager implements TagDispatcher {
     for (TagChange change : changes) {
       if (change instanceof TagChange.RenameTag) {
         newName = ((TagChange.RenameTag) change).getNewName();
+        NameIdentifierUtil.checkMetadataObjectName(
+            NameIdentifier.of(tagEntity.namespace(), newName), Entity.EntityType.TAG);
       } else if (change instanceof TagChange.UpdateTagComment) {
         newComment = ((TagChange.UpdateTagComment) change).getNewComment();
       } else if (change instanceof TagChange.SetProperty) {

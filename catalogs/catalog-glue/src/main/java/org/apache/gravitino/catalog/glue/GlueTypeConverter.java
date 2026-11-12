@@ -65,6 +65,15 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String STRUCT = "struct";
   static final String UNIONTYPE = "uniontype";
 
+  // Hive length limits, see
+  // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
+  static final int MAX_CHAR_LENGTH = 255;
+  static final int MAX_VARCHAR_LENGTH = 65535;
+
+  // Hive types carry no nullability, so a nested field cannot be NOT NULL.
+  private static final String NESTED_NOT_NULL_UNSUPPORTED =
+      "Glue/Hive does not support NOT NULL on nested fields, got %s";
+
   // Matches name(body): char(10), varchar(255), decimal(10,2)
   private static final Pattern PAREN_TYPE_PATTERN = Pattern.compile("(\\w+)\\(([^)]*)\\)");
   // Matches name<body>: array<string>, map<string,int>, struct<id:bigint>
@@ -221,20 +230,37 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.IntervalYearType) return INTERVAL_YEAR_MONTH;
     if (type instanceof Types.IntervalDayType) return INTERVAL_DAY_TIME;
     if (type instanceof Types.FixedCharType) {
-      return String.format("%s(%d)", CHAR, ((Types.FixedCharType) type).length());
+      int length = ((Types.FixedCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_CHAR_LENGTH,
+          "Glue/Hive char length must be in [1, %s], got %s",
+          MAX_CHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", CHAR, length);
     }
     if (type instanceof Types.VarCharType) {
-      return String.format("%s(%d)", VARCHAR, ((Types.VarCharType) type).length());
+      int length = ((Types.VarCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_VARCHAR_LENGTH,
+          "Glue/Hive varchar length must be in [1, %s], got %s",
+          MAX_VARCHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", VARCHAR, length);
     }
     if (type instanceof Types.DecimalType) {
       Types.DecimalType d = (Types.DecimalType) type;
       return String.format("%s(%d,%d)", DECIMAL, d.precision(), d.scale());
     }
     if (type instanceof Types.ListType) {
-      return String.format("%s<%s>", ARRAY, fromGravitino(((Types.ListType) type).elementType()));
+      Types.ListType listType = (Types.ListType) type;
+      Preconditions.checkArgument(
+          listType.elementNullable(), NESTED_NOT_NULL_UNSUPPORTED, listType.simpleString());
+      return String.format("%s<%s>", ARRAY, fromGravitino(listType.elementType()));
     }
     if (type instanceof Types.MapType) {
       Types.MapType mapType = (Types.MapType) type;
+      Preconditions.checkArgument(
+          mapType.valueNullable(), NESTED_NOT_NULL_UNSUPPORTED, mapType.simpleString());
       return String.format(
           "%s<%s,%s>", MAP, fromGravitino(mapType.keyType()), fromGravitino(mapType.valueType()));
     }
@@ -242,9 +268,12 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
       String fields =
           Arrays.stream(((Types.StructType) type).fields())
               .map(
-                  f ->
-                      String.format(
-                          "%s:%s", checkStructFieldName(f.name()), fromGravitino(f.type())))
+                  f -> {
+                    Preconditions.checkArgument(
+                        f.nullable(), NESTED_NOT_NULL_UNSUPPORTED, "struct field " + f.name());
+                    return String.format(
+                        "%s:%s", checkStructFieldName(f.name()), fromGravitino(f.type()));
+                  })
               .collect(Collectors.joining(","));
       return String.format("%s<%s>", STRUCT, fields);
     }

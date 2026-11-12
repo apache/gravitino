@@ -809,6 +809,48 @@ class TestHiveCatalogOperations {
   }
 
   @Test
+  void testCreateSparkViewRejectsNonNullDefaultCatalogOrSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveSchema schema = HiveSchema.builder().withCatalogName("hive").withName("db").build();
+    when(hiveClient.getDatabase(anyString(), anyString())).thenReturn(schema);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    String[][] defaults = {{"analytics", "mart"}, {"analytics", null}, {null, "mart"}};
+    for (String[] pair : defaults) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  op.createView(
+                      NameIdentifier.of("db", "v_spark"),
+                      null,
+                      new Column[0],
+                      new SQLRepresentation[] {
+                        SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+                      },
+                      pair[0],
+                      pair[1],
+                      Maps.newHashMap(ImmutableMap.of("spark.sql.create.version", "3.5.3"))));
+
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains("does not support non-null defaultCatalog/defaultSchema"));
+    }
+    verify(hiveClient, never()).createTable(any());
+  }
+
+  @Test
   void testCreateViewAcceptsSparkDialect() throws Exception {
     HiveCatalogOperations op = new HiveCatalogOperations();
     op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
@@ -2056,6 +2098,59 @@ class TestHiveCatalogOperations {
                         new SQLRepresentation[] {
                           SQLRepresentation.builder()
                               .withDialect("hive")
+                              .withSql("SELECT 2")
+                              .build()
+                        },
+                        "analytics",
+                        "mart",
+                        null)));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains("does not support non-null defaultCatalog/defaultSchema"));
+  }
+
+  @Test
+  void testAlterSparkViewReplaceRejectsNonNullDefaultCatalogAndSchema() throws Exception {
+    HiveCatalogOperations op = new HiveCatalogOperations();
+    op.initialize(Maps.newHashMap(), null, HIVE_PROPERTIES_METADATA);
+
+    CachedClientPool clientPool = mock(CachedClientPool.class);
+    HiveClient hiveClient = mock(HiveClient.class);
+    HiveTable currentTable =
+        HiveTable.builder()
+            .withName("v_spark")
+            .withCatalogName("hive")
+            .withDatabaseName("db")
+            .withColumns(new Column[0])
+            .withProperties(
+                Maps.newHashMap(
+                    ImmutableMap.of(
+                        HiveConstants.TABLE_TYPE,
+                        TableType.VIRTUAL_VIEW.name(),
+                        "spark.sql.create.version",
+                        "3.5.3")))
+            .withViewOriginalText("SELECT 1")
+            .build();
+    when(hiveClient.getTable(anyString(), anyString(), anyString())).thenReturn(currentTable);
+    when(clientPool.run(any()))
+        .thenAnswer(
+            invocation -> {
+              ClientPool.Action<?, HiveClient, ?> action = invocation.getArgument(0);
+              return action.run(hiveClient);
+            });
+    op.clientPool = clientPool;
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                op.alterView(
+                    NameIdentifier.of("db", "v_spark"),
+                    ViewChange.replaceView(
+                        new Column[0],
+                        new SQLRepresentation[] {
+                          SQLRepresentation.builder()
+                              .withDialect("spark")
                               .withSql("SELECT 2")
                               .build()
                         },

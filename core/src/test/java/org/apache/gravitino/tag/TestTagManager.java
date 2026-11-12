@@ -51,6 +51,9 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.File;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -59,6 +62,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -72,6 +76,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
@@ -108,7 +113,10 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.TagEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -123,12 +131,18 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyBindingMigration;
+import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
@@ -138,6 +152,10 @@ import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.JDBCBackend;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
+import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.RaceTestUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -186,6 +204,8 @@ public class TestTagManager {
 
   private static IdGenerator idGenerator;
 
+  @Nullable private static IdGenerator previousIdGenerator;
+
   private static TagManager tagManager;
 
   private static final CatalogManager catalogManager = mock(CatalogManager.class);
@@ -203,6 +223,8 @@ public class TestTagManager {
   @BeforeAll
   public static void setUp() throws IOException, IllegalAccessException {
     idGenerator = new RandomIdGenerator();
+    previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
 
     File dbDir = new File(DB_DIR);
     dbDir.mkdirs();
@@ -368,14 +390,18 @@ public class TestTagManager {
 
   @AfterAll
   public static void tearDown() throws IOException, IllegalAccessException {
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
-    if (entityStore != null) {
-      entityStore.close();
-      entityStore = null;
-    }
+    try {
+      if (entityStore != null) {
+        entityStore.close();
+        entityStore = null;
+      }
 
-    FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+      FileUtils.deleteDirectory(new File(JDBC_STORE_PATH));
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", previousIdGenerator, true);
+      FieldUtils.writeField(
+          GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
+    }
   }
 
   @AfterEach
@@ -849,6 +875,50 @@ public class TestTagManager {
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
   }
 
+  /** Invalid create/rename requests must never leave a persisted dotted name. */
+  @Test
+  public void testRejectDottedNameBeforeWrite() throws IOException {
+    TagDispatcher dispatcher =
+        new TagEventDispatcher(new EventBus(List.of()), new TagHookDispatcher(tagManager));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.createTag(METALAKE, "invalid.tag", null, Map.of()));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createTag(
+                METALAKE, "invalid.tag", null, Map.of(), TagValueConstraint.anyValue()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));
+    Tag original = tagManager.createTag(METALAKE, "valid_tag", null, Map.of());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.alterTag(METALAKE, original.name(), TagChange.rename("invalid.tag")));
+    Assertions.assertEquals(original, tagManager.getTag(METALAKE, original.name()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofTag(METALAKE, "invalid.tag"), Entity.EntityType.TAG));
+  }
+
+  /** A legacy dotted tag remains readable and removable through the manager. */
+  @Test
+  public void testLegacyDottedTagRecovery() throws IOException {
+    TagEntity legacy =
+        TagEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("legacy.tag")
+            .withNamespace(NameIdentifierUtil.ofTag(METALAKE, "legacy.tag").namespace())
+            .withProperties(Map.of())
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(legacy, false);
+    Assertions.assertEquals(legacy.name(), tagManager.getTag(METALAKE, legacy.name()).name());
+    Assertions.assertTrue(Arrays.asList(tagManager.listTags(METALAKE)).contains(legacy.name()));
+    Assertions.assertTrue(tagManager.deleteTag(METALAKE, legacy.name()));
+  }
+
   @Test
   public void testAlterTag() {
     String tagComment = "tag comment";
@@ -1000,6 +1070,20 @@ public class TestTagManager {
             NoSuchMetalakeException.class,
             () -> tagManager.deleteTag("non_existent_metalake", "tag1"));
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
+  }
+
+  /** Tag/policy objects cannot reach metadata tag-association writes through the manager. */
+  @Test
+  public void testTagAndPolicyAssociationTargetsAreRejected() {
+    for (MetadataObject.Type type :
+        new MetadataObject.Type[] {MetadataObject.Type.TAG, MetadataObject.Type.POLICY}) {
+      MetadataObject object = MetadataObjects.of(null, "legacy.with.dot", type);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.associateTagsForMetadataObject(
+                  METALAKE, object, new String[] {"tag"}, new String[0]));
+    }
   }
 
   @Test
@@ -1660,6 +1744,170 @@ public class TestTagManager {
         () -> tagManager.getTagForMetadataObject(METALAKE, semanticModelObject, tag1.name()));
   }
 
+  /** The old generic reserved prefix is available for ordinary tags. */
+  @Test
+  public void testLegacyReservedTagsRemainAccessible() throws Exception {
+    MetadataObject object = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
+    for (String name : new String[] {"reserved_legacy", "Reserved_legacy"}) {
+      TagEntity legacy =
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(Namespace.of(METALAKE))
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+      entityStore.put(legacy, false);
+      Assertions.assertTrue(Arrays.asList(tagManager.listTags(METALAKE)).contains(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertEquals(
+          "updated",
+          tagManager.alterTag(METALAKE, name, TagChange.updateComment("updated")).comment());
+      tagManager.associateTagsForMetadataObject(METALAKE, object, new String[] {name}, null);
+      Assertions.assertEquals(
+          name, tagManager.getTagForMetadataObject(METALAKE, object, name).name());
+      Assertions.assertArrayEquals(
+          new MetadataObject[] {object}, tagManager.listMetadataObjectsForTag(METALAKE, name));
+      Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, name).length);
+      tagManager.associateTagsForMetadataObject(METALAKE, object, null, new String[] {name});
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+
+      entityStore.put(
+          TagEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(name)
+              .withNamespace(legacy.namespace())
+              .withAuditInfo(legacy.auditInfo())
+              .build(),
+          false);
+      String newName = "legacy_" + name;
+      tagManager.alterTag(METALAKE, name, TagChange.rename(newName));
+      Assertions.assertEquals(newName, tagManager.getTag(METALAKE, newName).name());
+      tagManager.alterTag(METALAKE, newName, TagChange.rename(name));
+      Assertions.assertEquals(name, tagManager.getTag(METALAKE, name).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+      Assertions.assertEquals(name, tagManager.createTag(METALAKE, name, null, null).name());
+      Assertions.assertTrue(tagManager.deleteTag(METALAKE, name));
+    }
+  }
+
+  /** Verifies migrated bindings preserve inheritance and coexist with visible business tags. */
+  @Test
+  public void testMigratedHiddenPolicyTags() throws Exception {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    PolicyEntity policy =
+        PolicyEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("hidden_policy")
+            .withNamespace(Namespace.of(METALAKE))
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.custom(
+                    ImmutableMap.of("rule", "value"),
+                    ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.TABLE),
+                    null))
+            .withAuditInfo(audit)
+            .build();
+    entityStore.put(policy, false);
+    CatalogEntity catalog =
+        entityStore.get(
+            NameIdentifier.of(METALAKE, CATALOG), Entity.EntityType.CATALOG, CatalogEntity.class);
+    TableEntity table =
+        entityStore.get(
+            NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE),
+            Entity.EntityType.TABLE,
+            TableEntity.class);
+    MetadataObject catalogObject = MetadataObjects.parse(CATALOG, MetadataObject.Type.CATALOG);
+    MetadataObject tableObject =
+        MetadataObjects.parse(CATALOG + "." + SCHEMA + "." + TABLE, MetadataObject.Type.TABLE);
+    MetadataObject columnObject =
+        MetadataObjects.parse(tableObject.fullName() + "." + COLUMN, MetadataObject.Type.COLUMN);
+    String hidden = HiddenPolicyTag.name(policy.id());
+    PolicyManager policies = new PolicyManager(idGenerator, entityStore);
+    EntityStore migrationStore =
+        RelationalEntityStore.forOfflineMigration(new JDBCBackend(), new Config(false) {});
+    SessionUtils.beginTransaction();
+    Connection connection = SqlSessions.currentConnection();
+    try {
+      try (Statement statement = connection.createStatement()) {
+        statement.execute(
+            "CREATE TABLE policy_relation_meta (id BIGINT PRIMARY KEY, policy_id BIGINT NOT NULL,"
+                + " metadata_object_id BIGINT NOT NULL, metadata_object_type VARCHAR(64) NOT NULL,"
+                + " audit_info TEXT NOT NULL, current_version INT NOT NULL DEFAULT 1,"
+                + " last_version INT NOT NULL DEFAULT 1, deleted_at BIGINT NOT NULL DEFAULT 0)");
+      }
+      try {
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                "INSERT INTO policy_relation_meta (id, policy_id, metadata_object_id, metadata_object_type, audit_info)"
+                    + " VALUES (?, ?, ?, ?, '{}')")) {
+          statement.setLong(1, 1);
+          statement.setLong(2, policy.id());
+          statement.setLong(3, catalog.id());
+          statement.setString(4, "CATALOG");
+          statement.executeUpdate();
+        }
+        connection.commit();
+        new PolicyBindingMigration(connection, migrationStore).migrate();
+        ObjectPolicyResolver resolver = new ObjectPolicyResolver(entityStore);
+        Assertions.assertFalse(
+            resolver.resolve(METALAKE, catalogObject)[0].inherited().orElseThrow());
+        Assertions.assertTrue(resolver.resolve(METALAKE, tableObject)[0].inherited().orElseThrow());
+        Assertions.assertTrue(
+            resolver.resolve(METALAKE, columnObject)[0].inherited().orElseThrow());
+        // Managers expose internal tags; REST Operations own visibility and parameter checks.
+        Assertions.assertEquals(hidden, tagManager.getTag(METALAKE, hidden).name());
+        Assertions.assertEquals(1, tagManager.listTags(METALAKE).length);
+        Assertions.assertEquals(
+            1, tagManager.listTagsForMetadataObject(METALAKE, catalogObject).length);
+        Assertions.assertEquals(
+            1, policies.listTagAssociationsForPolicy(METALAKE, policy.name()).length);
+        tagManager.createTag(METALAKE, "visible", null, null);
+        tagManager.addPolicyForTag(METALAKE, "visible", policy.name(), AllValuesSelector.get());
+        Assertions.assertEquals(
+            ImmutableSet.of(hidden, "visible"),
+            ImmutableSet.copyOf(
+                tagManager.associateTagsForMetadataObject(
+                    METALAKE, catalogObject, new String[] {"visible"}, null)));
+        Assertions.assertEquals(1, resolver.resolve(METALAKE, tableObject).length);
+        policies.disablePolicy(METALAKE, policy.name());
+        Assertions.assertEquals(0, resolver.resolve(METALAKE, tableObject).length);
+        policies.enablePolicy(METALAKE, policy.name());
+        policies.alterPolicy(METALAKE, policy.name(), PolicyChange.rename("renamed_hidden_policy"));
+        Assertions.assertEquals(
+            "renamed_hidden_policy", resolver.resolve(METALAKE, tableObject)[0].name());
+        // A direct assignment of the same hidden tag must preserve a direct match on the child.
+        try (PreparedStatement statement =
+            connection.prepareStatement(
+                "INSERT INTO policy_relation_meta (id, policy_id, metadata_object_id, metadata_object_type, audit_info)"
+                    + " VALUES (2, ?, ?, 'TABLE', '{}')")) {
+          statement.setLong(1, policy.id());
+          statement.setLong(2, table.id());
+          statement.executeUpdate();
+        }
+        connection.commit();
+        new PolicyBindingMigration(connection, migrationStore).migrate();
+        Assertions.assertFalse(
+            resolver.resolve(METALAKE, tableObject)[0].inherited().orElseThrow());
+      } finally {
+        connection.rollback();
+        try (Statement statement = connection.createStatement()) {
+          statement.execute("DROP TABLE policy_relation_meta");
+        }
+        connection.commit();
+        entityStore.delete(
+            NameIdentifierUtil.ofPolicy(METALAKE, policy.name()), Entity.EntityType.POLICY);
+        entityStore.delete(
+            NameIdentifierUtil.ofPolicy(METALAKE, "renamed_hidden_policy"),
+            Entity.EntityType.POLICY);
+        connection.commit();
+      }
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+  }
+
   @Test
   public void testPolicyAssociationsForTag() throws IOException {
     String tagName = "policy_tag";
@@ -1709,13 +1957,45 @@ public class TestTagManager {
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
       Assertions.assertEquals(0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
 
-      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("engineering"));
+      for (String invalidValue : new String[] {"engineering", "Finance"}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tagManager.addPolicyForTag(
+                        METALAKE, tagName, policyName, TagValueSelector.of(invalidValue)));
+        Assertions.assertTrue(error.getMessage().contains("is not in allowed values"));
+        Assertions.assertEquals(
+            0, tagManager.listPolicyAssociationsForTag(METALAKE, tagName).length);
+      }
+
+      tagManager.addPolicyForTag(METALAKE, tagName, policyName, TagValueSelector.of("finance"));
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
       Assertions.assertEquals(
-          TagValueSelector.of("engineering"),
+          TagValueSelector.of("finance"),
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
+
+      String noValueTag = "policy_no_value_tag";
+      tagManager.createTag(METALAKE, noValueTag, null, null, TagValueConstraint.noValue());
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              tagManager.addPolicyForTag(
+                  METALAKE, noValueTag, policyName, TagValueSelector.of("finance")));
+      Assertions.assertEquals(
+          0, tagManager.listPolicyAssociationsForTag(METALAKE, noValueTag).length);
+      tagManager.addPolicyForTag(METALAKE, noValueTag, policyName, AllValuesSelector.get());
+      tagManager.removePolicyFromTag(METALAKE, noValueTag, policyName);
+
+      String anyValueTag = "policy_any_value_tag";
+      tagManager.createTag(METALAKE, anyValueTag, null, null);
+      tagManager.addPolicyForTag(
+          METALAKE, anyValueTag, policyName, TagValueSelector.of("engineering"));
+      Assertions.assertEquals(
+          1, tagManager.listPolicyAssociationsForTag(METALAKE, anyValueTag).length);
+      tagManager.removePolicyFromTag(METALAKE, anyValueTag, policyName);
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);
