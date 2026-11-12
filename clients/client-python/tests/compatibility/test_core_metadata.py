@@ -89,7 +89,7 @@ class TestInstalledCoreMetadata(unittest.TestCase):
         self.assertTrue(any(value.startswith("dataclasses-json") for value in core))
         simplejson = next(value for value in core if value.startswith("simplejson"))
         self.assertIn(">=3.20.1", simplejson)
-        self.assertIn("<=4.2.0", simplejson)
+        self.assertIn("<5", simplejson)
 
     def test_catalog_schema_table_round_trip(self):
         """Real metadata retains names, columns, properties and logical identifiers."""

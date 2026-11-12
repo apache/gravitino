@@ -20,5 +20,5 @@
 # Installed via the `lance` extra (`pip install -e .[lance]`).
 # The default integration-test environment remains pinned independently in
 # requirements-dev.txt.
-ray>=2.55.1,<=2.59.0
-lance-ray>=0.3.0,<=0.5.0
+ray>=2.55.1
+lance-ray>=0.3.0,<1

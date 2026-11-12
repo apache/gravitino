@@ -27,6 +27,9 @@ The following table outlines the tested compatibility between Gravitino versions
 
 :::note
 - These version entries show which versions are expected to work together.
+- A Gravitino `2.0.0-SNAPSHOT` candidate was also tested with `lance-ray` 0.5.0,
+  Ray 2.59.0 and `lance-namespace` 0.13.0 using the Lance REST write/read/filter test.
+  The candidate is separate from the released-version matrix above.
 - For Gravitino 1.3.0, the explicitly verified release versions are
   `lance-spark` (0.2.0, 0.4.0, 0.5.1) and `lance-ray` (0.3.0, 0.4.2). `lance-ray`
   0.2.0 is conditionally supported only with the conditions described below.

@@ -316,8 +316,7 @@ tasks {
     group = "verification"
     description =
       "Run tests/integration/test_lance_ray.py against multiple lance-ray " +
-        "versions. Override with -PlanceRayVersions=<csv> (default: " +
-        "tracks docs/lance-rest-integration.md Compatibility Matrix)."
+        "versions. Override with -PlanceRayVersions=<csv>."
 
     val versions = project.findProperty("lanceRayVersions") as? String
     val keepGoing = project.hasProperty("lanceRayKeepGoing")
@@ -353,7 +352,7 @@ tasks {
     doLast {
       gravitinoServer("start")
       try {
-        val args = mutableListOf(
+        val matrixArgs = mutableListOf(
           pythonExecutable,
           script.absolutePath,
           "--python",
@@ -362,15 +361,15 @@ tasks {
           gravitinoHome.absolutePath,
         )
         if (!versions.isNullOrBlank()) {
-          args += listOf("--versions", versions)
+          matrixArgs += listOf("--versions", versions)
         }
         if (keepGoing) {
-          args += "--keep-going"
+          matrixArgs += "--keep-going"
         }
-        val proc = ProcessBuilder(args)
-          .inheritIO()
-          .start()
-        val exit = proc.waitFor()
+        val exit = project.exec {
+          commandLine(matrixArgs)
+          isIgnoreExitValue = true
+        }.exitValue
         if (exit != 0) {
           throw GradleException("lance-ray matrix failed with exit code $exit")
         }
@@ -443,6 +442,13 @@ tasks {
     }
 
     doLast {
+      val serverHome = rootDir.resolve("distribution/package")
+      if (!serverHome.resolve("bin/gravitino.sh").isFile ||
+          !serverHome.resolve("libs").isDirectory) {
+        throw GradleException(
+          "Build the Gravitino server first with ./gradlew compileDistribution -PskipWeb=true -x test"
+        )
+      }
       val artifacts = projectDir.resolve("dist").listFiles { file ->
         file.name.startsWith("apache-gravitino-") || file.name.startsWith("apache_gravitino-")
       }?.filter { it.name.endsWith(".tar.gz") } ?: emptyList()
@@ -456,7 +462,7 @@ tasks {
         "--python", interpreter("3.12", "coreCompatibilityPython"),
         "--minimum-python", interpreter("3.10", "coreCompatibilityMinimumPython"),
         "--gravitino-uri", "http://localhost:8090",
-        "--gravitino-home", rootDir.resolve("distribution/package").absolutePath,
+        "--gravitino-home", serverHome.absolutePath,
       )
       (project.findProperty("coreCompatibilityCases") as? String)?.let {
         args += listOf("--cases", it)

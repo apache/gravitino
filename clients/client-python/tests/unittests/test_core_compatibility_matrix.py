@@ -20,6 +20,8 @@
 import importlib.util
 import json
 import os
+from contextlib import redirect_stderr, redirect_stdout
+from io import StringIO
 from pathlib import Path
 import subprocess
 import sys
@@ -106,6 +108,147 @@ class TestCoreCompatibilityMatrix(unittest.TestCase):
         self.assertIn("conflict", content)
         self.assertIn("exit_code=1", content)
 
+    def test_timed_out_command_preserves_output_and_fails(self):
+        """Timeouts remain visible and propagate as case failures."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            log = directory / "execution.log"
+            timeout = subprocess.TimeoutExpired(["pip"], 600, output=b"partial output")
+            with patch.object(MATRIX.subprocess, "run", side_effect=timeout):
+                with self.assertRaisesRegex(RuntimeError, "timed out"):
+                    MATRIX.run_command(["pip"], directory, log, {})
+            self.assertIn("partial output", log.read_text(encoding="utf-8"))
+
+    def test_latest_and_storage_cases_select_their_dependencies(self):
+        """Latest resolution floats, while storage explicitly exercises its floors."""
+        latest = next(case for case in MATRIX.CASES if case.name == "ray-latest")
+        self.assertIn("ray[data]", latest.requirements())
+        self.assertIn("pyarrow", latest.requirements())
+        self.assertIn("simplejson", latest.requirements())
+        probe = {
+            "python": [3, 12],
+            "prefix": "/case/venv",
+            "sdk_path": "/case/venv/lib/gravitino/__init__.py",
+            "versions": {
+                "apache-gravitino": "2.0.0",
+                "dataclasses-json": "0.6.7",
+                "simplejson": "4.3.0",
+                "ray": "2.60.0",
+                "pyarrow": "26.0.1",
+                "pandas": "3.1.1",
+            },
+        }
+        self.assertEqual(MATRIX.assert_probe(probe, latest, "2.0.0"), probe["versions"])
+        del probe["versions"]["ray"]
+        with self.assertRaisesRegex(ValueError, "ray"):
+            MATRIX.assert_probe(probe, latest, "2.0.0")
+        storage = next(case for case in MATRIX.CASES if case.name == "storage-min")
+        self.assertIn("fsspec==2023.12.1", storage.requirements())
+        self.assertIn("s3fs==2023.12.1", storage.requirements())
+        self.assertIn("gcsfs==2023.12.1", storage.requirements())
+        self.assertIn("pyarrow==17.0.0", storage.requirements())
+
+    def test_storage_case_installs_extra_and_runs_storage_tests(self):
+        """Storage acceptance uses the installed extra and the filesystem suite."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            wheel = directory / "sdk.whl"
+            case = next(case for case in MATRIX.CASES if case.name == "storage-min")
+            options = SimpleNamespace(
+                matrix_dir=directory,
+                minimum_python=sys.executable,
+                python=sys.executable,
+                artifact=wheel,
+                gravitino_uri="http://localhost:8090",
+            )
+            probe = {
+                "python": [3, 10],
+                "prefix": str(directory),
+                "sdk_path": str(directory / "venv/gravitino/__init__.py"),
+                "versions": {"apache-gravitino": "2.0.0", **case.dependencies()},
+            }
+            with (
+                patch.object(
+                    MATRIX, "prepare_environment", return_value=Path(sys.executable)
+                ),
+                patch.object(MATRIX, "prepare_tests"),
+                patch.object(MATRIX, "install_artifact") as install,
+                patch.object(MATRIX, "wheel_version", return_value="2.0.0"),
+                patch.object(
+                    MATRIX, "run_command", side_effect=["", json.dumps(probe), "", ""]
+                ) as run,
+            ):
+                result = MATRIX.run_case(case, options, wheel)
+            self.assertEqual(result["status"], "passed")
+            self.assertEqual(install.call_args.args[1], f"{wheel}[storage]")
+            self.assertFalse(install.call_args.kwargs["upgrade"])
+            test_command = run.call_args_list[2].args[0]
+            self.assertEqual(test_command[4:], list(MATRIX.STORAGE_TESTS))
+
+    def test_latest_case_requests_dependency_upgrades(self):
+        """A reused latest environment must refresh its direct dependencies."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            wheel = directory / "sdk.whl"
+            case = next(case for case in MATRIX.CASES if case.name == "ray-latest")
+            options = SimpleNamespace(
+                matrix_dir=directory,
+                python=sys.executable,
+                artifact=wheel,
+                gravitino_uri="http://localhost:8090",
+            )
+            with (
+                patch.object(
+                    MATRIX, "prepare_environment", return_value=Path(sys.executable)
+                ),
+                patch.object(MATRIX, "prepare_tests"),
+                patch.object(
+                    MATRIX, "install_artifact", side_effect=RuntimeError("stop")
+                ) as install,
+            ):
+                with self.assertRaisesRegex(RuntimeError, "stop"):
+                    MATRIX.run_case(case, options, wheel)
+            self.assertTrue(install.call_args.kwargs["upgrade"])
+
+    def test_lance_matrix_defaults_overrides_and_skips(self):
+        """Test the verified dependency combinations and reject skipped suites."""
+        script = SCRIPT.parent / "run_lance_ray_matrix.py"
+        spec = importlib.util.spec_from_file_location("lance_matrix_test", script)
+        matrix = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {spec.name: matrix}):
+            spec.loader.exec_module(matrix)
+            self.assertEqual(
+                matrix.dependency_specs("0.5.0", None, None),
+                ("ray==2.59.0", "lance-namespace==0.13.0"),
+            )
+            for version in ("0.3.0", "0.4.2"):
+                self.assertEqual(
+                    matrix.dependency_specs(version, None, None),
+                    ("ray==2.55.1", "lance-namespace==0.7.5"),
+                )
+            self.assertEqual(
+                matrix.dependency_specs(
+                    "0.5.0", "ray==2.60.0", "lance-namespace==0.13.0"
+                ),
+                ("ray==2.60.0", "lance-namespace==0.13.0"),
+            )
+            for output, expected in (
+                ("Ran 1 test in 0.1s\n\nOK\n", 0),
+                ("Ran 1 test in 0.1s\n\nOK (skipped=1)\n", 1),
+                ("Ran 0 tests in 0.1s\n\nOK\n", 1),
+            ):
+                with self.subTest(output=output):
+                    completed = subprocess.CompletedProcess([], 0, "", output)
+                    with (
+                        patch.object(matrix.subprocess, "run", return_value=completed),
+                        redirect_stdout(StringIO()),
+                        redirect_stderr(StringIO()),
+                    ):
+                        self.assertEqual(
+                            matrix.run_unittest(Path(sys.executable), Path(".")),
+                            expected,
+                        )
+
     def test_test_workspace_does_not_copy_the_sdk(self):
         """Only test fixtures are available from the isolated working directory."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -186,6 +329,70 @@ class TestCoreCompatibilityMatrix(unittest.TestCase):
                     environment,
                 )
                 self.assertEqual(actual.strip(), marker)
+
+    def test_upgrade_selects_newer_dependency_in_reused_environment(self):
+        """Real pip upgrades a direct dependency only for the latest case."""
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            python = MATRIX.prepare_environment(sys.executable, directory / "venv")
+            wheels = directory / "wheels"
+            wheels.mkdir()
+            for name, version in (
+                ("simplejson", "4.2.0"),
+                ("simplejson", "4.3.0"),
+                ("apache_gravitino", "2.0.0.dev0"),
+            ):
+                metadata_dir = f"{name}-{version}.dist-info"
+                with ZipFile(
+                    wheels / f"{name}-{version}-py3-none-any.whl", "w"
+                ) as archive:
+                    metadata = (
+                        f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n"
+                    )
+                    if name == "apache_gravitino":
+                        metadata += "Requires-Dist: simplejson>=3.20.1,<5\n"
+                    archive.writestr(f"{metadata_dir}/METADATA", metadata)
+                    archive.writestr(
+                        f"{metadata_dir}/WHEEL",
+                        "Wheel-Version: 1.0\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+                    )
+                    archive.writestr(f"{metadata_dir}/RECORD", "")
+            environment = MATRIX.clean_environment()
+            environment.update({"PIP_NO_INDEX": "1", "PIP_FIND_LINKS": str(wheels)})
+            log = directory / "install.log"
+            MATRIX.run_command(
+                [
+                    str(python),
+                    "-m",
+                    "pip",
+                    "install",
+                    str(wheels / "simplejson-4.2.0-py3-none-any.whl"),
+                ],
+                directory,
+                log,
+                environment,
+            )
+            for upgrade, expected in ((False, "4.2.0"), (True, "4.3.0")):
+                MATRIX.install_artifact(
+                    python,
+                    wheels / "apache_gravitino-2.0.0.dev0-py3-none-any.whl",
+                    ["simplejson"],
+                    directory,
+                    log,
+                    environment,
+                    upgrade=upgrade,
+                )
+                actual = MATRIX.run_command(
+                    [
+                        str(python),
+                        "-c",
+                        "import importlib.metadata; print(importlib.metadata.version('simplejson'))",
+                    ],
+                    directory,
+                    log,
+                    environment,
+                )
+                self.assertEqual(actual.strip(), expected)
 
     def test_owned_server_preserves_an_existing_listener(self):
         """An occupied endpoint is rejected without starting or stopping a service."""

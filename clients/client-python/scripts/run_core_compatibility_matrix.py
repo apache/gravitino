@@ -15,7 +15,18 @@
 # specific language governing permissions and limitations
 # under the License.
 
-"""Verify installed core SDK artifacts in isolated Ray dependency environments."""
+"""Verify installed SDK artifacts in isolated Ray and storage environments.
+
+Build the server with ``./gradlew compileDistribution -PskipWeb=true -x test``,
+then run ``./gradlew :clients:client-python:coreCompatibilityTest -PskipWeb=true``
+with Python 3.10 and 3.12 available. The task starts an owned foreground service
+on port 8090. Interpreter paths can be set
+with ``coreCompatibilityPython`` and ``coreCompatibilityMinimumPython``.
+Logs, resolved requirements and results are retained under
+``clients/client-python/build/core-compatibility``. The ``ray-latest`` case
+allows pip to select the latest compatible releases; ``storage-min`` exercises
+the declared storage floors with existing filesystem unit tests.
+"""
 
 from __future__ import annotations
 
@@ -49,6 +60,18 @@ CORE_TESTS = (
     "tests.unittests.api.semantic.test_semantic_model_supporting_types",
     "tests.compatibility.test_core_metadata",
 )
+STORAGE_TESTS = (
+    "tests.unittests.test_gvfs_with_local",
+    "tests.unittests.test_gvfs_with_hook",
+    "tests.unittests.test_gvfs_credential_cache",
+    "tests.unittests.test_gvfs_lazy_loading",
+    "tests.unittests.test_gvfs_merge_secrets",
+    "tests.unittests.test_gvfs_user_defined_configs",
+    "tests.unittests.test_gvfs_without_fileset",
+    "tests.unittests.test_filesystem_cache",
+    "tests.unittests.test_storage_handler",
+    "tests.unittests.test_client_import_without_storage_dependencies",
+)
 PROBE = """
 import importlib.metadata as metadata
 import json
@@ -71,14 +94,41 @@ class CompatibilityCase:
 
     name: str
     python_minor: tuple[int, int]
-    simplejson: str
+    simplejson: str | None
     arrow: str | None = None
     pandas: str | None = None
+    latest: bool = False
+    storage_min: bool = False
 
-    def dependencies(self) -> dict[str, str]:
+    def dependencies(self) -> dict[str, str | None]:
         """Return only the versions whose compatibility this case claims."""
+        if self.latest:
+            return {
+                name: None
+                for name in (
+                    "dataclasses-json",
+                    "simplejson",
+                    "ray",
+                    "pyarrow",
+                    "pandas",
+                )
+            }
         dependencies = {"dataclasses-json": "0.6.7", "simplejson": self.simplejson}
-        if self.arrow is not None:
+        if self.storage_min:
+            dependencies.update(
+                {
+                    "cachetools": "7.1.4",
+                    "fsspec": "2023.12.1",
+                    "readerwriterlock": "1.0.9",
+                    "pyarrow": "17.0.0",
+                    "s3fs": "2023.12.1",
+                    "gcsfs": "2023.12.1",
+                    "ossfs": "2025.5.0",
+                    "adlfs": "2026.2.0",
+                    "pandas": "2.3.3",
+                }
+            )
+        elif self.arrow is not None:
             if self.pandas is None:
                 raise ValueError("Ray cases require an explicit pandas version")
             dependencies.update(
@@ -92,10 +142,13 @@ class CompatibilityCase:
 
     def requirements(self) -> list[str]:
         """Return normal pip requirements, with Ray's Data extra when needed."""
-        return [
-            f"{'ray[data]' if name == 'ray' else name}=={version}"
-            for name, version in self.dependencies().items()
-        ]
+        requirements = []
+        for name, version in self.dependencies().items():
+            package = "ray[data]" if name == "ray" else name
+            requirements.append(package if version is None else f"{package}=={version}")
+        if self.storage_min:
+            requirements.append("pyjwt[crypto]==2.13.0")
+        return requirements
 
 
 CASES = (
@@ -103,6 +156,8 @@ CASES = (
     CompatibilityCase("ray-arrow17", (3, 12), "4.2.0", "17.0.0", "2.2.3"),
     CompatibilityCase("ray-arrow23", (3, 12), "4.2.0", "23.0.1", "2.3.3"),
     CompatibilityCase("ray-arrow26", (3, 12), "4.2.0", "26.0.0", "3.0.6"),
+    CompatibilityCase("storage-min", (3, 10), "3.20.1", storage_min=True),
+    CompatibilityCase("ray-latest", (3, 12), None, latest=True),
 )
 
 
@@ -124,14 +179,27 @@ def run_command(
     command: list[str], working_dir: Path, log: Path, environment: dict[str, str]
 ) -> str:
     """Run a command, preserve its output, and reject any nonzero result."""
-    result = subprocess.run(
-        command,
-        cwd=working_dir,
-        env=environment,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            command,
+            cwd=working_dir,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=600,
+        )
+    except subprocess.TimeoutExpired as error:
+        with log.open("a", encoding="utf-8") as output:
+            output.write(f"$ {json.dumps(command)}\nTimed out after 600 seconds\n")
+            for content in (error.stdout, error.stderr):
+                if content:
+                    output.write(
+                        content.decode("utf-8", errors="replace")
+                        if isinstance(content, bytes)
+                        else content
+                    )
+        raise RuntimeError(f"Command timed out; see {log}") from error
     with log.open("a", encoding="utf-8") as output:
         output.write(f"$ {json.dumps(command)}\n")
         output.write(result.stdout)
@@ -156,19 +224,24 @@ def assert_probe(
         raise ValueError(f"SDK was imported outside the case environment: {sdk_path}")
     expected = {"apache-gravitino": sdk_version, **case.dependencies()}
     for name, version in expected.items():
-        if probe["versions"].get(name) != version:
+        actual = probe["versions"].get(name)
+        if actual is None or (version is not None and actual != version):
             raise ValueError(f"Unexpected {name} version for {case.name}")
     return probe["versions"]
 
 
 def prepare_environment(interpreter: str, directory: Path) -> Path:
     """Create a dedicated venv without inheriting global site packages."""
-    result = subprocess.run(
-        [interpreter, "-m", "venv", str(directory)],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [interpreter, "-m", "venv", str(directory)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError("Creating the case environment timed out") from error
     if result.returncode:
         raise RuntimeError(f"Cannot create case environment: {result.stderr}")
     return directory / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
@@ -186,11 +259,13 @@ def prepare_tests(directory: Path) -> None:
 
 def install_artifact(
     python: Path,
-    artifact: Path,
+    artifact: Path | str,
     requirements: list[str],
     workspace: Path,
     log: Path,
     environment: dict[str, str],
+    *,
+    upgrade: bool = False,
 ) -> None:
     """Replace even a same-version SDK while preserving installed dependencies."""
     run_command(
@@ -199,8 +274,11 @@ def install_artifact(
         log,
         environment,
     )
+    install = [str(python), "-m", "pip", "install"]
+    if upgrade:
+        install.append("--upgrade")
     run_command(
-        [str(python), "-m", "pip", "install", str(artifact), *requirements],
+        [*install, str(artifact), *requirements],
         workspace,
         log,
         environment,
@@ -326,8 +404,18 @@ def run_case(case: CompatibilityCase, options: argparse.Namespace, wheel: Path) 
     environment["GRAVITINO_CORE_COMPATIBILITY_URI"] = options.gravitino_uri
     environment["GRAVITINO_CORE_COMPATIBILITY_SOURCE"] = str(CLIENT_ROOT)
     # The minimum case installs the original sdist; other cases install its wheel.
-    artifact = options.artifact if case.name == "core-min" else wheel
-    install_artifact(python, artifact, case.requirements(), workspace, log, environment)
+    artifact: Path | str = options.artifact if case.name == "core-min" else wheel
+    if case.storage_min:
+        artifact = f"{wheel}[storage]"
+    install_artifact(
+        python,
+        artifact,
+        case.requirements(),
+        workspace,
+        log,
+        environment,
+        upgrade=case.latest,
+    )
     run_command([str(python), "-m", "pip", "check"], workspace, log, environment)
     sdk_version = wheel_version(wheel)
     package_names = ["apache-gravitino", *case.dependencies()]
@@ -338,14 +426,14 @@ def run_case(case: CompatibilityCase, options: argparse.Namespace, wheel: Path) 
         environment,
     )
     versions = assert_probe(json.loads(output), case, sdk_version)
-    if case.arrow is not None:
+    if case.arrow is not None or case.latest:
         run_command(
             [str(python), "-c", "import ray.data; import gravitino"],
             workspace,
             log,
             environment,
         )
-    else:
+    elif not case.storage_min:
         run_command(
             [
                 str(python),
@@ -359,7 +447,13 @@ def run_case(case: CompatibilityCase, options: argparse.Namespace, wheel: Path) 
             environment,
         )
     run_command(
-        [str(python), "-m", "unittest", "-v", *CORE_TESTS],
+        [
+            str(python),
+            "-m",
+            "unittest",
+            "-v",
+            *(STORAGE_TESTS if case.storage_min else CORE_TESTS),
+        ],
         workspace,
         log,
         environment,

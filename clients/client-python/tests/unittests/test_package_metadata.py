@@ -95,7 +95,7 @@ class TestPackageMetadata(unittest.TestCase):
             if requirement.startswith("simplejson")
         )
         self.assertIn(">=3.20.1", simplejson_requirement)
-        self.assertIn("<=4.2.0", simplejson_requirement)
+        self.assertIn("<5", simplejson_requirement)
         dataclasses_requirement = next(
             requirement
             for requirement in base_requirements
@@ -183,17 +183,17 @@ class TestPackageMetadata(unittest.TestCase):
         """Generated requirements retain accepted points and reject boundary violations."""
         version_points = {
             "dataclasses-json": (("0.6.7",), ("0.6.6", "0.7.0")),
-            "simplejson": (("3.20.1", "4.2.0"), ("3.20.0", "4.2.1")),
+            "simplejson": (("3.20.1", "4.2.0", "4.3.0"), ("3.20.0", "5.0.0")),
             "cachetools": (("7.1.4", "7.2.7"), ("7.1.3", "8.0.0")),
-            "fsspec": (("2023.12.1", "2026.9.0"), ("2023.12.0", "2026.9.1")),
+            "fsspec": (("2023.12.1", "2026.9.0"), ("2023.12.0",)),
             "readerwriterlock": (("1.0.9", "1.0.10"), ("1.0.8", "2.0.0")),
-            "pyarrow": (("17.0.0", "26.0.0"), ("16.1.0", "26.0.1")),
-            "s3fs": (("2023.12.1", "2026.9.0"), ("2023.12.0", "2026.9.1")),
-            "gcsfs": (("2023.12.1", "2026.10.1"), ("2023.12.0", "2026.10.2")),
+            "pyarrow": (("17.0.0", "26.0.1"), ("16.1.0", "27.0.0")),
+            "s3fs": (("2023.12.1", "2026.9.0"), ("2023.12.0",)),
+            "gcsfs": (("2023.12.1", "2026.10.1"), ("2023.12.0",)),
             "ossfs": (("2025.5.0",), ("2025.4.0",)),
-            "adlfs": (("2026.2.0", "2026.8.0"), ("2026.1.0", "2026.8.1")),
-            "ray": (("2.55.1", "2.59.0"), ("2.55.0", "2.59.1")),
-            "lance-ray": (("0.3.0", "0.5.0"), ("0.2.0", "0.5.1")),
+            "adlfs": (("2026.2.0", "2026.8.0"), ("2026.1.0",)),
+            "ray": (("2.55.1", "2.59.0", "2.60.0"), ("2.55.0",)),
+            "lance-ray": (("0.3.0", "0.5.0", "0.5.1"), ("0.2.0", "1.0.0")),
         }
         requirements = [
             Requirement(value)
