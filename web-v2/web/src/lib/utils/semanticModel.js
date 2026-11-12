@@ -38,6 +38,24 @@ export const semanticDataTypes = [
 
 const isNonBlankString = value => typeof value === 'string' && value.trim() !== ''
 
+const normalizeFieldName = name => name.toLowerCase()
+
+const declaredFieldNames = dataset =>
+  new Set(
+    (Array.isArray(dataset?.fields) ? dataset.fields : [])
+      .map(field => field?.name)
+      .filter(isNonBlankString)
+      .map(normalizeFieldName)
+  )
+
+const validateFieldReferences = (references, path, datasetName, fieldNames, errors) => {
+  references.forEach((reference, index) => {
+    if (isNonBlankString(reference) && !fieldNames.has(normalizeFieldName(reference))) {
+      errors.push(`${path}[${index}] '${reference}' is not a declared field of dataset "${datasetName}".`)
+    }
+  })
+}
+
 const duplicatesOf = names => {
   const seen = new Set()
   const duplicates = new Set()
@@ -147,7 +165,13 @@ const validateDatasets = (datasets, errors) => {
 
     validateSource(dataset, errors)
     validateMetadata(dataset, `datasets[${index}]`, errors)
+
+    // Keys name fields declared by the dataset, not columns of its source.
+    const fieldNames = declaredFieldNames(dataset)
     validateStringArray(dataset.primaryKey, `datasets[${index}].primaryKey`, errors)
+    if (Array.isArray(dataset.primaryKey)) {
+      validateFieldReferences(dataset.primaryKey, `datasets[${index}].primaryKey`, dataset.name, fieldNames, errors)
+    }
 
     if (dataset.uniqueKeys != null) {
       if (!Array.isArray(dataset.uniqueKeys)) {
@@ -159,6 +183,7 @@ const validateDatasets = (datasets, errors) => {
             errors.push(`${path} must be a non-empty array.`)
           } else {
             validateStringArray(key, path, errors)
+            validateFieldReferences(key, path, dataset.name, fieldNames, errors)
           }
         })
       }
@@ -195,7 +220,7 @@ const validateDatasets = (datasets, errors) => {
   }
 }
 
-const validateRelationships = (relationships, datasetNames, errors) => {
+const validateRelationships = (relationships, datasetNames, datasetFields, errors) => {
   relationships.forEach((relationship, index) => {
     if (!isPlainObject(relationship) || !isNonBlankString(relationship.name)) {
       errors.push(`relationships[${index}] must have a non-empty name.`)
@@ -222,6 +247,16 @@ const validateRelationships = (relationships, datasetNames, errors) => {
     }
     validateStringArray(fromColumns, `relationships[${index}].fromColumns`, errors)
     validateStringArray(toColumns, `relationships[${index}].toColumns`, errors)
+
+    // Endpoint columns name fields declared by the endpoint datasets, not source columns.
+    const fromFieldNames = datasetFields.get(from)
+    const toFieldNames = datasetFields.get(to)
+    if (fromFieldNames) {
+      validateFieldReferences(fromColumns, `relationships[${index}].fromColumns`, from, fromFieldNames, errors)
+    }
+    if (toFieldNames) {
+      validateFieldReferences(toColumns, `relationships[${index}].toColumns`, to, toFieldNames, errors)
+    }
   })
 
   const duplicates = duplicatesOf(relationships.map(relationship => relationship?.name).filter(isNonBlankString))
@@ -251,7 +286,7 @@ const validateMetrics = (metrics, errors) => {
 /**
  * Checks the structural rules the server also enforces, so obvious mistakes are reported before the
  * request is sent. The server stays the authority: it additionally resolves every dataset source
- * and its columns against the catalog, which the browser cannot do.
+ * against the catalog, which the browser cannot do.
  *
  * @param {unknown} definition The parsed semantic model definition.
  * @returns {string[]} The problems found, empty when the definition looks well formed.
@@ -273,10 +308,15 @@ export const validateSemanticModelDefinition = definition => {
   validateMetadata(definition, 'definition', errors)
 
   const datasetNames = new Set(datasets.map(dataset => dataset?.name).filter(isNonBlankString))
+  const datasetFields = new Map(
+    datasets
+      .filter(dataset => isPlainObject(dataset) && isNonBlankString(dataset?.name))
+      .map(dataset => [dataset.name, declaredFieldNames(dataset)])
+  )
 
   if (relationships != null) {
     if (Array.isArray(relationships)) {
-      validateRelationships(relationships, datasetNames, errors)
+      validateRelationships(relationships, datasetNames, datasetFields, errors)
     } else {
       errors.push('The definition must declare relationships as an array.')
     }
