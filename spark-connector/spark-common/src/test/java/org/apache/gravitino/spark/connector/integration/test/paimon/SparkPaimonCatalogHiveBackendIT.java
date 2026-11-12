@@ -215,7 +215,8 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
         .sql(
             String.format(
                 "SHOW TBLPROPERTIES %s.%s.%s", DIRECT_CATALOG, getDefaultDatabase(), tableName))
-        .collectAsList().stream()
+        .collectAsList()
+        .stream()
         .collect(Collectors.toMap(r -> r.getString(0), r -> r.getString(1)));
   }
 }
