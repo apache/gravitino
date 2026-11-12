@@ -204,12 +204,19 @@ public class PartitionUtils {
   }
 
   private static String formatLiteral(Transform transform, Type type, String rawValue) {
-    // years/months/hours/bucket partition values are already Iceberg ints; leave unchanged.
+    // years/months/hours/bucket partition values are Iceberg ints; validate before emitting.
     if (transform instanceof Transforms.YearTransform
         || transform instanceof Transforms.MonthTransform
         || transform instanceof Transforms.HourTransform
         || transform instanceof Transforms.BucketTransform) {
-      return rawValue;
+      try {
+        return Long.toString(Long.parseLong(rawValue));
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            "Partition value for years/months/hours/bucket must be an integer, but got: "
+                + rawValue,
+            e);
+      }
     }
 
     // days() → DateType; double-quoted DATE survives CALL where => '...' embedding.
@@ -274,8 +281,17 @@ public class PartitionUtils {
     }
   }
 
+  /**
+   * Escapes a value for a double-quoted Iceberg Spark literal that is later embedded in {@code CALL
+   * ... where => '...'} via {@code IcebergJobUtils.escapeSqlString} (single-quote doubling only).
+   *
+   * <p>Spark's outer single-quoted string still unescapes backslashes ({@code \\} → {@code \},
+   * {@code \"} → {@code "}). Emit twice as many backslashes as the inner double-quoted literal
+   * needs so the escapes survive that outer parse.
+   */
   private static String escapeStringLiteral(String value) {
-    return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    // Inner needs \ → \\ and " → \"; outer then consumes one backslash layer.
+    return value.replace("\\", "\\\\\\\\").replace("\"", "\\\\\\\"");
   }
 
   private static String joinFieldName(String[] fieldNameParts) {

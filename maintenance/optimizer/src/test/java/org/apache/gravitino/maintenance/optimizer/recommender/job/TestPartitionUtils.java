@@ -85,7 +85,8 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("colA = \"a\\\"b\\\\c\"", where);
+    // Doubled backslashes: survive CALL where => '...' outer unescape, then inner \" / \\.
+    Assertions.assertEquals("colA = \"a\\\\\\\"b\\\\\\\\c\"", where);
   }
 
   @Test
@@ -121,7 +122,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\"x\\\\y\"", where);
+    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\\\\\"x\\\\\\\\y\"", where);
   }
 
   @Test
@@ -377,6 +378,34 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     Assertions.assertEquals("years(event_time) = 56", where);
+  }
+
+  @Test
+  void testYearPartitionRejectsNonIntegerValue() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("year", "not-an-int"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.year("event_time")};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("must be an integer"));
+    Assertions.assertTrue(ex.getMessage().contains("not-an-int"));
+  }
+
+  @Test
+  void testBucketPartitionRejectsNonIntegerValue() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("bucket", "14.5"));
+    Column[] columns = new Column[] {column("user_id", Types.LongType.get())};
+    Transform[] transforms = new Transform[] {Transforms.bucket(16, new String[] {"user_id"})};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("must be an integer"));
+    Assertions.assertTrue(ex.getMessage().contains("14.5"));
   }
 
   @Test

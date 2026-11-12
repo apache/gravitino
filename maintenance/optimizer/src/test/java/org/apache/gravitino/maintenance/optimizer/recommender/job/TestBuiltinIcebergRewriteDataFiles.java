@@ -225,6 +225,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
       for (boolean ansi : new boolean[] {false, true}) {
         spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(ansi));
         assertRewriteCallForIdentityString(spark, ansi);
+        assertRewriteCallForIdentityStringWithSingleQuote(spark, ansi);
+        assertRewriteCallForIdentityStringWithQuoteAndBackslash(spark, ansi);
         assertRewriteCallForIdentityDate(spark, ansi);
         assertRewriteCallForIdentityTimestamp(spark, ansi);
         assertRewriteCallForDays(spark, ansi);
@@ -261,6 +263,47 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
     Assertions.assertEquals("(region = \"usa\")", where);
+    callRewrite(spark, table, where);
+  }
+
+  private static void assertRewriteCallForIdentityStringWithSingleQuote(
+      SparkSession spark, boolean ansi) {
+    String table = fullTable("id_str_sq_" + ansiFlag(ansi));
+    recreateTable(
+        spark,
+        table,
+        "(id INT, region STRING)",
+        "region",
+        "INSERT INTO " + table + " SELECT id, 'O''Brien' FROM range(0, 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", "O'Brien")))),
+            new Column[] {column("region", Types.StringType.get())},
+            new Transform[] {Transforms.identity("region")});
+    Assertions.assertEquals("(region = \"O'Brien\")", where);
+    callRewrite(spark, table, where);
+  }
+
+  private static void assertRewriteCallForIdentityStringWithQuoteAndBackslash(
+      SparkSession spark, boolean ansi) {
+    String table = fullTable("id_str_qb_" + ansiFlag(ansi));
+    String partitionValue = "a\"b\\c";
+    recreateTable(
+        spark,
+        table,
+        "(id INT, region STRING)",
+        "region",
+        // Spark SQL string: \" → ", \\ → \
+        "INSERT INTO " + table + " SELECT id, 'a\\\"b\\\\c' FROM range(0, 20)");
+    String stored = spark.sql("SELECT region FROM " + table + " LIMIT 1").first().getString(0);
+    Assertions.assertEquals(
+        partitionValue, stored, "INSERT must store the intended partition value");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
+            new Column[] {column("region", Types.StringType.get())},
+            new Transform[] {Transforms.identity("region")});
+    Assertions.assertEquals("(region = \"a\\\\\\\"b\\\\\\\\c\")", where);
     callRewrite(spark, table, where);
   }
 
@@ -610,15 +653,21 @@ public class TestBuiltinIcebergRewriteDataFiles {
 
   private static void callRewrite(SparkSession spark, String fullTableName, String whereClause) {
     String tableArg = fullTableName.substring(SPARK_CATALOG_NAME.length() + 1);
+    // Mirror IcebergRewriteDataFilesJob.buildProcedureCall / IcebergJobUtils.escapeSqlString.
     String sql =
         "CALL "
             + SPARK_CATALOG_NAME
             + ".system.rewrite_data_files(table => '"
-            + tableArg
+            + escapeSqlString(tableArg)
             + "', strategy => 'binpack', where => '"
-            + whereClause
+            + escapeSqlString(whereClause)
             + "')";
     Assertions.assertDoesNotThrow(() -> spark.sql(sql).collect());
+  }
+
+  /** Same as {@code IcebergJobUtils.escapeSqlString}: double single quotes only. */
+  private static String escapeSqlString(String value) {
+    return value == null ? null : value.replace("'", "''");
   }
 
   private static GravitinoMetalake loadOrCreateMetalake(
