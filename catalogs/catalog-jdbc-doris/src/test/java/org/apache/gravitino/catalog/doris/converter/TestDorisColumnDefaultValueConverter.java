@@ -18,9 +18,12 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
+import java.time.LocalDate;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -62,6 +65,22 @@ public class TestDorisColumnDefaultValueConverter {
   public void testNumericDefaultUsesLegacyCompatibleQuotedSyntax() {
     Assertions.assertEquals(
         "\"7\"", CONVERTER.fromGravitinoForAddColumn(Literals.integerLiteral(7), false));
+    Assertions.assertEquals(
+        "\"42\"",
+        CONVERTER.fromGravitinoForAddColumn(Literals.of(" 42 ", Types.IntegerType.get()), false));
+    Assertions.assertEquals(
+        "\"\"",
+        CONVERTER.fromGravitinoForAddColumn(Literals.of("", Types.IntegerType.get()), false));
+    for (String invalid : new String[] {"abc", "1); DROP TABLE t; --"}) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  CONVERTER.fromGravitinoForAddColumn(
+                      Literals.of(invalid, Types.IntegerType.get()), false));
+      Assertions.assertEquals(
+          "Invalid numeric column default value: " + invalid, exception.getMessage());
+    }
   }
 
   @Test
@@ -129,6 +148,20 @@ public class TestDorisColumnDefaultValueConverter {
             false,
             false));
     Assertions.assertEquals(
+        Literals.stringLiteral("owner's \"value\"\\path"),
+        CONVERTER.toGravitino(
+            new JdbcTypeConverter.JdbcTypeBean(DorisTypeConverter.STRING),
+            "owner's \\\"value\\\"\\\\path",
+            false,
+            false));
+    Assertions.assertEquals(
+        Literals.dateLiteral(LocalDate.of(2024, 1, 2)),
+        CONVERTER.toGravitino(
+            new JdbcTypeConverter.JdbcTypeBean(DorisTypeConverter.DATEV2),
+            "2024-01-02",
+            false,
+            false));
+    Assertions.assertEquals(
         Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's \\\"value\\\"\\\\path", false, false));
     Assertions.assertEquals(
@@ -137,5 +170,55 @@ public class TestDorisColumnDefaultValueConverter {
     Assertions.assertEquals(
         Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's a\"\"b \"value\"\\\\path", false, false));
+  }
+
+  /** Verifies loaded literal and native expression defaults use MODIFY COLUMN SQL forms. */
+  @Test
+  public void testModifyColumnSerializesLoadedDefaultValues() {
+    Assertions.assertNull(
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_NOT_SET, false, false));
+    Assertions.assertEquals(
+        "NULL", CONVERTER.fromGravitinoForModifyColumn(Literals.NULL, false, false));
+    Assertions.assertEquals(
+        "7", CONVERTER.fromGravitinoForModifyColumn(Literals.integerLiteral(7), false, false));
+    Assertions.assertEquals(
+        "CURRENT_TIMESTAMP",
+        CONVERTER.fromGravitinoForModifyColumn(DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
+    Assertions.assertEquals(
+        "CURRENT_DATE",
+        CONVERTER.fromGravitinoForModifyColumn(
+            UnparsedExpression.of("CURRENT_DATE"), false, false));
+
+    Assertions.assertEquals(
+        "\"owner's \\\"value\\\"\\\\path\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)), false, false));
+  }
+
+  /** Verifies adjacent backslash and quote escaping for Doris 3.x and 4.x. */
+  @Test
+  public void testModifyColumnEscapesAdjacentBackslashAndQuoteByDorisVersion() {
+    String defaultValue = "prefix" + "\\" + "\"" + "suffix";
+
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(3) + "\"suffix\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), false, false));
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(7) + "\"suffix\"",
+        CONVERTER.fromGravitinoForModifyColumn(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), true, true));
+  }
+
+  @Test
+  public void testCreateTableStringDefaultLiteralForms() {
+    DorisColumnDefaultValueConverter converter = new DorisColumnDefaultValueConverter();
+    Literal<?> value = Literals.varcharLiteral(64, "O'Brien C:\\tmp \"x\"");
+    Assertions.assertEquals(
+        "\"O'Brien C:\\\\tmp \\\"x\\\"\"", converter.fromGravitinoForCreateTable(value, true));
+    Assertions.assertEquals(
+        "'O''Brien C:\\\\tmp \"x\"'", converter.fromGravitinoForCreateTable(value, false));
+    Assertions.assertEquals(
+        "12", converter.fromGravitinoForCreateTable(Literals.integerLiteral(12), true));
   }
 }

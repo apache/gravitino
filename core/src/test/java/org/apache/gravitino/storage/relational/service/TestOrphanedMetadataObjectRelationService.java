@@ -25,7 +25,10 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -108,6 +111,38 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
     Assertions.assertEquals(0, countActiveRelations(droppedColumn.id()));
   }
 
+  @TestTemplate
+  public void testSoftDeleteOrphanedSemanticModelRelations() throws Exception {
+    String metalake = "metalake_for_semantic_model_orphan_test";
+    String catalog = "catalog_for_semantic_model_orphan_test";
+    String schema = "schema_for_semantic_model_orphan_test";
+    BaseMetalake metalakeEntity = createAndInsertMakeLake(metalake);
+    CatalogEntity catalogEntity = createAndInsertCatalog(metalake, catalog);
+    SchemaEntity schemaEntity = createAndInsertSchema(metalake, catalog, schema);
+
+    // Insert the identity row directly to isolate relation cleanup from lifecycle operations.
+    long liveSemanticModelId = 123456789L;
+    insertSemanticModel(
+        liveSemanticModelId,
+        "live_semantic_model",
+        metalakeEntity.id(),
+        catalogEntity.id(),
+        schemaEntity.id());
+
+    insertRelations("SEMANTIC_MODEL", liveSemanticModelId, ORPHAN_ID);
+
+    Assertions.assertEquals(
+        4,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+    Assertions.assertEquals(4, countActiveRelations(liveSemanticModelId));
+    Assertions.assertEquals(0, countActiveRelations(ORPHAN_ID));
+    Assertions.assertEquals(
+        0,
+        OrphanedMetadataObjectRelationService.getInstance()
+            .softDeleteOrphanedRelations(MetadataObject.Type.SEMANTIC_MODEL, 10));
+  }
+
   private static ColumnEntity column(long id, String name, int position) {
     return ColumnEntity.builder()
         .withId(id)
@@ -118,6 +153,30 @@ public class TestOrphanedMetadataObjectRelationService extends TestJDBCBackend {
         .withAutoIncrement(false)
         .withAuditInfo(AUDIT_INFO)
         .build();
+  }
+
+  private void insertSemanticModel(
+      long semanticModelId, String name, long metalakeId, long catalogId, long schemaId)
+      throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          "INSERT INTO semantic_model_meta (semantic_model_id, semantic_model_name, metalake_id,"
+              + " catalog_id, schema_id, audit_info, current_version, last_version, deleted_at)"
+              + " VALUES ("
+              + semanticModelId
+              + ", '"
+              + name
+              + "', "
+              + metalakeId
+              + ", "
+              + catalogId
+              + ", "
+              + schemaId
+              + ", '{}', 1, 1, 0)");
+    }
   }
 
   private void insertRelations(String type, long liveId, long orphanId) throws SQLException {

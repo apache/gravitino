@@ -38,6 +38,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.apache.gravitino.hive.hms.MiniHiveMetastoreService;
 import org.apache.gravitino.meta.AuditInfo;
@@ -227,5 +228,29 @@ public class TestHiveCatalog extends MiniHiveMetastoreService {
                 String.format(
                     "Properties or property prefixes are required and must be set: [%s]",
                     METASTORE_URIS)));
+  }
+
+  @Test
+  void testPathBasedCredentialProvidersRejected() {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("catalog")
+            .withNamespace(Namespace.of("metalake"))
+            .withType(HiveCatalog.Type.RELATIONAL)
+            .withProvider("hive")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    HiveCatalog catalog = new HiveCatalog().withCatalogEntity(entity);
+
+    Assertions.assertFalse(catalog.supportsPathBasedCredentials());
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog.validateCredentialProviders(
+                    ImmutableMap.of(CredentialConstants.CREDENTIAL_PROVIDERS, "s3-token")));
+    Assertions.assertTrue(exception.getMessage().contains("s3-token"));
   }
 }

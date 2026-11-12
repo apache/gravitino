@@ -21,7 +21,7 @@ package org.apache.gravitino.storage;
 /** Property names for AWS static credentials shared across catalogs. */
 public final class AWSProperties {
 
-  /** AWS access key ID. Not hidden. */
+  /** AWS access key ID. Hidden (identifier half of a static credential pair). */
   public static final String GRAVITINO_AWS_ACCESS_KEY_ID = "aws-access-key-id";
 
   /** AWS secret access key. Hidden. */

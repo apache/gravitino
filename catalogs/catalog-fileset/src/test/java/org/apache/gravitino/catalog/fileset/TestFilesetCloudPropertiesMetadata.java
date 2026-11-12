@@ -53,12 +53,12 @@ public class TestFilesetCloudPropertiesMetadata {
   @ParameterizedTest
   @MethodSource("filesetPropertiesMetadata")
   void testCloudCredentialsAreHidden(PropertiesMetadata metadata) {
-    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertFalse(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
     assertTrue(metadata.isHiddenProperty(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
-    assertFalse(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
   }
 
@@ -85,7 +85,9 @@ public class TestFilesetCloudPropertiesMetadata {
         HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
 
     assertEquals("s3a://bucket/path", response.get(FilesetCatalogPropertiesMetadata.LOCATION));
-    assertEquals("AKIATEST", response.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        response.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         response.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));

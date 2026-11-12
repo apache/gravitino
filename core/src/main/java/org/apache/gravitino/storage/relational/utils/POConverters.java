@@ -31,6 +31,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -64,6 +65,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -687,6 +689,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(filesetEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
+          .withOccVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withFilesetVersionPOs(filesetVersionPOs)
           .build();
@@ -696,23 +699,35 @@ public class POConverters {
   }
 
   /**
-   * Update FilesetPO version
+   * Updates fileset metadata, advancing OCC and reusing a known unchanged content snapshot.
    *
    * @param oldFilesetPO the existing {@link FilesetPO} containing the current and last version data
    * @param newFileset the {@link FilesetEntity} with updated metadata and storage locations
    * @param maxStoredVersion the highest version the fileset still has a stored snapshot for, or
-   *     {@code null} when it has none
-   * @return {@code FilesetPO} object with updated version
+   *     {@code null} when it has not been queried or no active snapshot exists
+   * @return the updated fileset row, carrying only newly allocated snapshot rows
    * @throws RuntimeException if JSON serialization of properties fails
    */
   public static FilesetPO updateFilesetPOWithVersion(
       FilesetPO oldFilesetPO, FilesetEntity newFileset, @Nullable Long maxStoredVersion) {
     try {
-      // Every successful fileset alter advances the OCC token. The current version is also the
-      // value used by reads to find the fileset details, so even a rename or audit-only change
-      // needs a complete snapshot at the new version. Alters that change nothing therefore still
-      // write one row per storage location; the version retention job is what removes them again.
-      //
+      // Every successful fileset alter advances the OCC token, which is the value the CAS compares.
+      Long occVersion = oldFilesetPO.getOccVersion() + 1;
+      String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
+
+      // The current version is a different thing: it is the join key reads use to find the fileset
+      // details, so it may only ever point at a version that has a stored snapshot. An alter that
+      // leaves every stored field untouched, such as a rename or an audit-only change, therefore
+      // keeps it where it is and writes no snapshot at all.
+      if (filesetSnapshotUnchanged(oldFilesetPO, newFileset, props)) {
+        return newFilesetPOBuilder(oldFilesetPO, newFileset)
+            .withCurrentVersion(oldFilesetPO.getCurrentVersion())
+            .withLastVersion(oldFilesetPO.getLastVersion())
+            .withOccVersion(occVersion)
+            .withFilesetVersionPOs(Collections.emptyList())
+            .build();
+      }
+
       // The stored snapshots are taken into account as well, because a fileset written before the
       // version reset was fixed can carry snapshots newer than the version its metadata row
       // records. Starting from the metadata row alone would rebuild a version that already exists
@@ -723,7 +738,6 @@ public class POConverters {
         previousVersion = Math.max(previousVersion, maxStoredVersion);
       }
       Long currentVersion = previousVersion + 1;
-      String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
       List<FilesetVersionPO> newFilesetVersionPOs =
           newFileset.storageLocations().entrySet().stream()
               .map(
@@ -741,17 +755,10 @@ public class POConverters {
                           .withDeletedAt(DEFAULT_DELETED_AT)
                           .build())
               .collect(Collectors.toList());
-      return FilesetPO.builder()
-          .withFilesetId(newFileset.id())
-          .withFilesetName(newFileset.name())
-          .withMetalakeId(oldFilesetPO.getMetalakeId())
-          .withCatalogId(oldFilesetPO.getCatalogId())
-          .withSchemaId(oldFilesetPO.getSchemaId())
-          .withType(newFileset.filesetType().name())
-          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
+      return newFilesetPOBuilder(oldFilesetPO, newFileset)
           .withCurrentVersion(currentVersion)
           .withLastVersion(currentVersion)
-          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withOccVersion(occVersion)
           .withFilesetVersionPOs(newFilesetVersionPOs)
           .build();
     } catch (JsonProcessingException e) {
@@ -759,8 +766,74 @@ public class POConverters {
     }
   }
 
+  private static FilesetPO.Builder newFilesetPOBuilder(
+      FilesetPO oldFilesetPO, FilesetEntity newFileset) throws JsonProcessingException {
+    return FilesetPO.builder()
+        .withFilesetId(newFileset.id())
+        .withFilesetName(newFileset.name())
+        .withMetalakeId(oldFilesetPO.getMetalakeId())
+        .withCatalogId(oldFilesetPO.getCatalogId())
+        .withSchemaId(oldFilesetPO.getSchemaId())
+        .withType(newFileset.filesetType().name())
+        .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
+        .withDeletedAt(DEFAULT_DELETED_AT);
+  }
+
   /**
-   * Builds the next complete policy metadata and content snapshot.
+   * Tells whether an alter leaves every field {@code fileset_version_info} stores untouched.
+   *
+   * <p>Compares exactly the persisted columns: comment, properties, and the storage locations.
+   * Properties are compared by value, because the same map can serialize in a different key order
+   * after a read/write round trip. This decides only whether to write a snapshot, never whether a
+   * concurrent write happened, which is what the OCC version is for; a wrong {@code false} costs
+   * one redundant snapshot, the behaviour every alter used to have.
+   *
+   * @param oldFilesetPO the row being replaced, carrying the snapshot its current version points at
+   * @param newFileset the updated fileset
+   * @param newProperties the updated properties, already serialized
+   * @return true when no stored field changed and no new snapshot is needed
+   */
+  private static boolean filesetSnapshotUnchanged(
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, String newProperties) {
+    List<FilesetVersionPO> storedVersions = oldFilesetPO.getFilesetVersionPOs();
+    if (storedVersions == null || storedVersions.isEmpty()) {
+      // Nothing to point at, so the alter has to write a snapshot whatever it changed.
+      return false;
+    }
+    Map<String, String> storedLocations =
+        storedVersions.stream()
+            .collect(
+                Collectors.toMap(
+                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
+    if (!storedLocations.equals(newFileset.storageLocations())) {
+      return false;
+    }
+    // Rows for the same snapshot share the comment and properties; only locations differ.
+    FilesetVersionPO snapshot = storedVersions.get(0);
+    return Objects.equals(snapshot.getFilesetComment(), newFileset.comment())
+        && filesetPropertiesUnchanged(
+            snapshot.getProperties(), newProperties, newFileset.properties());
+  }
+
+  private static boolean filesetPropertiesUnchanged(
+      String storedProperties, String newProperties, Map<String, String> newPropertyMap) {
+    if (Objects.equals(storedProperties, newProperties)) {
+      return true;
+    }
+
+    // The alter path copies properties into a HashMap, so the same map can serialize in a
+    // different key order than the stored snapshot. Compare the maps so a rename does not
+    // allocate a redundant snapshot.
+    try {
+      return Objects.equals(
+          JsonUtils.anyFieldMapper().readValue(storedProperties, Map.class), newPropertyMap);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize fileset properties:", e);
+    }
+  }
+
+  /**
+   * Updates policy metadata, advancing OCC and reusing a known unchanged content snapshot.
    *
    * <p>The row keeps the ID it already has: {@code oldPolicyPO} is the row being replaced, and its
    * ID is what the version snapshots and every relation row point at. An alter cannot change the
@@ -770,7 +843,7 @@ public class POConverters {
    *
    * @param oldPolicyPO The policy row observed by the caller.
    * @param newPolicy The policy values to persist.
-   * @return The policy row and version snapshot at the next monotonic version.
+   * @return The updated policy row and the content snapshot it points at.
    */
   public static PolicyPO updatePolicyPOWithVersion(PolicyPO oldPolicyPO, PolicyEntity newPolicy) {
     try {
@@ -788,7 +861,7 @@ public class POConverters {
   }
 
   /**
-   * Builds the next policy version from values that were serialized before acquiring a row lock.
+   * Updates a policy from values that were serialized before acquiring a row lock.
    *
    * <p>This overload is used by overwrite: the initialized replacement already contains the
    * serialized audit and content values, so advancing the locked row does not repeat CPU-bound JSON
@@ -796,7 +869,7 @@ public class POConverters {
    *
    * @param oldPolicyPO The locked policy row being replaced.
    * @param replacementPolicyPO The initialized replacement values.
-   * @return The policy row and version snapshot at the next monotonic version.
+   * @return The updated policy row and the content snapshot it points at.
    */
   public static PolicyPO updatePolicyPOWithVersion(
       PolicyPO oldPolicyPO, PolicyPO replacementPolicyPO) {
@@ -1153,7 +1226,8 @@ public class POConverters {
                 .withUserId(userEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(userEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1255,7 +1329,8 @@ public class POConverters {
                 .withGroupId(groupEntity.id())
                 .withRoleId(roleId)
                 .withAuditInfo(
-                    JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
+                    JsonUtils.anyFieldMapper()
+                        .writeValueAsString(roleAssignmentAudit(groupEntity.auditInfo())))
                 .withCurrentVersion(INIT_VERSION)
                 .withLastVersion(INIT_VERSION)
                 .withDeletedAt(DEFAULT_DELETED_AT)
@@ -1461,12 +1536,34 @@ public class POConverters {
 
   public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
       Long tagId, Long metadataObjectId, String metadataObjectType, String tagValue) {
+    return initializeTagMetadataObjectRelPOWithVersion(
+        tagId, metadataObjectId, metadataObjectType, tagValue, null);
+  }
+
+  /**
+   * Builds a tag assignment with explicit creation audit metadata.
+   *
+   * @param tagId The tag ID.
+   * @param metadataObjectId The object ID.
+   * @param metadataObjectType The object type.
+   * @param tagValue The optional assignment value.
+   * @param audit The audit to preserve, or null to use the current principal and time.
+   * @return The initialized relation row.
+   */
+  public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
+      Long tagId,
+      Long metadataObjectId,
+      String metadataObjectType,
+      String tagValue,
+      @Nullable Audit audit) {
     try {
-      AuditInfo auditInfo =
-          AuditInfo.builder()
-              .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
-              .withCreateTime(Instant.now())
-              .build();
+      Audit auditInfo =
+          audit == null
+              ? AuditInfo.builder()
+                  .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                  .withCreateTime(Instant.now())
+                  .build()
+              : audit;
 
       return TagMetadataObjectRelPO.builder()
           .withTagId(tagId)
@@ -1486,6 +1583,8 @@ public class POConverters {
   public static PolicyEntity fromPolicyPO(PolicyPO policyPO, Namespace namespace) {
     try {
       Policy.BuiltInType policyType = Policy.BuiltInType.fromPolicyType(policyPO.getPolicyType());
+      // Skip PolicyContent.validate() so stricter checks added after write do not break load,
+      // rename, comment, or enable of already-stored policies. Create/UpdateContent still validate.
       return PolicyEntity.builder()
           .withId(policyPO.getPolicyId())
           .withName(policyPO.getPolicyName())
@@ -1498,7 +1597,7 @@ public class POConverters {
                   .readValue(policyPO.getPolicyVersionPO().getContent(), policyType.contentClass()))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(policyPO.getAuditInfo(), AuditInfo.class))
-          .build();
+          .buildSkippingContentValidation();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to deserialize json object:", e);
     }
@@ -1529,6 +1628,7 @@ public class POConverters {
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(policyEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
+          .withOccVersion(INIT_VERSION)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withPolicyVersionPO(policyVersionPO)
           .build();
@@ -1794,6 +1894,33 @@ public class POConverters {
       String policyComment,
       boolean enabled,
       String content) {
+    // Every successful policy alter advances the OCC token, which is the value the CAS compares.
+    Long occVersion = oldPolicyPO.getOccVersion() + 1;
+
+    // The current version is the join key reads use to find the policy content, so it may only
+    // point at a version that has a stored snapshot. An alter that leaves comment, enabled and
+    // content untouched keeps it where it is and writes no snapshot, so the row keeps pointing at
+    // the one it already has.
+    PolicyVersionPO storedVersionPO = oldPolicyPO.getPolicyVersionPO();
+    if (storedVersionPO != null
+        && Objects.equals(storedVersionPO.getPolicyComment(), policyComment)
+        && storedVersionPO.isEnabled() == enabled
+        && Objects.equals(oldPolicyPO.getPolicyType(), policyType)
+        && policyContentUnchanged(storedVersionPO.getContent(), content, policyType)) {
+      return PolicyPO.builder()
+          .withPolicyId(oldPolicyPO.getPolicyId())
+          .withPolicyName(policyName)
+          .withPolicyType(policyType)
+          .withMetalakeId(oldPolicyPO.getMetalakeId())
+          .withAuditInfo(auditInfo)
+          .withCurrentVersion(oldPolicyPO.getCurrentVersion())
+          .withLastVersion(oldPolicyPO.getLastVersion())
+          .withOccVersion(occVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .withPolicyVersionPO(storedVersionPO)
+          .build();
+    }
+
     Long nextVersion = Math.max(oldPolicyPO.getCurrentVersion(), oldPolicyPO.getLastVersion()) + 1;
     PolicyVersionPO newPolicyVersionPO =
         PolicyVersionPO.builder()
@@ -1813,9 +1940,44 @@ public class POConverters {
         .withAuditInfo(auditInfo)
         .withCurrentVersion(nextVersion)
         .withLastVersion(nextVersion)
+        .withOccVersion(occVersion)
         .withDeletedAt(DEFAULT_DELETED_AT)
         .withPolicyVersionPO(newPolicyVersionPO)
         .build();
+  }
+
+  private static AuditInfo roleAssignmentAudit(AuditInfo principalAudit) {
+    // New relations are created by the principal mutation, rather than its original creation.
+    // Initial assignments on principal creation have no modification audit yet.
+    return AuditInfo.builder()
+        .withCreator(
+            principalAudit.lastModifier() != null
+                ? principalAudit.lastModifier()
+                : principalAudit.creator())
+        .withCreateTime(
+            principalAudit.lastModifiedTime() != null
+                ? principalAudit.lastModifiedTime()
+                : principalAudit.createTime())
+        .build();
+  }
+
+  private static boolean policyContentUnchanged(
+      String storedContent, String newContent, String policyType) {
+    if (Objects.equals(storedContent, newContent)) {
+      return true;
+    }
+
+    // Sets in policy content can serialize in a different order after a read/write round trip.
+    // Compare the content objects so an audit-only update does not allocate a redundant snapshot.
+    try {
+      Class<? extends PolicyContent> contentClass =
+          Policy.BuiltInType.fromPolicyType(policyType).contentClass();
+      return Objects.equals(
+          JsonUtils.anyFieldMapper().readValue(storedContent, contentClass),
+          JsonUtils.anyFieldMapper().readValue(newContent, contentClass));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to deserialize policy content:", e);
+    }
   }
 
   private static ModelVersionAliasRelPO createAliasRelPO(Long modelId, int version, String alias) {

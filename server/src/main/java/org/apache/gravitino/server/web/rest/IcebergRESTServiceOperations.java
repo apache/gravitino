@@ -20,8 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -32,7 +30,6 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
@@ -52,32 +49,7 @@ public class IcebergRESTServiceOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceOperations.class);
 
-  // Matches gravitino.auxService.names / AuxiliaryServiceManager's registration key.
   private static final String AUX_SERVICE_NAME = "iceberg-rest";
-  // Keys below are read from AuxiliaryServiceManager.getAuxServiceConfig, which already strips
-  // the gravitino.iceberg-rest. (or deprecated gravitino.auxService.iceberg-rest.) prefix, so
-  // they must NOT be re-prefixed here.
-  // The provider name used by the Iceberg REST server itself; see
-  // IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER and DynamicIcebergConfigProvider. The
-  // server module cannot depend on iceberg-common/catalog-common, hence the literal here.
-  private static final String CATALOG_CONFIG_PROVIDER_KEY = "catalog-config-provider";
-  private static final String DYNAMIC_CATALOG_CONFIG_PROVIDER_NAME = "dynamic-config-provider";
-  // The post-strip key used by the Iceberg REST server itself; see
-  // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
-  private static final String SERVED_METALAKE_KEY = "gravitino-metalake";
-  // Overrides the listener-derived endpoint; see docs/iceberg-rest-service.md.
-  private static final String ADVERTISED_URI_KEY = "advertised-uri";
-  private static final String HOST_KEY = "host";
-  private static final String HTTP_PORT_KEY = "httpPort";
-  private static final String HTTPS_PORT_KEY = "httpsPort";
-  private static final String ENABLE_HTTPS_KEY = "enableHttps";
-  // Match IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT/HTTPS_PORT: the server module
-  // cannot depend on iceberg-common, and JettyServerConfig's own defaults are the Gravitino
-  // server's (8090/8433), not the Iceberg REST server's — reading raw values with these
-  // defaults avoids silently reporting the wrong port when httpPort is not set explicitly.
-  private static final int DEFAULT_HTTP_PORT = 9001;
-  private static final int DEFAULT_HTTPS_PORT = 9433;
-  private static final String DEFAULT_HOST = "0.0.0.0";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -96,14 +68,19 @@ public class IcebergRESTServiceOperations {
   public Response getIcebergRestServiceUri(@QueryParam("metalake") String metalake) {
     String uri;
     try {
-      uri = resolveUri(metalake);
+      uri =
+          Utils.resolveIcebergRestServiceUri(
+              getAuxServiceManager(),
+              getIcebergRestServiceConfig(),
+              metalake,
+              getHttpRequest().getServerName());
     } catch (IllegalStateException e) {
       // A misconfiguration, re-reported on every discovery poll until fixed; the message alone
       // identifies it, so the stack trace is omitted from both the log and the response.
       LOG.error("Failed to resolve the Iceberg REST service endpoint: {}", e.getMessage());
       return Utils.internalError(e.getMessage());
     }
-    // The reported host can depend on the caller's own Host header (see resolveUri), so this
+    // The reported host can depend on the caller's own Host header, so this
     // response must never be cached and replayed to a different caller.
     return Response.fromResponse(Utils.ok(new IcebergRESTServiceResponse(uri)))
         .header("Cache-Control", "no-store")
@@ -126,117 +103,5 @@ public class IcebergRESTServiceOperations {
 
   HttpServletRequest getHttpRequest() {
     return httpRequest;
-  }
-
-  private String resolveUri(String metalake) {
-    if (!getAuxServiceManager().isAuxServiceRegistered(AUX_SERVICE_NAME)) {
-      return null;
-    }
-
-    Map<String, String> config = getIcebergRestServiceConfig();
-    String provider = config.getOrDefault(CATALOG_CONFIG_PROVIDER_KEY, "");
-    if (!DYNAMIC_CATALOG_CONFIG_PROVIDER_NAME.equals(provider)) {
-      // Only the dynamic catalog config provider maps Iceberg REST catalog names onto Gravitino
-      // catalogs; the default static provider serves statically-declared catalogs unrelated to
-      // Gravitino catalog names, so routing at it would 404 on every request.
-      LOG.debug(
-          "Iceberg REST service does not use the dynamic catalog config provider "
-              + "(catalog-config-provider={}); not reporting its endpoint for auto-discovery.",
-          provider);
-      return null;
-    }
-
-    String servedMetalake = config.getOrDefault(SERVED_METALAKE_KEY, "");
-    if (StringUtils.isNotBlank(metalake)
-        && StringUtils.isNotBlank(servedMetalake)
-        && !servedMetalake.equals(metalake)) {
-      // The Iceberg REST server serves exactly one metalake. Routing a different metalake's
-      // catalogs at it would 404 on every request, so report it as unavailable instead.
-      LOG.debug(
-          "Iceberg REST service serves metalake {}, not the requested metalake {}; not "
-              + "reporting its endpoint for auto-discovery.",
-          servedMetalake,
-          metalake);
-      return null;
-    }
-
-    String advertisedUri = StringUtils.trimToNull(config.get(ADVERTISED_URI_KEY));
-    if (advertisedUri != null) {
-      return checkAdvertisedUri(advertisedUri);
-    }
-
-    String host = config.getOrDefault(HOST_KEY, DEFAULT_HOST);
-    if (isWildcardHost(host)) {
-      // The Iceberg REST server binds to all interfaces, so it has no single externally
-      // reachable address of its own. The caller already reached this Gravitino server at some
-      // resolvable host, so reuse it — this holds whenever both services share a host, which is
-      // the common case, and callers with a genuinely split topology can still set
-      // gravitino.iceberg.rest-uri manually.
-      host = getHttpRequest().getServerName();
-    }
-    boolean enableHttps = Boolean.parseBoolean(config.getOrDefault(ENABLE_HTTPS_KEY, "false"));
-    String scheme = enableHttps ? "https" : "http";
-    int port =
-        parsePort(
-            config,
-            enableHttps ? HTTPS_PORT_KEY : HTTP_PORT_KEY,
-            enableHttps ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT);
-    return String.format("%s://%s:%d/iceberg", scheme, bracketIfIPv6(host), port);
-  }
-
-  private static String checkAdvertisedUri(String value) {
-    boolean valid;
-    try {
-      URI uri = new URI(value);
-      // URI accepts any non-negative integer as a port; -1 means no explicit port.
-      int port = uri.getPort();
-      valid =
-          StringUtils.equalsAnyIgnoreCase(uri.getScheme(), "http", "https")
-              && StringUtils.isNotBlank(uri.getHost())
-              && (port == -1 || (port >= 1 && port <= 65535))
-              && uri.getQuery() == null
-              && uri.getFragment() == null;
-    } catch (URISyntaxException e) {
-      valid = false;
-    }
-    if (!valid) {
-      throw new IllegalStateException(
-          String.format(
-              "Invalid Iceberg REST service %s '%s': expected an absolute http(s) URI with a "
-                  + "host, a port in 1-65535 if present, and no query or fragment",
-              ADVERTISED_URI_KEY, value));
-    }
-    return value;
-  }
-
-  // An IPv6 literal host (e.g. "::1", from an explicit config value or from
-  // HttpServletRequest#getServerName()) must be bracketed to form a valid URI authority;
-  // otherwise its colons are parsed as the port separator. A hostname or IPv4 address never
-  // contains a colon, so this only ever fires for IPv6.
-  private static String bracketIfIPv6(String host) {
-    if (host.contains(":") && !host.startsWith("[")) {
-      return "[" + host + "]";
-    }
-    return host;
-  }
-
-  private static int parsePort(Map<String, String> config, String key, int defaultPort) {
-    String value = config.getOrDefault(key, "");
-    if (StringUtils.isBlank(value)) {
-      return defaultPort;
-    }
-    try {
-      return Integer.parseInt(value.trim());
-    } catch (NumberFormatException e) {
-      return defaultPort;
-    }
-  }
-
-  private static boolean isWildcardHost(String host) {
-    return StringUtils.isBlank(host)
-        || "0.0.0.0".equals(host)
-        || "::".equals(host)
-        || "[::]".equals(host)
-        || "0:0:0:0:0:0:0:0".equals(host);
   }
 }

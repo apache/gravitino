@@ -106,11 +106,6 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().insertFilesetMeta(filesetPO);
   }
 
-  public static String insertFilesetMetaOnDuplicateKeyUpdate(
-      @Param("filesetMeta") FilesetPO filesetPO) {
-    return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
-  }
-
   public static String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {
@@ -133,12 +128,12 @@ public class FilesetMetaSQLProviderFactory {
    * Returns SQL that soft-deletes a fileset by ID and expected version.
    *
    * @param filesetId the fileset ID
-   * @param currentVersion the version observed by the caller
+   * @param occVersion the OCC version observed by the caller
    * @return the version-checked delete SQL
    */
   public static String softDeleteFilesetMetasByFilesetId(
-      @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteFilesetMetasByFilesetId(filesetId, currentVersion);
+      @Param("filesetId") Long filesetId, @Param("occVersion") Long occVersion) {
+    return getProvider().softDeleteFilesetMetasByFilesetId(filesetId, occVersion);
   }
 
   public String deleteFilesetMetasByLegacyTimeline(

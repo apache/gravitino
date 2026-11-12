@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.postgresql.converter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -40,22 +42,55 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   static final String BPCHAR = "bpchar";
   static final String BYTEA = "bytea";
   static final String UUID = "uuid";
+  static final String SERIAL = "serial";
+  static final String SMALLSERIAL = "smallserial";
+  static final String BIGSERIAL = "bigserial";
   @VisibleForTesting static final String JDBC_ARRAY_PREFIX = "_";
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
+
+  private static final int MAX_NUMERIC_PRECISION = 1000;
+
+  // Match a type declaration, not an arbitrary SQL fragment. Quoted identifiers may contain SQL
+  // punctuation safely; modifier tokens and array suffixes cannot introduce DDL clauses.
+  private static final String TYPE_IDENTIFIER =
+      "(?:[\\p{L}_][\\p{L}\\p{N}_$]*|\"(?:[^\"]|\"\")++\")";
+  private static final String TYPE_MODIFIER = "(?:[+-]?\\d++|" + TYPE_IDENTIFIER + ")";
+  private static final String TYPE_MODIFIERS =
+      "(?:\\s*\\(\\s*" + TYPE_MODIFIER + "(?:\\s*,\\s*" + TYPE_MODIFIER + ")*+\\s*\\))?";
+  private static final Pattern EXTERNAL_TYPE_DECLARATION =
+      Pattern.compile(
+          "(?:"
+              + TYPE_IDENTIFIER
+              + "(?:\\s*\\.\\s*"
+              + TYPE_IDENTIFIER
+              + ")?"
+              + TYPE_MODIFIERS
+              + "|(?:double\\s+precision|(?:character|char|bit)\\s+varying|national\\s+(?:character|char)(?:\\s+varying)?)"
+              + TYPE_MODIFIERS
+              + "|(?:timestamp|time)"
+              + TYPE_MODIFIERS
+              + "\\s+(?:with|without)\\s+time\\s+zone"
+              + "|interval\\s+(?:year|month|day|hour|minute|second)(?:\\s+to\\s+(?:month|day|hour|minute|second))?"
+              + TYPE_MODIFIERS
+              + ")(?:\\s+ARRAY(?:\\s*\\[\\s*\\d*+\\s*\\])?|(?:\\s*\\[\\s*\\d*+\\s*\\])*+)",
+          Pattern.CASE_INSENSITIVE);
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
     String typeName = typeBean.getTypeName().toLowerCase();
     if (typeName.startsWith(JDBC_ARRAY_PREFIX)) {
-      return toGravitinoArrayType(typeName);
+      return toGravitinoArrayType(typeName, typeBean);
     }
     switch (typeName) {
       case BOOL:
         return Types.BooleanType.get();
+      case SMALLSERIAL:
       case INT_2:
         return Types.ShortType.get();
+      case SERIAL:
       case INT_4:
         return Types.IntegerType.get();
+      case BIGSERIAL:
       case INT_8:
         return Types.LongType.get();
       case FLOAT_4:
@@ -86,13 +121,34 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         if (columnSize == null || columnSize == 0) {
           return Types.ExternalType.of(NUMERIC);
         }
-        return Types.DecimalType.of(columnSize, scale == null ? 0 : scale);
+        int numericScale = scale == null ? 0 : scale;
+        // PostgreSQL stores scale as a signed 11-bit value. JDBC metadata can expose the
+        // unsigned representation, for example 2045 for NUMERIC(2, -3).
+        // PostgreSQL's numeric_typmod_scale sign-extends the low 11 bits:
+        // https://github.com/postgres/postgres/blob/REL_15_0/src/backend/utils/adt/numeric.c#L851-L864
+        // pgjdbc 42.7.14 TypeInfoCache.getScale instead returns the low 16 bits unsigned:
+        // https://github.com/pgjdbc/pgjdbc/blob/REL42.7.14/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L863-L875
+        if (numericScale >= 1024 && numericScale <= 2047) {
+          numericScale -= 2048;
+        }
+        if (columnSize > 38 || numericScale < 0 || numericScale > columnSize) {
+          return Types.ExternalType.of(NUMERIC + "(" + columnSize + "," + numericScale + ")");
+        }
+        return Types.DecimalType.of(columnSize, numericScale);
       case VARCHAR:
+        // Table metadata normalizes unbounded declarations to zero. Also accept pgjdbc's default
+        // sentinel for callers supplying driver metadata directly.
         return typeBean.getColumnSize() == null
+                || typeBean.getColumnSize() <= 0
+                || typeBean.getColumnSize() == Integer.MAX_VALUE
             ? Types.StringType.get()
             : Types.VarCharType.of(typeBean.getColumnSize());
       case BPCHAR:
-        return Types.FixedCharType.of(typeBean.getColumnSize());
+        // An unbounded bpchar ignores trailing spaces and is not equivalent to String.
+        Integer length = typeBean.getColumnSize();
+        return length == null || length <= 0 || length == Integer.MAX_VALUE
+            ? Types.ExternalType.of(BPCHAR)
+            : Types.FixedCharType.of(length);
       case TEXT:
         return Types.StringType.get();
       case BYTEA:
@@ -148,11 +204,22 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {
-      return ((Types.ExternalType) type).catalogString();
+      String declaration = ((Types.ExternalType) type).catalogString();
+      Preconditions.checkArgument(
+          isSingleTypeDeclaration(declaration),
+          "PostgreSQL external type must be a single type declaration without DDL clauses: %s",
+          declaration);
+      return declaration;
     }
     throw new IllegalArgumentException(
         String.format(
             "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
+  }
+
+  static boolean isSingleTypeDeclaration(@Nullable String declaration) {
+    return declaration != null
+        && declaration.indexOf('\0') < 0
+        && EXTERNAL_TYPE_DECLARATION.matcher(declaration.trim()).matches();
   }
 
   // PG doesn't support the multidimensional array internally. The current implementation does not
@@ -173,9 +240,25 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     return elementTypeString + ARRAY_TOKEN;
   }
 
-  private ListType toGravitinoArrayType(String typeName) {
+  private ListType toGravitinoArrayType(String typeName, JdbcTypeBean columnBean) {
     String elementTypeName = typeName.substring(JDBC_ARRAY_PREFIX.length(), typeName.length());
+    // PostgreSQL has no dedicated element metadata for array columns: the driver reports the
+    // element's type information (length, scale, precision) on the array column itself, encoded
+    // through atttypmod. Propagate it to the element bean so constrained character, numeric and
+    // temporal element types keep the same metadata as their scalar counterparts.
     JdbcTypeBean bean = new JdbcTypeBean(elementTypeName);
+    Integer columnSize = columnBean.getColumnSize();
+    // pgjdbc getColumns substitutes the display width (131089) when an unconstrained NUMERIC
+    // array's precision is zero, because its JDBC type is ARRAY rather than NUMERIC. That width
+    // is not a declared precision: PostgreSQL only allows explicit precision up to 1000.
+    if (NUMERIC.equals(elementTypeName)
+        && columnSize != null
+        && columnSize > MAX_NUMERIC_PRECISION) {
+      columnSize = 0;
+    }
+    bean.setColumnSize(columnSize);
+    bean.setScale(columnBean.getScale());
+    bean.setDatetimePrecision(columnBean.getDatetimePrecision());
     return ListType.nullable(toGravitino(bean));
   }
 }

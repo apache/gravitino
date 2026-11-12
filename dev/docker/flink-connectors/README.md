@@ -40,14 +40,14 @@ Build locally from the repository root with the shared image build script:
 ```
 
 The script builds the connector runtime jars (`flink-connectors-dependency.sh`),
-stages the repository-root `LICENSE`/`NOTICE` into `licenses/`, injects
+stages each runtime jar's `LICENSE`/`NOTICE` into `licenses/`, injects
 `IMAGE_VERSION` from `gradle.properties`, and runs the multi-arch buildx build.
 
 This image contains open source software only. The Apache Gravitino connector
 code is licensed under the Apache License 2.0; the shaded runtime jar also
-bundles third-party open source components under their own licenses. See the
-`LICENSE`, `NOTICE` and `THIRD_PARTY_LICENSES.txt` files under `/licenses` in
-the image.
+bundles third-party open source components under their own licenses. Every
+bundled component is declared under `/licenses` in the image, in one directory
+per runtime variant.
 
 ## Server compatibility
 
@@ -59,18 +59,19 @@ server version, or keep it lower.
 
 ## Supported versions
 
-Each Flink minor version ships as its own directory under `/connectors`
-(Scala 2.12; Flink does not support Scala 2.13). The exact set baked into an
+Flink 1.19, 1.20, 2.1, and 2.2 are supported. Each Flink minor version ships as its own directory under
+`/connectors`. Flink 1.x runtime JAR names include the `_2.12` Scala suffix;
+Flink 2.x runtime JAR names have no Scala suffix. The exact set baked into an
 image depends on the Gravitino source branch it was built from; list them
 with:
 
 ```bash
-docker run --rm apache/gravitino-flink-connector:{version}
+docker run --rm -e LIST_VERSIONS=true apache/gravitino-flink-connector:{version}
 ```
 
 Each directory contains one shaded runtime JAR. Do not mix JARs from
-different Flink minor versions. `LICENSE` and `NOTICE` are in `/licenses` in
-the image.
+different Flink minor versions. Each JAR's `LICENSE` and `NOTICE` are under
+`/licenses/<jar name>` in the image.
 
 ## Install
 

@@ -27,11 +27,13 @@ public enum OperationType {
   LOAD_TABLE,
   LOAD_TABLE_CREDENTIAL,
   PLAN_TABLE_SCAN,
+  FETCH_SCAN_TASKS,
   LIST_TABLE,
   ALTER_TABLE,
   RENAME_TABLE,
   REGISTER_TABLE,
   TABLE_EXISTS,
+  REPORT_TABLE_METRICS,
 
   // Tag operations
   CREATE_TAG,
@@ -73,6 +75,7 @@ public enum OperationType {
   LIST_CATALOG,
   ENABLE_CATALOG,
   DISABLE_CATALOG,
+  TEST_CONNECTION_CATALOG,
 
   // Partition event
   ADD_PARTITION,
@@ -207,6 +210,23 @@ public enum OperationType {
   LIST_POLICY_INFOS_FOR_METADATA_OBJECT,
   ASSOCIATE_POLICIES_FOR_METADATA_OBJECT,
   GET_POLICY_FOR_METADATA_OBJECT,
+
+  // Semantic Model operations
+  CREATE_SEMANTIC_MODEL,
+  ALTER_SEMANTIC_MODEL,
+  DROP_SEMANTIC_MODEL,
+  LOAD_SEMANTIC_MODEL,
+  LIST_SEMANTIC_MODEL,
+  /** List identifiers of metrics contained in Semantic Models. */
+  LIST_SEMANTIC_MODEL_METRIC,
+  /** Lists datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+  /** List complete metrics contained in Semantic Models. */
+  LIST_SEMANTIC_MODEL_METRIC_INFOS,
+  /** Import a Semantic Model from an Ossie document. */
+  IMPORT_SEMANTIC_MODEL,
+  /** Export a Semantic Model as an Ossie document. */
+  EXPORT_SEMANTIC_MODEL,
 
   // Function operations
   REGISTER_FUNCTION,

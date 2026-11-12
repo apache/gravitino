@@ -22,10 +22,13 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE
 
 import com.google.common.collect.ImmutableMap;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestLancePropertiesUtils {
 
@@ -36,6 +39,39 @@ public class TestLancePropertiesUtils {
     Assertions.assertTrue(LancePropertiesUtils.isLanceTableFormat("LANCE"));
     Assertions.assertFalse(LancePropertiesUtils.isLanceTableFormat("delta"));
     Assertions.assertFalse(LancePropertiesUtils.isLanceTableFormat(null));
+  }
+
+  /** Checks ownership without extending Lance registration semantics to other formats. */
+  @ParameterizedTest
+  @CsvSource(
+      value = {
+        "lance,true,NULL,true", "LANCE,TRUE,false,true", "lance,true,true,true",
+        "lance,false,false,false", "lance,NULL,NULL,false", "lance,false,true,true",
+        "delta,true,false,false", "delta,true,true,true", "NULL,true,false,false"
+      },
+      nullValues = "NULL")
+  void testEffectiveExternalOwnership(
+      String format, String register, String external, boolean expected) {
+    Map<String, String> properties = new HashMap<>();
+    if (format != null) {
+      properties.put("format", format);
+    }
+    if (register != null) {
+      properties.put("lance.register", register);
+    }
+    if (external != null) {
+      properties.put("external", external);
+    }
+    Map<String, String> original = Map.copyOf(properties);
+
+    Assertions.assertEquals(expected, LancePropertiesUtils.isExternalTable(properties));
+    Map<String, String> normalized = LancePropertiesUtils.normalizeTableProperties(properties);
+    if (LancePropertiesUtils.isLanceTableFormat(format) && Boolean.parseBoolean(register)) {
+      Assertions.assertEquals("true", normalized.get("external"));
+    } else {
+      Assertions.assertSame(properties, normalized);
+    }
+    Assertions.assertEquals(original, properties);
   }
 
   @Test

@@ -25,8 +25,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.BiMap;
 import com.google.common.collect.ImmutableBiMap;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Supplier;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
@@ -58,7 +60,6 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.COLUMN, Entity.EntityType.COLUMN)
           .put(MetadataObject.Type.ROLE, Entity.EntityType.ROLE)
           .put(MetadataObject.Type.MODEL, Entity.EntityType.MODEL)
-          .put(MetadataObject.Type.MODEL_VERSION, Entity.EntityType.MODEL_VERSION)
           .put(MetadataObject.Type.TAG, Entity.EntityType.TAG)
           .put(MetadataObject.Type.POLICY, Entity.EntityType.POLICY)
           .put(MetadataObject.Type.JOB_TEMPLATE, Entity.EntityType.JOB_TEMPLATE)
@@ -135,7 +136,6 @@ public class MetadataObjectUtil {
       case TOPIC:
       case FILESET:
       case COLUMN:
-      case MODEL_VERSION:
       case MODEL:
       case FUNCTION:
         String fullName = DOT.join(metalakeName, metadataObject.fullName());
@@ -265,22 +265,6 @@ public class MetadataObjectUtil {
         check(env.internalTableDispatcher().tableExists(tableIdent), exceptionToThrowSupplier);
         break;
 
-      case MODEL_VERSION:
-        NameIdentifierUtil.checkModelVersion(identifier);
-        NameIdentifier modelIdent = NameIdentifier.of(identifier.namespace().levels());
-        check(env.internalModelDispatcher().modelExists(modelIdent), exceptionToThrowSupplier);
-        try {
-          int version = Integer.parseInt(object.name());
-          check(
-              env.internalModelDispatcher().modelVersionExists(modelIdent, version),
-              exceptionToThrowSupplier);
-        } catch (NumberFormatException e) {
-          check(
-              env.internalModelDispatcher().modelVersionExists(modelIdent, object.name()),
-              exceptionToThrowSupplier);
-        }
-        break;
-
       case TOPIC:
         NameIdentifierUtil.checkTopic(identifier);
         check(env.internalTopicDispatcher().topicExists(identifier), exceptionToThrowSupplier);
@@ -300,6 +284,13 @@ public class MetadataObjectUtil {
       case VIEW:
         NameIdentifierUtil.checkView(identifier);
         check(env.internalViewDispatcher().viewExists(identifier), exceptionToThrowSupplier);
+        break;
+
+      case SEMANTIC_MODEL:
+        NameIdentifierUtil.checkSemanticModel(identifier);
+        check(
+            env.internalSemanticModelDispatcher().semanticModelExists(identifier),
+            exceptionToThrowSupplier);
         break;
 
       case ROLE:
@@ -350,6 +341,42 @@ public class MetadataObjectUtil {
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the type %s", object.type()));
+    }
+  }
+
+  /**
+   * Checks metadata objects, checking each distinct table only once for tables and their columns.
+   *
+   * <p>Every object's identifier is validated. Successful table checks are shared only within this
+   * call. Like {@link #checkMetadataObject(String, MetadataObject)}, this must be called outside
+   * the tree lock because checking an object may load it into the entity store.
+   *
+   * @param metalake The metalake name.
+   * @param objects The metadata objects to check, in order.
+   * @throws NoSuchMetadataObjectException if a metadata object does not exist.
+   */
+  public static void checkMetadataObjects(String metalake, List<MetadataObject> objects) {
+    Set<NameIdentifier> checkedTables = new HashSet<>();
+    for (MetadataObject object : objects) {
+      Preconditions.checkArgument(object != null, "metadataObject cannot be null");
+      if (object.type() != MetadataObject.Type.TABLE
+          && object.type() != MetadataObject.Type.COLUMN) {
+        checkMetadataObject(metalake, object);
+        continue;
+      }
+
+      NameIdentifier identifier = toEntityIdent(metalake, object);
+      NameIdentifier tableIdentifier;
+      if (object.type() == MetadataObject.Type.COLUMN) {
+        NameIdentifierUtil.checkColumn(identifier);
+        tableIdentifier = NameIdentifier.of(identifier.namespace().levels());
+      } else {
+        NameIdentifierUtil.checkTable(identifier);
+        tableIdentifier = identifier;
+      }
+      if (checkedTables.add(tableIdentifier)) {
+        checkMetadataObject(metalake, object);
+      }
     }
   }
 

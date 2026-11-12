@@ -19,8 +19,10 @@
 package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
@@ -145,6 +147,27 @@ public class TestViewHookDispatcher {
           () ->
               AuthorizationUtils.authorizationPluginRenamePrivileges(
                   ident, Entity.EntityType.VIEW, "newName"));
+    }
+  }
+
+  @Test
+  public void testDropViewInvalidatesNameIdMappingOnlyWhenDropped() {
+    ViewDispatcher dispatcher = Mockito.mock(ViewDispatcher.class);
+    ViewHookDispatcher hook = new ViewHookDispatcher(dispatcher, () -> null);
+    NameIdentifier dropped = NameIdentifier.of(METALAKE, CATALOG, "schema", "view");
+    NameIdentifier missing = NameIdentifier.of(METALAKE, CATALOG, "schema", "missing");
+    Mockito.when(dispatcher.dropView(dropped)).thenReturn(true);
+    Mockito.when(dispatcher.dropView(missing)).thenReturn(false);
+
+    try (MockedStatic<AuthorizationUtils> authorizationUtils =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      assertFalse(hook.dropView(missing));
+      authorizationUtils.verifyNoInteractions();
+
+      assertTrue(hook.dropView(dropped));
+      authorizationUtils.verify(
+          () ->
+              AuthorizationUtils.notifyEntityNameIdMappingChange(dropped, Entity.EntityType.VIEW));
     }
   }
 

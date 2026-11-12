@@ -51,14 +51,14 @@ public class TestBaseCatalogPropertiesMetadata {
   void testSharedCloudCredentialKeysAreDeclaredForAllCatalogs() {
     assertTrue(metadata.containsProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.containsProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
-    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
   }
 
   @Test
   void testConnectorCredentialKeysAreDeclaredForAllCatalogs() {
     assertTrue(metadata.containsProperty("aws-access-key-id"));
-    assertFalse(metadata.isHiddenProperty("aws-access-key-id"));
+    assertTrue(metadata.isHiddenProperty("aws-access-key-id"));
     assertTrue(metadata.isHiddenProperty("aws-secret-access-key"));
     assertFalse(metadata.containsProperty("jdbc-user"));
     assertFalse(metadata.containsProperty("jdbc-password"));
@@ -77,7 +77,7 @@ public class TestBaseCatalogPropertiesMetadata {
             return ImmutableMap.of(
                 "aws-access-key-id",
                 PropertyEntry.stringOptionalPropertyEntry(
-                    "aws-access-key-id", "AWS access key ID", false, null, false),
+                    "aws-access-key-id", "AWS access key ID", false, null, true),
                 "aws-secret-access-key",
                 PropertyEntry.stringOptionalPropertyEntry(
                     "aws-secret-access-key", "AWS secret access key", false, null, true));
@@ -95,8 +95,9 @@ public class TestBaseCatalogPropertiesMetadata {
     Map<String, String> masked =
         HiddenPropertyMaskUtils.maskHiddenProperties(properties, glueLikeMetadata);
 
-    assertEquals("AKIAEXAMPLE", masked.get("aws-access-key-id"));
-    assertEquals("AKIAEXAMPLE", masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("aws-access-key-id"));
+    assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
     assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         masked.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
@@ -115,12 +116,12 @@ public class TestBaseCatalogPropertiesMetadata {
                     "Catalog-owned S3 access key ID",
                     false,
                     null,
-                    true));
+                    false));
           }
         };
 
     assertTrue(catalogMetadata.containsProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertTrue(catalogMetadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
-    assertFalse(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertFalse(catalogMetadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    assertTrue(metadata.isHiddenProperty(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
   }
 }

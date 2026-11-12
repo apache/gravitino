@@ -297,6 +297,12 @@ public class CatalogOperations {
     }
 
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleCatalogException(OperationType.SET, catalogName, metalake, e);
+    }
+
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
@@ -313,7 +319,7 @@ public class CatalogOperations {
             Response response = Utils.ok(new BaseResponse());
             LOG.info(
                 "Successfully {} catalog: {}.{}",
-                request.isInUse() ? "enable" : "disable",
+                op == OperationType.ENABLE ? "enable" : "disable",
                 metalake,
                 catalogName);
             return response;
@@ -322,7 +328,7 @@ public class CatalogOperations {
     } catch (Exception e) {
       LOG.info(
           "Failed to {} catalog: {}.{}",
-          request.isInUse() ? "enable" : "disable",
+          op == OperationType.ENABLE ? "enable" : "disable",
           metalake,
           catalogName);
       return ExceptionHandlers.handleCatalogException(op, catalogName, metalake, e);

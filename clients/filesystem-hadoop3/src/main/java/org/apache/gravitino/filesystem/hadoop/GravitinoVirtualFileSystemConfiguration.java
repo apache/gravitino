@@ -48,14 +48,29 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The authentication type for simple authentication. */
   public static final String SIMPLE_AUTH_TYPE = "simple";
 
+  /** The authentication type for basic authentication. */
+  public static final String BASIC_AUTH_TYPE = "basic";
+
   /** The authentication type for oauth2 authentication. */
   public static final String OAUTH2_AUTH_TYPE = "oauth2";
 
   /** The authentication type for kerberos authentication. */
   public static final String KERBEROS_AUTH_TYPE = "kerberos";
 
+  // basic
+  /** The configuration key prefix for basic authentication. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PREFIX = "fs.gravitino.client.basic.";
+
+  /** The configuration key for the basic authentication username. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_USERNAME_KEY =
+      "fs.gravitino.client.basic.username";
+
+  /** The configuration key for the basic authentication password. */
+  public static final String FS_GRAVITINO_CLIENT_BASIC_PASSWORD_KEY =
+      "fs.gravitino.client.basic.password";
+
   // oauth2
-  /** The configuration key prefix for oauth2 */
+  /** The configuration key prefix for oauth2. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_PREFIX = "fs.gravitino.client.oauth2.";
 
   /** The configuration key for the URI of the default OAuth server. */
@@ -73,6 +88,15 @@ public class GravitinoVirtualFileSystemConfiguration {
   /** The configuration key for the scope of the token. */
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY =
       "fs.gravitino.client.oauth2.scope";
+
+  /**
+   * The configuration key for the OAuth2 client authentication method.
+   *
+   * <p>Canonical values are the RFC 6749 style names {@code client_secret_post} (default) and
+   * {@code client_secret_basic} (case-insensitive).
+   */
+  public static final String FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY =
+      "fs.gravitino.client.oauth2.authenticationMethod";
 
   /** The configuration key prefix for kerberos */
   public static final String FS_GRAVITINO_CLIENT_KERBEROS_PREFIX = "fs.gravitino.client.kerberos.";

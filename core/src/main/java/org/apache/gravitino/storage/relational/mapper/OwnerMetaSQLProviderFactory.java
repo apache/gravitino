@@ -89,6 +89,10 @@ public class OwnerMetaSQLProviderFactory {
         table = ModelMetaMapper.TABLE_NAME;
         idColumn = "model_id";
         break;
+      case SEMANTIC_MODEL:
+        table = SemanticModelMetaMapper.TABLE_NAME;
+        idColumn = "semantic_model_id";
+        break;
       case VIEW:
         table = ViewMetaMapper.TABLE_NAME;
         idColumn = "view_id";
@@ -183,6 +187,11 @@ public class OwnerMetaSQLProviderFactory {
 
   public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
+  }
+
+  public static String softDeleteOwnerRelOfJobsByTemplateId(
+      @Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().softDeleteOwnerRelOfJobsByTemplateId(jobTemplateId);
   }
 
   public static String deleteOwnerMetasByLegacyTimeline(

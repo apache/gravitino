@@ -50,8 +50,9 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
 
   private final String sparkSubmit;
 
-  protected SparkProcessBuilder(SparkJobTemplate sparkJobTemplate, Map<String, String> configs) {
-    super(sparkJobTemplate, configs);
+  protected SparkProcessBuilder(
+      SparkJobTemplate sparkJobTemplate, File workingDirectory, Map<String, String> configs) {
+    super(sparkJobTemplate, workingDirectory, configs);
     this.sparkSubmit = resolveSparkSubmit(configs);
   }
 
@@ -116,8 +117,13 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
       commandList.add(String.join(",", sparkJobTemplate.archives()));
     }
 
-    // Add the Spark configs
+    // Add the Spark configs. A blank value means the configuration isn't set, as it is what an
+    // optional template parameter such as {{spark_jars:-}} becomes, and spark-submit would reject
+    // or misread a blank value of some configurations, such as spark.master.
     for (Map.Entry<String, String> entry : sparkJobTemplate.configs().entrySet()) {
+      if (StringUtils.isBlank(entry.getValue())) {
+        continue;
+      }
       commandList.add("--conf");
       commandList.add(entry.getKey() + "=" + entry.getValue());
     }

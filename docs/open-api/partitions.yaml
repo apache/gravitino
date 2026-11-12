@@ -49,7 +49,13 @@ paths:
                   $ref: "#/components/examples/PartitionListResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     post:
@@ -68,6 +74,10 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PartitionListResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
         "409":
           description: Conflict - The target partition already exists
           content:
@@ -77,7 +87,9 @@ paths:
               examples:
                 PartitionAlreadyExistsErrorResponse:
                   $ref: "#/components/examples/PartitionAlreadyExistsErrorResponse"
-        "5xx":
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables/{table}/partitions/{partition}:
@@ -97,10 +109,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/PartitionResponse"
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified partition does not exist
+          description: >-
+            Not Found - The partition or its parent resource does not exist. When authorization
+            is enabled, a missing metalake returns 403 instead.
           content:
-            application/vnd.gravitino.v1+json:
+            application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -114,7 +130,11 @@ paths:
                   $ref: "./tables.yaml#/components/examples/NoSuchTableException"
                 NoSuchPartitionException:
                   $ref: "#/components/examples/NoSuchPartitionException"
-        "5xx":
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
     delete:
@@ -130,7 +150,13 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
+        "403":
+          $ref: "./openapi.yaml#/components/responses/ForbiddenErrorResponse"
+        "406":
+          $ref: "./openapi.yaml#/components/responses/NotAcceptableErrorResponse"
+        "501":
+          $ref: "#/components/responses/PartitionUnsupportedOperationErrorResponse"
+        "5XX":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
@@ -148,7 +174,9 @@ components:
     purge:
       name: purge
       in: query
-      description: Purge the partition data
+      description: >-
+        Purge the partition data. Support depends on the catalog provider. Setting this
+        parameter to true returns HTTP 501 if the provider does not support partition purging.
       required: false
       schema:
         type: boolean
@@ -175,6 +203,50 @@ components:
           range: "#/components/schemas/RangePartition"
           list: "#/components/schemas/ListPartition"
 
+    WritablePartitionSpec:
+      oneOf:
+        - $ref: "#/components/schemas/WritableIdentityPartition"
+        - $ref: "#/components/schemas/WritableRangePartition"
+        - $ref: "#/components/schemas/WritableListPartition"
+      discriminator:
+        propertyName: type
+        mapping:
+          identity: "#/components/schemas/WritableIdentityPartition"
+          range: "#/components/schemas/WritableRangePartition"
+          list: "#/components/schemas/WritableListPartition"
+
+    WritableIdentityPartition:
+      allOf:
+        - $ref: "#/components/schemas/IdentityPartition"
+        - type: object
+          properties:
+            values:
+              type: array
+              items:
+                $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
+    WritableRangePartition:
+      allOf:
+        - $ref: "#/components/schemas/RangePartition"
+        - type: object
+          properties:
+            upper:
+              $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+            lower:
+              $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
+    WritableListPartition:
+      allOf:
+        - $ref: "#/components/schemas/ListPartition"
+        - type: object
+          properties:
+            lists:
+              type: array
+              items:
+                type: array
+                items:
+                  $ref: "./expression.yaml#/components/schemas/WritableLiteral"
+
     AddPartitionsRequest:
       type: object
       required:
@@ -184,7 +256,7 @@ components:
           type: array
           description: The partitions to add
           items:
-            $ref: "#/components/schemas/PartitionSpec"
+            $ref: "#/components/schemas/WritablePartitionSpec"
 
     PartitionNameListResponse:
       type: object
@@ -303,6 +375,33 @@ components:
           $ref: "#/components/schemas/Properties"
 
   responses:
+    PartitionUnsupportedOperationErrorResponse:
+      description: >-
+        Not Implemented - The table does not support partition operations or the requested
+        partition operation is unsupported. For DELETE with purge=true, this also includes
+        tables that do not support partition purging.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          examples:
+            PartitionOperationsUnsupported:
+              summary: The table does not support partition operations
+              value:
+                code: 1006
+                type: UnsupportedOperationException
+                message: >-
+                  Failed to operate partition(s) operation [LIST] of table [table1], reason
+                  [Table does not support partition operations.]
+            PartitionPurgeUnsupported:
+              summary: Partition purging is unsupported for DELETE with purge=true
+              value:
+                code: 1006
+                type: UnsupportedOperationException
+                message: >-
+                  Failed to operate partition(s) operation [DROP] of table [table1], reason
+                  [Partition purging is not supported]
+
 
     PartitionListResponse:
       description: Returns list of partition objects

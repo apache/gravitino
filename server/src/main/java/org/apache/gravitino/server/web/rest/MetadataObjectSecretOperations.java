@@ -29,7 +29,6 @@ import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotSupportedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
@@ -42,6 +41,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -67,8 +67,7 @@ public class MetadataObjectSecretOperations {
           MetadataObject.Type.TABLE,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.VIEW,
-          MetadataObject.Type.MODEL,
-          MetadataObject.Type.MODEL_VERSION);
+          MetadataObject.Type.MODEL);
 
   private final SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
@@ -105,20 +104,31 @@ public class MetadataObjectSecretOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             if (!supportsSecretOperations(object)) {
-              throw new NotSupportedException(
+              throw new IllegalArgumentException(
                   "Doesn't support secret property operations for metadata object type");
             }
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-            if (!MetadataAuthzHelper.checkAccess(
-                identifier,
-                entityType,
-                AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION)) {
+            boolean canUseSecrets =
+                MetadataAuthzHelper.checkAccess(
+                    identifier,
+                    entityType,
+                    AuthorizationExpressionConstants.FILTER_USE_SECRET_AUTHORIZATION_EXPRESSION);
+            if (!canUseSecrets) {
               return Utils.ok(new SecretsResponse(ImmutableMap.of()));
             }
+            boolean canIncludeCredentialSecrets =
+                MetadataAuthzHelper.checkAccess(
+                    identifier,
+                    entityType,
+                    AuthorizationExpressionConstants
+                        .FILTER_INCLUDE_CREDENTIAL_SECRETS_AUTHORIZATION_EXPRESSION);
             Map<String, String> secrets =
                 secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
+            if (!canIncludeCredentialSecrets) {
+              secrets = SecretPropertyUtils.omitCloudAccessKeyPairSecrets(secrets);
+            }
             return Utils.ok(new SecretsResponse(secrets));
           });
     } catch (Exception e) {

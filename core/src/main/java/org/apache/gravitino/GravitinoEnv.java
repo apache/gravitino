@@ -27,6 +27,8 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerNormalizeDispatcher;
+import org.apache.gravitino.authorization.OwnerPropertySyncDispatcher;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -70,6 +72,7 @@ import org.apache.gravitino.hook.MetalakeHookDispatcher;
 import org.apache.gravitino.hook.ModelHookDispatcher;
 import org.apache.gravitino.hook.PolicyHookDispatcher;
 import org.apache.gravitino.hook.SchemaHookDispatcher;
+import org.apache.gravitino.hook.SemanticModelHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
@@ -90,6 +93,7 @@ import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TagEventDispatcher;
@@ -161,6 +165,7 @@ public class GravitinoEnv {
   private FunctionDispatcher internalFunctionDispatcher;
 
   private SemanticModelDispatcher semanticModelDispatcher;
+  private SemanticModelDispatcher internalSemanticModelDispatcher;
 
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
@@ -415,6 +420,15 @@ public class GravitinoEnv {
    */
   public SemanticModelDispatcher semanticModelDispatcher() {
     return semanticModelDispatcher;
+  }
+
+  /**
+   * Returns the Semantic Model dispatcher for infrastructure operations without hooks or events.
+   *
+   * @return the internal Semantic Model dispatcher
+   */
+  public SemanticModelDispatcher internalSemanticModelDispatcher() {
+    return internalSemanticModelDispatcher;
   }
 
   /**
@@ -802,6 +816,21 @@ public class GravitinoEnv {
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
 
+    // Stop the auxiliary services first, since they share the event bus. Then stop the event
+    // listeners, so the async listeners finish the queued events, such as audit logs and built-in
+    // job template registration, before the entity store and the catalogs are closed.
+    if (auxServiceManager != null) {
+      try {
+        auxServiceManager.serviceStop();
+      } catch (Exception e) {
+        LOG.warn("Failed to stop AuxServiceManager", e);
+      }
+    }
+
+    if (eventListenerManager != null) {
+      eventListenerManager.stop();
+    }
+
     if (entityStore != null) {
       try {
         entityStore.close();
@@ -814,20 +843,8 @@ public class GravitinoEnv {
       catalogManager.close();
     }
 
-    if (auxServiceManager != null) {
-      try {
-        auxServiceManager.serviceStop();
-      } catch (Exception e) {
-        LOG.warn("Failed to stop AuxServiceManager", e);
-      }
-    }
-
     if (metricsSystem != null) {
       metricsSystem.close();
-    }
-
-    if (eventListenerManager != null) {
-      eventListenerManager.stop();
     }
 
     if (metalakeManager != null) {
@@ -1004,15 +1021,12 @@ public class GravitinoEnv {
   }
 
   private void initSemanticModelDispatcher(SchemaOperationDispatcher schemaOperationDispatcher) {
-    // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
-    // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
-    // TODO(#12595): Add Semantic Model event dispatching before server integration.
-    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
             catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
-    this.semanticModelDispatcher =
+    this.internalSemanticModelDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
+    this.semanticModelDispatcher = internalSemanticModelDispatcher;
   }
 
   private void initInternalAuthorizationComponents() {
@@ -1137,6 +1151,22 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(viewHookDispatcher, catalogManager);
     this.viewDispatcher = new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
 
+    // Semantic Model operation chain: Event -> Normalize -> Hook -> Operation.
+    SemanticModelOperationDispatcher semanticModelOperationDispatcher =
+        new SemanticModelOperationDispatcher(
+            catalogManager,
+            metadataOperations.schemaOperationDispatcher,
+            entityStore,
+            idGenerator,
+            secretManager);
+    SemanticModelHookDispatcher semanticModelHookDispatcher =
+        new SemanticModelHookDispatcher(
+            semanticModelOperationDispatcher, this::internalOwnerDispatcher);
+    SemanticModelNormalizeDispatcher semanticModelNormalizeDispatcher =
+        new SemanticModelNormalizeDispatcher(semanticModelHookDispatcher, catalogManager);
+    this.semanticModelDispatcher =
+        new SemanticModelEventDispatcher(eventBus, semanticModelNormalizeDispatcher);
+
     this.statisticDispatcher = new StatisticEventDispatcher(eventBus, internalStatisticDispatcher);
 
     // Create and initialize access control related modules
@@ -1145,7 +1175,15 @@ public class GravitinoEnv {
           new AccessControlHookDispatcher(internalAccessControlDispatcher);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
-      this.ownerDispatcher = new OwnerEventManager(eventBus, internalOwnerDispatcher);
+      // Transfers through the public dispatcher also update the owner property of Iceberg
+      // namespaces and tables. Internal callers, such as the Iceberg REST catalog's create hooks,
+      // set the first owner, which the property already names.
+      this.ownerDispatcher =
+          new OwnerEventManager(
+              eventBus,
+              new OwnerPropertySyncDispatcher(
+                  new OwnerNormalizeDispatcher(
+                      internalOwnerDispatcher, catalogManager, entityStore)));
     } else {
       this.accessControlDispatcher = null;
       this.ownerDispatcher = null;

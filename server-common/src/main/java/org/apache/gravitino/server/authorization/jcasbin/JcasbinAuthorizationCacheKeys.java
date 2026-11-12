@@ -39,7 +39,8 @@ final class JcasbinAuthorizationCacheKeys {
     String[] names = metadataObject.fullName().split("\\.");
     switch (metadataObject.type()) {
       case METALAKE:
-        parts.add(MetadataObject.Type.METALAKE.name());
+        // No type token: the metalake key must stay a strict prefix of every key in the metalake,
+        // so a metalake drop can evict them all with one prefix invalidation.
         break;
       case CATALOG:
         parts.add(MetadataObject.Type.CATALOG.name());
@@ -58,18 +59,12 @@ final class JcasbinAuthorizationCacheKeys {
         parts.add(MetadataObject.Type.COLUMN.name());
         parts.add(names[names.length - 1]);
         break;
-      case MODEL_VERSION:
-        appendCatalogAndSchemas(parts, names, names.length - 2);
-        parts.add(MetadataObject.Type.MODEL.name());
-        parts.add(names[names.length - 2]);
-        parts.add(MetadataObject.Type.MODEL_VERSION.name());
-        parts.add(names[names.length - 1]);
-        break;
       case VIEW:
       case TOPIC:
       case FILESET:
       case MODEL:
       case FUNCTION:
+      case SEMANTIC_MODEL:
         appendCatalogSchemasAndLeaf(parts, names, metadataObject.type());
         break;
       default:

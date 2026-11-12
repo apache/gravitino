@@ -132,8 +132,8 @@ elif [ "${component_type}" == "trino-connectors" ] || \
     exit 1
   fi
   echo "INFO : IMAGE_VERSION=${image_version} (from gradle.properties)"
-  # Build the connector jars, stage them under packages/, and copy the
-  # repository-root LICENSE/NOTICE into licenses/ (done by the dependency script).
+  # Build the connector jars, stage them under packages/, and stage each
+  # artifact's own LICENSE/NOTICE under licenses/ (done by the dependency script).
   . "${script_dir}/${component_type}/${component_type}-dependency.sh"
   build_args="--build-arg IMAGE_VERSION=${image_version}"
 else

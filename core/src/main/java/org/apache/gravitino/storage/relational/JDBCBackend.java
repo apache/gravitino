@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -63,15 +64,16 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.StatisticEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
@@ -88,6 +90,9 @@ import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetricService;
+import org.apache.gravitino.storage.relational.service.SemanticModelSourceService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -98,7 +103,6 @@ import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.tag.TagValue;
-import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -127,6 +131,17 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    return SemanticModelMetricService.getInstance().listMetrics(namespace);
+  }
+
+  @Override
+  public List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    return SemanticModelMetricService.getInstance().listMetricInfos(namespace);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> list(
       Namespace namespace, Entity.EntityType entityType, boolean allFields) throws IOException {
     switch (entityType) {
@@ -140,6 +155,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
       case VIEW:
         return (List<E>) ViewMetaService.getInstance().listViewsByNamespace(namespace);
+      case SEMANTIC_MODEL:
+        return (List<E>)
+            SemanticModelMetaService.getInstance().listSemanticModelsByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
@@ -202,7 +220,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     boolean committed = false;
     try {
       insertEntity(e, true);
-      insertEntityChange(e.nameIdentifier(), e.type(), OperateType.ALTER);
+      EntityChangeLogWriter.append(e.nameIdentifier(), e.type(), OperateType.ALTER);
       if (transactionOwner) {
         SessionUtils.commitTransaction();
       }
@@ -229,7 +247,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     boolean committed = false;
     try {
       E updatedEntity = updateEntity(ident, entityType, updater);
-      insertEntityChange(ident, entityType, OperateType.ALTER);
+      EntityChangeLogWriter.append(ident, entityType, OperateType.ALTER);
       if (transactionOwner) {
         SessionUtils.commitTransaction();
       }
@@ -281,6 +299,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
       case VIEW:
         return (E) ViewMetaService.getInstance().getViewByIdentifier(ident);
+      case SEMANTIC_MODEL:
+        return (E) SemanticModelMetaService.getInstance().getSemanticModelByIdentifier(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for get operation", entityType);
@@ -358,6 +378,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           }
         }
         return views;
+      case SEMANTIC_MODEL:
+        List<E> semanticModels = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          try {
+            semanticModels.add(
+                (E)
+                    SemanticModelMetaService.getInstance()
+                        .getSemanticModelByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing semantic model during batch get: {}", identifier.name());
+          }
+        }
+        return semanticModels;
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for batch get operation", entityType);
@@ -379,7 +412,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     try {
       boolean deleted = deleteEntity(ident, entityType, cascade);
       if (deleted) {
-        insertEntityChange(ident, entityType, OperateType.DROP);
+        EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
       }
       if (transactionOwner) {
         SessionUtils.commitTransaction();
@@ -403,37 +436,22 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     if (entityType != Entity.EntityType.FILESET) {
       return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     }
+    return deleteWithCallback(
+        ident,
+        entityType,
+        () -> clazz.cast(FilesetMetaService.getInstance().deleteFilesetAndGet(ident)),
+        postDeleteAction);
+  }
 
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
-    try {
-      FilesetEntity deletedFileset;
-      try {
-        deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
-      } catch (NoSuchEntityException e) {
-        // Only the delete itself may report the fileset as missing. A NoSuchEntityException from
-        // any later step means the delete did happen and something else failed, which must not be
-        // reported to the caller as "there was nothing to delete".
-        return Optional.empty();
-      }
-      insertEntityChange(ident, entityType, OperateType.DROP);
-      E deletedEntity = clazz.cast(deletedFileset);
-      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
-      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
-      postDeleteAction.accept(deletedEntity);
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return Optional.of(deletedEntity);
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
-    }
+  @Override
+  public Optional<SchemaEntity> deleteSchemaAndGet(
+      NameIdentifier ident, boolean cascadeFunctions, Consumer<SchemaEntity> postDeleteAction)
+      throws IOException {
+    return deleteWithCallback(
+        ident,
+        Entity.EntityType.SCHEMA,
+        () -> SchemaMetaService.getInstance().deleteSchemaAndGet(ident, false, cascadeFunctions),
+        postDeleteAction);
   }
 
   @Override
@@ -515,8 +533,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             .deleteViewMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case SEMANTIC_MODEL:
-        // TODO(#12209): Delegate to SemanticModelMetaService when relational persistence is added.
-        return 0;
+        return SemanticModelMetaService.getInstance()
+            .deleteSemanticModelMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -558,8 +577,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return 0;
 
       case SEMANTIC_MODEL:
-        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
-        return 0;
+        return SemanticModelMetaService.getInstance()
+            .deleteSemanticModelVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FILESET:
         return FilesetMetaService.getInstance()
@@ -651,7 +671,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             "All entities must be in the same namespace for batchPut operation.");
 
         StatisticMetaService.getInstance()
-            .batchInsertStatisticPOsOnDuplicateKeyUpdate(
+            .writeStatisticsWithVersion(
                 statisticEntities,
                 NameIdentifier.parse(statisticEntities.get(0).namespace().toString()),
                 Entity.EntityType.TABLE);
@@ -702,6 +722,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      case SEMANTIC_MODEL_SOURCE_REL:
+        return (List<E>)
+            SemanticModelSourceService.getInstance().listForSource(nameIdentifier, identType);
       case POLICY_TAG_REL:
         return (List<E>)
             PolicyTagRelService.getInstance()
@@ -724,6 +747,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
       case POLICY_TAG_REL:
         return PolicyTagRelService.getInstance().listRelations(nameIdentifiers, identType);
+      case TAG_METADATA_OBJECT_REL:
+        return TagMetaService.getInstance().listTagsForMetadataObjects(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -830,7 +855,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                     update.sourceIdentifier(),
                     update.sourceEntityType(),
                     toTagValues(update.targetsToAdd()),
-                    toTagValues(update.targetsToRemove()));
+                    toTagValues(update.targetsToRemove()),
+                    update.auditInfo().orElse(null));
       case POLICY_TAG_REL:
         Preconditions.checkArgument(
             update.sourceEntityType() == Entity.EntityType.TAG,
@@ -838,7 +864,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>)
             PolicyTagRelService.getInstance()
                 .updateRelations(
-                    update.sourceIdentifier(), update.targetsToAdd(), update.targetsToRemove());
+                    update.sourceIdentifier(),
+                    update.targetsToAdd(),
+                    update.targetsToRemove(),
+                    update.auditInfo().orElse(null));
       default:
         Preconditions.checkArgument(
             !update.hasRelationValues(),
@@ -850,6 +879,42 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             update.sourceEntityType(),
             toNameIdentifiers(update.targetsToAdd()),
             toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> Optional<E> deleteWithCallback(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Supplier<E> deleteAction,
+      Consumer<E> postDeleteAction) {
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      E deletedEntity;
+      try {
+        deletedEntity = deleteAction.get();
+      } catch (NoSuchEntityException e) {
+        // Only the delete itself may report the entity as missing. A NoSuchEntityException from
+        // any later step means the delete did happen and something else failed, which must not be
+        // reported to the caller as "there was nothing to delete".
+        return Optional.empty();
+      }
+      EntityChangeLogWriter.append(ident, entityType, OperateType.DROP);
+      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
+      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
+      postDeleteAction.accept(deletedEntity);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return Optional.of(deletedEntity);
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 
@@ -993,6 +1058,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
     } else if (e instanceof ViewEntity) {
       ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
+    } else if (e instanceof SemanticModelEntity) {
+      SemanticModelMetaService.getInstance()
+          .insertSemanticModel((SemanticModelEntity) e, overwritten);
     } else if (e instanceof GenericEntity) {
       GenericEntity genericEntity = (GenericEntity) e;
       throw new UnsupportedEntityTypeException(
@@ -1041,6 +1109,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) JobMetaService.getInstance().updateJob(ident, updater);
       case VIEW:
         return (E) ViewMetaService.getInstance().updateView(ident, updater);
+      case SEMANTIC_MODEL:
+        return (E) SemanticModelMetaService.getInstance().updateSemanticModel(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -1084,22 +1154,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:
         return ViewMetaService.getInstance().deleteView(ident);
+      case SEMANTIC_MODEL:
+        return SemanticModelMetaService.getInstance().deleteSemanticModel(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
     }
-  }
-
-  private static void insertEntityChange(
-      NameIdentifier ident, Entity.EntityType entityType, OperateType operateType) {
-    SessionUtils.doWithoutCommit(
-        EntityChangeLogMapper.class,
-        mapper ->
-            mapper.insertEntityChange(
-                NameIdentifierUtil.getMetalake(ident),
-                entityType.name(),
-                EntityChangeLogNameIdentifierCodec.encode(ident),
-                operateType));
   }
 
   private static boolean shouldRecordEntityDrop(Entity.EntityType entityType) {

@@ -36,29 +36,29 @@ public abstract class LocalProcessBuilder {
 
   protected final File workingDirectory;
 
-  protected LocalProcessBuilder(JobTemplate jobTemplate, Map<String, String> configs) {
+  protected LocalProcessBuilder(
+      JobTemplate jobTemplate, File workingDirectory, Map<String, String> configs) {
     this.jobTemplate = jobTemplate;
-    this.workingDirectory = resolveWorkingDirectory(jobTemplate);
-  }
-
-  /**
-   * Resolves the working directory for a job template. The executable is expected to be in the
-   * working directory, so the working directory can be derived from the executable's path.
-   *
-   * @param jobTemplate the job template to resolve the working directory for
-   * @return the working directory for the job template
-   */
-  public static File resolveWorkingDirectory(JobTemplate jobTemplate) {
-    return new File(jobTemplate.executable()).getAbsoluteFile().getParentFile();
+    this.workingDirectory = workingDirectory;
   }
 
   public abstract Process start();
 
-  public static LocalProcessBuilder create(JobTemplate jobTemplate, Map<String, String> configs) {
+  /**
+   * Creates the process builder of a job.
+   *
+   * @param jobTemplate the localized job template of the job
+   * @param workingDirectory the working directory of the job process, where the job's resources are
+   *     localized and its output is written
+   * @param configs the local job executor configurations
+   * @return the process builder of the job
+   */
+  public static LocalProcessBuilder create(
+      JobTemplate jobTemplate, File workingDirectory, Map<String, String> configs) {
     if (jobTemplate instanceof ShellJobTemplate) {
-      return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, configs);
+      return new ShellProcessBuilder((ShellJobTemplate) jobTemplate, workingDirectory, configs);
     } else if (jobTemplate instanceof SparkJobTemplate) {
-      return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, configs);
+      return new SparkProcessBuilder((SparkJobTemplate) jobTemplate, workingDirectory, configs);
     } else {
       throw new IllegalArgumentException(
           "Unsupported job template type: " + jobTemplate.getClass().getName());

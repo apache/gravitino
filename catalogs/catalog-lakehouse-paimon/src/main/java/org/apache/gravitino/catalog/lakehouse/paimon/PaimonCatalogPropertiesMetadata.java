@@ -132,7 +132,7 @@ public class PaimonCatalogPropertiesMetadata extends BaseCatalogPropertiesMetada
                   "The access key ID for Aliyun DLF",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
               PaimonConstants.GRAVITINO_DLF_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(

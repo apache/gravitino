@@ -17,10 +17,14 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -82,7 +86,12 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
 
   @Override
   public PolicyEntity alterPolicy(String metalake, String policyName, PolicyChange... changes) {
-    return dispatcher.alterPolicy(metalake, policyName, changes);
+    PolicyEntity alteredPolicy = dispatcher.alterPolicy(metalake, policyName, changes);
+    if (Arrays.stream(changes).anyMatch(change -> change instanceof PolicyChange.RenamePolicy)) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
+    }
+    return alteredPolicy;
   }
 
   @Override
@@ -97,7 +106,13 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
 
   @Override
   public boolean deletePolicy(String metalake, String policyName) {
-    return dispatcher.deletePolicy(metalake, policyName);
+    boolean deleted = dispatcher.deletePolicy(metalake, policyName);
+    if (deleted) {
+      // A policy created later under the same name gets a new id, so drop the cached mapping.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          NameIdentifierUtil.ofPolicy(metalake, policyName), Entity.EntityType.POLICY);
+    }
+    return deleted;
   }
 
   @Override
@@ -109,5 +124,11 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
     return dispatcher.listPolicyInfosForMetadataObject(metalake, metadataObject);
+  }
+
+  @Override
+  public Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    return dispatcher.listPolicyInfosForMetadataObjects(metalake, metadataObjects);
   }
 }

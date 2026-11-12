@@ -30,6 +30,15 @@ public class TestSparkJdbcTypeConverter {
   private final SparkJdbcTypeConverter sparkJdbcTypeConverter = new SparkJdbcTypeConverter();
 
   @Test
+  void testOptInUsesWallClockTimestamps() {
+    SparkJdbcTypeConverter converter = new SparkJdbcTypeConverter(true);
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType, converter.toSparkType(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType, converter.toSparkType(Types.TimestampType.withTimeZone()));
+  }
+
+  @Test
   void testConvertTimestampTypesToSparkTimestamp() {
     Assertions.assertEquals(
         DataTypes.TimestampType,
@@ -46,7 +55,20 @@ public class TestSparkJdbcTypeConverter {
   }
 
   @Test
+  void testConvertFixedTypeToSparkBinary() {
+    Assertions.assertEquals(
+        DataTypes.BinaryType, sparkJdbcTypeConverter.toSparkType(Types.FixedType.of(16)));
+  }
+
+  @Test
   void testConvertExternalTypeToSparkString() {
+    for (String declaration : new String[] {"numeric(39,0)", "numeric(2,-3)", "numeric(3,5)"}) {
+      Assertions.assertEquals(
+          DataTypes.StringType,
+          sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+
     Assertions.assertEquals(
         DataTypes.StringType, sparkJdbcTypeConverter.toSparkType(Types.ExternalType.of("numeric")));
     Assertions.assertEquals(

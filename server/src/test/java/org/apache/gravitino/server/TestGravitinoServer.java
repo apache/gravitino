@@ -158,6 +158,24 @@ public class TestGravitinoServer {
   }
 
   @Test
+  public void testMetricsEndpointsAreAvailableOnMainServer() throws Exception {
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    int port =
+        JettyServerConfig.fromConfig(spyServerConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpClient client = HttpClient.newHttpClient();
+    for (String path : JettyServer.METRICS_PATH_SPECS) {
+      HttpResponse<String> response =
+          client.send(
+              HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).GET().build(),
+              HttpResponse.BodyHandlers.ofString());
+      assertEquals(200, response.statusCode(), "Metrics endpoint " + path);
+    }
+  }
+
+  @Test
   public void testStartWithoutInitialise() throws Exception {
     assertThrows(RuntimeException.class, () -> gravitinoServer.start());
   }

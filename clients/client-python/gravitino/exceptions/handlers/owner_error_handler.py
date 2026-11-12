@@ -6,7 +6,7 @@
 # "License"); you may not use this file except in compliance
 # with the License.  You may obtain a copy of the License at
 #
-#   http://www.apache.org/licenses/LICENSE-2.0
+#  http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
@@ -20,39 +20,23 @@ from gravitino.exceptions.base import (
     IllegalArgumentException,
     MetalakeNotInUseException,
     NoSuchMetadataObjectException,
-    NotFoundException,
     UnsupportedOperationException,
 )
-from gravitino.exceptions.handlers.rest_error_handler import RestErrorHandler
+from gravitino.exceptions.handlers.rest_error_handler import CodeMappingErrorHandler
 
 
-class OwnerErrorHandler(RestErrorHandler):
+class OwnerErrorHandler(CodeMappingErrorHandler):
     """Error handler specific to Owner operations."""
 
-    def handle(self, error_response) -> None:
-        error_message = error_response.format_error_message()
-        code = error_response.code()
-        exception_type = error_response.type()
-
-        if code == ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
-            raise IllegalArgumentException(error_message)
-
-        if code == ErrorConstants.NOT_FOUND_CODE:
-            if exception_type == NoSuchMetadataObjectException.__name__:
-                raise NoSuchMetadataObjectException(error_message)
-
-            raise NotFoundException(error_message)
-
-        if code == ErrorConstants.UNSUPPORTED_OPERATION_CODE:
-            raise UnsupportedOperationException(error_message)
-
-        if code == ErrorConstants.NOT_IN_USE_CODE:
-            raise MetalakeNotInUseException(error_message)
-
-        if code == ErrorConstants.INTERNAL_ERROR_CODE:
-            raise RuntimeError(error_message)
-
-        super().handle(error_response)
+    _code_exception_map = {
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE: IllegalArgumentException,
+        ErrorConstants.NOT_FOUND_CODE: {
+            NoSuchMetadataObjectException.__name__: NoSuchMetadataObjectException
+        },
+        ErrorConstants.UNSUPPORTED_OPERATION_CODE: UnsupportedOperationException,
+        ErrorConstants.NOT_IN_USE_CODE: MetalakeNotInUseException,
+        ErrorConstants.INTERNAL_ERROR_CODE: RuntimeError,
+    }
 
 
 OWNER_ERROR_HANDLER = OwnerErrorHandler()

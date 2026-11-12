@@ -24,6 +24,7 @@ from gravitino.api.rel.expressions.expression import Expression
 from gravitino.api.rel.types.type import Type
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.utils import HTTPClient
 
@@ -69,6 +70,9 @@ class GenericColumn(Column, SupportsTags):
     def default_value(self) -> Expression:
         return self._internal_column.default_value()
 
+    def initial_default_value(self) -> Expression:
+        return self._internal_column.initial_default_value()
+
     def __hash__(self) -> int:
         return hash(self._internal_column)
 
@@ -84,8 +88,14 @@ class GenericColumn(Column, SupportsTags):
     def list_tags(self) -> list[str]:
         return self._object_tag_operations.list_tags()
 
+    def list_tags_with_visibility(self) -> TagList[str]:
+        return self._object_tag_operations.list_tags_with_visibility()
+
     def list_tags_info(self) -> list[Tag]:
         return self._object_tag_operations.list_tags_info()
+
+    def list_tags_info_with_visibility(self) -> TagList[Tag]:
+        return self._object_tag_operations.list_tags_info_with_visibility()
 
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)

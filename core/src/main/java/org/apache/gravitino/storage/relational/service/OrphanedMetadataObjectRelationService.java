@@ -33,6 +33,7 @@ import org.apache.gravitino.storage.relational.mapper.OrphanedMetadataObjectRela
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -60,6 +61,9 @@ public class OrphanedMetadataObjectRelationService {
               new EntityTable(FilesetMetaMapper.META_TABLE_NAME, "fileset_id"))
           .put(MetadataObject.Type.TABLE, new EntityTable(TableMetaMapper.TABLE_NAME, "table_id"))
           .put(MetadataObject.Type.VIEW, new EntityTable(ViewMetaMapper.TABLE_NAME, "view_id"))
+          .put(
+              MetadataObject.Type.SEMANTIC_MODEL,
+              new EntityTable(SemanticModelMetaMapper.TABLE_NAME, "semantic_model_id"))
           .put(MetadataObject.Type.TOPIC, new EntityTable(TopicMetaMapper.TABLE_NAME, "topic_id"))
           .put(
               MetadataObject.Type.COLUMN,
