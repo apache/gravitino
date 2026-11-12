@@ -24,6 +24,8 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Locale;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DELETE;
@@ -49,6 +51,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.TableResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -61,6 +64,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,6 +72,10 @@ import org.slf4j.LoggerFactory;
 public class TableOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TableOperations.class);
+
+  // Table property the Lance catalog reads to replace an existing table on create.
+  private static final String LANCE_CREATION_MODE = "lance.creation-mode";
+  private static final String OVERWRITE_MODE = "OVERWRITE";
 
   private final TableDispatcher dispatcher;
 
@@ -148,6 +156,7 @@ public class TableOperations {
             request.validate();
             NameIdentifier ident =
                 NameIdentifierUtil.ofTable(metalake, catalog, schema, request.getName());
+            checkOverwriteAllowed(ident, request.getProperties());
 
             Table table =
                 dispatcher.createTable(
@@ -298,5 +307,34 @@ public class TableOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleTableException(OperationType.DROP, table, schema, e);
     }
+  }
+
+  /**
+   * Rejects a create request that would replace an existing Lance table unless the caller may
+   * modify that table.
+   *
+   * <p>With {@code lance.creation-mode=OVERWRITE} the Lance catalog purges or drops the existing
+   * table before it creates the new one, so the request is a modification and CREATE_TABLE on the
+   * schema is not enough. The mode alone decides this, without probing whether the table exists,
+   * matching the overwrite check of the Lance REST service: a probe would race with the create.
+   */
+  private static void checkOverwriteAllowed(NameIdentifier ident, Map<String, String> properties) {
+    if (properties == null || !isOverwrite(properties.get(LANCE_CREATION_MODE))) {
+      return;
+    }
+    if (!MetadataAuthzHelper.checkAccess(
+        ident,
+        Entity.EntityType.TABLE,
+        AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION)) {
+      throw new ForbiddenException(
+          "User '%s' is not authorized to overwrite table '%s'",
+          PrincipalUtils.getCurrentUserName(), ident);
+    }
+  }
+
+  private static boolean isOverwrite(String mode) {
+    // Normalize like the Lance REST service, so a spelling the catalog may accept as an overwrite
+    // cannot pass as a plain create.
+    return mode != null && OVERWRITE_MODE.equals(mode.trim().toUpperCase(Locale.ROOT));
   }
 }
