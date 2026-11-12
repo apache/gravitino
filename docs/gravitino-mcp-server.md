@@ -229,7 +229,9 @@ For example, call `list_domain_members` with:
 `types` is a list of leaf object types; `domains` selects the union of named scopes using repeated query parameters.
 Selecting the requested domain includes its visible children. Well-formed names outside that scope are ignored.
 `name_contains` matches a case-insensitive substring of the full metadata object name.
-Omitted or blank values leave this filter unset.
+If `name_contains` is omitted, empty, or contains only whitespace, MCP omits the
+`nameContains` query parameter. Sending an empty or whitespace-only `nameContains`
+directly to the REST endpoint returns HTTP 400.
 Omitted or empty type/domain lists leave those filters unset.
 Leaf lookups support tables, filesets, topics, models, views and semantic models;
 use the REST object type spelling (for example `table` or `semantic_model`).
