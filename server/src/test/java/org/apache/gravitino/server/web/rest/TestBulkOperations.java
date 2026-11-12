@@ -43,9 +43,11 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
@@ -55,6 +57,7 @@ import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.requests.BulkGroupAddRequest;
 import org.apache.gravitino.dto.requests.BulkRemoveRequest;
@@ -167,6 +170,41 @@ public class TestBulkOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  /** Reports an invalid role item without dispatching its internal tag grants. */
+  @Test
+  public void testBulkRoleRejectsInternalTag() {
+    SecurableObjectDTO tag =
+        SecurableObjectDTO.builder()
+            .withFullName("GRAVITINO_HIDDEN_123")
+            .withType(MetadataObject.Type.TAG)
+            .withPrivileges(
+                new PrivilegeDTO[] {
+                  PrivilegeDTO.builder()
+                      .withName(Privilege.Name.APPLY_TAG)
+                      .withCondition(Privilege.Condition.ALLOW)
+                      .build()
+                })
+            .build();
+    BulkRoleAddRequest request =
+        new BulkRoleAddRequest(
+            new RoleCreateRequest[] {
+              new RoleCreateRequest("role", Collections.emptyMap(), new SecurableObjectDTO[] {tag})
+            });
+    when(manager.createRoles(any(), any())).thenReturn(Collections.emptyList());
+    try (Response response =
+        target("/bulk/metalakes/metalake1/roles/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      BulkRoleResponse result = response.readEntity(BulkRoleResponse.class);
+      Assertions.assertEquals(0, result.getRoles().length);
+      Assertions.assertEquals(1, result.getErrors().length);
+      Assertions.assertEquals(
+          ErrorConstants.ILLEGAL_ARGUMENTS_CODE, result.getErrors()[0].getCode());
+    }
+    Mockito.verify(manager).createRoles(eq("metalake1"), eq(Collections.emptyList()));
   }
 
   @Test

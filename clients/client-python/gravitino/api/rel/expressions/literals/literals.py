@@ -108,8 +108,21 @@ class Literals:
 
     @staticmethod
     def decimal_literal(value: decimal.Decimal) -> LiteralImpl[decimal.Decimal]:
-        precision: int = len(value.as_tuple().digits)
-        scale: int = -value.as_tuple().exponent
+        """Creates a decimal literal from the given value.
+
+        A positive exponent is normalized into the type: the precision counts
+        the exponent zeroes and the scale is clamped to 0, so Decimal("1E+3")
+        gets the type decimal(4, 0). Java's Decimal instead derives its scale
+        from BigDecimal.scale() and rejects such a value, but a literal
+        travels as a value string with an explicit type, which the server
+        accepts.
+        """
+        if not value.is_finite():
+            raise ValueError("Decimal literal must be a finite number")
+        decimal_tuple = value.as_tuple()
+        # Positive exponents add integer digits, not a negative fractional scale.
+        precision: int = len(decimal_tuple.digits) + max(decimal_tuple.exponent, 0)
+        scale: int = max(-decimal_tuple.exponent, 0)
         return LiteralImpl(value, Types.DecimalType.of(max(precision, scale), scale))
 
     @staticmethod

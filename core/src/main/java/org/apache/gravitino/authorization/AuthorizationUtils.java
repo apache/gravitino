@@ -366,7 +366,7 @@ public class AuthorizationUtils {
     // authorization plugin.
     if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
-      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
       String metalake =
           type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
 
@@ -427,7 +427,7 @@ public class AuthorizationUtils {
     // authorization plugin.
     if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
-      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
       MetadataObject newMetadataObject = NameIdentifierUtil.toMetadataObject(newIdent, type);
 
       MetadataObjectChange renameChange =

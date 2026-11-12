@@ -27,6 +27,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerNormalizeDispatcher;
 import org.apache.gravitino.authorization.OwnerPropertySyncDispatcher;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.bulk.BulkManager;
@@ -1178,7 +1179,11 @@ public class GravitinoEnv {
       // namespaces and tables. Internal callers, such as the Iceberg REST catalog's create hooks,
       // set the first owner, which the property already names.
       this.ownerDispatcher =
-          new OwnerEventManager(eventBus, new OwnerPropertySyncDispatcher(internalOwnerDispatcher));
+          new OwnerEventManager(
+              eventBus,
+              new OwnerPropertySyncDispatcher(
+                  new OwnerNormalizeDispatcher(
+                      internalOwnerDispatcher, catalogManager, entityStore)));
     } else {
       this.accessControlDispatcher = null;
       this.ownerDispatcher = null;

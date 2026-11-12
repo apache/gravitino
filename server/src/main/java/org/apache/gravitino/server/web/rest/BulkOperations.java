@@ -497,6 +497,7 @@ public class BulkOperations {
         for (Privilege privilege : object.privileges()) {
           AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
         }
+        TagOperations.checkVisibleTag(metalake, object);
         MetadataObjectUtil.checkMetadataObject(metalake, object);
       } catch (NoSuchMetadataObjectException nsm) {
         throw new IllegalMetadataObjectException(nsm);
