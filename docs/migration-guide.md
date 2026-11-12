@@ -19,6 +19,10 @@ registrations and a new active registration to retain the same external identifi
 Each external identifier can have only one active registration; importing it through another
 catalog or schema is rejected.
 
+Earlier 2.0.0 snapshots with identifier-only primary keys also require these primary-key changes.
+Apply the updated 1.3.0-to-2.0.0 upgrade script using the backup and shutdown procedure below;
+the existing 2.0.0 version label does not mean the database already has composite primary keys.
+
 Loading an externally renamed object no longer automatically moves a conflicting active
 registration. There is no per-object metadata-only unregister API; recovery here requires catalog
 re-registration as described below.

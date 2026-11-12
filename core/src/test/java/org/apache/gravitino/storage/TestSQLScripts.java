@@ -120,6 +120,36 @@ public class TestSQLScripts extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testUpgradeEarlierTwoZeroIdentifierKeys() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-2.0.0" + suffix).toFile());
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      String table = entity + "_meta";
+      String dropPrimaryKey =
+          backendType.equalsIgnoreCase("postgresql")
+              ? " DROP CONSTRAINT " + table + "_pkey"
+              : " DROP PRIMARY KEY";
+      executeStatements(
+          List.of(
+              "ALTER TABLE " + table + dropPrimaryKey,
+              "ALTER TABLE " + table + " ADD PRIMARY KEY (" + entity + "_id)"),
+          "simulate the earlier 2.0 identifier-only primary keys");
+    }
+    executeStatements(externalEntityInsertStatements(), "live 2.0 registrations");
+    seedExternalGovernance(1);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      executeScript(upgrade);
+      assertExternalGovernanceCount(4);
+      for (String entity : List.of("schema", "table", "topic", "view")) {
+        assertExternalIdentityPrimaryKey(entity + "_meta", entity + "_id");
+      }
+    }
+  }
+
+  @TestTemplate
   void testUpgradeClearsRetiredGovernanceAndPreservesReimportedGovernance()
       throws SQLException, IOException {
     Path scripts = upgradeScriptDirectory();
