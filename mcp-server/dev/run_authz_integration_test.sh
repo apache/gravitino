@@ -24,8 +24,8 @@
 #   2. Enables simple authentication + authorization (serviceAdmins=admin).
 #   3. Starts the Gravitino server.
 #   4. Starts the MCP server in HTTP transport mode.
-#   5. Runs the pytest integration suite (which provisions metadata as admin and
-#      verifies per-user authorization through MCP).
+#   5. Runs the pytest integration suite (authz e2e against the live Gravitino
+#      plus the self-contained OAuth refresh e2e that boots mock IdP/Gravitino).
 #   6. Tears everything down and restores the original config.
 #
 # Usage:
@@ -149,6 +149,11 @@ rm -f "${MCP_AUDIT_LOG}"
     --mcp-url "${MCP_URL}"
 ) &
 MCP_PID=$!
+
+if ! command -v nc >/dev/null 2>&1; then
+  log "ERROR: nc (netcat) is required to wait for the MCP server"
+  exit 1
+fi
 
 log "Waiting for MCP server to become reachable..."
 for i in $(seq 1 30); do

@@ -31,6 +31,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ExceptionMessages;
 
 /**
  * Encodes and decodes Trino/Presto's native "Presto View" HMS view format, so that views created by
@@ -134,7 +135,7 @@ final class TrinoNativeViewCodec {
     try {
       bytes = MAPPER.writeValueAsBytes(root);
     } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to encode Trino native view definition", e);
+      throw ExceptionMessages.wrap("Failed to encode Trino native view definition", e);
     }
     return VIEW_PREFIX + Base64.getEncoder().encodeToString(bytes) + VIEW_SUFFIX;
   }

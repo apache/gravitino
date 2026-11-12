@@ -22,7 +22,11 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
+import java.util.Collections;
 import java.util.Map;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -32,6 +36,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listSchemas(Namespace)})
@@ -73,7 +79,20 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return dispatcher.createSchema(normalizeNameIdentifier(ident), comment, properties);
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    checkCommentLength(comment);
+    return dispatcher.createSchema(
+        normalizeNameIdentifier(ident), comment, properties, secretBindings, secretReferences);
   }
 
   @Override
@@ -86,6 +105,8 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
+    // SchemaChange supports property and secret changes only; schema comments cannot be updated.
+    // Comment length is therefore validated on createSchema, the only API that accepts a comment.
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     return dispatcher.alterSchema(normalizeCaseSensitive(ident), changes);
@@ -99,6 +120,11 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private boolean supportsHierarchicalSchema(Namespace namespace) {
     Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
     return capabilities.supportsHierarchicalSchema().supported();
+  }
+
+  private static void checkCommentLength(@Nullable String comment) {
+    EntityFieldLimits.checkMaxLength(
+        comment, EntityFieldLimits.MAX_COMMENT_LENGTH, "comment", Entity.EntityType.SCHEMA);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier schemaIdent) {

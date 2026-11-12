@@ -20,12 +20,14 @@
 package org.apache.gravitino.cos.fs;
 
 import com.qcloud.cos.auth.BasicCOSCredentials;
+import com.qcloud.cos.auth.BasicSessionCredentials;
 import com.qcloud.cos.auth.COSCredentials;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.CosNConfigKeys;
@@ -106,6 +108,46 @@ public class TestCOSCredentialsProvider {
     Assertions.assertTrue(
         ex.getMessage() != null && ex.getMessage().contains("No suitable credential"),
         "Expected message about no suitable credential, but got: " + ex.getMessage());
+  }
+
+  @Test
+  void testRefreshWithTokenCredential() {
+    // Token credentials must be exposed as BasicSessionCredentials so that hadoop-cos signs
+    // requests with the SessionToken header (x-cos-security-token).
+    long expireMs = System.currentTimeMillis() + 60_000L;
+    StubGravitinoFileSystemCredentialsProvider.nextCredentials =
+        new Credential[] {new COSTokenCredential("tmp-ak", "tmp-sk", "sts-token", expireMs)};
+
+    COSCredentialsProvider provider = new COSCredentialsProvider(COS_URI, newStubConf());
+
+    COSCredentials credentials = provider.getCredentials();
+
+    Assertions.assertTrue(
+        credentials instanceof BasicSessionCredentials,
+        "Expected BasicSessionCredentials, got: " + credentials.getClass().getName());
+    BasicSessionCredentials session = (BasicSessionCredentials) credentials;
+    Assertions.assertEquals("tmp-ak", session.getCOSAccessKeyId());
+    Assertions.assertEquals("tmp-sk", session.getCOSSecretKey());
+    Assertions.assertEquals("sts-token", session.getSessionToken());
+  }
+
+  @Test
+  void testTokenCredentialPreferredOverSecretKey() {
+    // When both credential types are present, COSUtils#getSuitableCredential must pick the
+    // dynamic (token) one. This mirrors the OSS bundle's selection policy.
+    long expireMs = System.currentTimeMillis() + 60_000L;
+    StubGravitinoFileSystemCredentialsProvider.nextCredentials =
+        new Credential[] {
+          new COSSecretKeyCredential("static-ak", "static-sk"),
+          new COSTokenCredential("tmp-ak", "tmp-sk", "sts-token", expireMs)
+        };
+
+    COSCredentialsProvider provider = new COSCredentialsProvider(COS_URI, newStubConf());
+
+    COSCredentials credentials = provider.getCredentials();
+
+    Assertions.assertTrue(credentials instanceof BasicSessionCredentials);
+    Assertions.assertEquals("tmp-ak", credentials.getCOSAccessKeyId());
   }
 
   @Test

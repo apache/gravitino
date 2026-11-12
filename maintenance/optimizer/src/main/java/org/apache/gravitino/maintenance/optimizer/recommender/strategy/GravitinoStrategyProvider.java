@@ -77,14 +77,11 @@ public class GravitinoStrategyProvider implements StrategyProvider {
             .loadCatalog(IdentifierUtils.getCatalogNameFromTableIdentifier(nameIdentifier))
             .asTableCatalog()
             .loadTable(IdentifierUtils.removeCatalogFromIdentifier(nameIdentifier));
-    String[] policyNames = t.supportsPolicies().listPolicies();
-    List<Strategy> policies =
-        Arrays.stream(policyNames)
-            .map(t.supportsPolicies()::getPolicy)
-            .filter(Objects::nonNull)
-            .map(this::toStrategy)
-            .collect(Collectors.toList());
-    return policies;
+    return Arrays.stream(t.supportsPolicies().listPolicyInfos())
+        .filter(Objects::nonNull)
+        .filter(Policy::enabled)
+        .map(this::toStrategy)
+        .collect(Collectors.toList());
   }
 
   /**
@@ -93,13 +90,16 @@ public class GravitinoStrategyProvider implements StrategyProvider {
    * @param strategyName strategy name
    * @return strategy
    * @throws NotFoundException if the strategy does not exist
+   * @throws IllegalArgumentException if the policy exists but is disabled
    */
   @Override
   public Strategy strategy(String strategyName) throws NotFoundException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(strategyName), "strategyName must not be blank");
     try {
-      return toStrategy(gravitinoClient.getPolicy(strategyName));
+      Policy policy = gravitinoClient.getPolicy(strategyName);
+      Preconditions.checkArgument(policy.enabled(), "Strategy '%s' is disabled", strategyName);
+      return toStrategy(policy);
     } catch (NoSuchPolicyException e) {
       throw new NotFoundException(e, "Strategy '%s' not found", strategyName);
     }

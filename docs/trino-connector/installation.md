@@ -19,12 +19,12 @@ Choose the package by your Trino server version first.
 
 | Trino server version | Connector package segment |
 |----------------------|---------------------------|
-| 435-439              | `trino-connector-435-439` |
-| 440-445              | `trino-connector-440-445` |
-| 446-451              | `trino-connector-446-451` |
-| 452-468              | `trino-connector-452-468` |
 | 469-472              | `trino-connector-469-472` |
-| 473-478              | `trino-connector-473-478` |
+| 473-477              | `trino-connector-473-477` |
+| 478-479              | `trino-connector-478-479` |
+| 480                  | `trino-connector-480`     |
+| 481                  | `trino-connector-481`     |
+| 482-483              | `trino-connector-482-483` |
 
 For Trino `469`, choose the `trino-connector-469-472` package.
 
@@ -64,8 +64,7 @@ After unpacking, you can see the connector directory:
 1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
 2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
-3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino Trino connector.
-4. Update Trino coordinator configuration. 
+3. Update Trino coordinator configuration.
    You need to set `catalog.management=dynamic`, The config location is `Trino-server-<version>/etc/config.properties`,  and the contents like:
 
 ```text
@@ -146,10 +145,15 @@ gravitino.metalake=test
 ```
 
 - The `gravitino.name` defines which Gravitino Trino connector is used. It must be `gravitino`.
-- The `gravitino.metalake` defines which metalake are used. It should exist in the Gravitino server.
+- The `gravitino.metalake` defines which metalake is used. It should exist in the Gravitino server. It is optional: when omitted, the catalogs of every metalake are loaded, see [configuration](./configuration.md).
 - The `gravitino.uri` defines the connection information about Gravitino server. Make sure your container can access the Gravitino server.
 
 Full configurations for Apache Gravitino Trino connector can be seen [here](configuration.md)
+
+If the Gravitino server requires authentication, Iceberg catalogs routed through the Iceberg REST
+server need OAuth2, because Trino's Iceberg REST client does not support Basic or Kerberos. Set
+`gravitino.iceberg.rest-catalog.security=OAUTH2` and its `oauth2.*` properties; see
+[Authenticating to the Iceberg REST Server](./catalog-iceberg.md#authenticating-to-the-iceberg-rest-server).
 
 If you haven't created the metalake named `test`, you can use the following command to create it.
 

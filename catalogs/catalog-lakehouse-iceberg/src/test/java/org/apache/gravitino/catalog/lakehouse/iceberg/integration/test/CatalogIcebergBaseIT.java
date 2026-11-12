@@ -1540,6 +1540,7 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Schema loadSchema = catalog.asSchemas().loadSchema(ident.name());
     Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, loadSchema.auditInfo().creator());
     Assertions.assertNull(loadSchema.auditInfo().lastModifier());
+    // comment is reserved+hidden and omitted from API responses
     Assertions.assertFalse(
         loadSchema.properties().containsKey(IcebergSchemaPropertiesMetadata.COMMENT));
     prop.forEach((key, value) -> Assertions.assertEquals(loadSchema.properties().get(key), value));

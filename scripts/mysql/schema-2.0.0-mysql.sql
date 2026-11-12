@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_name` VARCHAR(300) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` TEXT NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS `fileset_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'fileset audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset last version',
+    `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'fileset optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (`fileset_id`),
     UNIQUE KEY `fileset_meta_uk_sid_fn_del` (`schema_id`, `fileset_name`, `deleted_at`),
@@ -162,8 +163,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
@@ -171,7 +170,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_mid_us_del` (`metalake_id`, `user_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_ueid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
@@ -221,7 +219,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
@@ -229,7 +226,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`group_id`),
     UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_geid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_group_meta_name_del_upd` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
@@ -243,13 +239,16 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     UNIQUE KEY `uk_gi_ri_del` (`group_id`, `role_id`, `deleted_at`),
-    KEY `group_role_rel_idx_rid` (`group_id`)
+    KEY `group_role_rel_idx_rid` (`group_id`),
+    KEY `group_role_rel_idx_role_id` (`role_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group role relation';
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
+    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',
@@ -261,6 +260,7 @@ CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
     `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',
@@ -272,6 +272,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_group_rel` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'idp user group relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp relation deleted at',
@@ -326,7 +327,7 @@ CREATE TABLE IF NOT EXISTS `owner_meta` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'owner relation deleted at',
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`,`deleted_at`),
+    UNIQUE KEY `uk_ow_me_del` (`owner_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_oid` (`owner_id`),
     KEY `idx_meid` (`metadata_object_id`),
     KEY `idx_owner_meta_del_upd_obj` (`deleted_at`, `updated_at`, `metadata_object_id`)
@@ -341,6 +342,8 @@ CREATE TABLE IF NOT EXISTS `model_meta` (
     `model_comment` TEXT DEFAULT NULL COMMENT 'model comment',
     `model_properties` MEDIUMTEXT DEFAULT NULL COMMENT 'model properties',
     `model_latest_version` INT UNSIGNED DEFAULT 0 COMMENT 'model latest version',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'model audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model deleted at',
     PRIMARY KEY (`model_id`),
@@ -388,6 +391,7 @@ CREATE TABLE IF NOT EXISTS `policy_meta` (
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy last version',
+    `occ_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy optimistic concurrency version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy deleted at',
     PRIMARY KEY (`policy_id`),
     UNIQUE KEY `uk_mi_pn_del` (`metalake_id`, `policy_name`, `deleted_at`)
@@ -407,20 +411,19 @@ CREATE TABLE IF NOT EXISTS `policy_version_info` (
     KEY `policy_version_info_idx_mid` (`metalake_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy version info';
 
-CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
+CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
-    `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
-    `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy relation audit info',
-    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation current version',
-    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy relation last version',
-    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy relation deleted at',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `selector` MEDIUMTEXT DEFAULT NULL COMMENT 'policy tag selector JSON, NULL matches tag presence',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
-    KEY `idx_pid` (`policy_id`),
-    KEY `policy_relation_meta_idx_mid` (`metadata_object_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
+    UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
@@ -462,6 +465,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
     `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at',
     `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `runtime_job_template` MEDIUMTEXT DEFAULT NULL COMMENT 'job run runtime job template',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'job run audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',
@@ -585,7 +589,11 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
     `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
     `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
-    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `datasets` MEDIUMTEXT NOT NULL COMMENT 'dataset definitions snapshot (JSON)',
+    `relationships` MEDIUMTEXT DEFAULT NULL COMMENT 'relationship definitions snapshot (JSON)',
+    `metrics` MEDIUMTEXT DEFAULT NULL COMMENT 'metric definitions snapshot (JSON)',
+    `ai_context` MEDIUMTEXT DEFAULT NULL COMMENT 'model AI context snapshot (JSON)',
+    `custom_extensions` MEDIUMTEXT DEFAULT NULL COMMENT 'model custom extensions snapshot (JSON)',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
@@ -595,6 +603,21 @@ CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
     KEY `idx_smvi_cid` (`catalog_id`),
     KEY `idx_smvi_sid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_metric_meta` (
+    `metric_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'stable internal metric id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `metric_name` MEDIUMTEXT NOT NULL COMMENT 'metric name',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'metric retired at',
+    PRIMARY KEY (`metric_id`),
+    KEY `idx_smmm_model_live` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smmm_mid` (`metalake_id`),
+    KEY `idx_smmm_cid` (`catalog_id`),
+    KEY `idx_smmm_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metric identities';
 
 -- This schema extends version 1.1.0 with partition statistics storage support
 -- The partition_statistic_meta table stores partition-level statistics for tables
@@ -664,3 +687,99 @@ CREATE TABLE IF NOT EXISTS `iceberg_cleanup_job` (
   KEY `idx_state_updated` (`state`, `updated_at`),
   KEY `idx_object` (`catalog_id`, `namespace`(255), `table_name`(128), `state`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'async Iceberg table cleanup jobs';
+
+CREATE TABLE IF NOT EXISTS `scheduled_expand_tasks` (
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
+    `task_data` BLOB COMMENT 'serialized task data',
+    `execution_time` DATETIME(6) NOT NULL COMMENT 'next execution time',
+    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
+    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
+    `last_heartbeat` DATETIME(6) NULL COMMENT 'last heartbeat from the picker',
+    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
+    `consecutive_failures` INT COMMENT 'consecutive failure count',
+    `last_success` DATETIME(6) NULL COMMENT 'last successful execution time',
+    `last_failure` DATETIME(6) NULL COMMENT 'last failed execution time',
+    PRIMARY KEY (`task_name`, `task_instance`),
+    KEY `execution_time_idx` (`execution_time`),
+    KEY `last_heartbeat_idx` (`last_heartbeat`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance expand schedule metadata';
+
+CREATE TABLE IF NOT EXISTS `scheduled_cron_tasks` (
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
+    `task_data` BLOB COMMENT 'serialized task data',
+    `execution_time` DATETIME(6) NOT NULL COMMENT 'next execution time',
+    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
+    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
+    `last_heartbeat` DATETIME(6) NULL COMMENT 'last heartbeat from the picker',
+    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
+    `consecutive_failures` INT COMMENT 'consecutive failure count',
+    `last_success` DATETIME(6) NULL COMMENT 'last successful execution time',
+    `last_failure` DATETIME(6) NULL COMMENT 'last failed execution time',
+    PRIMARY KEY (`task_name`, `task_instance`),
+    KEY `execution_time_idx` (`execution_time`),
+    KEY `last_heartbeat_idx` (`last_heartbeat`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance cron schedule metadata';
+
+CREATE TABLE IF NOT EXISTS `scheduled_commit_tasks` (
+    `task_name` VARCHAR(100) NOT NULL COMMENT 'task name',
+    `task_instance` VARCHAR(100) NOT NULL COMMENT 'task instance',
+    `task_data` BLOB COMMENT 'serialized task data',
+    `execution_time` DATETIME(6) NOT NULL COMMENT 'next execution time',
+    `picked` BOOLEAN NOT NULL COMMENT 'whether the task is currently picked',
+    `picked_by` VARCHAR(50) COMMENT 'scheduler instance that picked the task',
+    `last_heartbeat` DATETIME(6) NULL COMMENT 'last heartbeat from the picker',
+    `version` BIGINT NOT NULL COMMENT 'optimistic lock version',
+    `consecutive_failures` INT COMMENT 'consecutive failure count',
+    `last_success` DATETIME(6) NULL COMMENT 'last successful execution time',
+    `last_failure` DATETIME(6) NULL COMMENT 'last failed execution time',
+    PRIMARY KEY (`task_name`, `task_instance`),
+    KEY `execution_time_idx` (`execution_time`),
+    KEY `last_heartbeat_idx` (`last_heartbeat`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance commit schedule metadata';
+
+CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
+    `action_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'maintenance action id',
+    `job_id` BIGINT(20) UNSIGNED NULL COMMENT 'job run id, maps to job_run_meta.job_run_id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `before_metrics_id` BIGINT(20) UNSIGNED NULL COMMENT 'table_snapshot_metrics.metrics_id for S0 sample',
+    `after_metrics_id` BIGINT(20) UNSIGNED NULL COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    `finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    PRIMARY KEY (`action_id`),
+    KEY `idx_tma_job_id` (`job_id`),
+    -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
+    UNIQUE KEY `uk_tma_table_policy_finished` (`table_id`, `policy_id`, `finished_at`),
+    KEY `idx_tma_before_metrics` (`before_metrics_id`),
+    KEY `idx_tma_after_metrics` (`after_metrics_id`),
+    KEY `idx_tma_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table maintenance action metadata';
+
+CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
+    `metrics_id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'metrics row id',
+    `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id from table_meta',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id from policy_meta',
+    `snapshot_id` BIGINT(20) NOT NULL COMMENT 'Iceberg snapshot id',
+    `metrics_value` MEDIUMTEXT NOT NULL COMMENT 'metrics value as JSON',
+    `created_at` BIGINT(20) UNSIGNED NOT NULL COMMENT 'creation timestamp in milliseconds',
+    PRIMARY KEY (`metrics_id`),
+    KEY `idx_tsm_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
+    KEY `idx_tsm_created_at` (`created_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table snapshot metrics metadata';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`),
+    KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
+    KEY `idx_smsr_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'current semantic model dataset source associations';

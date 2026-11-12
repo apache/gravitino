@@ -22,6 +22,7 @@ package org.apache.gravitino.utils;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.StringReader;
+import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.util.Arrays;
 import java.util.Collections;
@@ -31,6 +32,9 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
@@ -41,6 +45,15 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
  * safe to use.
  */
 public class JdbcUrlUtils {
+
+  private static final Pattern URL_PARAMETER = Pattern.compile("(?:[?;&,(]|^)([^=?;&,()]+)=");
+  private static final List<String> CREDENTIAL_PARAMETER_KEYWORDS =
+      Arrays.asList("password", "passwd", "pwd", "secret", "token", "credential");
+  // Connector/J options whose names contain "password" but whose values are not credentials.
+  private static final List<String> NON_SECRET_MYSQL_PARAMETERS =
+      Arrays.asList("passwordcharacterencoding", "disconnectonexpiredpasswords");
+  private static final Pattern USER_INFO =
+      Pattern.compile("(?i)(?://[^/?#]*@|jdbc:oracle:(?:thin|oci|oci8):[^/@]+/[^@]*@)");
 
   // The DBCP2 connection-pool property whose value is a list of connection properties forwarded
   // verbatim to the JDBC driver. Unsafe parameters smuggled here would otherwise evade a check
@@ -75,6 +88,26 @@ public class JdbcUrlUtils {
   }
 
   /**
+   * Detects credentials embedded in JDBC URLs, including encoded parameter names.
+   *
+   * @param url the JDBC URL, or null
+   * @return whether the URL must not be exposed as a public catalog property
+   */
+  public static boolean containsCredentials(@Nullable String url) {
+    if (url == null) {
+      return false;
+    }
+    // Determine the driver family before URLDecoder turns the DNS SRV scheme's '+' into a space.
+    String lowerUrl = url.toLowerCase(Locale.ROOT);
+    boolean mysqlUrl = lowerUrl.startsWith("jdbc:mysql:") || lowerUrl.startsWith("jdbc:mysql+srv:");
+    // Decoding a password can introduce '/', '?' or '#' and change the authority boundaries.
+    // Inspect raw user information before scanning decoded parameter names.
+    return USER_INFO.matcher(url).find()
+        || decodedFormsForScan(url).stream()
+            .anyMatch(form -> containsCredentialParameters(form, mysqlUrl));
+  }
+
+  /**
    * Validates the JDBC configuration by checking the driver and URL for unsafe parameters.
    *
    * @param driver the JDBC driver class name
@@ -86,23 +119,56 @@ public class JdbcUrlUtils {
     Preconditions.checkArgument(StringUtils.isNotBlank(url), "JDBC URL can't be blank");
 
     String lowerUrl = url.toLowerCase(Locale.ROOT);
-    String decodedUrl = recursiveDecode(lowerUrl);
+    List<String> decodedForms = decodedFormsForScan(lowerUrl);
 
-    if (decodedUrl.startsWith("jdbc:mysql")) {
-      checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MySQL");
-    } else if (decodedUrl.startsWith("jdbc:mariadb")) {
-      checkUnsafeParameters(decodedUrl, all, UNSAFE_MYSQL_PARAMETERS, "MariaDB");
-    } else if (decodedUrl.startsWith("jdbc:postgresql")) {
-      checkUnsafeParameters(decodedUrl, all, UNSAFE_POSTGRES_PARAMETERS, "PostgreSQL");
+    if (anyFormStartsWith(decodedForms, "jdbc:mysql")) {
+      checkUnsafeParameters(decodedForms, all, UNSAFE_MYSQL_PARAMETERS, "MySQL");
+    } else if (anyFormStartsWith(decodedForms, "jdbc:mariadb")) {
+      checkUnsafeParameters(decodedForms, all, UNSAFE_MYSQL_PARAMETERS, "MariaDB");
+    } else if (anyFormStartsWith(decodedForms, "jdbc:postgresql")) {
+      checkUnsafeParameters(decodedForms, all, UNSAFE_POSTGRES_PARAMETERS, "PostgreSQL");
     }
   }
 
-  private static void checkUnsafeParameters(
-      String url, Map<String, String> config, List<String> unsafeParams, String dbType) {
+  /**
+   * Returns the decoded forms of a JDBC URL that unsafe-parameter scans must cover. Drivers such as
+   * MySQL Connector/J decode query tokens independently and ignore the URL fragment, so a malformed
+   * percent escape in one part of the URL must not stop the scan from revealing parameter names
+   * hidden behind valid encodings in another part. The returned forms are the URL decoded until the
+   * first undecodable escape, plus the fully decoded form of the URL with malformed escapes treated
+   * as literal '{@code %}' characters.
+   *
+   * @param url the JDBC URL, already lower-cased by the caller.
+   * @return the candidate decoded forms, never empty.
+   */
+  public static List<String> decodedFormsForScan(String url) {
+    // Percent-decoding can reintroduce upper-case characters (e.g. "%4a" -> 'J'), so the
+    // returned forms are lower-cased for substring and prefix matching.
+    String stoppedAtMalformed = recursiveDecode(url).toLowerCase(Locale.ROOT);
+    String fullyDecoded = recursiveDecodeSanitizingEachPass(url).toLowerCase(Locale.ROOT);
+    if (fullyDecoded.equals(stoppedAtMalformed)) {
+      return Collections.singletonList(stoppedAtMalformed);
+    }
+    return Arrays.asList(stoppedAtMalformed, fullyDecoded);
+  }
 
-    // Percent-decoding in recursiveDecode can reintroduce upper-case characters (e.g. "%4a" ->
-    // 'J'), so lower-case again here rather than relying on the pre-decode lower-casing.
-    String lowerUrl = url.toLowerCase(Locale.ROOT);
+  /**
+   * Replaces every '{@code %}' that is not followed by two hex digits with the escape for a literal
+   * '{@code %}', making the URL decodable by {@link URLDecoder}.
+   */
+  private static String sanitizeMalformedPercentEscapes(String url) {
+    return url.replaceAll("%(?![0-9a-fA-F]{2})", "%25");
+  }
+
+  private static boolean anyFormStartsWith(List<String> forms, String prefix) {
+    return forms.stream().anyMatch(form -> form.startsWith(prefix));
+  }
+
+  private static void checkUnsafeParameters(
+      List<String> decodedForms,
+      Map<String, String> config,
+      List<String> unsafeParams,
+      String dbType) {
 
     // Parameter names that reach the JDBC driver through the config map: the config keys
     // themselves (defense in depth) plus any names embedded in the DBCP2 "connectionProperties"
@@ -111,11 +177,29 @@ public class JdbcUrlUtils {
 
     for (String param : unsafeParams) {
       String lowerParam = param.toLowerCase(Locale.ROOT);
-      if (lowerUrl.contains(lowerParam) || configParamNames.contains(lowerParam)) {
+      boolean inUrl = decodedForms.stream().anyMatch(form -> form.contains(lowerParam));
+      if (inUrl || configParamNames.contains(lowerParam)) {
         throw new GravitinoRuntimeException(
             "Unsafe %s parameter '%s' detected in JDBC configuration", dbType, param);
       }
     }
+  }
+
+  private static boolean containsCredentialParameters(String url, boolean mysqlUrl) {
+    if (USER_INFO.matcher(url).find()) {
+      return true;
+    }
+    Matcher parameters = URL_PARAMETER.matcher(url);
+    while (parameters.find()) {
+      String key = parameters.group(1);
+      if (mysqlUrl && NON_SECRET_MYSQL_PARAMETERS.contains(key)) {
+        continue;
+      }
+      if (CREDENTIAL_PARAMETER_KEYWORDS.stream().anyMatch(key::contains)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static String recursiveDecode(String url) {
@@ -127,8 +211,41 @@ public class JdbcUrlUtils {
       prev = decoded;
       try {
         decoded = URLDecoder.decode(prev, "UTF-8");
-      } catch (Exception e) {
-        throw new GravitinoRuntimeException("Unable to decode JDBC URL");
+      } catch (UnsupportedEncodingException e) {
+        // UTF-8 is guaranteed to be supported by the JVM specification.
+        throw new RuntimeException(e);
+      } catch (IllegalArgumentException e) {
+        // The URL contains a literal '%' that is not part of a valid escape (e.g. a password
+        // like "100%"). JDBC URLs are not required to be validly percent-encoded, so keep the
+        // last fully decoded form instead of rejecting the URL: any parameter name hidden
+        // behind valid encodings was already revealed by the previous passes, and a malformed
+        // escape cannot additionally hide a readable name from this check.
+        return prev;
+      }
+    } while (!prev.equals(decoded) && --max > 0);
+
+    return decoded;
+  }
+
+  /**
+   * Fully decodes {@code url}, neutralizing malformed percent escapes before EVERY decode pass.
+   * Sanitizing only once is not enough: decoding "{@code %25zz}" yields "{@code %zz}" again, so a
+   * later pass would halt at the regenerated malformed escape and leave a doubly-encoded parameter
+   * name elsewhere (e.g. "{@code %2561utoDeserialize}", which needs two passes to reveal 'a') only
+   * partially decoded. Because each pass is sanitized first, {@link URLDecoder} never throws here.
+   */
+  private static String recursiveDecodeSanitizingEachPass(String url) {
+    String prev;
+    String decoded = url;
+    int max = 5;
+
+    do {
+      prev = decoded;
+      try {
+        decoded = URLDecoder.decode(sanitizeMalformedPercentEscapes(prev), "UTF-8");
+      } catch (UnsupportedEncodingException e) {
+        // UTF-8 is guaranteed to be supported by the JVM specification.
+        throw new RuntimeException(e);
       }
     } while (!prev.equals(decoded) && --max > 0);
 

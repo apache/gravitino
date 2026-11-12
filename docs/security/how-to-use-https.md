@@ -84,10 +84,11 @@ gravitino.server.webserver.keyStorePassword = {store_password}
 gravitino.server.webserver.managerPassword = {key_password}
 ```
 
-**5. Connect.** From Java, configure the HTTPS URI and the dedicated client truststore:
+**5. Connect.** From Java, configure the client to trust the server certificate using the client trust store:
 
 ```java
 import java.nio.file.Path;
+
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoVersion;
 import org.apache.gravitino.client.TLSConfigurer;

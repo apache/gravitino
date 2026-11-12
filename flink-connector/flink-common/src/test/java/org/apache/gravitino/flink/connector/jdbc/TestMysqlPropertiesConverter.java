@@ -19,13 +19,66 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.gravitino.flink.connector.jdbc.mysql.MysqlPropertiesConverter;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
 public class TestMysqlPropertiesConverter extends AbstractJdbcPropertiesConverterTestSuite {
 
   @Override
   protected JdbcPropertiesConverter getConverter(Map<String, String> catalogOptions) {
     return MysqlPropertiesConverter.INSTANCE;
+  }
+
+  @Test
+  public void testToFlinkTableProperties() {
+    String schema = "myDatabase";
+    String tableName = "myTable";
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogProperties).toFlinkCatalogProperties(catalogProperties);
+    Map<String, String> tableProperties =
+        getConverter(catalogProperties)
+            .toFlinkTableProperties(
+                flinkCatalogProperties, ImmutableMap.of(), new ObjectPath(schema, tableName));
+
+    // For MySQL, the Flink "database" (schema) is itself the connection database.
+    Assertions.assertEquals(
+        flinkUrl + schema,
+        tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+    Assertions.assertEquals(
+        tableName, tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME));
+  }
+
+  @Test
+  public void testToFlinkTablePropertiesWithBypassBaseUrl() {
+    // The database in the base-url is replaced by the table's database, and query parameters are
+    // kept.
+    Map<String, String> expectedTableUrls =
+        ImmutableMap.of(
+            "jdbc:mysql://127.0.0.1:13306/", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306/db0", "jdbc:mysql://127.0.0.1:13306/db1",
+            "jdbc:mysql://127.0.0.1:13306/db0?useSSL=false",
+                "jdbc:mysql://127.0.0.1:13306/db1?useSSL=false");
+    for (Map.Entry<String, String> entry : expectedTableUrls.entrySet()) {
+      Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+      catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", entry.getKey());
+      Map<String, String> flinkCatalogProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+      Map<String, String> tableProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkTableProperties(
+                  flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("db1", "t"));
+
+      Assertions.assertEquals(
+          entry.getValue(),
+          tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL),
+          entry.getKey());
+    }
   }
 }

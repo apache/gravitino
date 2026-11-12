@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -93,25 +94,11 @@ public class JobTemplateMetaBaseSQLProvider {
         + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
-  public String softDeleteJobTemplateMetaByMetalakeAndName(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return "UPDATE "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000.0"
-        + " WHERE job_template_name = #{jobTemplateName} AND metalake_id ="
-        + " (SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
   public String softDeleteJobTemplateMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobTemplateMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000.0"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -136,10 +123,7 @@ public class JobTemplateMetaBaseSQLProvider {
         + " last_version = #{newJobTemplateMeta.lastVersion},"
         + " deleted_at = #{newJobTemplateMeta.deletedAt}"
         + " WHERE job_template_id = #{oldJobTemplateMeta.jobTemplateId}"
-        + " AND job_template_name = #{oldJobTemplateMeta.jobTemplateName}"
-        + " AND metalake_id = #{oldJobTemplateMeta.metalakeId}"
         + " AND current_version = #{oldJobTemplateMeta.currentVersion}"
-        + " AND last_version = #{oldJobTemplateMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -206,5 +190,53 @@ public class JobTemplateMetaBaseSQLProvider {
         + " )"
         + " AND jtm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String selectJobTemplateByIdForUpdate(@Param("jobTemplateId") Long jobTemplateId) {
+    return selectJobTemplateIdentityById() + " FOR UPDATE";
+  }
+
+  /**
+   * Locks the active row for OCC identity validation.
+   *
+   * @param jobTemplateId the stable template ID
+   * @return the SQL statement
+   */
+  public String selectJobTemplateByIdForShare(@Param("jobTemplateId") Long jobTemplateId) {
+    return selectJobTemplateIdentityById() + " LOCK IN SHARE MODE";
+  }
+
+  /**
+   * Deletes active metadata using a stable identity and expected version.
+   *
+   * @param jobTemplateId the stable template ID
+   * @param currentVersion the expected OCC version
+   * @return the SQL statement
+   */
+  public String softDeleteJobTemplateById(
+      @Param("jobTemplateId") Long jobTemplateId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE job_template_id = #{jobTemplateId} AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  /**
+   * Builds the identity projection used by locking reads.
+   *
+   * @return SQL selecting the active template's identity fields
+   */
+  protected String selectJobTemplateIdentityById() {
+    return "SELECT job_template_id AS jobTemplateId, job_template_name AS jobTemplateName,"
+        + " metalake_id AS metalakeId FROM "
+        + JobTemplateMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0";
   }
 }

@@ -42,7 +42,7 @@ public class MonitorMetricsCommand implements OptimizerCommandExecutor {
         partitionPath.isEmpty() || context.identifiers().length == 1,
         "--partition-path requires exactly one identifier");
     try (Monitor monitor = new Monitor(context.optimizerEnv())) {
-      for (NameIdentifier identifier : context.parsedIdentifiers()) {
+      for (NameIdentifier identifier : context.parsedTableIdentifiers()) {
         List<EvaluationResult> results =
             monitor.evaluateMetrics(identifier, actionTimeSeconds, rangeSeconds, partitionPath);
         results.forEach(

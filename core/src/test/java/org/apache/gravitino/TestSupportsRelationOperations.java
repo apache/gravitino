@@ -138,6 +138,19 @@ public class TestSupportsRelationOperations {
     Assertions.assertSame(originalTarget, update.targetsToRemove()[0]);
   }
 
+  /** Explicit audit metadata is required when overriding a relation update's default audit. */
+  @Test
+  public void testRelationUpdateRejectsNullAudit() {
+    RelationUpdate update =
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            NameIdentifier.of("metalake", "catalog"),
+            Entity.EntityType.CATALOG,
+            null,
+            null);
+    Assertions.assertThrows(IllegalArgumentException.class, () -> update.withAuditInfo(null));
+  }
+
   private static class RecordingRelationOperations implements SupportsRelationOperations {
     private RelationQuery relationQuery;
     private RelationUpdate relationUpdate;

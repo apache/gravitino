@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
@@ -85,6 +86,28 @@ public interface SchemaMetaMapper {
 
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
+
+  /**
+   * Returns one when an active table, view, fileset, function, model, or topic exists in the
+   * schema, and {@code null} otherwise.
+   *
+   * <p>Only a literal is selected because callers need an existence answer, not complete child
+   * metadata. The final limit also lets the database stop as soon as it finds the first child.
+   */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
+  Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
+
+  /**
+   * Locks a schema identity, whether active or retired, for an overwrite transaction.
+   *
+   * @param schemaId the schema identity to lock
+   * @return the locked row, or null if that identity has never been registered or was collected
+   */
+  @Nullable
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdIncludingDeletedForUpdate")
+  SchemaPO selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId);
 
   /** Selects and locks an active schema by ID for the current transaction. */
   @SelectProvider(

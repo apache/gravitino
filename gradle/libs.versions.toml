@@ -17,12 +17,16 @@
 # under the License.
 #
 [versions]
+antlr = "4.13.2"
+db-scheduler = "16.12.0"
 awssdk = "2.31.73"
 azure-identity = "1.13.1"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
+# JUnit Jupiter 5.x ships with JUnit Platform 1.x of the same minor; bump them together.
 junit = "5.8.1"
+junit-platform = "1.8.1"
 jackson = "2.15.2"
 snakeyaml = "2.0"
 gson = "2.11.0"
@@ -36,8 +40,10 @@ lance-namespace = "0.7.5"
 delta-kernel = "3.3.0"
 jetty = "9.4.58.v20250814"
 jersey = "2.41"
+hk2 = "2.6.1"
 mockito = "4.11.0"
 airlift-json = "237"
+airlift-log = "237"
 airlift-resolver = "1.6"
 hive2 = "2.3.9"
 hive3 = "3.1.3"
@@ -51,9 +57,12 @@ hadoop-minikdc = "3.3.6"
 re2j = "1.7"
 httpclient = "4.4.1"
 httpclient5 = "5.4.4"
-httpcore5 = "5.3.4"
+# Keep httpcore5 on the same 5.4 line as httpclient5: httpclient5 5.4.x expects httpcore5 5.4.x.
+httpcore5 = "5.4.4"
 micrometer-core = "1.12.2"
 mockserver = "5.15.0"
+# 7.3.x moves to Jackson 2.19, which isn't audited in dev/release/maven/dependencies.txt yet.
+fabric8-kubernetes = "7.2.0"
 commons-configuration2 = "2.10.1"
 commons-csv = "1.12.0"
 commons-lang3 = "3.14.0"
@@ -67,15 +76,18 @@ commons-configuration1 = "1.6"
 commons-dbcp2 = "2.11.0"
 caffeine = "2.9.3"
 iceberg = '1.11.0'
-# Last Iceberg release compatible with Spark 3.3; Spark 3.3 deploy ITs cover basic CRUD only.
-iceberg4spark33 = "1.8.1"
-iceberg4spark34 = "1.11.0"
+datastrato-iceberg = "1.13.0"
+experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
 iceberg4spark35 = "1.11.0"
+iceberg4spark40 = "1.11.0"
 paimon = '1.2.0'
-spark33 = "3.3.4"
+# spark34 is pinned by modules other than the Spark connector for their own tests, so it stays
+# after the connector dropped 3.4; it says nothing about connector support.
 spark34 = "3.4.3"
 spark35 = "3.5.3"
-kyuubi4spark = "1.11.0"
+spark40 = "4.0.3"
+spark41 = "4.1.3"
+kyuubi4spark = "1.12.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
 # Trino version the iceberg-rest-trino-it module's in-process query runner is tested against.
@@ -98,7 +110,7 @@ clickhouse = "0.7.1"
 lz4 = "1.8.0"
 snappy-java = "1.1.10.8"
 mysql = "8.0.33"
-postgresql = "42.7.11"
+postgresql = "42.7.14"
 immutables-value = "2.11.7"
 selenium = "4.33.0"
 rauschig = "1.2.0"
@@ -109,25 +121,41 @@ curator = "2.12.0"
 awaitility = "4.2.1"
 servlet = "3.1.0"
 jodd = "3.5.2"
-flink = "1.18.0"
-flink18 = "1.18.0"
 flink119 = "1.19.0"
 flink120 = "1.20.0"
-flinkjdbc = "3.2.0-1.18"
-flinkjdbc18 = "3.2.0-1.18"
+flink21 = "2.1.3"
+flink22 = "2.2.1"
 flinkjdbc119 = "3.3.0-1.19"
 flinkjdbc120 = "3.3.0-1.20"
-iceberg4flink18 = "1.9.2"
+# flink-connector-jdbc was restructured starting with the 4.x line: the monolithic
+# flink-connector-jdbc artifact was split into flink-connector-jdbc-core plus one artifact per
+# database (flink-connector-jdbc-mysql, flink-connector-jdbc-postgres, ...), and this split line
+# is what publishes real Flink 2.x builds.
+flinkjdbc21 = "4.1.0-2.1"
+flinkjdbc22 = "4.1.0-2.2"
+# flink-connector-hive has not published a build targeting the Flink 2.x line yet either;
+# reuse the newest externalized release (built against 1.20) until an official 2.x build ships.
+flinkHive21 = "3.0.0-1.20"
+# flink-connector-jdbc-core (Flink 2.x) transitively pulls openlineage-sql-java:1.32.0, whose
+# bundled, unrelocated org.apache.commons.lang3.SystemProperties predates the getUserName(String)
+# overload and shadows the real commons-lang3 on the classpath. Force this newer release, which
+# ships an up-to-date bundled copy.
+openlineageSqlJava = "1.52.0"
 iceberg4flink119 = "1.10.2"
 iceberg4flink120 = "1.11.0"
-paimon4flink18 = "1.2.0"
+iceberg4flink21 = "1.11.0"
+iceberg4flink22 = "1.12.0"
 paimon4flink119 = "1.2.0"
 paimon4flink120 = "1.2.0"
+paimon4flink21 = "1.4.1"
+paimon4flink22 = "1.4.1"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
+objenesis = "3.3"
 asm = "9.8"
-ranger = "2.4.0"
+ranger = "2.8.0"
+zookeeper = "3.8.8"
 javax-jaxb-api = "2.3.1"
 javax-ws-rs-api = "2.1.1"
 spotless-plugin = '6.11.0'
@@ -136,6 +164,10 @@ publish-plugin = '1.2.0'
 rat-plugin = '0.8.0'
 shadow-plugin = "8.1.1"
 kerby = "2.0.3"
+# Transitive of kerb-admin; raised above the 3.8.8.Final that kerb-admin brings in.
+xnio = "3.8.17.Final"
+# Netty is a transitive dependency of the AWS SDK (Glue catalog); the BOM keeps all modules on one patch.
+netty = "4.1.140.Final"
 node-plugin = "7.0.1"
 commons-cli = "1.2"
 commons-cli-new = "1.9.0"
@@ -155,6 +187,7 @@ hudi = "0.15.0"
 google-auth = "1.28.0"
 aliyun-credentials = "0.3.12"
 aliyun-sdk-oss = "3.10.2"
+tencentcloud-sdk-sts = "3.1.1239"
 openlineage = "1.29.0"
 jcstress = "0.8.15"
 jmh-plugin = "0.7.3"
@@ -167,6 +200,10 @@ aspectj = "1.9.24"
 ql-expression = "4.0.3"
 
 [libraries]
+jsr305 = { module = "com.google.code.findbugs:jsr305", version = "3.0.2" }
+antlr-tool = { module = "org.antlr:antlr4", version.ref = "antlr" }
+antlr-runtime = { module = "org.antlr:antlr4-runtime", version.ref = "antlr" }
+db-scheduler = { group = "com.github.kagkarlsson", name = "db-scheduler", version.ref = "db-scheduler" }
 aspectj-aspectjrt = { group = "org.aspectj", name = "aspectjrt", version.ref = "aspectj" }
 aws-dynamodb = { group = "software.amazon.awssdk", name = "dynamodb", version.ref = "awssdk" }
 aws-glue = { group = "software.amazon.awssdk", name = "glue", version.ref = "awssdk" }
@@ -189,14 +226,17 @@ jackson-jaxrs-json-provider = { group = "com.fasterxml.jackson.jaxrs", name = "j
 guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 kerby-core = { group = "org.apache.kerby", name = "kerb-core", version.ref = "kerby"}
+netty-bom = { group = "io.netty", name = "netty-bom", version.ref = "netty" }
+xnio-api = { group = "org.jboss.xnio", name = "xnio-api", version.ref = "xnio" }
 kerby-simplekdc = { group = "org.apache.kerby", name = "kerb-simplekdc", version.ref = "kerby"}
 lombok = { group = "org.projectlombok", name = "lombok", version.ref = "lombok" }
 junit-jupiter-api = { group = "org.junit.jupiter", name = "junit-jupiter-api", version.ref = "junit" }
 junit-jupiter-params = { group = "org.junit.jupiter", name = "junit-jupiter-params", version.ref = "junit" }
 junit-jupiter-engine = { group = "org.junit.jupiter", name = "junit-jupiter-engine", version.ref = "junit" }
+junit-platform-testkit = { group = "org.junit.platform", name = "junit-platform-testkit", version.ref = "junit-platform" }
 slf4j-api = { group = "org.slf4j", name = "slf4j-api", version.ref = "slf4j" }
 slf4j-simple = { group = "org.slf4j", name = "slf4j-simple", version.ref = "slf4j" }
-slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version = "1.7.30" }
+slf4j-jdk14 = { group = "org.slf4j", name = "slf4j-jdk14", version.ref = "slf4j" }
 log4j-slf4j2-impl = { group = "org.apache.logging.log4j", name = "log4j-slf4j2-impl", version.ref = "log4j" }
 log4j-api = { group = "org.apache.logging.log4j", name = "log4j-api", version.ref = "log4j" }
 log4j-core = { group = "org.apache.logging.log4j", name = "log4j-core", version.ref = "log4j" }
@@ -205,6 +245,7 @@ log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j
 arrow-vector = { group = "org.apache.arrow", name = "arrow-vector", version.ref = "arrow" }
 lance = { group = "org.lance", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "org.lance", name = "lance-namespace-core", version.ref = "lance-namespace" }
+lance-namespace-apache-client = { group = "org.lance", name = "lance-namespace-apache-client", version.ref = "lance-namespace" }
 delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
 delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }
@@ -246,6 +287,7 @@ hadoop3-shaded-guava = { group = "org.apache.hadoop.thirdparty", name = "hadoop-
 hadoop3-shaded-protobuf = { group = "org.apache.hadoop.thirdparty", name = "hadoop-shaded-protobuf_3_7", version.ref = "hadoop3-thirdparty" }
 re2j = { group = "com.google.re2j", name = "re2j", version.ref = "re2j" }
 airlift-json = { group = "io.airlift", name = "json", version.ref = "airlift-json"}
+airlift-log = { group = "io.airlift", name = "log", version.ref = "airlift-log" }
 airlift-resolver = { group = "io.airlift.resolver", name = "resolver", version.ref = "airlift-resolver"}
 httpclient = { group = "org.apache.httpcomponents", name = "httpclient", version.ref = "httpclient" }
 httpclient5 = { group = "org.apache.httpcomponents.client5", name = "httpclient5", version.ref = "httpclient5" }
@@ -254,6 +296,9 @@ micrometer-core = { group = "io.micrometer", name = "micrometer-core", version.r
 
 mockserver-netty = { group = "org.mock-server", name = "mockserver-netty", version.ref = "mockserver" }
 mockserver-client-java = { group = "org.mock-server", name = "mockserver-client-java", version.ref = "mockserver" }
+fabric8-kubernetes-client = { group = "io.fabric8", name = "kubernetes-client", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-httpclient-jdk = { group = "io.fabric8", name = "kubernetes-httpclient-jdk", version.ref = "fabric8-kubernetes" }
+fabric8-kubernetes-server-mock = { group = "io.fabric8", name = "kubernetes-server-mock", version.ref = "fabric8-kubernetes" }
 commons-csv = { group = "org.apache.commons", name = "commons-csv", version.ref = "commons-csv" }
 commons-lang = { group = "commons-lang", name = "commons-lang", version.ref = "commons-lang" }
 commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "commons-lang3" }
@@ -271,6 +316,7 @@ iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle"
 iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
 iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
+iceberg-common = { group = "org.apache.iceberg", name = "iceberg-common", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
 iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
@@ -326,6 +372,7 @@ kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.re
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+objenesis = { group = "org.objenesis", name = "objenesis", version.ref = "objenesis" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}
@@ -336,6 +383,9 @@ datanucleus-rdbms = { group = "org.datanucleus", name = "datanucleus-rdbms", ver
 datanucleus-jdo = { group = "org.datanucleus", name = "javax.jdo", version.ref = "datanucleus-jdo" }
 
 ranger-intg = { group = "org.apache.ranger", name = "ranger-intg", version.ref = "ranger" }
+ranger-ugsync-util = { group = "org.apache.ranger", name = "ugsync-util", version.ref = "ranger" }
+zookeeper = { group = "org.apache.zookeeper", name = "zookeeper", version.ref = "zookeeper" }
+zookeeper-jute = { group = "org.apache.zookeeper", name = "zookeeper-jute", version.ref = "zookeeper" }
 javax-jaxb-api = { group = "javax.xml.bind", name = "jaxb-api", version.ref = "javax-jaxb-api" }
 javax-ws-rs-api = { group = "javax.ws.rs", name = "javax.ws.rs-api", version.ref = "javax-ws-rs-api" }
 selenium = { group = "org.seleniumhq.selenium", name = "selenium-java", version.ref = "selenium" }
@@ -353,10 +403,17 @@ google-auth-credentials = { group = "com.google.auth", name = "google-auth-libra
 
 aliyun-credentials-sdk = { group='com.aliyun', name='credentials-java', version.ref='aliyun-credentials' }
 aliyun-sdk-oss = { module = "com.aliyun.oss:aliyun-sdk-oss", version.ref = "aliyun-sdk-oss" }
-flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc'}
-flinkjdbc18 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc18'}
+tencentcloud-sdk-sts = { group = "com.tencentcloudapi", name = "tencentcloud-sdk-java-sts", version.ref = "tencentcloud-sdk-sts" }
 flinkjdbc119 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc119'}
 flinkjdbc120 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc120'}
+flinkjdbc21-core = {group='org.apache.flink',name='flink-connector-jdbc-core', version.ref='flinkjdbc21'}
+flinkjdbc21-mysql = {group='org.apache.flink',name='flink-connector-jdbc-mysql', version.ref='flinkjdbc21'}
+flinkjdbc21-postgres = {group='org.apache.flink',name='flink-connector-jdbc-postgres', version.ref='flinkjdbc21'}
+flinkjdbc22-core = {group='org.apache.flink',name='flink-connector-jdbc-core', version.ref='flinkjdbc22'}
+flinkjdbc22-mysql = {group='org.apache.flink',name='flink-connector-jdbc-mysql', version.ref='flinkjdbc22'}
+flinkjdbc22-postgres = {group='org.apache.flink',name='flink-connector-jdbc-postgres', version.ref='flinkjdbc22'}
+flinkHive21 = {group='org.apache.flink',name='flink-connector-hive_2.12', version.ref='flinkHive21'}
+openlineageSqlJava = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

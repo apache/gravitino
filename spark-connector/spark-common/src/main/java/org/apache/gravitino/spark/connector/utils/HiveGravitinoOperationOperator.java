@@ -27,21 +27,28 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveGravitinoOperationOperator {
 
-  private org.apache.gravitino.rel.Table gravitinoTable;
+  private static final Logger LOG = LoggerFactory.getLogger(HiveGravitinoOperationOperator.class);
+
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
+
+  private org.apache.gravitino.rel.Table gravitinoTable;
 
   public HiveGravitinoOperationOperator(org.apache.gravitino.rel.Table gravitinoTable) {
     this.gravitinoTable = gravitinoTable;
@@ -49,7 +56,7 @@ public class HiveGravitinoOperationOperator {
 
   public void createPartition(
       InternalRow ident, Map<String, String> properties, StructType partitionSchema)
-      throws PartitionAlreadyExistsException {
+      throws PartitionsAlreadyExistException {
     List<String[]> fields = new ArrayList<>();
     List<Literal<?>> values = new ArrayList<>();
 
@@ -58,7 +65,11 @@ public class HiveGravitinoOperationOperator {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
       fields.add(new String[] {structField.name()});
-      values.add(SparkPartitionUtils.toGravitinoLiteral(ident, i, dataType));
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
+      values.add(
+          ident.isNullAt(i)
+              ? Literals.stringLiteral(SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME)
+              : SparkPartitionUtils.toGravitinoLiteral(ident, i, dataType));
     }
 
     Partition partition =
@@ -68,8 +79,12 @@ public class HiveGravitinoOperationOperator {
     try {
       gravitinoTable.supportPartitions().addPartition(partition);
     } catch (org.apache.gravitino.exceptions.PartitionAlreadyExistsException e) {
-      throw new org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException(
-          e.getMessage());
+      // Build the exception from (table, ident, schema): that is the only constructor present on
+      // every supported Spark version, since Spark 4 dropped the single-String form this class used
+      // to call. It produces Spark's documented PARTITIONS_ALREADY_EXIST message rather than
+      // Gravitino's, so log the Gravitino-side detail, which the constructor takes no cause for.
+      LOG.debug("Gravitino rejected addPartition for table {}", gravitinoTable.name(), e);
+      throw new PartitionsAlreadyExistException(gravitinoTable.name(), ident, partitionSchema);
     }
   }
 
@@ -85,29 +100,16 @@ public class HiveGravitinoOperationOperator {
 
     boolean isNeedAll = names != null && names.length == 0 ? true : false;
 
-    String[] partitionNames =
-        getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER);
-    String[] partitionNamesWithDelimiter =
-        Arrays.stream(partitionNames)
-            .map(name -> name + PARTITION_NAME_DELIMITER)
-            .toArray(String[]::new);
+    List<String> requestedParts =
+        Arrays.asList(
+            getHivePartitionName(names, ident, partitionSchema).split(PARTITION_NAME_DELIMITER));
 
     return Arrays.stream(allPartitions)
-        .map(e -> e + PARTITION_NAME_DELIMITER)
+        // Match whole column=value parts; a substring match lets region=us match subregion=us.
         .filter(
-            e -> {
-              if (isNeedAll) {
-                return true;
-              }
-              for (String name : partitionNamesWithDelimiter) {
-                // exactly match
-                if (!e.contains(name)) {
-                  return false;
-                }
-              }
-              return true;
-            })
-        .map(e -> e.substring(0, e.length() - 1))
+            e ->
+                isNeedAll
+                    || Arrays.asList(e.split(PARTITION_NAME_DELIMITER)).containsAll(requestedParts))
         .map(e -> toSparkPartition(e, partitionSchema))
         .toArray(GenericInternalRow[]::new);
   }
@@ -136,9 +138,11 @@ public class HiveGravitinoOperationOperator {
     String[] splits = partitionName.split(PARTITION_NAME_DELIMITER);
     Object[] values = new Object[splits.length];
     for (int i = 0; i < splits.length; i++) {
+      // Partition names use the Hive path escaping, which Gravitino and HMS share.
       values[i] =
           SparkPartitionUtils.getSparkPartitionValue(
-              splits[i].split(PARTITION_VALUE_DELIMITER)[1], partitionSchema.apply(i).dataType());
+              ExternalCatalogUtils.unescapePathName(splits[i].split(PARTITION_VALUE_DELIMITER)[1]),
+              partitionSchema.apply(i).dataType());
     }
     return new GenericInternalRow(values);
   }
@@ -147,13 +151,15 @@ public class HiveGravitinoOperationOperator {
       String[] names, InternalRow ident, StructType partitionSchema) {
     StringBuilder partitionName = new StringBuilder();
     Preconditions.checkArgument(names != null, "Partition column names must not be null");
+    // names can be any subset of the partition columns, so look each column up by name.
     for (int i = 0; i < names.length; i++) {
-      StructField structField = partitionSchema.apply(i);
+      StructField structField = partitionSchema.apply(names[i]);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
+      // Hive and Spark write a null partition value as __HIVE_DEFAULT_PARTITION__.
       partitionName.append(
-          names[i]
-              + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+          partitionNamePart(
+              names[i], value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < names.length - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
@@ -167,14 +173,22 @@ public class HiveGravitinoOperationOperator {
     for (int i = 0; i < numFields; i++) {
       StructField structField = partitionSchema.apply(i);
       DataType dataType = structField.dataType();
+      String value = SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType);
       partitionName.append(
-          structField.name()
-              + PARTITION_VALUE_DELIMITER
-              + SparkPartitionUtils.getPartitionValueAsString(ident, i, dataType));
+          partitionNamePart(
+              structField.name(),
+              value == null ? SparkPartitionUtils.HIVE_DEFAULT_PARTITION_NAME : value));
       if (i < numFields - 1) {
         partitionName.append(PARTITION_NAME_DELIMITER);
       }
     }
     return partitionName.toString();
+  }
+
+  /** Builds one {@code column=value} part of a partition name with the Hive path escaping. */
+  private static String partitionNamePart(String column, String value) {
+    return ExternalCatalogUtils.escapePathName(column)
+        + PARTITION_VALUE_DELIMITER
+        + ExternalCatalogUtils.escapePathName(String.valueOf(value));
   }
 }

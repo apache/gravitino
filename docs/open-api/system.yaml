@@ -1,0 +1,95 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+  /system/iceberg-rest:
+    get:
+      tags:
+        - system
+      summary: Discover the Iceberg REST service endpoint
+      operationId: getIcebergRestServiceUri
+      description: >
+        Reports the endpoint of the Iceberg REST service running as an auxiliary service of this
+        Gravitino server, so that clients which already connect to the Gravitino server, such as
+        the Trino connector, can discover it instead of configuring it separately.
+        The reported `uri` is `null` when the service is not registered, does not use the dynamic
+        catalog config provider, or serves a different metalake than the requested one.
+        When `gravitino.iceberg-rest.advertised-uri` is configured, it is reported as-is;
+        otherwise the endpoint is derived from the service's listener configuration, and a wildcard
+        listener host is replaced with the host the caller used to reach the Gravitino server.
+        The response is therefore marked `Cache-Control: no-store`.
+      parameters:
+        - name: metalake
+          in: query
+          description: >
+            The metalake the caller intends to route through the Iceberg REST service. When
+            omitted or blank, the endpoint is reported regardless of which metalake it serves.
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/IcebergRESTServiceResponse"
+        "4XX":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+  responses:
+    IcebergRESTServiceResponse:
+      description: The Iceberg REST service endpoint
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            $ref: "#/components/schemas/IcebergRESTServiceResponse"
+          examples:
+            IcebergRESTServiceAvailable:
+              $ref: "#/components/examples/IcebergRESTServiceAvailable"
+            IcebergRESTServiceUnavailable:
+              $ref: "#/components/examples/IcebergRESTServiceUnavailable"
+
+  schemas:
+    IcebergRESTServiceResponse:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: integer
+          description: Response code, 0 for success
+          example: 0
+        uri:
+          type: string
+          nullable: true
+          description: >
+            The Iceberg REST service endpoint, or null when the service is not running or does not
+            serve the requested metalake
+          example: "http://gravitino-host:9001/iceberg"
+
+  examples:
+    IcebergRESTServiceAvailable:
+      value:
+        code: 0
+        uri: "http://gravitino-host:9001/iceberg"
+
+    IcebergRESTServiceUnavailable:
+      value:
+        code: 0
+        uri: null

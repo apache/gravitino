@@ -26,6 +26,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -81,5 +82,13 @@ public interface Topic extends Auditable {
    */
   default SupportsRoles supportsRoles() {
     throw new UnsupportedOperationException("Topic does not support role operations.");
+  }
+
+  /**
+   * @return the {@link SupportsSecrets} if the topic supports secret property operations.
+   * @throws UnsupportedOperationException if the topic does not support secret property operations.
+   */
+  default SupportsSecrets supportsSecrets() {
+    throw new UnsupportedOperationException("Topic does not support secret property operations.");
   }
 }

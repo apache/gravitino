@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -47,6 +48,8 @@ public class PropertiesMetadataHelpers {
     if (properties == null) {
       return;
     }
+
+    HiddenPropertyMaskUtils.validateNoMaskedPlaceholders(properties);
 
     List<String> reservedProperties =
         properties.keySet().stream()
@@ -87,6 +90,8 @@ public class PropertiesMetadataHelpers {
       PropertiesMetadata propertiesMetadata,
       Map<String, String> upserts,
       Map<String, String> deletes) {
+    HiddenPropertyMaskUtils.validateNoMaskedPlaceholders(upserts);
+
     for (Map.Entry<String, String> entry : upserts.entrySet()) {
       if (!propertiesMetadata.containsProperty(entry.getKey())) {
         continue;

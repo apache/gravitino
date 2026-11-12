@@ -19,6 +19,7 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +44,7 @@ import org.apache.gravitino.maintenance.optimizer.common.OptimizerEnv;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
@@ -60,7 +62,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static final String NAME =
       JobTemplateProvider.BUILTIN_NAME_PREFIX + "iceberg-update-stats";
-  private static final String VERSION = "v1";
+  private static final String VERSION = "v3";
   private static final String DEFAULT_STATISTICS_UPDATER = "gravitino-statistics-updater";
   private static final String DEFAULT_METRICS_UPDATER = "gravitino-metrics-updater";
   private static final long DEFAULT_TARGET_FILE_SIZE_BYTES = 128L * 1024 * 1024;
@@ -96,7 +98,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
       System.exit(1);
     }
 
-    Map<String, String> updaterOptions = parseJsonOptions(argMap.get("updater-options"));
+    Map<String, String> updaterOptions =
+        parseJsonOptions(argMap.get("updater-options"), "updater-options");
     String sparkConfJson = argMap.get("spark-conf");
 
     SparkSession.Builder sparkBuilder =
@@ -110,6 +113,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
     }
 
     SparkSession spark = sparkBuilder.getOrCreate();
+    IcebergJobUtils.requireIcebergSparkRuntimeOrExit(spark);
     StatisticsUpdater statisticsUpdater = null;
     MetricsUpdater metricsUpdater = null;
     try {
@@ -391,15 +395,22 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   @VisibleForTesting
   static Map<String, String> parseCustomSparkConfigs(String sparkConfJson) {
-    return parseJsonOptions(sparkConfJson);
+    return IcebergJobUtils.filterCustomSparkConfigs(parseJsonOptions(sparkConfJson, "spark-conf"));
   }
 
+  /**
+   * Parse a flat JSON option map and report parse errors with the real CLI flag name.
+   *
+   * @param json JSON string; null or empty yields an empty map
+   * @param optionName CLI flag name without {@code --} (for example {@code updater-options})
+   * @return parsed flat string map
+   */
   @VisibleForTesting
-  static Map<String, String> parseJsonOptions(String json) {
+  static Map<String, String> parseJsonOptions(String json, String optionName) {
     if (json == null || json.isEmpty()) {
       return new HashMap<>();
     }
-    return IcebergSparkConfigUtils.parseFlatJsonMap(json, "json-options");
+    return IcebergSparkConfigUtils.parseFlatJsonMap(json, optionName);
   }
 
   @VisibleForTesting
@@ -425,6 +436,7 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
     gravitinoUri.ifPresent(uri -> optimizerProperties.put(OptimizerConfig.GRAVITINO_URI, uri));
     metalake.ifPresent(value -> optimizerProperties.put(OptimizerConfig.GRAVITINO_METALAKE, value));
+    GravitinoAuthSettings.copyAliases(optimizerProperties);
     return optimizerProperties;
   }
 
@@ -547,11 +559,11 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         "--table",
         "{{table_identifier}}",
         "--update-mode",
-        "{{update_mode}}",
+        "{{update_mode:-all}}",
         "--updater-options",
-        "{{updater_options}}",
+        "{{updater_options:-}}",
         "--spark-conf",
-        "{{spark_conf}}");
+        "{{spark_conf:-}}");
   }
 
   private static Map<String, String> buildSparkConfigs() {
@@ -559,27 +571,24 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
   }
 
   private static void printUsage() {
-    System.err.println(
-        "Usage: IcebergUpdateStatsAndMetricsJob [OPTIONS]\\n"
-            + "\\n"
-            + "Required Options:\\n"
-            + "  --catalog <name>                   Iceberg catalog name registered in Spark\\n"
-            + "  --table <identifier>               Table name in schema.table format\\n"
-            + "\\n"
-            + "Optional Options:\\n"
-            + "  --update-mode <stats|metrics|all> Update behavior mode, default: all\\n"
-            + "  data-file-mse target file size is fixed at 134217728 (128MB)\\n"
-            + "                                     small-file-number threshold is fixed at 33554432 (32MB)\\n"
-            + "  --updater-options <json>           JSON map for updater and repository settings\\n"
-            + "                                     Example: '{\"gravitino_uri\":\"http://localhost:8090\",\\n"
-            + "                                     \"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\\n"
-            + "                                     \"metrics_updater\":\"gravitino-metrics-updater\"}'\\n"
-            + "  --spark-conf <json>                JSON map of custom Spark configs\\n"
-            + "                                     Must include Iceberg catalog configs for --catalog\\n"
-            + "                                     Example: '{\"spark.master\":\"local[2]\","
-            + "\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\","
-            + "\"spark.sql.catalog.rest_catalog.type\":\"rest\","
-            + "\"spark.sql.catalog.rest_catalog.uri\":\"http://localhost:9001/iceberg\"}'");
+    IcebergJobUtils.printCliUsage(
+        IcebergUpdateStatsAndMetricsJob.class.getSimpleName(),
+        ImmutableList.of(
+            "  --catalog <name>          Iceberg catalog name registered in Spark",
+            "  --table <identifier>      Table name in schema.table format"),
+        IcebergJobUtils.withSparkConfUsage(
+            "  --update-mode <mode>      stats | metrics | all (default: all)",
+            "                              data-file-mse target size is fixed at 134217728 (128MB)",
+            "                              small-file-number threshold is fixed at 33554432 (32MB)",
+            "  --updater-options <json>  Updater and repository settings",
+            "                              Example: '{\"gravitino_uri\":\"http://localhost:8090\",",
+            "                              \"metalake\":\"test\",\"auth_type\":\"basic\",",
+            "                              \"username\":\"admin\",\"password\":\"...\"}'"),
+        ImmutableList.of(
+            "  --catalog rest_catalog --table db.sample --update-mode all \\",
+            "    --spark-conf '{\"spark.sql.catalog.rest_catalog\":\"org.apache.iceberg.spark.SparkCatalog\",",
+            "    \"spark.sql.catalog.rest_catalog.type\":\"rest\",",
+            "    \"spark.sql.catalog.rest_catalog.uri\":\"http://localhost:9001/iceberg\"}'"));
   }
 
   enum UpdateMode {

@@ -33,8 +33,10 @@ import org.apache.gravitino.Version;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.credential.CredentialDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
 import org.apache.gravitino.dto.responses.CatalogResponse;
+import org.apache.gravitino.dto.responses.CredentialResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
 import org.apache.gravitino.dto.responses.MetalakeResponse;
 import org.apache.gravitino.dto.responses.SecretsResponse;
@@ -69,6 +71,7 @@ public abstract class GravitinoMockServerBase {
     port = mockServer.getLocalPort();
     mockAPIVersion();
     mockEmptySecretsAPI();
+    mockEmptyCredentialsAPI();
   }
 
   @AfterEach
@@ -76,6 +79,7 @@ public abstract class GravitinoMockServerBase {
     mockServer.reset();
     mockAPIVersion();
     mockEmptySecretsAPI();
+    mockEmptyCredentialsAPI();
   }
 
   @AfterAll
@@ -146,6 +150,23 @@ public abstract class GravitinoMockServerBase {
                   .withPath("/api/metalakes/.*/objects/.*/.*/secrets"),
               Times.unlimited())
           .respond(HttpResponse.response().withStatusCode(SC_OK).withBody(emptySecretsJson));
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  /** Mocks metadata-object credentials endpoints used by {@code getAllProperties}. */
+  protected static void mockEmptyCredentialsAPI() {
+    try {
+      String emptyCredentialsJson =
+          MAPPER.writeValueAsString(new CredentialResponse(new CredentialDTO[] {}));
+      mockServer
+          .when(
+              HttpRequest.request()
+                  .withMethod("GET")
+                  .withPath("/api/metalakes/.*/objects/.*/.*/credentials"),
+              Times.unlimited())
+          .respond(HttpResponse.response().withStatusCode(SC_OK).withBody(emptyCredentialsJson));
     } catch (JsonProcessingException e) {
       throw new RuntimeException(e);
     }

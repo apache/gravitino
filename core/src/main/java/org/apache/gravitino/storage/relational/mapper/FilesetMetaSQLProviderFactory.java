@@ -81,6 +81,18 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().selectFilesetMetaById(filesetId);
   }
 
+  /**
+   * Returns SQL that selects an active fileset metadata row by schema and name.
+   *
+   * @param schemaId the schema ID
+   * @param filesetName the fileset name
+   * @return the metadata-only select SQL
+   */
+  public static String selectFilesetMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("filesetName") String filesetName) {
+    return getProvider().selectFilesetMetaBySchemaIdAndNameForUpdate(schemaId, filesetName);
+  }
+
   public static String selectFilesetByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
@@ -92,11 +104,6 @@ public class FilesetMetaSQLProviderFactory {
 
   public static String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
     return getProvider().insertFilesetMeta(filesetPO);
-  }
-
-  public static String insertFilesetMetaOnDuplicateKeyUpdate(
-      @Param("filesetMeta") FilesetPO filesetPO) {
-    return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
   }
 
   public static String updateFilesetMeta(
@@ -117,8 +124,16 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().softDeleteFilesetMetasBySchemaIds(schemaIds);
   }
 
-  public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
-    return getProvider().softDeleteFilesetMetasByFilesetId(filesetId);
+  /**
+   * Returns SQL that soft-deletes a fileset by ID and expected version.
+   *
+   * @param filesetId the fileset ID
+   * @param occVersion the OCC version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("occVersion") Long occVersion) {
+    return getProvider().softDeleteFilesetMetasByFilesetId(filesetId, occVersion);
   }
 
   public String deleteFilesetMetasByLegacyTimeline(

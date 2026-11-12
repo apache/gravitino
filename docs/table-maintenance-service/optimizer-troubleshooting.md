@@ -12,7 +12,7 @@ license: "This software is licensed under the Apache License version 2."
 
 Failures fall into three groups, matching where they occur in the workflow. Command and argument errors surface immediately. Evaluation problems produce no output rather than an error, which is what makes them confusing. Execution failures happen inside Spark, so the real message is in the staging log rather than the API response.
 
-Staging logs live under `/tmp/gravitino/jobs/staging/{metalake}/{job_template_name}/{job_id}/`, controlled by `gravitino.job.stagingDir`. Read `error.log` for failures and `output.log` for results.
+Staging logs live under `/tmp/gravitino/jobs/staging/job-runs/{job_id}/`, controlled by `gravitino.job.stagingDir`. Read `error.log` for failures and `output.log` for results.
 
 ## Command and Argument Errors
 
@@ -64,33 +64,72 @@ These are the hard ones, because success and "the policy decided not to act" loo
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing:
+**`submit-update-stats-job` fails with JDBC metrics errors** — when `--updater-options` includes `gravitino.optimizer.jdbcMetrics.*`, the JDBC driver has to be on the Spark runtime classpath. `ClassNotFoundException` and `No suitable driver` both mean the same thing. With the k8s job executor, add it in `--spark-conf`; with the local job executor, install it into `SPARK_HOME/jars`, as the driver applies `--spark-conf` only after it starts:
 
 ```json
 {
-  "spark.jars": "/path/to/postgresql-42.7.4.jar"
+  "spark.jars": "https://repo1.maven.org/maven2/org/postgresql/postgresql/42.7.4/postgresql-42.7.4.jar"
 }
 ```
 
-**Rewrite fails on a multi-level partition** — in release `1.2.0`, rewriting a table partitioned by an identity transform combined with a time transform, such as `PARTITIONED BY (p, days(ts))`, fails with:
+`spark.jars` in `spark_conf` replaces a `spark.jars` default of the k8s job executor, so if that
+default provides the Iceberg runtime, list it in `spark_conf` as well.
 
-```text
-Cannot translate Spark expression ... day(cast(ts as date)) ... to data source filter
+**`The provided credentials did not support` or Iceberg `Not authorized`** — a secured Gravitino
+endpoint needs the optimizer Gravitino client auth (`none` / `simple` / `basic` / `oauth`) in CLI
+conf and/or short names in `updater_options`. A secured Iceberg REST catalog needs `rest.auth.*` in
+`spark-conf` for any built-in job that reads the table. Object-store writes also need
+`spark.sql.catalog.<cat>.header.X-Iceberg-Access-Delegation=vended-credentials`. See
+[Gravitino client auth](./optimizer-configuration.md#gravitino-client-auth-cli-and-update-stats) and
+[Secured Gravitino and Iceberg REST](./optimizer.md#secured-gravitino-and-iceberg-rest-object-storage).
+
+**`NoSuchWarehouse` on Iceberg REST** — `warehouse_location` was set to an `s3://` (or similar)
+URI. For REST catalogs use the Gravitino **catalog name** instead.
+
+**Direct rewrite `runJob` returns HTTP 400 listing missing keys** — `where_clause` has no template
+default; pass `""` to rewrite the whole table. Shared catalog keys
+(`catalog_name`, `table_identifier`, `catalog_type`, `catalog_uri`, `warehouse_location`) are also
+required. `strategy` / `sort_order` / `options` have defaults when omitted.
+
+**Rewrite succeeds with `Rewritten data files: 0`** — Iceberg's default `min-input-files` is 5.
+One small file per partition is not enough for a non-empty rewrite. Add more small files or pass
+rewrite options that lower the threshold, then re-run.
+
+**Built-in Iceberg jobs fail with `Missing Iceberg Spark session extensions`** —
+Spark only warns when `IcebergSparkSessionExtensions` is missing, so built-in jobs check the
+classpath after `SparkSession` starts and exit with a non-zero status when the Iceberg Spark
+runtime is absent. The templates configure Iceberg classes but leave `jars` empty, and
+`gravitino-jobs` does not bundle `iceberg-spark-runtime`. A stock Spark install is not enough.
+Put a version-matched Iceberg Spark runtime on the job classpath: install it into `SPARK_HOME/jars`
+or the Spark image, or, with the k8s job executor, set it in `spark_conf`:
+
+```json
+{
+  "spark.jars": "https://repo1.maven.org/maven2/org/apache/iceberg/iceberg-spark-runtime-3.5_2.12/1.11.0/iceberg-spark-runtime-3.5_2.12-1.11.0.jar"
+}
 ```
 
-Confirm it by checking the job run at `/api/metalakes/{metalake}/jobs/runs/{job_id}` and reading `error.log` under `builtin-iceberg-rewrite-data-files`. The only workaround is to compact identity-partitioned tables and leave the rest alone.
+With the local job executor, `spark.jars` in `spark_conf` doesn't add it: the driver applies
+`spark_conf` only after spark-submit has built its classpath.
 
-Observed in `1.2.0`:
+Use the Spark, Scala, and Iceberg versions that match your cluster. See
+[Built-in Job Templates](./optimizer-cli-reference.md#built-in-job-templates).
 
-| Partitioning                                                                  | Rewrite |
-|-------------------------------------------------------------------------------|---------|
-| `p`, `p, c2`                                                                    | Works   |
-| `p, years(ts)`, `p, months(ts)`, `p, days(ts)`, `p, hours(ts)`                  | Fails   |
-| `p, truncate(1, c2)`, `p, bucket(8, id)`                                        | Fails   |
+**Multi-level / non-identity partition rewrite** — the rewrite **job** does not reject these
+layouts. A **direct** `builtin-iceberg-rewrite-data-files` submit with an empty `where_clause`
+rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and similar). You may
+still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
+
+The failure mode
+`Cannot translate Spark expression ... day(...) ... to data source filter` still happens when
+the submit uses a **partition `where_clause` that applies time/bucket transforms** — the form
+the compaction adapter builds via `PartitionUtils` (for example `p = "a" AND day(ts) = 19723`).
+That is a strategy-generated filter path, not a limitation of empty-`where_clause` direct
+submits. Confirm in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 
 ## Related
 
 - [Table Maintenance Service](./optimizer.md)
 - [Configuration](./optimizer-configuration.md)
-- [Quick Start](./optimizer.md#walkthrough)
-- [CLI Reference](./optimizer-configuration.md)
+- [Walkthrough](./optimizer.md#walkthrough)
+- [CLI Reference](./optimizer-cli-reference.md)

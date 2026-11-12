@@ -68,6 +68,7 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.JobEntity;
@@ -158,16 +159,28 @@ public class JobOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       JobTemplateRegisterRequest request) {
+    if (request == null) {
+      LOG.warn("Received register job template request with null request body");
+      return ExceptionHandlers.handleJobTemplateException(
+          OperationType.REGISTER,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String jobTemplateName =
+        request.getJobTemplate() == null ? "" : request.getJobTemplate().name();
     LOG.info(
-        "Received request to register job template {} in metalake: {}",
-        request.getJobTemplate().name(),
-        metalake);
+        "Received request to register job template {} in metalake: {}", jobTemplateName, metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
+            NameIdentifierUtil.checkMetadataObjectName(
+                NameIdentifierUtil.ofJobTemplate(metalake, request.getJobTemplate().name()),
+                Entity.EntityType.JOB_TEMPLATE);
 
             jobOperationDispatcher.registerJobTemplate(
                 metalake, toEntity(metalake, request.getJobTemplate()));
@@ -181,7 +194,7 @@ public class JobOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleJobTemplateException(
-          OperationType.REGISTER, request.getJobTemplate().name(), metalake, e);
+          OperationType.REGISTER, jobTemplateName, metalake, e);
     }
   }
 
@@ -261,6 +274,13 @@ public class JobOperations {
       JobTemplateUpdatesRequest request) {
     LOG.info(
         "Received request to alter job template: {} in metalake: {}", jobTemplateName, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handleJobTemplateException(
+          OperationType.ALTER,
+          jobTemplateName,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(
@@ -271,6 +291,14 @@ public class JobOperations {
                 request.getUpdates().stream()
                     .map(JobTemplateUpdateRequest::jobTemplateChange)
                     .toArray(JobTemplateChange[]::new);
+            for (JobTemplateChange change : changes) {
+              if (change instanceof JobTemplateChange.RenameJobTemplate) {
+                NameIdentifierUtil.checkMetadataObjectName(
+                    NameIdentifierUtil.ofJobTemplate(
+                        metalake, ((JobTemplateChange.RenameJobTemplate) change).getNewName()),
+                    Entity.EntityType.JOB_TEMPLATE);
+              }
+            }
 
             JobTemplateEntity updatedEntity =
                 jobOperationDispatcher.alterJobTemplate(metalake, jobTemplateName, changes);
@@ -365,14 +393,19 @@ public class JobOperations {
   public Response getJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId) {
+      @PathParam("jobId") @AuthorizationMetadata(type = Entity.EntityType.JOB) String jobId,
+      @QueryParam("includeOutput") @DefaultValue("false") boolean includeOutput,
+      @QueryParam("outputMaxLines") Integer outputMaxLines,
+      @QueryParam("outputMaxBytes") Integer outputMaxBytes) {
     LOG.info("Received request to get job {} in metalake {}", jobId, metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            JobEntity jobEntity = jobOperationDispatcher.getJob(metalake, jobId);
+            JobEntity jobEntity =
+                jobOperationDispatcher.getJob(
+                    metalake, jobId, includeOutput, outputMaxLines, outputMaxBytes);
             LOG.info("Retrieved job {} in metalake: {}", jobId, metalake);
             return Utils.ok(new JobResponse(toDTO(jobEntity)));
           });
@@ -395,6 +428,14 @@ public class JobOperations {
           String metalake,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.RUN_JOB)
           JobRunRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleJobException(
+          OperationType.RUN,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received request to run job {} in metalake: {}", request.getJobTemplateName(), metalake);
 
@@ -426,6 +467,7 @@ public class JobOperations {
   @Path("runs/{jobId}")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "cancel-job." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "cancel-job", absolute = true)
   @AuthorizationExpression(expression = "METALAKE::OWNER || JOB::OWNER")
   public Response cancelJob(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
@@ -518,7 +560,38 @@ public class JobOperations {
         DTOConverters.toDTO(jobEntity.auditInfo()),
         jobEntity.auditInfo().createTime(),
         jobEntity.startedAtAsInstant(),
-        jobEntity.finishedAtAsInstant());
+        jobEntity.finishedAtAsInstant(),
+        toRuntimeJobTemplateDTO(jobEntity),
+        jobEntity.stdout(),
+        jobEntity.stderr());
+  }
+
+  /**
+   * Deserializes the job entity's stored runtime job template JSON, if any. A malformed or
+   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
+   * make the job unreadable or uncancellable through the API - failures here are logged and
+   * swallowed rather than propagated, so callers of {@link #toDTO(JobEntity)} (get/run/cancel/list
+   * job) always get a usable response with just the runtime job template omitted.
+   *
+   * <p>For a Spark runtime template, sensitive-named keys inside {@code --updater-options} and
+   * {@code --spark-conf} JSON arguments are masked before the DTO is returned via {@link
+   * JobRuntimeTemplateMaskUtils}. Other arguments and map fields stay as stored. This DTO has no
+   * {@code jobConf}; event {@code jobConf} is masked separately in the job event dispatcher. Stored
+   * plaintext is unchanged.
+   */
+  private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
+    try {
+      return JobRuntimeTemplateMaskUtils.maskSensitiveFields(
+          DTOConverters.fromRuntimeJobTemplateJson(
+              jobEntity.runtimeJobTemplate(), jobEntity.name()));
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to deserialize the runtime job template for job {}, omitting it from the "
+              + "response",
+          jobEntity.name(),
+          e);
+      return null;
+    }
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {

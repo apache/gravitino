@@ -19,16 +19,16 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.ModelDispatcher;
-import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -71,17 +71,11 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
-      // so the entity is stored under the normalized identifier. Apply the same normalization
-      // here so the owner is attached to the same identifier the manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
@@ -90,7 +84,12 @@ public class ModelHookDispatcher implements ModelDispatcher {
 
   @Override
   public boolean deleteModel(NameIdentifier ident) {
-    return dispatcher.deleteModel(ident);
+    boolean deleted = dispatcher.deleteModel(ident);
+    if (deleted) {
+      // A model registered later under the same name gets a new id, so drop the cached mapping.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.MODEL);
+    }
+    return deleted;
   }
 
   @Override
@@ -165,17 +164,11 @@ public class ModelHookDispatcher implements ModelDispatcher {
     Model model = dispatcher.registerModel(ident, uris, aliases, comment, properties);
 
     // Set the creator as owner of the model.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().internalOwnerDispatcher();
     if (ownerManager != null) {
-      // The inner NormalizeDispatcher case-folds the model name based on catalog capabilities,
-      // so the entity is stored under the normalized identifier. Apply the same normalization
-      // here so the owner is attached to the same identifier the manager sees.
-      NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.MODEL, GravitinoEnv.getInstance().catalogManager());
       ownerManager.setOwner(
-          normalizedIdent.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.MODEL),
+          ident.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.MODEL),
           PrincipalUtils.getCurrentUserName(),
           Owner.Type.USER);
     }
@@ -195,7 +188,11 @@ public class ModelHookDispatcher implements ModelDispatcher {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    return dispatcher.alterModel(ident, changes);
+    Model alteredModel = dispatcher.alterModel(ident, changes);
+    if (Arrays.stream(changes).anyMatch(change -> change instanceof ModelChange.RenameModel)) {
+      AuthorizationUtils.notifyEntityNameIdMappingChange(ident, Entity.EntityType.MODEL);
+    }
+    return alteredModel;
   }
 
   @Override

@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.catalog;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
@@ -31,10 +32,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
@@ -42,6 +45,7 @@ import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.stubbing.Answer;
 
 /**
  * Verifies that GravitinoCatalogManager partitions its client and catalog caches by the identity
@@ -132,7 +136,9 @@ public class TestGravitinoCatalogManager {
   @Test
   void testCloseClosesEveryCachedClient() {
     SparkConf sparkConf = tokenConf();
-    GravitinoCatalogManager manager = createManager(sparkConf);
+    // With the removal listener run inline, the drain and the listener both try to close every
+    // client before close() returns.
+    GravitinoCatalogManager manager = createManager(sparkConf, Runnable::run);
 
     for (String user : new String[] {"alice", "bob", "carol"}) {
       sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt(user));
@@ -142,7 +148,10 @@ public class TestGravitinoCatalogManager {
 
     manager.close();
 
-    assertEquals(3, clientFactory.closedCount());
+    assertEquals(
+        List.of(1, 1, 1),
+        clientFactory.closeCounts(),
+        "each cached client must be closed exactly once");
   }
 
   @Test
@@ -186,9 +195,75 @@ public class TestGravitinoCatalogManager {
     assertEquals(1, clientFactory.clientCount());
   }
 
+  @Test
+  void testIcebergRestUriIsCachedAfterSuccessfulDiscovery() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              discoveryCalls.incrementAndGet();
+              return Optional.of("http://irc:9001/iceberg");
+            });
+
+    Optional<String> first = manager.getIcebergRestUri();
+    Optional<String> second = manager.getIcebergRestUri();
+
+    assertEquals(Optional.of("http://irc:9001/iceberg"), first);
+    assertSame(first, second, "A cached discovery result must not be recomputed");
+    assertEquals(1, discoveryCalls.get());
+  }
+
+  @Test
+  void testNoIcebergRestUriDiscoveredIsAlsoCached() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              discoveryCalls.incrementAndGet();
+              return Optional.empty();
+            });
+
+    manager.getIcebergRestUri();
+    manager.getIcebergRestUri();
+
+    assertEquals(1, discoveryCalls.get(), "A negative discovery result must be cached too");
+  }
+
+  @Test
+  void testIcebergRestUriDiscoveryFailurePropagatesAndIsNotCached() {
+    AtomicInteger discoveryCalls = new AtomicInteger();
+    GravitinoCatalogManager manager =
+        createManagerWithIcebergRestUri(
+            invocation -> {
+              if (discoveryCalls.incrementAndGet() == 1) {
+                throw new RuntimeException("Gravitino server unreachable");
+              }
+              return Optional.of("http://irc:9001/iceberg");
+            });
+
+    assertThrows(RuntimeException.class, manager::getIcebergRestUri);
+    Optional<String> second = manager.getIcebergRestUri();
+
+    assertEquals(Optional.of("http://irc:9001/iceberg"), second);
+    assertEquals(2, discoveryCalls.get(), "A failed discovery must be retried on the next call");
+  }
+
+  private GravitinoCatalogManager createManagerWithIcebergRestUri(Answer<Optional<String>> answer) {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_METALAKE, "test_metalake");
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.icebergRestServiceUri(anyString())).thenAnswer(answer);
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", identity -> client);
+  }
+
   private GravitinoCatalogManager createManager(SparkConf sparkConf) {
     clientFactory = new ClientFactory();
     return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory);
+  }
+
+  private GravitinoCatalogManager createManager(SparkConf sparkConf, Executor cacheExecutor) {
+    clientFactory = new ClientFactory();
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory, cacheExecutor);
   }
 
   private static SparkConf tokenConf() {
@@ -233,7 +308,7 @@ public class TestGravitinoCatalogManager {
   /** Hands out a distinct mock client per identity and counts what the manager asks of it. */
   private static class ClientFactory implements Function<GravitinoIdentity, GravitinoClient> {
 
-    private final List<AtomicBoolean> closedFlags = new ArrayList<>();
+    private final List<AtomicInteger> closeCounts = new ArrayList<>();
     private final AtomicInteger clients = new AtomicInteger();
     private final AtomicInteger loads = new AtomicInteger();
 
@@ -250,15 +325,13 @@ public class TestGravitinoCatalogManager {
                 when(catalog.name()).thenReturn(invocation.getArgument(0));
                 return catalog;
               });
-      // Closing twice must not be counted twice: the shutdown path closes explicitly and the
-      // removal listener may then fire for the same client.
-      AtomicBoolean closed = new AtomicBoolean(false);
-      synchronized (closedFlags) {
-        closedFlags.add(closed);
+      AtomicInteger closes = new AtomicInteger();
+      synchronized (closeCounts) {
+        closeCounts.add(closes);
       }
       doAnswer(
               invocation -> {
-                closed.set(true);
+                closes.incrementAndGet();
                 return null;
               })
           .when(client)
@@ -275,8 +348,14 @@ public class TestGravitinoCatalogManager {
     }
 
     int closedCount() {
-      synchronized (closedFlags) {
-        return (int) closedFlags.stream().filter(AtomicBoolean::get).count();
+      synchronized (closeCounts) {
+        return (int) closeCounts.stream().filter(closes -> closes.get() > 0).count();
+      }
+    }
+
+    List<Integer> closeCounts() {
+      synchronized (closeCounts) {
+        return closeCounts.stream().map(AtomicInteger::get).collect(Collectors.toList());
       }
     }
   }

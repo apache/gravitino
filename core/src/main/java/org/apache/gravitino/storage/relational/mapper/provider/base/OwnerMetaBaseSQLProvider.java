@@ -25,20 +25,21 @@ import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
   protected String currentTimestampMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 
   public String selectUserOwnerMetaByMetadataObjectIdAndType(
@@ -47,8 +48,6 @@ public class OwnerMetaBaseSQLProvider {
     return "SELECT ut.user_id as userId,"
         + " ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId,"
-        + " ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion,"
         + " ut.last_version as lastVersion,"
@@ -72,8 +71,6 @@ public class OwnerMetaBaseSQLProvider {
         + "ut.user_id as userId, "
         + "ut.user_name as userName, "
         + "ut.metalake_id as metalakeId, "
-        + "ut.external_id as externalId, "
-        + "ut.enabled as enabled, "
         + "ut.audit_info as auditInfo, "
         + "ut.current_version as currentVersion, "
         + "ut.last_version as lastVersion, "
@@ -286,6 +283,22 @@ public class OwnerMetaBaseSQLProvider {
         + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
         + " fnt.function_id = ot.metadata_object_id AND ot.metadata_object_type = 'FUNCTION'"
         + ")";
+  }
+
+  public String softDeleteOwnerRelOfJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    String now = currentTimestampMillisExpression();
+    // No deleted_at filter on the job rows: the template delete soft-deletes its jobs earlier in
+    // the same transaction, and filtering them out would make this a no-op.
+    return "UPDATE "
+        + OWNER_TABLE_NAME
+        + " SET deleted_at = "
+        + now
+        + ", updated_at = "
+        + now
+        + " WHERE deleted_at = 0 AND metadata_object_type = 'JOB' AND metadata_object_id IN ("
+        + " SELECT job_run_id FROM "
+        + JobMetaMapper.TABLE_NAME
+        + " WHERE job_template_id = #{jobTemplateId})";
   }
 
   public String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {

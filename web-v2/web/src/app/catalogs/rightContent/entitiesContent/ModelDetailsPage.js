@@ -454,6 +454,7 @@ export default function ModelDetailsPage({ ...props }) {
           catalog={catalog}
           schema={schema}
           editModel={model}
+          version={searchParams.get('version')}
           init={true}
         />
       )}

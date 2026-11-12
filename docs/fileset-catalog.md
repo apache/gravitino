@@ -49,6 +49,12 @@ the Fileset catalog has the following properties:
 
 Refer to [Credential vending](./security/credential-vending.md) for more details about credential vending.
 
+Sensitive catalog properties such as cloud access keys are hidden from the default load catalog
+response. Recover credential fields via the [credential vending API](security/credential-vending.md)
+(`getCredentials`). Other non-credential secrets (secret-manager URNs, declared `hidden`
+properties, undeclared sensitive-named keys) use `getSecrets` /
+`GET .../objects/{type}/{fullName}/secrets`.
+
 ### HDFS Fileset
 
 Apart from the above properties, to access fileset like HDFS fileset, you need to configure the following extra
@@ -200,6 +206,7 @@ Besides, the Fileset catalog fileset has the following properties:
 | `credential-providers`                | The credential provider types, separated by comma.                                                                      | (none)                                                                                                         | No                                         | No        |
 | `placeholder-`                        | Properties that start with `placeholder-` are used to replace placeholders in the location.                             | (none)                                                                                                         | No                                         | Yes       |
 | `default-location-name`               | The name of the default location of the fileset, mainly used for GVFS operations without specifying a location name.    | When the fileset has only one location, its location name will be automatically selected as the default value. | Yes, if the fileset has multiple locations | Yes       |
+| `allow-existing-location-as-managed`  | Whether a managed fileset may be created on a location that already exists and is not empty. Such a location is rejected by default when filesystem operations are enabled; register it as an `EXTERNAL` fileset instead. | false                                                                       | No                                         | Yes       |
 | `config.resources`                    | The configuration resources, separated by comma. For example, `hdfs-site.xml,core-site.xml`.                            | (none)                                                                                                         | No                                         | NO        |
 
 Some properties are reserved and cannot be set by users:
@@ -216,6 +223,23 @@ setting in the following order of precedence:
 1. Fileset properties
 2. Schema properties
 3. Catalog properties
+
+### How fileset locations are resolved
+
+Gravitino merges locations by name. At the catalog and schema levels, `location` supplies the
+reserved name `unknown`, and `location-{name}` supplies a named location. For example, the
+`landing` catalog below gives `unknown` and `eu` the same URI. Its `raw` schema overrides only `eu`.
+
+| Level | Property | Value |
+| --- | --- | --- |
+| Catalog `landing` | `location` | `s3a://example-bucket/landing` |
+| Catalog `landing` | `location-eu` | `s3a://example-bucket/landing` |
+| Schema `raw` | `location-eu` | `s3a://example-eu/landing/raw` |
+
+For each name, a fileset location overrides the schema location, which overrides the catalog
+location. A partial create request inherits the names it omits. For example, a fileset named
+`raw_events` that supplies only `unknown` and `us` inherits `s3a://example-eu/landing/raw/raw_events`
+as `eu`. See the [create request and resolved locations](./manage-fileset-metadata-using-gravitino.md#create-a-fileset-with-several-locations).
 
 ### Fileset Operations
 

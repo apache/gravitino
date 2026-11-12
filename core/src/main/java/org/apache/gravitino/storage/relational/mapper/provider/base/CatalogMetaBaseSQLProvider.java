@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.T
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -241,21 +242,28 @@ public class CatalogMetaBaseSQLProvider {
       @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  /**
+   * Returns SQL that soft-deletes catalogs using identifier-and-version pairs. The leading IN list
+   * lets the database find the rows by primary key instead of scanning the table for the OR chain.
+   */
   public String softDeleteCatalogMetasWithVersion(
       @Param("catalogMetas") List<CatalogPO> catalogPOs) {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE deleted_at = 0 AND "
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE deleted_at = 0 AND catalog_id IN "
+        + "<foreach collection='catalogMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.catalogId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

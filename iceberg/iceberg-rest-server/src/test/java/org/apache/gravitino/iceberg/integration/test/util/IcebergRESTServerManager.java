@@ -139,13 +139,15 @@ public abstract class IcebergRESTServerManager {
     Properties properties = serverConfig.loadPropertiesFromFile(configFile.toFile());
     serverConfig.loadFromProperties(properties);
 
-    LOG.info("Server config:{}.", serverConfig.getAllConfig());
+    // Configuration values may contain credentials. Log only keys for test diagnostics.
+    LOG.info("Server config keys: {}.", serverConfig.getAllConfig().keySet());
 
     JettyServerConfig jettyServerConfig =
         JettyServerConfig.fromConfig(serverConfig, IcebergConfig.ICEBERG_CONFIG_PREFIX);
     String host = jettyServerConfig.getHost();
+    String checkHost = "0.0.0.0".equals(host) ? "127.0.0.1" : host;
     int port = jettyServerConfig.getHttpPort();
-    this.checkUri = String.format("http://%s:%d/metrics", host, port);
+    this.checkUri = String.format("http://%s:%d/iceberg/health/live", checkHost, port);
     LOG.info("Check uri:{}.", checkUri);
   }
 }

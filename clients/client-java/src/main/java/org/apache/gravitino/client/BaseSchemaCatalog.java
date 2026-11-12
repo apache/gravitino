@@ -42,11 +42,11 @@ import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.function.Function;
 import org.apache.gravitino.function.FunctionCatalog;
@@ -54,10 +54,14 @@ import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /**
@@ -171,7 +175,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   /**
-   * Create a new schema with specified identifier, comment and metadata.
+   * Create a new schema with specified identifier, comment and properties.
    *
    * @param schemaName The name identifier of the schema.
    * @param comment The comment of the schema.
@@ -183,8 +187,40 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(
+        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
 
-    SchemaCreateRequest req = new SchemaCreateRequest(schemaName, comment, properties);
+  /**
+   * Create a new schema with specified identifier, comment, properties, and optional secret maps.
+   *
+   * @param schemaName The name identifier of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created {@link Schema}.
+   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
+   * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
+   */
+  @Override
+  public Schema createSchema(
+      String schemaName,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+
+    SchemaCreateRequest req =
+        new SchemaCreateRequest(
+            schemaName,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     SchemaResponse resp =
@@ -205,6 +241,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    * @param schemaName The name identifier of the schema.
    * @return The {@link Schema} with specified identifier.
    * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
+   * @throws SchemaAlreadyExistsException if an external schema carries another existing schema's
+   *     identifier. Remove the copied source marker before importing an independent copy.
    */
   @Override
   public Schema loadSchema(String schemaName) throws NoSuchSchemaException {
@@ -254,10 +292,14 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   /**
    * Drop the schema with specified identifier.
    *
+   * <p>Cascade support depends on the catalog. PostgreSQL refuses non-empty schemas even when
+   * cascade is requested, because native cascade may remove objects in other schemas.
+   *
    * @param schemaName The name identifier of the schema.
-   * @param cascade Whether to drop all the tables under the schema.
+   * @param cascade Whether to request recursive deletion, subject to catalog support.
    * @return true if the schema is dropped successfully, false otherwise.
-   * @throws NonEmptySchemaException if the schema is not empty and cascade is false.
+   * @throws NonEmptySchemaException if the schema is non-empty and cascade is false, or the catalog
+   *     cannot safely cascade within the schema.
    */
   @Override
   public boolean dropSchema(String schemaName, boolean cascade) throws NonEmptySchemaException {
@@ -278,8 +320,18 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -303,19 +355,18 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
   }
 
   @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

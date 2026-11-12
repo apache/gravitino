@@ -42,6 +42,7 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /**
  * Abstract base class for Iceberg REST credential vending integration tests with cloud storage
@@ -172,8 +173,7 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
         () -> sql("SELECT * FROM %s.%s.%s", SPARK_CATALOG_NAME, SCHEMA_NAME, tableName));
 
     grantSelectTableRole(tableName);
-    Assertions.assertThrows(
-        SparkException.class, () -> sql("INSERT INTO %s VALUES (1,1),(2,2)", tableName));
+    assertStorageWriteDenied(() -> sql("INSERT INTO %s VALUES (1,1),(2,2)", tableName));
     List<Object[]> rows = sql("SELECT * FROM %s", tableName);
     Assertions.assertEquals(0, rows.size());
 
@@ -233,8 +233,7 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
 
     // Narrowed to the select-only role the caller gets a read-only credential, so the write fails
     // inside Spark instead of being rejected by Gravitino.
-    Assertions.assertThrows(
-        SparkException.class,
+    assertStorageWriteDenied(
         () ->
             sql(
                 "INSERT INTO %s.%s.%s VALUES (3,3)",
@@ -243,6 +242,16 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
     List<Object[]> rows =
         sql("SELECT * FROM %s.%s.%s", NARROWED_SPARK_CATALOG_NAME, SCHEMA_NAME, tableName);
     Assertions.assertEquals(2, rows.size());
+  }
+
+  /**
+   * Checks that a storage write fails inside Spark. Providers may additionally check the storage
+   * error code to distinguish policy denial from an unrelated client failure.
+   *
+   * @param operation the write operation to reject
+   */
+  protected void assertStorageWriteDenied(Executable operation) {
+    Assertions.assertThrows(SparkException.class, operation);
   }
 
   /**

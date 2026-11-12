@@ -187,7 +187,8 @@ public class TestIcebergSchema {
   private IcebergCatalog initIcebergCatalog(String name) {
     CatalogEntity entity =
         CatalogEntity.builder()
-            .withId(1L)
+            // Each test creates a different catalog, so it must also use a distinct catalog ID.
+            .withId(Integer.toUnsignedLong(name.hashCode()))
             .withName(name)
             .withNamespace(Namespace.of(META_LAKE_NAME))
             .withType(IcebergCatalog.Type.RELATIONAL)

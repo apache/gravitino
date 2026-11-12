@@ -36,6 +36,12 @@ import javax.ws.rs.client.Invocation;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
@@ -47,16 +53,21 @@ import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserEnabledRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
+import org.apache.gravitino.idp.listener.IdpUserGroupEventDispatcher;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.rest.RESTUtils;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.JerseyTest;
 import org.glassfish.jersey.test.TestProperties;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -65,6 +76,23 @@ class TestIdpOperations extends JerseyTest {
   private static final String ACCEPT = "application/vnd.gravitino.v1+json";
   private static final String VALID_PASSWORD = "Passw0rd-For-User";
   private static final IdpUserGroupManager MANAGER = mock(IdpUserGroupManager.class);
+  private static final IdpUserGroupEventDispatcher DISPATCHER =
+      new IdpUserGroupEventDispatcher(new EventBus(Collections.emptyList()), MANAGER);
+
+  private static Config previousConfig;
+
+  @BeforeAll
+  static void installServiceAdminConfig() throws Exception {
+    previousConfig = GravitinoEnv.getInstance().config();
+    Config config = mock(Config.class);
+    when(config.get(Configs.SERVICE_ADMINS)).thenReturn(List.of("admin"));
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+  }
+
+  @AfterAll
+  static void restoreConfig() throws Exception {
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+  }
 
   @BeforeEach
   void resetManager() {
@@ -82,6 +110,8 @@ class TestIdpOperations extends JerseyTest {
 
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getRemoteUser()).thenReturn(null);
+    when(request.getAttribute(AuthConstants.AUTHENTICATED_PRINCIPAL_ATTRIBUTE_NAME))
+        .thenReturn(new UserPrincipal("admin"));
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(IdpUserOperations.class);
@@ -91,7 +121,7 @@ class TestIdpOperations extends JerseyTest {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            bind(MANAGER).to(IdpUserGroupManager.class);
+            bind(DISPATCHER).to(IdpUserGroupEventDispatcher.class);
             bind(request).to(HttpServletRequest.class);
           }
         });
@@ -99,9 +129,18 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
+  void testNullRequestBodyReturnsBadRequest() {
+    assertNullBody(postNull("/idp/users"));
+    assertNullBody(putNull("/idp/users/user1/password"));
+    assertNullBody(putNull("/idp/users/user1/enabled"));
+    assertNullBody(postNull("/idp/groups"));
+    assertNullBody(putNull("/idp/groups/group1/users"));
+  }
+
+  @Test
   void testAddUser() throws Exception {
     AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
-    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD);
+    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD, true);
 
     assertError(
         Response.Status.BAD_REQUEST,
@@ -113,7 +152,7 @@ class TestIdpOperations extends JerseyTest {
 
     doThrow(new AlreadyExistsException("mock error"))
         .when(MANAGER)
-        .addUser("user1", VALID_PASSWORD);
+        .addUser("user1", VALID_PASSWORD, true);
     assertStatus(Response.Status.CONFLICT, post("/idp/users", req));
   }
 
@@ -136,8 +175,59 @@ class TestIdpOperations extends JerseyTest {
     when(MANAGER.removeUser("user1")).thenReturn(true);
 
     Assertions.assertEquals(
-        "user1", put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().name());
+        "user1",
+        put("/idp/users/user1/password", req).readEntity(IdpUserResponse.class).getUser().name());
     Assertions.assertTrue(delete("/idp/users/user1").readEntity(RemoveResponse.class).removed());
+  }
+
+  @Test
+  void testAdminSelfPasswordChangeRequiresOldPassword() {
+    ChangePasswordRequest missingOld = new ChangePasswordRequest(VALID_PASSWORD);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/password", missingOld),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    ChangePasswordRequest withOld = new ChangePasswordRequest(VALID_PASSWORD, "admin-old-pass12");
+    when(MANAGER.changePassword("admin", VALID_PASSWORD, "admin-old-pass12")).thenReturn(true);
+    when(MANAGER.getUser("admin")).thenReturn(buildUser("admin"));
+    Assertions.assertEquals(
+        "admin",
+        put("/idp/users/admin/password", withOld)
+            .readEntity(IdpUserResponse.class)
+            .getUser()
+            .name());
+  }
+
+  @Test
+  void testAdminResetRejectsOldPassword() {
+    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD, "other-old-pass12");
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/user1/password", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+  }
+
+  @Test
+  void testUpdateEnabled() {
+    UpdateUserEnabledRequest req = new UpdateUserEnabledRequest(false);
+    when(MANAGER.updateEnabled("user1", false)).thenReturn(true);
+    when(MANAGER.getUser("user1")).thenReturn(new IdpUser("user1", Collections.emptyList(), false));
+
+    Assertions.assertFalse(
+        put("/idp/users/user1/enabled", req).readEntity(IdpUserResponse.class).getUser().enabled());
+  }
+
+  @Test
+  void testCannotUpdateEnabledOfServiceAdmin() {
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/enabled", new UpdateUserEnabledRequest(false)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin/enabled", new UpdateUserEnabledRequest(true)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
   }
 
   @Test
@@ -218,8 +308,16 @@ class TestIdpOperations extends JerseyTest {
     return request(path).post(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response postNull(String path) {
+    return request(path).post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response put(String path, Object body) {
     return request(path).put(Entity.entity(body, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response putNull(String path) {
+    return request(path).put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
   }
 
   private Response delete(String path) {
@@ -233,6 +331,13 @@ class TestIdpOperations extends JerseyTest {
   private void assertError(Response.Status expected, Response response, int code) {
     assertStatus(expected, response);
     Assertions.assertEquals(code, response.readEntity(ErrorResponse.class).getCode());
+  }
+
+  private void assertNullBody(Response response) {
+    assertStatus(Response.Status.BAD_REQUEST, response);
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+    Assertions.assertTrue(error.getMessage().contains("Request body cannot be null"));
   }
 
   private IdpUser buildUser(String user) {

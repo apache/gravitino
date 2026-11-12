@@ -22,11 +22,29 @@ import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TA
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaBaseSQLProvider {
+  private static final String SELECT_SCHEMA_BY_ID =
+      "SELECT schema_id as schemaId, schema_name as schemaName,"
+          + " metalake_id as metalakeId, catalog_id as catalogId,"
+          + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+          + " current_version as currentVersion, last_version as lastVersion,"
+          + " deleted_at as deletedAt"
+          + " FROM "
+          + TABLE_NAME
+          + " WHERE schema_id = #{schemaId}";
+
   public String listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId) {
     return "SELECT schema_id as schemaId, schema_name as schemaName,"
         + " metalake_id as metalakeId, catalog_id as catalogId,"
@@ -172,14 +190,45 @@ public class SchemaMetaBaseSQLProvider {
   }
 
   public String selectSchemaMetaById(@Param("schemaId") Long schemaId) {
-    return "SELECT schema_id as schemaId, schema_name as schemaName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId,"
-        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+    return SELECT_SCHEMA_BY_ID + " AND deleted_at = 0";
+  }
+
+  /**
+   * Returns SQL that locks a schema identity, including a retired row that can be revived.
+   *
+   * @param schemaId the schema ID bound by MyBatis
+   * @return a select-for-update statement without a deleted-at filter
+   */
+  public String selectSchemaMetaByIdIncludingDeletedForUpdate(@Param("schemaId") Long schemaId) {
+    return SELECT_SCHEMA_BY_ID + " FOR UPDATE";
+  }
+
+  /** Returns SQL that checks whether an active child exists in the schema. */
+  public String selectActiveChildBySchemaId(@Param("schemaId") Long schemaId) {
+    // Each branch returns only the same literal, so UNION ALL avoids unnecessary duplicate
+    // elimination. LIMIT 1 lets the database stop as soon as any kind of child is found.
+    return "SELECT 1 FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + SemanticModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " LIMIT 1";
   }
 
   /** Returns SQL that selects and locks an active schema by ID. */
@@ -319,8 +368,8 @@ public class SchemaMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -333,20 +382,27 @@ public class SchemaMetaBaseSQLProvider {
       @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id = #{schemaId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  /**
+   * Returns SQL that soft-deletes schemas using identifier-and-version pairs. The leading IN list
+   * lets the database find the rows by primary key instead of scanning the table for the OR chain.
+   */
   public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE deleted_at = 0 AND "
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE deleted_at = 0 AND schema_id IN "
+        + "<foreach collection='schemaMetas' item='item' separator=',' open='(' close=')'>"
+        + "#{item.schemaId}"
+        + "</foreach>"
+        + " AND "
         + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
         + "</foreach>"

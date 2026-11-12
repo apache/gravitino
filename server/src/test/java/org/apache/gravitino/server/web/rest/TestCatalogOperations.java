@@ -30,6 +30,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -45,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -79,6 +82,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestCatalogOperations extends BaseOperationsTest {
@@ -222,6 +226,17 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -232,7 +247,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
             ImmutableMap.of("key", "value"));
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(manager.createCatalog(any(), any(), any(), any(), any())).thenReturn(catalog);
+    when(manager.createCatalog(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -256,7 +272,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -273,7 +289,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -290,7 +306,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -302,6 +318,20 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testTestConnectionWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    // A missing request body never reaches the connection test, so it is reported as a regular
+    // HTTP 400 rather than through the HTTP 200 envelope used for connection-test failures.
+    assertNullRequestBodyRejected(resp);
+    verify(manager, never()).testConnection(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -371,6 +401,46 @@ public class TestCatalogOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     Assertions.assertEquals(0, response.readEntity(BaseResponse.class).getCode());
+
+    CatalogUpdatesRequest proposedChanges =
+        new CatalogUpdatesRequest(
+            ImmutableList.of(
+                new CatalogUpdateRequest.RenameCatalogRequest("catalog2"),
+                new CatalogUpdateRequest.UpdateCatalogCommentRequest("new comment"),
+                new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "new value"),
+                new CatalogUpdateRequest.RemoveCatalogPropertyRequest("old-key")));
+    doNothing().when(manager).testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response changedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), changedResponse.getStatus());
+    Assertions.assertEquals(0, changedResponse.readEntity(BaseResponse.class).getCode());
+    ArgumentCaptor<CatalogChange[]> changesCaptor = ArgumentCaptor.forClass(CatalogChange[].class);
+    Mockito.verify(manager).testConnection(any(NameIdentifier.class), changesCaptor.capture());
+    Assertions.assertArrayEquals(
+        new CatalogChange[] {
+          CatalogChange.rename("catalog2"),
+          CatalogChange.updateComment("new comment"),
+          CatalogChange.setProperty("key", "new value"),
+          CatalogChange.removeProperty("old-key")
+        },
+        changesCaptor.getValue());
+
+    doThrow(new IllegalArgumentException("invalid proposed change"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response invalidChangesResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), invalidChangesResponse.getStatus());
+    ErrorResponse invalidChanges = invalidChangesResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, invalidChanges.getCode());
+    Assertions.assertEquals("invalid proposed change", invalidChanges.getMessage());
+    Assertions.assertNull(invalidChanges.getStack());
 
     doThrow(new ConnectionFailedException("sanitized failure"))
         .when(manager)
@@ -491,6 +561,38 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  void testRenameCatalogToExistingName() {
+    CatalogAlreadyExistsException exception =
+        new CatalogAlreadyExistsException("Catalog existing already exists");
+    doThrow(exception).when(manager).alterCatalog(any(), any());
+    CatalogUpdatesRequest request =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(new CatalogUpdateRequest.RenameCatalogRequest("existing")));
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(CatalogAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
@@ -606,6 +708,55 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testDropCatalogWithSchemaConnectionFailure() {
+    String message =
+        "Failed to check schemas in the underlying catalog metalake1.catalog1: "
+            + "Failed to connect to Hive Metastore: TTransportException: Connection refused. "
+            + "Use force=true to skip this check.";
+    doThrow(new ConnectionFailedException("%s", message))
+        .when(manager)
+        .dropCatalog(NameIdentifier.of("metalake1", "catalog1"), false);
+
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .delete()) {
+      Assertions.assertEquals(Response.Status.BAD_GATEWAY.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, error.getCode());
+      Assertions.assertEquals(ConnectionFailedException.class.getSimpleName(), error.getType());
+      Assertions.assertEquals(
+          "Failed to operate catalog(s) [catalog1] operation [DROP] under metalake [metalake1], "
+              + "reason ["
+              + message
+              + "]",
+          error.getMessage());
+    }
+  }
+
+  @Test
+  void testSetCatalogRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/catalogs/catalog1")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(
+            "Failed to operate catalog(s) [catalog1] operation [SET] under metalake [metalake1], "
+                + "reason [inUse field is required and must not be null]",
+            error.getMessage());
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).enableCatalog(any());
+    Mockito.verify(manager, Mockito.never()).disableCatalog(any());
+  }
+
+  @Test
   public void testSetCatalog() {
     // Test enable catalog
     CatalogSetRequest req = new CatalogSetRequest(true);
@@ -668,6 +819,18 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testSetCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   private static TestCatalog buildCatalogWithProperties(

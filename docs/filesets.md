@@ -25,6 +25,11 @@ interface, so anything that already speaks HDFS paths works, and it requires Had
 The Python one is built on fsspec, so it works with pandas, PyArrow, and anything else in that
 ecosystem. There is also a FUSE implementation for mounting a fileset as a local directory.
 
+:::note
+The FUSE implementation (`gvfs-fuse`) is deprecated. It is excluded from the Gradle build and
+receives no further development or support; use the Java or Python GVFS implementation instead.
+:::
+
 Credentials are the other half of it. A caller reaching storage through GVFS can be given
 short-lived credentials vended by Gravitino rather than holding long-lived cloud keys of its own,
 which is what makes the indirection a governance boundary rather than only a convenience. See
@@ -39,8 +44,11 @@ than federating an external one, so no provider is needed when creating it.
 [Catalogs and Schemas](./catalogs-and-schemas.md). A fileset catalog usually carries a base
 `location`, and schemas can narrow it further.
 
-**2. Create the fileset.** Give it a name, a type, and a storage location. Creating a managed
-fileset creates the directory; pointing at an existing path makes it external.
+**2. Create the fileset.** Give it a name, a type, and a storage location. Choose `MANAGED` to let
+Gravitino manage the data lifecycle, or `EXTERNAL` to retain the data when the fileset is dropped.
+Pointing at an existing path does not automatically make a fileset external.
+An existing empty directory can be adopted as `MANAGED`; when filesystem operations are enabled,
+adopting an existing non-empty directory requires `allow-existing-location-as-managed=true`.
 
 **3. Read it by name.** Engines reach the files through GVFS or the client rather than the raw path.
 See [How to use GVFS](./how-to-use-gvfs.md).
@@ -49,26 +57,37 @@ See [How to use GVFS](./how-to-use-gvfs.md).
 
 ### Managed and External
 
-A managed fileset belongs to Gravitino. Creating it creates the directory, and deleting it deletes
-the data.
+With filesystem operations enabled, Gravitino creates missing directories for both managed and
+external filesets. The fileset type determines what happens on drop.
 
-An external fileset points at a location that already exists and stays under someone else's control.
-Deleting it removes the Gravitino record and leaves the files alone.
+- Dropping a managed fileset recursively deletes every resolved fileset directory and its contents,
+  including directories derived from schema or catalog locations.
+- Dropping an external fileset removes only its metadata and preserves data at every location.
 
-The distinction only matters at deletion time, and it is the single most important thing to get
-right when creating one.
+With filesystem operations enabled, a managed fileset can use an existing empty directory.
+To use a non-empty directory, register it as an external fileset or set
+`allow-existing-location-as-managed=true` to let Gravitino delete the existing data on drop.
+With `disable-filesystem-ops=true`, creating and dropping either type changes only its metadata.
+
+An existing fileset can be converted between the two types using
+[`FilesetChange.updateType`](./manage-fileset-metadata-using-gravitino.md#change-the-fileset-type).
+Conversion changes metadata only and preserves its identity, locations, and files. Converting to
+external relinquishes management of the data; converting to managed accepts deletion of the data
+when the fileset is dropped. With `disable-filesystem-ops=true`, dropping a fileset removes only
+its metadata, even after conversion to `MANAGED`.
 
 ### Storage Locations
 
-A fileset has at least one storage location and can have several, each with a name. The default is
-chosen by the `default-location-name` property, and a location supplied without a name is recorded
-as `unknown`.
+A fileset has at least one named storage location. A location supplied without a name is recorded
+as `unknown`. With a single location, Gravitino selects it as the default. With multiple resolved
+names, set `default-location-name` to one of them. GVFS uses this default unless the reader
+[selects another location](./how-to-use-gvfs.md#examples).
 
 Several locations on one fileset is how the same logical dataset is described across clusters or
 regions, with readers selecting the one they should use rather than each carrying its own path.
 
-Locations can also be inherited: a catalog or schema with a `location` property supplies a base, and
-a fileset created beneath it can take its placement from that rather than spelling out a full path.
+Filesets inherit locations by name from their schema and catalog. See
+[how fileset locations are resolved](./fileset-catalog.md#how-fileset-locations-are-resolved).
 
 A location can be a template rather than a fixed path. Placeholders such as `{{catalog}}`,
 `{{schema}}`, `{{user}}`, and `{{project}}` are filled in when the fileset is created, with values
@@ -93,7 +112,7 @@ today. Attaching a tag to a fileset goes through the API.
 
 | Privilege        | Grantable on                          | What it allows              |
 |------------------|---------------------------------------|-----------------------------|
-| `CREATE_FILESET` | Metalake, catalog, schema, or fileset | Creating filesets           |
+| `CREATE_FILESET` | Metalake, catalog, or schema          | Creating filesets           |
 | `READ_FILESET`   | Metalake, catalog, schema, or fileset | Reading a fileset's files   |
 | `WRITE_FILESET`  | Metalake, catalog, schema, or fileset | Writing a fileset's files   |
 
