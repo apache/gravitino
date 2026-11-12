@@ -65,10 +65,14 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
@@ -127,6 +131,7 @@ public class TestPolicyManager {
 
   private static EntityStore entityStore;
   private static PolicyManager policyManager;
+  private static Object originalCatalogManager;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
@@ -135,6 +140,13 @@ public class TestPolicyManager {
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
     policyManager = new PolicyManager(idGenerator, entityStore);
+    originalCatalogManager =
+        FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog backendCatalog = mock(BaseCatalog.class);
+    when(backendCatalog.capability()).thenReturn(new Capability() {});
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, backendCatalog);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
@@ -267,7 +279,9 @@ public class TestPolicyManager {
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() throws IOException, IllegalAccessException {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
     if (entityStore != null) {
       entityStore.close();
       entityStore = null;
