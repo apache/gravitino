@@ -33,16 +33,24 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
    * @param topicId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
    * @return the guarded soft-delete SQL
    */
   @Override
-  public String softDeleteTopicMetasByTopicId(Long topicId, Long currentVersion, Long catalogId) {
+  public String softDeleteTopicMetasByTopicId(
+      Long topicId,
+      Long currentVersion,
+      Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE topic_id = #{topicId}"
         + " AND catalog_id = #{catalogId}"
+        + " AND schema_id = #{schemaId} AND topic_name = #{topicName}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

@@ -165,6 +165,8 @@ public interface TableMetaMapper {
    * @param tableId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
    * @return the number of affected rows
    */
   @UpdateProvider(
@@ -173,7 +175,9 @@ public interface TableMetaMapper {
   Integer softDeleteTableMetasByTableId(
       @Param("tableId") Long tableId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId);
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

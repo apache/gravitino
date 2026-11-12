@@ -203,6 +203,80 @@ public class TestCatalogReregistration extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testStaleDropsDoNotDeleteIdsReimportedAtAnotherPath() throws Exception {
+    for (boolean sameSchema : List.of(false, true)) {
+      Registration original = createRegistration("reimport_" + sameSchema, null, true);
+      TablePO oldTable =
+          SessionUtils.getWithoutCommit(
+              TableMetaMapper.class,
+              mapper -> mapper.selectTableMetaByIdForUpdate(original.table().id()));
+      TopicPO oldTopic =
+          SessionUtils.getWithoutCommit(
+              TopicMetaMapper.class, mapper -> mapper.selectTopicMetaById(original.topic().id()));
+      ViewPO oldView =
+          ViewMetaService.getInstance().getViewPOByIdentifier(original.view().nameIdentifier());
+      backend.delete(original.table().nameIdentifier(), EntityType.TABLE, false);
+      backend.delete(original.topic().nameIdentifier(), EntityType.TOPIC, false);
+      backend.delete(original.view().nameIdentifier(), EntityType.VIEW, false);
+
+      SchemaEntity schema = original.schema();
+      if (!sameSchema) {
+        schema =
+            createSchemaEntity(
+                nextId(), original.schema().namespace(), "replacement_schema", AUDIT_INFO);
+        backend.insert(schema, false);
+      }
+      Namespace namespace = Namespace.of(METALAKE, original.catalog().name(), schema.name());
+      String suffix = sameSchema ? "_replacement" : "";
+      TableEntity table =
+          TableEntity.builder()
+              .withId(original.table().id())
+              .withName("table" + suffix)
+              .withNamespace(namespace)
+              .withColumns(List.of(original.column()))
+              .withAuditInfo(AUDIT_INFO)
+              .build();
+      TopicEntity topic =
+          createTopicEntity(original.topic().id(), namespace, "topic" + suffix, AUDIT_INFO);
+      ViewEntity view = createViewEntity(original.view().id(), namespace, "view" + suffix);
+      backend.insert(table, false);
+      backend.insert(topic, false);
+      backend.insert(view, false);
+      Map<Long, String> objects =
+          Map.of(
+              table.id(), "TABLE",
+              original.column().id(), "COLUMN",
+              topic.id(), "TOPIC",
+              view.id(), "VIEW");
+      seedGovernance(objects);
+
+      assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              SessionUtils.doMultipleWithCommit(
+                  () ->
+                      TableMetaService.getInstance()
+                          .deleteTableWithVersion(original.table().nameIdentifier(), oldTable)));
+      assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              TopicMetaService.getInstance()
+                  .deleteTopicWithVersion(original.topic().nameIdentifier(), oldTopic));
+      assertThrows(
+          NoSuchEntityException.class,
+          () ->
+              ViewMetaService.getInstance()
+                  .deleteViewWithVersion(original.view().nameIdentifier(), oldView));
+      assertGovernance(objects, 1);
+      assertLiveTableData(table.id());
+      assertEquals(1, countLive("view_version_info", "view_id", view.id(), null, null));
+      assertTrue(backend.exists(table.nameIdentifier(), EntityType.TABLE));
+      assertTrue(backend.exists(topic.nameIdentifier(), EntityType.TOPIC));
+      assertTrue(backend.exists(view.nameIdentifier(), EntityType.VIEW));
+    }
+  }
+
+  @TestTemplate
   void testStaleSchemaAlterDoesNotUpdateReregisteredSchema() throws Exception {
     Registration original = createRegistration("source", null, true);
     AtomicReference<Registration> replacement = new AtomicReference<>();

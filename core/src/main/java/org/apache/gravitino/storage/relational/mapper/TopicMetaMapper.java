@@ -94,6 +94,8 @@ public interface TopicMetaMapper {
    * @param topicId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
    * @return the number of affected rows
    */
   @UpdateProvider(
@@ -102,7 +104,9 @@ public interface TopicMetaMapper {
   Integer softDeleteTopicMetasByTopicId(
       @Param("topicId") Long topicId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId);
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName);
 
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,

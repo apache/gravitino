@@ -292,18 +292,23 @@ public class TableMetaBaseSQLProvider {
    * @param tableId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
    * @return the guarded soft-delete SQL
    */
   public String softDeleteTableMetasByTableId(
       @Param("tableId") Long tableId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId) {
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE table_id = #{tableId}"
         + " AND catalog_id = #{catalogId}"
+        + " AND schema_id = #{schemaId} AND table_name = #{tableName}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

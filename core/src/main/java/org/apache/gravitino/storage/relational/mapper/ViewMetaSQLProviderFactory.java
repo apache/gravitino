@@ -116,13 +116,18 @@ public class ViewMetaSQLProviderFactory {
    * @param viewId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param viewName the observed view name
    * @return the guarded soft-delete SQL
    */
   public static String softDeleteViewMetasByViewId(
       @Param("viewId") Long viewId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteViewMetasByViewId(viewId, currentVersion, catalogId);
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("viewName") String viewName) {
+    return getProvider()
+        .softDeleteViewMetasByViewId(viewId, currentVersion, catalogId, schemaId, viewName);
   }
 
   public static String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

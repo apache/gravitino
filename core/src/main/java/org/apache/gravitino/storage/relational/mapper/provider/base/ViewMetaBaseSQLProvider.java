@@ -233,18 +233,23 @@ public class ViewMetaBaseSQLProvider {
    * @param viewId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param viewName the observed view name
    * @return the guarded soft-delete SQL
    */
   public String softDeleteViewMetasByViewId(
       @Param("viewId") Long viewId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId) {
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("viewName") String viewName) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
         + " WHERE view_id = #{viewId}"
         + " AND catalog_id = #{catalogId}"
+        + " AND schema_id = #{schemaId} AND view_name = #{viewName}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 

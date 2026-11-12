@@ -247,7 +247,9 @@ public class ViewMetaService {
                             mapper.softDeleteViewMetasByViewId(
                                 observedViewPO.getViewId(),
                                 observedViewPO.getCurrentVersion(),
-                                observedViewPO.getCatalogId())),
+                                observedViewPO.getCatalogId(),
+                                observedViewPO.getSchemaId(),
+                                observedViewPO.getViewName())),
                 () -> viewWriteFailure(identifier, observedViewPO)),
         () -> deleteViewDependents(observedViewPO.getViewId()));
   }

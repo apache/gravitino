@@ -129,13 +129,18 @@ public class TopicMetaSQLProviderFactory {
    * @param topicId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
    * @return the guarded soft-delete SQL
    */
   public static String softDeleteTopicMetasByTopicId(
       @Param("topicId") Long topicId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion, catalogId);
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName) {
+    return getProvider()
+        .softDeleteTopicMetasByTopicId(topicId, currentVersion, catalogId, schemaId, topicName);
   }
 
   public static String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

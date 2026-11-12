@@ -159,13 +159,17 @@ public interface ViewMetaMapper {
    * @param viewId the stable external identity
    * @param currentVersion the observed row version
    * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param viewName the observed view name
    * @return the number of affected rows
    */
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasByViewId")
   Integer softDeleteViewMetasByViewId(
       @Param("viewId") Long viewId,
       @Param("currentVersion") Long currentVersion,
-      @Param("catalogId") Long catalogId);
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("viewName") String viewName);
 
   @UpdateProvider(
       type = ViewMetaSQLProviderFactory.class,
