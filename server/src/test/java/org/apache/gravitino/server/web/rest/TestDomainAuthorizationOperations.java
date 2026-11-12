@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -34,15 +35,19 @@ import static org.mockito.Mockito.when;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import javax.servlet.DispatcherType;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
@@ -63,6 +68,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.dto.requests.DomainParentSetRequest;
 import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -71,12 +77,19 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.hook.DomainHookDispatcher;
+import org.apache.gravitino.listener.DomainEventDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.event.Event;
+import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.storage.IdGenerator;
@@ -91,6 +104,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** REST permission tests against the real domain manager with mocked storage transactions. */
 public class TestDomainAuthorizationOperations extends BaseOperationsTest {
@@ -104,6 +119,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   private final SupportsDomainOperations transactions = mock(SupportsDomainOperations.class);
   private final GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
   private final DomainManager manager = new DomainManager(mock(IdGenerator.class), store);
+  private DomainDispatcher savedInternalDomainDispatcher;
   private Config savedConfig;
   private GravitinoAuthorizer savedAuthorizer;
 
@@ -147,6 +163,8 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   void configureAuthorization() throws Exception {
     GravitinoEnv env = GravitinoEnv.getInstance();
     savedConfig = env.config();
+    savedInternalDomainDispatcher = env.internalDomainDispatcher();
+    FieldUtils.writeField(env, "internalDomainDispatcher", manager, true);
     savedAuthorizer = env.gravitinoAuthorizer();
     Config config = mock(Config.class);
     when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
@@ -256,9 +274,110 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   @AfterEach
   void restoreAuthorization() throws Exception {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", savedConfig, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "internalDomainDispatcher",
+        savedInternalDomainDispatcher,
+        true);
     GravitinoEnv.getInstance().setGravitinoAuthorizer(savedAuthorizer);
     RequestContext.resetOperationFailureFired();
     RequestContext.clear();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "Trading"})
+  void missingParentChangePreflightRetainsHttpAuditContext(String name) throws Exception {
+    allows.add("lake:MANAGE_DOMAIN");
+    doThrow(new NoSuchEntityException("Missing domain"))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "missing")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    List<Event> events = new ArrayList<>();
+    EventListenerPlugin listener = mock(EventListenerPlugin.class);
+    doAnswer(
+            call -> {
+              events.add(call.getArgument(0));
+              return null;
+            })
+        .when(listener)
+        .onPostEvent(any());
+    EventBus bus = new EventBus(Collections.singletonList(listener));
+    DomainOperations operations =
+        new DomainOperations(new DomainEventDispatcher(bus, new DomainHookDispatcher(manager)));
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    String uri = "/api" + BASE + "/" + name + "/parent";
+    when(request.getMethod()).thenReturn("PUT");
+    when(request.getRequestURI()).thenReturn(uri);
+    when(request.getRemoteAddr()).thenReturn("192.0.2.10");
+    when(request.getDispatcherType()).thenReturn(DispatcherType.REQUEST);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+    new HttpAuditFilter(bus, EventSource.GRAVITINO_SERVER)
+        .doFilter(
+            request,
+            mock(HttpServletResponse.class),
+            (req, response) -> {
+              try (Response result =
+                  operations.setParent("lake", name, new DomainParentSetRequest("missing"))) {
+                assertEquals(404, result.getStatus());
+                ((HttpServletResponse) response).setStatus(result.getStatus());
+              }
+            });
+    assertEquals(1, events.size());
+    HttpRequestFailureEvent failure =
+        assertInstanceOf(HttpRequestFailureEvent.class, events.get(0));
+    assertEquals("PUT", failure.httpMethod());
+    assertEquals(uri, failure.requestUri());
+    assertEquals(404, failure.statusCode());
+  }
+
+  @Test
+  void missingMemberDomainRetainsHttpAuditContext() throws Exception {
+    allows.add("lake:USE_DOMAIN");
+    doThrow(new NoSuchEntityException("Missing domain"))
+        .when(store)
+        .get(
+            eq(NameIdentifierUtil.ofDomain("lake", "missing")),
+            eq(EntityType.DOMAIN),
+            eq(DomainEntity.class));
+    List<Event> events = new ArrayList<>();
+    EventListenerPlugin listener = mock(EventListenerPlugin.class);
+    doAnswer(
+            call -> {
+              events.add(call.getArgument(0));
+              return null;
+            })
+        .when(listener)
+        .onPostEvent(any());
+    EventBus bus = new EventBus(Collections.singletonList(listener));
+    DomainMembershipOperations operations =
+        new DomainMembershipOperations(
+            new DomainEventDispatcher(bus, new DomainHookDispatcher(manager)));
+    HttpServletRequest request = mock(HttpServletRequest.class);
+    String uri = "/api" + BASE + "/missing/objects";
+    when(request.getMethod()).thenReturn("GET");
+    when(request.getRequestURI()).thenReturn(uri);
+    when(request.getRemoteAddr()).thenReturn("192.0.2.10");
+    when(request.getDispatcherType()).thenReturn(DispatcherType.REQUEST);
+    FieldUtils.writeField(operations, "httpRequest", request, true);
+    new HttpAuditFilter(bus, EventSource.GRAVITINO_SERVER)
+        .doFilter(
+            request,
+            mock(HttpServletResponse.class),
+            (req, response) -> {
+              try (Response result =
+                  operations.listMembers("lake", "missing", null, null, Collections.emptyList())) {
+                assertEquals(404, result.getStatus());
+                ((HttpServletResponse) response).setStatus(result.getStatus());
+              }
+            });
+    assertEquals(1, events.size());
+    HttpRequestFailureEvent failure =
+        assertInstanceOf(HttpRequestFailureEvent.class, events.get(0));
+    assertEquals("GET", failure.httpMethod());
+    assertEquals(uri, failure.requestUri());
+    assertEquals(404, failure.statusCode());
   }
 
   @Test

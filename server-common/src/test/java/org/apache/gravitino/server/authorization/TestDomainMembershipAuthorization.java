@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -71,6 +72,7 @@ class TestDomainMembershipAuthorization {
     when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
     when(config.get(Configs.GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE)).thenReturn(2);
     when(env.config()).thenReturn(config);
+    when(env.internalDomainDispatcher()).thenReturn(dispatcher);
     when(env.gravitinoAuthorizer()).thenReturn(authorizer);
     environment = mockStatic(GravitinoEnv.class);
     environment.when(GravitinoEnv::getInstance).thenReturn(env);
@@ -111,15 +113,14 @@ class TestDomainMembershipAuthorization {
 
   @Test
   void hiddenOrUnknownSelectionsCannotWidenResults() {
+    when(dispatcher.listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), any()))
+        .thenReturn(new DomainMember[0]);
     for (String selected : new String[] {"Trading", "unknown"}) {
-      assertEquals(
-          0,
-          DomainAuthzHelper.listMembers(
-                  dispatcher,
-                  "lake",
-                  "Finance",
-                  DomainMemberFilter.builder().withDomains(selected).build())
-              .length);
+      DomainMemberFilter filter = DomainMemberFilter.builder().withDomains(selected).build();
+      assertEquals(0, DomainAuthzHelper.listMembers(dispatcher, "lake", "Finance", filter).length);
+      verify(dispatcher)
+          .listMembers(
+              eq("lake"), eq(parent), argThat(snapshots -> snapshots.length == 0), eq(filter));
     }
     verify(dispatcher, never()).listMembers(anyString(), anyString(), any());
   }

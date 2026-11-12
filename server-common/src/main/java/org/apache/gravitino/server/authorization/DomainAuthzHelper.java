@@ -310,28 +310,30 @@ public final class DomainAuthzHelper {
       return dispatcher.listMembers(metalake, name, filter);
     }
     AuthorizationRequestContext context = new AuthorizationRequestContext();
-    DomainEntity domain = dispatcher.getDomain(metalake, name);
+    DomainDispatcher internal = GravitinoEnv.getInstance().internalDomainDispatcher();
+    DomainEntity domain = internal.getDomain(metalake, name);
     requireVisible(metalake, domain, context);
     Set<String> visibleNames = new HashSet<>();
     visibleNames.add(domain.name());
     DomainEntity[] subdomains =
         domain.parent().isPresent()
             ? new DomainEntity[0]
-            : filterDomains(metalake, dispatcher.listSubdomainInfos(metalake, name), context);
+            : filterDomains(metalake, internal.listSubdomainInfos(metalake, name), context);
     Arrays.stream(subdomains).map(DomainEntity::name).forEach(visibleNames::add);
     DomainMemberFilter effectiveFilter = filter;
     if (!filter.domains().isEmpty()) {
       Set<String> selected = new HashSet<>(filter.domains());
       selected.retainAll(visibleNames);
-      if (selected.isEmpty()) {
-        return new DomainMember[0];
+      // Preserve an unmatched nonempty filter so the dispatcher still emits query events.
+      // Replacing it with an empty filter would incorrectly select the whole scope.
+      if (!selected.isEmpty()) {
+        effectiveFilter =
+            DomainMemberFilter.builder()
+                .withDomains(selected.toArray(new String[0]))
+                .withTypes(filter.types().toArray(new MetadataObject.Type[0]))
+                .withNameContains(filter.nameContains().orElse(null))
+                .build();
       }
-      effectiveFilter =
-          DomainMemberFilter.builder()
-              .withDomains(selected.toArray(new String[0]))
-              .withTypes(filter.types().toArray(new MetadataObject.Type[0]))
-              .withNameContains(filter.nameContains().orElse(null))
-              .build();
     }
     DomainMember[] members = dispatcher.listMembers(metalake, domain, subdomains, effectiveFilter);
     Set<MetadataObject> accessible =
