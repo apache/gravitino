@@ -27,7 +27,7 @@ paths:
       summary: List domains
       operationId: listDomains
       description: >-
-        List domains. Published domains require USE_DOMAIN; drafts require MANAGE_DOMAIN or inherited ownership. Hidden drafts return 404 and are omitted from lists.
+        List all visible top-level domains and subdomains in this metalake. Names are unique across both levels and are literal strings, not hierarchy paths. Published domains require USE_DOMAIN; drafts require MANAGE_DOMAIN or inherited ownership. Hidden drafts return 404 and are omitted from lists.
       parameters:
         - name: details
           in: query
@@ -69,7 +69,7 @@ paths:
       summary: Create a domain
       operationId: createDomain
       description: >-
-        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Requires MANAGE_DOMAIN on the metalake and, when specified, the parent. A new tag additionally requires CREATE_TAG on the metalake; an existing tag requires ownership of that tag or the metalake. Hidden drafts return 404; other permission failures return 403.
+        Creates a DRAFT domain, its optional parent edge and an optional new backing tag atomically. A failure leaves no new domain or tag behind. Requires MANAGE_DOMAIN on the metalake and, when specified, the parent. The backing tag must be explicit: create=true never adopts an existing tag and cannot include a value. Bindings use tag identity, so tag rename preserves a binding while delete/recreate does not. A tag can back one domain without a value, or multiple domains with distinct exact values; these forms cannot be mixed. A new tag additionally requires CREATE_TAG on the metalake; an existing tag requires ownership of that tag or the metalake. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -98,11 +98,13 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled, the domain or new tag name already exists, or the backing-tag binding conflicts.
           content:
             application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaTypeResponse"
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
 
@@ -148,7 +150,7 @@ paths:
       summary: Alter a domain
       operationId: alterDomain
       description: >-
-        Alter a domain. Requires MANAGE_DOMAIN or ownership of the domain, its current parent, or the metalake.
+        Alter name, comment or properties and return a fresh snapshot. A rename preserves the backing tag and hierarchy. Old SDK snapshots remain unchanged and address future operations by their old name. Requires MANAGE_DOMAIN or ownership of the domain, its current parent, or the metalake.
       requestBody:
         required: true
         content:
@@ -177,11 +179,13 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled, the new domain name already exists, or the alteration conflicts with a concurrent update.
           content:
             application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaTypeResponse"
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
     patch:
@@ -218,11 +222,13 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled.
           content:
             application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaTypeResponse"
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
     delete:
@@ -257,7 +263,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled, the domain has subdomains, or the deletion conflicts with a concurrent update.
           content:
             application/json:
               schema:
@@ -274,7 +280,7 @@ paths:
       summary: Attach or move a domain
       operationId: setDomainParent
       description: >-
-        Attaches the child addressed by this path under a top-level parent, replacing its current parent. The backing tag is unchanged. Requires MANAGE_DOMAIN on both the domain and the new parent, inherited from their current scopes. Hidden drafts return 404; other permission failures return 403.
+        Attaches the child addressed by this path under a top-level parent, replacing its current parent. The backing tag and member assignments are unchanged; inherited permissions and membership roll-ups follow the new parent. The destination must be top-level, not this domain, and published if the child is published. A domain with children cannot be attached. Requires MANAGE_DOMAIN on both the domain and the new parent, inherited from their current scopes. Hidden drafts return 404; other permission failures return 403.
       requestBody:
         required: true
         content:
@@ -303,11 +309,13 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled.
           content:
             application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaTypeResponse"
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
     delete:
@@ -338,7 +346,7 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled.
           content:
             application/json:
               schema:
@@ -384,11 +392,13 @@ paths:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
-          description: The metalake is disabled, the name or backing tag conflicts, the domain has subdomains, or a concurrent update could not complete.
+          description: The metalake is disabled or the backing-tag binding conflicts.
           content:
             application/json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaTypeResponse"
         "5XX":
           $ref: "#/components/responses/ServerErrorResponse"
 
@@ -457,8 +467,9 @@ paths:
           in: query
           description: >-
             Repeated domain names selecting the union of their scopes. Omit to select the whole
-            scope. Selecting the listed domain also selects its subdomains. Unknown names are
-            ignored; if all supplied names are unknown, the result is empty.
+            scope. Selecting the listed domain also selects its subdomains. Well-formed names outside the visible scope are
+            ignored. If none match, the result is empty. Invalid domain names return 400.
+            Relations are reported relative to the domain in the path.
           style: form
           explode: true
           schema:
@@ -467,7 +478,7 @@ paths:
               $ref: "#/components/schemas/DomainName"
         - name: types
           in: query
-          description: Comma-separated leaf types, case-insensitive. Omit to include all supported types.
+          description: Comma-separated leaf types, case-insensitive, with whitespace around each token trimmed. Omit to include all supported types. Blank tokens and unsupported types return 400.
           style: form
           explode: false
           schema:
@@ -476,7 +487,7 @@ paths:
               $ref: "#/components/schemas/MemberType"
         - name: nameContains
           in: query
-          description: Nonblank substring of the member's full name, matched case-insensitively.
+          description: Nonblank substring of the member's complete full name, matched case-insensitively; no wildcard or regex interpretation. Omit for any name. Blank text returns 400.
           schema:
             type: string
             minLength: 1
@@ -532,7 +543,7 @@ paths:
       description: >-
         Lists domains whose scopes contain the leaf object, including parents of directly matched
         subdomains. Detailed responses carry every applicable relation without precedence.
-        Only visible domains and accessible objects are returned; hidden subdomains contribute no roll-up relations. No tag privilege is required. No paging or counts are provided.
+        The leaf must exist and be accessible; an inaccessible leaf returns 403. Only visible domains are returned; hidden subdomains contribute no roll-up relations. No tag privilege is required. No paging or counts are provided.
       parameters:
         - name: details
           in: query
@@ -574,6 +585,16 @@ paths:
 
 components:
   responses:
+    UnsupportedMediaTypeResponse:
+      description: The request Content-Type is not supported by this operation.
+      content:
+        application/json:
+          schema:
+            $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+          example:
+            code: 1000
+            type: RESTException
+            message: HTTP 415 Unsupported Media Type
     BadRequestResponse:
       description: Invalid JSON or domain request parameters.
       content:
@@ -612,7 +633,7 @@ components:
 
     DomainRelation:
       type: object
-      description: One applicable membership relation, with no precedence over other relations.
+      description: One applicable membership relation relative to the queried domain, with no precedence over other relations. All applicable relations are returned; a direct assignment masks inheritance of the same tag.
       required: [relation]
       properties:
         relation:
@@ -621,7 +642,7 @@ components:
         source:
           description: >-
             Omitted for DIRECT; the nearest tagged catalog or schema for INHERITED;
-            the subdomain metadata object for VIA_SUBDOMAIN.
+            the subdomain metadata object for VIA_SUBDOMAIN. Sources carry the complete fullName and type. A hidden subdomain contributes no relation; an inherited source is retained for an accessible leaf without a separate source access check.
           allOf:
             - $ref: "#/components/schemas/RelationSource"
 
@@ -659,6 +680,7 @@ components:
             $ref: "#/components/schemas/DomainRelation"
 
     Domain:
+      description: A snapshot of a domain in one metalake. A domain is top-level or a child of one top-level domain.
       type: object
       required: [name, properties, status, audit]
       properties:
@@ -680,12 +702,12 @@ components:
             - type: string
               nullable: true
               enum: [null]
-          description: Parent domain name, or null for a top-level domain.
+          description: Parent domain name, or null for a top-level domain. A child can name a parent hidden from the caller.
         backingTag:
           type: object
           nullable: true
           required: [name]
-          description: Null when unbound or when the backing tag has been deleted.
+          description: Null or omitted when unbound or when the backing tag has been deleted. A renamed tag is returned with its current name; recreating a deleted tag name does not restore the binding.
           properties:
             name:
               type: string
@@ -696,6 +718,7 @@ components:
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         relations:
+          description: Present only on detailed object-to-domain lookup; omitted from ordinary domain snapshots.
           type: array
           minItems: 1
           items:
@@ -709,7 +732,6 @@ components:
               fullName: cat.schema.table
               type: table
             relations:
-              - relation: direct
               - relation: inherited
                 source:
                   fullName: cat.schema
@@ -850,7 +872,9 @@ components:
       properties:
         status:
           type: string
-          enum: [draft, published, DRAFT, PUBLISHED]
+          pattern: "^([dD][rR][aA][fF][tT]|[pP][uU][bB][lL][iI][sS][hH][eE][dD])$"
+          description: Accepts draft or published, case-insensitively; responses use lowercase.
+          example: published
 
     DomainParentSetRequest:
       type: object

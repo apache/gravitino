@@ -261,11 +261,12 @@ components:
       properties:
         fullName:
           type: string
-          description: The full name of the securable object
+          description: The full name of the securable object. For DOMAIN, use the domain name, without its parent or metalake prefix.
         type:
           type: string
           enum:
             - "METALAKE"
+            - "DOMAIN"
             - "CATALOG"
             - "SCHEMA"
             - "TABLE"
