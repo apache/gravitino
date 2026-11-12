@@ -1013,16 +1013,29 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                         original.nameIdentifier(),
                         entity -> {
                           FilesetEntity current = (FilesetEntity) entity;
-                          return FilesetEntity.builder()
-                              .withId(current.id())
-                              .withName(current.name())
-                              .withNamespace(current.namespace())
-                              .withFilesetType(current.filesetType())
-                              .withStorageLocations(ImmutableMap.of(tooLongLocationName, "/tmp-v2"))
-                              .withComment("new comment")
-                              .withProperties(current.properties())
-                              .withAuditInfo(current.auditInfo())
-                              .build();
+                          FilesetEntity updated =
+                              FilesetEntity.builder()
+                                  .withId(current.id())
+                                  .withName(current.name())
+                                  .withNamespace(current.namespace())
+                                  .withFilesetType(current.filesetType())
+                                  .withStorageLocations(ImmutableMap.of("valid", "/tmp-v2"))
+                                  .withComment("new comment")
+                                  .withProperties(current.properties())
+                                  .withAuditInfo(current.auditInfo())
+                                  .build();
+                          // The entity validation rejects the over-long name, so it is set
+                          // afterwards to exercise the database error.
+                          try {
+                            FieldUtils.writeField(
+                                updated,
+                                "storageLocations",
+                                ImmutableMap.of(tooLongLocationName, "/tmp-v2"),
+                                true);
+                          } catch (IllegalAccessException e) {
+                            throw new IllegalStateException(e);
+                          }
+                          return updated;
                         }));
     Assertions.assertEquals(
         "The fileset entity has a value that exceeds the maximum length of its column.",

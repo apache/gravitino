@@ -63,6 +63,7 @@ include(
 // in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
+include("iceberg:iceberg-rest-server-experiment")
 include("iceberg:iceberg-rest-trino-it")
 include("lance:lance-common")
 include("lance:lance-rest-server")
@@ -71,12 +72,12 @@ val skipTrinoConnector: Boolean =
   gradle.startParameter.projectProperties["skipTrinoConnector"]?.toBoolean() ?: false
 if (!skipTrinoConnector) {
   include(
-    "trino-connector:trino-connector",
-    "trino-connector:trino-connector-440-445",
-    "trino-connector:trino-connector-446-451",
-    "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
-    "trino-connector:trino-connector-473-478",
+    "trino-connector:trino-connector-473-477",
+    "trino-connector:trino-connector-478-479",
+    "trino-connector:trino-connector-480",
+    "trino-connector:trino-connector-481",
+    "trino-connector:trino-connector-482-483",
     "trino-connector:integration-test"
   )
 } else {
@@ -133,8 +134,9 @@ include(":lineage")
 include(":mcp-server")
 include(":plugins:idp-basic")
 include(":plugins:k8s-job-executor")
-include(":plugins:tms")
+include(":plugins:maintenance")
 include(
+  ":maintenance:maintenance-common",
   ":maintenance:optimizer-api",
   ":maintenance:updaters",
   ":maintenance:optimizer",

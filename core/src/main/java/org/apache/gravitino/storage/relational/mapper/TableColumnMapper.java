@@ -73,6 +73,19 @@ public interface TableColumnMapper {
   Long selectColumnIdByTableIdAndName(
       @Param("tableId") Long tableId, @Param("columnName") String name);
 
+  /**
+   * Selects live column IDs for a table and a set of names.
+   *
+   * @param tableId the table ID
+   * @param columnNames the column names
+   * @return the matching column rows
+   */
+  @SelectProvider(
+      type = TableColumnSQLProviderFactory.class,
+      method = "selectColumnIdsByTableIdAndNames")
+  List<ColumnPO> selectColumnIdsByTableIdAndNames(
+      @Param("tableId") Long tableId, @Param("columnNames") List<String> columnNames);
+
   @SelectProvider(type = TableColumnSQLProviderFactory.class, method = "selectColumnPOById")
   ColumnPO selectColumnPOById(@Param("columnId") Long columnId);
 

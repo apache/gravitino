@@ -22,6 +22,7 @@ env_map = {
     # Catalog
     "GRAVITINO_ICEBERG_REST_HOST": "host",
     "GRAVITINO_ICEBERG_REST_HTTP_PORT": "httpPort",
+    "GRAVITINO_ICEBERG_REST_METRICS_ENABLED": "metrics.enabled",
     "GRAVITINO_ICEBERG_REST_URI": "uri",
     "GRAVITINO_ICEBERG_REST_IO_IMPL": "io-impl",
     "GRAVITINO_ICEBERG_REST_CATALOG_BACKEND": "catalog-backend",

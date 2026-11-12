@@ -325,7 +325,7 @@ public class StatisticIT extends BaseIT {
     NameIdentifier nameIdentifier = NameIdentifier.of(schemaName, tableName);
 
     Distribution distribution =
-        Distributions.of(Strategy.EVEN, 10, NamedReference.field(HIVE_COL_NAME1));
+        Distributions.of(Strategy.HASH, 10, NamedReference.field(HIVE_COL_NAME1));
 
     final SortOrder[] sortOrders =
         new SortOrder[] {

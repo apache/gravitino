@@ -77,6 +77,11 @@ import org.slf4j.LoggerFactory;
  * original name is A and when a new user B tries to call the clientPool() method, it will use the
  * connection that belongs to A. This will not work with kerberos authentication as it will change
  * the user name.
+ *
+ * <p>The shared cache expires each key after the configured idle interval and closes removed pools.
+ * There is no maximum cache size: expiry limits idle retention, but does not bound the number of
+ * active identities or pools created within an expiry interval. By default, fresh proxy UGIs and
+ * renewed delegation tokens for the same authentication identity reuse the same key.
  */
 public class IcebergHiveCachedClientPool implements ClientPool<IMetaStoreClient, TException> {
   private static final Logger LOG = LoggerFactory.getLogger(IcebergHiveCachedClientPool.class);
@@ -167,6 +172,20 @@ public class IcebergHiveCachedClientPool implements ClientPool<IMetaStoreClient,
     List<Object> elements = Lists.newArrayList();
     elements.add(conf.get(HiveConf.ConfVars.METASTOREURIS.varname, ""));
     elements.add(conf.get("HIVE_CONF_CATALOG", "hive"));
+    // The cache is shared across catalogs. Never reuse a connection opened with different
+    // authentication settings, even when the metastore URI and current subject match.
+    elements.add(conf.get("hadoop.security.authentication", "simple"));
+    elements.add(conf.getBoolean(HiveConf.ConfVars.METASTORE_USE_THRIFT_SASL.varname, false));
+    elements.add(conf.get(HiveConf.ConfVars.METASTORE_KERBEROS_PRINCIPAL.varname, ""));
+    elements.add(conf.get(HiveConf.ConfVars.METASTORE_TOKEN_SIGNATURE.varname, ""));
+    try {
+      // Proxy UGIs are recreated for each request. Share pools by authentication identity, not
+      // Subject identity, while keeping different real users and auth methods isolated. HMS
+      // delegation tokens are issued per request and must not prevent reuse by the same identity.
+      elements.add(authenticationIdentity(UserGroupInformation.getCurrentUser()));
+    } catch (IOException e) {
+      throw new UncheckedIOException(e);
+    }
     if (cacheKeys == null || cacheKeys.isEmpty()) {
       return Key.of(elements);
     }
@@ -215,6 +234,13 @@ public class IcebergHiveCachedClientPool implements ClientPool<IMetaStoreClient,
       }
     }
     return Key.of(elements);
+  }
+
+  private static List<Object> authenticationIdentity(UserGroupInformation user) {
+    return List.of(
+        user.getUserName(),
+        user.getAuthenticationMethod(),
+        user.getRealUser() == null ? List.of() : authenticationIdentity(user.getRealUser()));
   }
 
   static class Key {

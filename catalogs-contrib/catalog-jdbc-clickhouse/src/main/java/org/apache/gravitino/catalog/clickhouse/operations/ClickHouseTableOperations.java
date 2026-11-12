@@ -24,9 +24,13 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.CLICKHOUSE_TYPE_FULL;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_ANNOY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_BLOOM_FILTER;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_FULL_TEXT;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_GIN;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_INVERTED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_MINMAX_VALUE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_NGRAMBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_SET;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TEXT;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_TOKENBFV1;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_USEARCH;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.DATA_SKIPPING_VECTOR_SIMILARITY;
@@ -37,6 +41,9 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexC
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.NGRAM_SIZE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.RANDOM_SEED;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TEXT_INDEX_NGRAMS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TEXT_INDEX_TOKENS;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.TOKENIZER;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_DISTANCE_FUNCTION;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.USEARCH_SCALAR_KIND;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.VECTOR_SIMILARITY_DIMENSIONS;
@@ -87,6 +94,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTa
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.bean.JdbcIndexBean;
@@ -693,6 +701,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       JdbcColumn column = columns[i];
       sqlBuilder.append("  %s".formatted(quoteIdentifier(column.name())));
 
+      checkDefaultValue(column.dataType(), column.defaultValue());
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
@@ -904,6 +913,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       // NOTE: Cannot use getColumnBuilder() here because we need to override the default
       // value for MATERIALIZED/ALIAS columns between getBasicJdbcColumnInfo() and build().
       List<JdbcColumn> jdbcColumns = new ArrayList<>();
+      Map<String, String> nativeColumnTypes = new HashMap<>();
       ResultSet columns = getColumns(connection, databaseName, tableName);
       while (columns.next()) {
         if (!Objects.equals(columns.getString("TABLE_NAME"), tableName)) {
@@ -913,6 +923,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         // Correct default value for MATERIALIZED/ALIAS columns: the JDBC driver
         // hardcodes IS_GENERATEDCOLUMN to 'NO', so re-derive with isExpression=true.
         String columnName = columns.getString("COLUMN_NAME");
+        nativeColumnTypes.put(columnName, columns.getString("TYPE_NAME"));
         String defaultKind = defaultKinds.getOrDefault(columnName, "");
         if ("MATERIALIZED".equals(defaultKind) || "ALIAS".equals(defaultKind)) {
           String columnDef = columns.getString("COLUMN_DEF");
@@ -940,7 +951,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       SystemTableMetadata systemTableMetadata =
           getSystemTableMetadata(connection, databaseName, tableName);
       String partitionKey = getPartitionKey(connection, databaseName, tableName);
-      jdbcTableBuilder.withPartitioning(parsePartitioning(partitionKey));
+      jdbcTableBuilder.withPartitioning(
+          ClickHouseTableSqlUtils.parsePartitioning(partitionKey, nativeColumnTypes));
       jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
@@ -1219,7 +1231,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateColumnDefaultValue updateColumnDefaultValue) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
-            updateColumnDefaultValueFieldDefinition(updateColumnDefaultValue, lazyLoadTable));
+            updateColumnDefaultValueFieldDefinition(
+                updateColumnDefaultValue, lazyLoadTable, changes));
 
       } else if (change instanceof TableChange.UpdateColumnType updateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1245,7 +1258,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                (TableChange.UpdateColumnNullability) change, lazyLoadTable));
+                (TableChange.UpdateColumnNullability) change, lazyLoadTable, changes));
 
       } else if (change instanceof TableChange.AddIndex addIndex) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
@@ -1268,7 +1281,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Last modified comment
     if (null != updateComment) {
-      String newComment = updateComment.getNewComment();
+      String newComment = StringUtils.defaultString(updateComment.getNewComment());
       // Load the existing table once. We need it for two purposes:
       //   1. Preserve the Gravitino StringIdentifier embedded in the old comment, so Gravitino can
       //      still identify the table after the comment is changed.
@@ -1430,20 +1443,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table) {
-    validateUpdateColumnNullable(change, table);
+      TableChange.UpdateColumnNullability change, JdbcTable table, TableChange... changes) {
+    JdbcColumn column = validateUpdateColumnNullable(change, table);
 
     String col = change.fieldName()[0];
-    JdbcColumn column = getJdbcColumnFromTable(table, col);
-    JdbcColumn updateColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withDefaultValue(column.defaultValue())
-            .withNullable(change.nullable())
-            .withType(column.dataType())
-            .withComment(column.comment())
-            .withAutoIncrement(column.autoIncrement())
-            .build();
+    JdbcColumn updateColumn = withPendingDefaultValueAndNullability(column, changes);
 
     return "%s %s %s"
         .formatted(
@@ -1599,6 +1603,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     String col = updateColumnComment.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
+    // appendColumnDefinition omits an empty COMMENT, and MODIFY COLUMN without COMMENT keeps the
+    // existing one, so use COMMENT COLUMN to clear it.
+    if (StringUtils.isEmpty(newComment)) {
+      return "COMMENT COLUMN %s ''".formatted(quoteIdentifier(col));
+    }
+
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -1639,6 +1649,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Append default value if available
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      checkDefaultValue(addColumn.getDataType(), addColumn.getDefaultValue());
       columnDefinition.append(
           "DEFAULT %s "
               .formatted(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue())));
@@ -1719,7 +1730,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnDefaultValueFieldDefinition(
-      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue,
+      JdbcTable jdbcTable,
+      TableChange... changes) {
     if (updateColumnDefaultValue.fieldName().length > 1) {
       throw new UnsupportedOperationException(CLICKHOUSE_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
@@ -1727,14 +1740,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     String col = updateColumnDefaultValue.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
-    JdbcColumn newColumn =
-        JdbcColumn.builder()
-            .withName(col)
-            .withType(column.dataType())
-            .withNullable(column.nullable())
-            .withComment(column.comment())
-            .withDefaultValue(updateColumnDefaultValue.getNewDefaultValue())
-            .build();
+    JdbcColumn newColumn = withPendingDefaultValueAndNullability(column, changes);
+    checkDefaultValue(newColumn.dataType(), updateColumnDefaultValue.getNewDefaultValue());
 
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -1759,6 +1766,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
+    // The existing default is kept when the type changes, so it must also fit the new type.
+    try {
+      checkDefaultValue(newColumn.dataType(), newColumn.defaultValue());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "The existing default value of column %s is not compatible with the new type %s: %s"
+              .formatted(col, newColumn.dataType().simpleString(), e.getMessage()),
+          e);
+    }
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
@@ -2122,6 +2138,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
           if (indexType == Index.IndexType.DATA_SKIPPING_SET
               || isParameterizedBloomFilterIndex(indexType)
+              || indexType == Index.IndexType.DATA_SKIPPING_TEXT
               || isLegacyAnnUsearchIndex(indexType)
               || indexType == Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY) {
             try {
@@ -2183,6 +2200,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 name,
                 databaseName,
                 tableName);
+          }
+          if (indexType == Index.IndexType.DATA_SKIPPING_TEXT) {
+            if (parameterProperties.isEmpty()) {
+              LOG.warn(
+                  "ClickHouse text index '{}' on {}.{} has no supported tokenizer metadata in "
+                      + "{} '{}'; loaded Index.properties() is incomplete",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource);
+            } else if (TEXT_INDEX_NGRAMS.equals(parameterProperties.get(TOKENIZER))
+                && !parameterProperties.containsKey(NGRAM_SIZE)) {
+              LOG.warn(
+                  "ClickHouse text index '{}' on {}.{} uses ngrams but {} '{}' does not expose "
+                      + "ngram_size; loaded Index.properties() is incomplete",
+                  name,
+                  databaseName,
+                  tableName,
+                  parameterSourceName,
+                  parameterSource);
+            }
           }
           properties.putAll(parameterProperties);
           secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
@@ -2294,6 +2333,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_TOKENBFV1:
         return parseBloomFilterPropertiesForQuery(
             indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_TEXT:
+        return parseTextIndexPropertiesForQuery(parameterSource, indexName);
       case DATA_SKIPPING_ANNOY:
       case DATA_SKIPPING_USEARCH:
         return parseLegacyAnnUsearchProperties(indexType, parameterSource, indexName);
@@ -2584,6 +2625,271 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         || indexType == Index.IndexType.DATA_SKIPPING_TOKENBFV1;
   }
 
+  @VisibleForTesting
+  static Map<String, String> parseTextIndexPropertiesForQuery(String typeFull, String indexName) {
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    if (paramsStart < 0) {
+      return Collections.emptyMap();
+    }
+    Preconditions.checkArgument(
+        normalizedTypeFull.endsWith(")"),
+        "Invalid text-index metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+
+    String clickHouseType = normalizedTypeFull.substring(0, paramsStart).trim();
+    Preconditions.checkArgument(
+        isClickHouseTextIndexTypeName(clickHouseType),
+        "Text-index metadata '%s' has an unsupported type for index '%s'",
+        typeFull,
+        indexName);
+
+    String rawParameters =
+        normalizedTypeFull.substring(paramsStart + 1, normalizedTypeFull.length() - 1);
+    if (isLegacyTextIndexTypeName(clickHouseType)) {
+      List<String> parameters = splitTextIndexParameters(rawParameters, typeFull, indexName);
+      Preconditions.checkArgument(
+          parameters.size() == 1,
+          "Invalid %s metadata '%s' for index '%s': expected one tokenizer parameter",
+          clickHouseType,
+          typeFull,
+          indexName);
+      return parseLegacyTextTokenizer(parameters.get(0), typeFull, clickHouseType, indexName);
+    }
+
+    Map<String, String> namedParameters = new HashMap<>();
+    List<String> unsupportedParameters = new ArrayList<>();
+    for (String parameter : splitTextIndexParameters(rawParameters, typeFull, indexName)) {
+      int assignmentIndex = parameter.indexOf('=');
+      if (assignmentIndex <= 0) {
+        unsupportedParameters.add(parameter.trim());
+        continue;
+      }
+      String key = StringUtils.lowerCase(parameter.substring(0, assignmentIndex).trim());
+      String value = parameter.substring(assignmentIndex + 1).trim();
+      if (!TOKENIZER.equals(key) && !NGRAM_SIZE.equals(key)) {
+        unsupportedParameters.add(key);
+        continue;
+      }
+      Preconditions.checkArgument(
+          !namedParameters.containsKey(key),
+          "Duplicate text-index parameter '%s' in '%s' for index '%s'",
+          key,
+          typeFull,
+          indexName);
+      namedParameters.put(key, value);
+    }
+    if (!unsupportedParameters.isEmpty()) {
+      LOG.warn(
+          "ClickHouse text index '{}' contains unsupported metadata parameters {}; "
+              + "loaded Index.properties() is incomplete",
+          indexName,
+          unsupportedParameters);
+    }
+
+    String tokenizer = stripTextParameterQuotes(namedParameters.get(TOKENIZER));
+    if (StringUtils.isBlank(tokenizer)) {
+      return Collections.emptyMap();
+    }
+    if (StringUtils.equalsAnyIgnoreCase(tokenizer, "default", "tokens", "splitByNonAlpha")) {
+      Preconditions.checkArgument(
+          !namedParameters.containsKey(NGRAM_SIZE),
+          "ngram_size is only valid for ngrams tokenizer in text-index metadata '%s' for index '%s'",
+          typeFull,
+          indexName);
+      return Map.of(TOKENIZER, TEXT_INDEX_TOKENS);
+    }
+
+    String embeddedNgramSize = null;
+    String normalizedTokenizer = tokenizer;
+    int tokenizerParamsStart = tokenizer.indexOf('(');
+    if (tokenizerParamsStart >= 0 && tokenizer.endsWith(")")) {
+      normalizedTokenizer = tokenizer.substring(0, tokenizerParamsStart).trim();
+      embeddedNgramSize =
+          tokenizer.substring(tokenizerParamsStart + 1, tokenizer.length() - 1).trim();
+    }
+    if (StringUtils.equalsAnyIgnoreCase(normalizedTokenizer, "ngram", "ngrams")) {
+      String configuredNgramSize = namedParameters.get(NGRAM_SIZE);
+      Preconditions.checkArgument(
+          embeddedNgramSize == null || configuredNgramSize == null,
+          "ngram_size is specified twice in text-index metadata '%s' for index '%s'",
+          typeFull,
+          indexName);
+      String ngramSize = embeddedNgramSize == null ? configuredNgramSize : embeddedNgramSize;
+      Map<String, String> properties = new HashMap<>();
+      properties.put(TOKENIZER, TEXT_INDEX_NGRAMS);
+      if (StringUtils.isNotBlank(ngramSize)) {
+        properties.put(NGRAM_SIZE, requireTextNgramSize(ngramSize, typeFull, indexName));
+      }
+      return Map.copyOf(properties);
+    }
+
+    return Collections.emptyMap();
+  }
+
+  private static Map<String, String> parseLegacyTextTokenizer(
+      String rawParameter, String typeFull, String clickHouseType, String indexName) {
+    String parameter = stripTextParameterQuotes(rawParameter);
+    Preconditions.checkArgument(
+        StringUtils.isNumeric(parameter),
+        "Invalid %s metadata '%s' for index '%s': tokenizer parameter '%s' must be an integer",
+        clickHouseType,
+        typeFull,
+        indexName,
+        parameter);
+    int value;
+    try {
+      value = Integer.parseInt(parameter);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid text-index metadata '%s' for index '%s': tokenizer parameter '%s' is outside the supported integer range"
+              .formatted(typeFull, indexName, parameter),
+          e);
+    }
+
+    if (value == 0) {
+      return Map.of(TOKENIZER, TEXT_INDEX_TOKENS);
+    }
+    Preconditions.checkArgument(
+        value >= 1 && value <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
+        typeFull,
+        indexName,
+        value);
+    return Map.of(TOKENIZER, TEXT_INDEX_NGRAMS, NGRAM_SIZE, String.valueOf(value));
+  }
+
+  private static String requireTextNgramSize(String value, String typeFull, String indexName) {
+    String normalizedValue = stripTextParameterQuotes(value);
+    Preconditions.checkArgument(
+        StringUtils.isNumeric(normalizedValue),
+        "Invalid text-index metadata '%s' for index '%s': ngram_size '%s' must be an integer",
+        typeFull,
+        indexName,
+        normalizedValue);
+    int ngramSize;
+    try {
+      ngramSize = Integer.parseInt(normalizedValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid text-index metadata '%s' for index '%s': ngram_size '%s' is outside the supported integer range"
+              .formatted(typeFull, indexName, normalizedValue),
+          e);
+    }
+    Preconditions.checkArgument(
+        ngramSize >= 1 && ngramSize <= 8,
+        "Invalid text-index metadata '%s' for index '%s': ngram_size %s is outside the supported range [1, 8]",
+        typeFull,
+        indexName,
+        ngramSize);
+    return String.valueOf(ngramSize);
+  }
+
+  private static List<String> splitTextIndexParameters(
+      String rawParameters, String typeFull, String indexName) {
+    List<String> parameters = new ArrayList<>();
+    StringBuilder current = new StringBuilder();
+    int parenthesesDepth = 0;
+    int bracketsDepth = 0;
+    char quote = 0;
+    boolean escaped = false;
+    for (int i = 0; i < rawParameters.length(); i++) {
+      char character = rawParameters.charAt(i);
+      if (quote != 0) {
+        current.append(character);
+        if (escaped) {
+          escaped = false;
+        } else if (character == '\\') {
+          escaped = true;
+        } else if (character == quote) {
+          if (i + 1 < rawParameters.length() && rawParameters.charAt(i + 1) == quote) {
+            current.append(rawParameters.charAt(++i));
+          } else {
+            quote = 0;
+          }
+        }
+        continue;
+      }
+      if (character == '\'' || character == '"') {
+        quote = character;
+        current.append(character);
+      } else if (character == '(') {
+        parenthesesDepth++;
+        current.append(character);
+      } else if (character == ')') {
+        parenthesesDepth--;
+        Preconditions.checkArgument(
+            parenthesesDepth >= 0,
+            "Invalid text-index metadata '%s' for index '%s'",
+            typeFull,
+            indexName);
+        current.append(character);
+      } else if (character == '[') {
+        bracketsDepth++;
+        current.append(character);
+      } else if (character == ']') {
+        bracketsDepth--;
+        Preconditions.checkArgument(
+            bracketsDepth >= 0,
+            "Invalid text-index metadata '%s' for index '%s'",
+            typeFull,
+            indexName);
+        current.append(character);
+      } else if (character == ',' && parenthesesDepth == 0 && bracketsDepth == 0) {
+        parameters.add(current.toString().trim());
+        current.setLength(0);
+      } else {
+        current.append(character);
+      }
+    }
+    Preconditions.checkArgument(
+        quote == 0 && parenthesesDepth == 0 && bracketsDepth == 0 && !escaped,
+        "Invalid text-index metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+    if (current.length() > 0 || !rawParameters.isEmpty()) {
+      parameters.add(current.toString().trim());
+    }
+    return parameters;
+  }
+
+  private static String stripTextParameterQuotes(String value) {
+    String normalizedValue = StringUtils.trimToEmpty(value);
+    if (normalizedValue.length() >= 2
+        && ((normalizedValue.startsWith("'") && normalizedValue.endsWith("'"))
+            || (normalizedValue.startsWith("\"") && normalizedValue.endsWith("\"")))) {
+      normalizedValue = normalizedValue.substring(1, normalizedValue.length() - 1);
+    }
+    return normalizedValue.replace("\\'", "'").replace("''", "'");
+  }
+
+  private static boolean isClickHouseTextIndexTypeName(String typeName) {
+    return StringUtils.equalsAnyIgnoreCase(
+        StringUtils.trimToEmpty(typeName),
+        DATA_SKIPPING_TEXT,
+        DATA_SKIPPING_GIN,
+        DATA_SKIPPING_FULL_TEXT,
+        DATA_SKIPPING_INVERTED);
+  }
+
+  private static boolean isLegacyTextIndexTypeName(String typeName) {
+    return StringUtils.equalsAnyIgnoreCase(
+        StringUtils.trimToEmpty(typeName),
+        DATA_SKIPPING_GIN,
+        DATA_SKIPPING_FULL_TEXT,
+        DATA_SKIPPING_INVERTED);
+  }
+
+  private static boolean isClickHouseTextIndexType(String rawType) {
+    if (StringUtils.isBlank(rawType)) {
+      return false;
+    }
+    int paramsStart = rawType.indexOf('(');
+    String typeName = paramsStart < 0 ? rawType.trim() : rawType.substring(0, paramsStart).trim();
+    return isClickHouseTextIndexTypeName(typeName);
+  }
+
   private static Map<String, String> parseLegacyAnnUsearchProperties(
       Index.IndexType indexType, String typeFull, String indexName) {
     String expectedType = legacyAnnUsearchTypeName(indexType);
@@ -2732,12 +3038,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /**
    * Maps a ClickHouse data skipping index type string to the corresponding Gravitino {@link
    * Index.IndexType}. Returns {@code DATA_SKIPPING_MINMAX} for blank/null input (ClickHouse
-   * default). Also handles parameterized formats such as {@code set(N)}, {@code annoy(N)}, {@code
-   * usearch(distanceFunction)}, and {@code vector_similarity(...)} that some ClickHouse versions
-   * may return from {@code system.data_skipping_indices}.
+   * default). Also handles parameterized formats returned from {@code
+   * system.data_skipping_indices}, including text, legacy Annoy/USearch, and vector similarity
+   * indexes.
    *
-   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "bloom_filter",
-   *     "set", "set(0)", or "vector_similarity")
+   * @param rawType the index type string from ClickHouse metadata (e.g. "minmax", "set(0)",
+   *     "inverted(0)", "text(tokenizer = ngrams(3))", or "vector_similarity")
    * @return the corresponding Gravitino IndexType
    * @throws IllegalArgumentException if the type is not supported
    */
@@ -2758,6 +3064,11 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         return Index.IndexType.DATA_SKIPPING_NGRAMBFV1;
       case DATA_SKIPPING_TOKENBFV1:
         return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+      case DATA_SKIPPING_TEXT:
+      case DATA_SKIPPING_GIN:
+      case DATA_SKIPPING_FULL_TEXT:
+      case DATA_SKIPPING_INVERTED:
+        return Index.IndexType.DATA_SKIPPING_TEXT;
       case DATA_SKIPPING_ANNOY:
         return Index.IndexType.DATA_SKIPPING_ANNOY;
       case DATA_SKIPPING_USEARCH:
@@ -2765,8 +3076,8 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       case DATA_SKIPPING_VECTOR_SIMILARITY:
         return Index.IndexType.DATA_SKIPPING_VECTOR_SIMILARITY;
       default:
-        // ClickHouse may return type with parameters in some versions. Match on prefix to handle
-        // both bare and parameterized formats.
+        // ClickHouse may return types with parameters in some versions. Match the parameterized
+        // format for data skipping indexes whose raw type is not covered by an exact case above.
         if (rawType.startsWith(DATA_SKIPPING_SET + "(")) {
           return Index.IndexType.DATA_SKIPPING_SET;
         }
@@ -2775,6 +3086,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         }
         if (rawType.startsWith(DATA_SKIPPING_TOKENBFV1 + "(")) {
           return Index.IndexType.DATA_SKIPPING_TOKENBFV1;
+        }
+        if (isClickHouseTextIndexType(rawType)) {
+          return Index.IndexType.DATA_SKIPPING_TEXT;
         }
         if (isParameterizedLegacyAnnUsearchType(rawType, DATA_SKIPPING_ANNOY)) {
           return Index.IndexType.DATA_SKIPPING_ANNOY;
@@ -3192,6 +3506,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static boolean isQuoteDelimiter(char value) {
     return value == '\'' || value == '"' || value == '`';
+  }
+
+  private void checkDefaultValue(Type columnType, Expression defaultValue) {
+    Preconditions.checkState(
+        columnDefaultValueConverter instanceof ClickHouseColumnDefaultValueConverter,
+        "ClickHouse table operations require ClickHouseColumnDefaultValueConverter, but got %s",
+        columnDefaultValueConverter.getClass().getName());
+    ((ClickHouseColumnDefaultValueConverter) columnDefaultValueConverter)
+        .checkDefaultValue(columnType, defaultValue);
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {

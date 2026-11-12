@@ -28,6 +28,9 @@ public class PolicyPO {
   private String policyName;
   private String policyType;
   private Long metalakeId;
+  /** Metalake name from a join. Absent on queries that do not select it. */
+  private String metalakeName;
+
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;

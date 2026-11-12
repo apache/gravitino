@@ -19,6 +19,96 @@
 
 paths:
 
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/semantic-model-datasets:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - name: metadataObjectType
+        in: path
+        required: true
+        description: The source metadata object type
+        schema:
+          type: string
+          enum: [table, view]
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+    get:
+      tags:
+        - semantic-model
+      summary: List Semantic Model datasets associated with a source
+      description: >-
+        Lists datasets directly associated with a registered table or View in the same metalake,
+        including models in other catalogs and schemas. Requires access to the source metadata
+        and returns datasets only from models the caller can load, including access to each model's
+        catalog and schema. Authorization evaluation failures exclude the affected models.
+        Returns one identifier per matching dataset, with namespace
+        [metalake, catalog, schema, semanticModel] and the exact, case-sensitive dataset name.
+        Results are sorted by those components in order using UTF-16 code units, independently of
+        database collation. Dataset names containing dots remain a single name component.
+        An existing source with no visible matches returns an empty identifiers array; missing
+        sources and storage failures fail the request. The response is unpaginated.
+        Associations refer to source IDs resolved at the latest definition write. Renaming a source
+        while preserving its ID keeps its associations; reusing its name for a new source does not.
+        This lookup neither rewrites nor revalidates model definitions and does not follow View
+        dependencies. The source full name uses catalog.schema.name; literal dots in source name
+        components cannot be represented reliably by this route.
+      operationId: listSemanticModelDatasets
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelDatasetListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          description: The source or one of its parents does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+      - $ref: "./openapi.yaml#/components/parameters/schema"
+    get:
+      tags:
+        - semantic-model
+      summary: List metrics across Semantic Models
+      description: >-
+        Lists metrics in the current committed definitions of live Semantic Models in a schema.
+        Supported only for relational catalogs. With details=false (the default), returns metric
+        identifiers; with details=true, returns complete metric definitions and their namespaces.
+        Namespaces contain [metalake, catalog, schema, semanticModel]. Both modes require schema
+        access and include only metrics whose containing model is visible under the existing
+        Semantic Model listing rules. Results are sorted by structured model identifier and then
+        case-sensitive metric name. Models without metrics contribute no entries. Empty results
+        contain an empty identifiers or metrics array. Storage or metric decoding failures fail
+        the entire request, including decoding failures in models that would be filtered out.
+      operationId: listSemanticModelMetrics
+      parameters:
+        - name: details
+          in: query
+          required: false
+          description: Whether to return complete metric definitions instead of identifiers
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelMetricListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          $ref: "#/components/responses/SemanticModelParentNotFoundResponse"
+        "501":
+          $ref: "#/components/responses/SemanticModelUnsupportedCatalogResponse"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-models:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -53,8 +143,9 @@ paths:
       summary: Create a Semantic Model
       description: >-
         Creates a schema-scoped Semantic Model in a relational catalog. The complete definition is
-        validated before the model is stored, including source identifier shape. Source existence,
-        source columns, and source authorization checks are not yet implemented.
+        validated before the model is stored, including source identifier shape, source existence,
+        and primary-key, unique-key, and relationship columns. When authorization is enabled,
+        source lookups also require the caller's permission to access the source metadata.
       operationId: createSemanticModel
       requestBody:
         required: true
@@ -95,6 +186,10 @@ paths:
       summary: Import an Apache Ossie Semantic Model
       description: >-
         Imports one standalone Apache Ossie document and creates the represented Semantic Model.
+        The imported definition is validated before the model is stored, including source identifier
+        shape, source existence, and primary-key, unique-key, and relationship columns. When
+        authorization is enabled, source lookups also require the caller's permission to access the
+        source metadata.
         The request body is the raw JSON or YAML document, not a JSON-encoded string. Content-Type
         selects the parser; when the header is absent, the body is parsed as YAML. Parsing does not
         fall back to another format.
@@ -182,8 +277,10 @@ paths:
       description: >-
         Applies the ordered updates atomically. The server validates and converts the complete
         update batch before dispatch; if any update or the resulting model is invalid, none of the
-        updates is applied. Only replaceDefinition revalidates the complete definition. Source
-        existence, source columns, and source authorization checks are not yet implemented.
+        updates is applied. Each replaceDefinition revalidates the complete definition, source
+        existence, and primary-key, unique-key, and relationship columns. When authorization is
+        enabled, source lookups also require the caller's permission to access the source metadata.
+        Metadata-only updates do not revalidate sources.
       operationId: alterSemanticModel
       requestBody:
         required: true
@@ -290,6 +387,60 @@ paths:
 components:
 
   schemas:
+    SemanticModelMetric:
+      type: object
+      description: The namespace and complete definition of a discovered metric
+      required:
+        - namespace
+        - metric
+      properties:
+        namespace:
+          type: array
+          description: Full namespace [metalake, catalog, schema, semanticModel]
+          minItems: 4
+          maxItems: 4
+          items:
+            type: string
+            minLength: 1
+        metric:
+          $ref: "#/components/schemas/Metric"
+      additionalProperties: false
+
+    MetricIdentifierListResponse:
+      type: object
+      description: Metric identifiers returned when details is false
+      required:
+        - code
+        - identifiers
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        identifiers:
+          type: array
+          description: Identifiers with namespace [metalake, catalog, schema, semanticModel]
+          items:
+            $ref: "./openapi.yaml#/components/schemas/NameIdentifier"
+      additionalProperties: false
+
+    MetricInfoListResponse:
+      type: object
+      description: Complete metrics returned when details is true
+      required:
+        - code
+        - metrics
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum: [0]
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemanticModelMetric"
+      additionalProperties: false
+
     AIContext:
       description: Additional context for AI tools, encoded as exactly one string or object value
       oneOf:
@@ -1087,6 +1238,83 @@ components:
       }
 
   responses:
+    SemanticModelDatasetListResponse:
+      description: Fully qualified identifiers of visible datasets directly associated with the source
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required: [code, identifiers]
+            properties:
+              code:
+                type: integer
+                format: int32
+                enum: [0]
+              identifiers:
+                type: array
+                items:
+                  type: object
+                  required: [namespace, name]
+                  properties:
+                    namespace:
+                      type: array
+                      description: Full namespace [metalake, catalog, schema, semanticModel]
+                      minItems: 4
+                      maxItems: 4
+                      items:
+                        type: string
+                        minLength: 1
+                    name:
+                      type: string
+                      minLength: 1
+                      description: The exact, case-sensitive dataset name, which may contain dots
+                  additionalProperties: false
+            additionalProperties: false
+          examples:
+            SharedSource:
+              summary: Two datasets in one model referencing the same source
+              value:
+                code: 0
+                identifiers:
+                  - namespace: [example, analytics, semantic, employee_analysis]
+                    name: employee
+                  - namespace: [example, analytics, semantic, employee_analysis]
+                    name: manager
+            Empty:
+              summary: The source exists but no matching datasets are visible
+              value:
+                code: 0
+                identifiers: []
+
+    SemanticModelMetricListResponse:
+      description: Metric identifiers or complete metric definitions, according to details
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            oneOf:
+              - $ref: "#/components/schemas/MetricIdentifierListResponse"
+              - $ref: "#/components/schemas/MetricInfoListResponse"
+          examples:
+            Identifiers:
+              summary: details=false
+              value:
+                code: 0
+                identifiers:
+                  - namespace: [lake, sales, mart, sales_model]
+                    name: total_revenue
+            Definitions:
+              summary: details=true
+              value:
+                code: 0
+                metrics:
+                  - namespace: [lake, sales, mart, sales_model]
+                    metric:
+                      name: total_revenue
+                      expression:
+                        dialects:
+                          - dialect: ANSI_SQL
+                            expression: SUM(orders.amount)
+
     SemanticModelListResponse:
       description: Returns the Semantic Model identifiers in the schema
       content:

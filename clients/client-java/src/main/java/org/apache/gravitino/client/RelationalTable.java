@@ -47,6 +47,7 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -58,6 +59,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -68,6 +70,7 @@ import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a relational table. */
@@ -88,6 +91,7 @@ class RelationalTable
   private final Namespace namespace;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectStatisticsOperations objectStatisticsOperations;
@@ -121,6 +125,8 @@ class RelationalTable
         MetadataObjects.of(
             Arrays.asList(namespace.level(1), namespace.level(2), tableDTO.name()),
             MetadataObject.Type.TABLE);
+    this.objectSemanticModelOperations =
+        new MetadataObjectSemanticModelOperations(namespace.level(0), tableObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
@@ -352,6 +358,11 @@ class RelationalTable
   }
 
   @Override
+  public SupportsSemanticModels supportsSemanticModels() {
+    return objectSemanticModelOperations;
+  }
+
+  @Override
   public SupportsTags supportsTags() {
     return this;
   }
@@ -392,8 +403,18 @@ class RelationalTable
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -417,8 +438,18 @@ class RelationalTable
   }
 
   @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
+  }
+
+  @Override
   public Policy[] listPolicyInfos() {
     return objectPolicyOperations.listPolicyInfos();
+  }
+
+  @Override
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

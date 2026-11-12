@@ -24,7 +24,13 @@ import java.util.Set;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.gravitino.MetadataObject;
 
-/** The interface of the content of the policy. */
+/**
+ * The interface of the content of the policy.
+ *
+ * <p>Execution peers ({@code timeTrigger}, {@code commitTrigger}, {@code minIntervalMs}, {@code
+ * jobOptions}, {@code updaterOptions}) are not part of this universal interface. Built-in Iceberg
+ * maintenance contents carry them via {@link ExecutablePolicyContent}/{@link PolicyExecutionSpec}.
+ */
 public interface PolicyContent {
 
   /**
@@ -49,6 +55,9 @@ public interface PolicyContent {
 
   /**
    * Validates the policy content.
+   *
+   * <p>Checks universal fields such as {@link #supportedObjectTypes()}. Maintenance execution-field
+   * validation lives on {@link ExecutablePolicyContent} implementations.
    *
    * @throws IllegalArgumentException if the content is invalid.
    */

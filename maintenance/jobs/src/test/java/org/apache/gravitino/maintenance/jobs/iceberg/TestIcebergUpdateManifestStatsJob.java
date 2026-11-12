@@ -64,7 +64,7 @@ public class TestIcebergUpdateManifestStatsJob {
     assertTrue(template.arguments().contains("{{spark_conf:-}}"));
     assertTrue(template.arguments().contains("{{coordination_directory:-}}"));
     assertFalse(template.arguments().contains("--update-mode"));
-    assertEquals("v1", template.customFields().get("version"));
+    assertEquals("v2", template.customFields().get("version"));
     assertTrue(template.configs().containsKey("spark.sql.extensions"));
     SparkJobTemplate existing = (SparkJobTemplate) templates.get("builtin-iceberg-update-stats");
     assertNotNull(existing);

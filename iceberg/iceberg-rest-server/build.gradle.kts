@@ -49,6 +49,7 @@ dependencies {
     exclude("*")
   }
   implementation(libs.bundles.iceberg)
+  implementation(libs.iceberg.common)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jersey)
   implementation(libs.bundles.jwt)
@@ -98,6 +99,7 @@ dependencies {
   }
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.javax.ws.rs.api)
   // At runtime use the SDK supplied by iceberg-aws-bundle, keeping its S3 and STS versions aligned.
   testCompileOnly(libs.aws.s3)
   testImplementation(libs.h2db)
@@ -199,13 +201,39 @@ tasks {
   }
 }
 
+// Share the authorization IT harness with the experimental service module.
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  // Shared test resources must not inherit the production JAR's logging/resource exclusions.
+  setExcludes(emptyList())
+  from(sourceSets.test.get().output)
+}
+
+configurations.create("testArtifacts") {
+  isCanBeResolved = false
+}
+
+artifacts {
+  add("testArtifacts", testJar)
+}
+
+// Retain the existing CI entry point while the experimental module owns the tests and runtime.
+tasks.register("experimentalTest") {
+  description = "Runs experimental Iceberg REST integration tests"
+  group = "verification"
+  dependsOn(":iceberg:iceberg-rest-server-experiment:experimentalTest")
+}
+
 tasks.test {
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     // Exclude integration tests
     exclude("**/integration/test/**")
   } else {
-    dependsOn(tasks.jar)
+    dependsOn(
+      tasks.jar,
+      ":catalogs:catalog-lakehouse-iceberg:jar"
+    )
   }
 }
 

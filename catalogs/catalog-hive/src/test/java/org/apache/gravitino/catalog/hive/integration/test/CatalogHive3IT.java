@@ -44,7 +44,11 @@ public class CatalogHive3IT extends CatalogHive2IT {
   protected void startNecessaryContainer() {
     hmsCatalog = "hive";
     containerSuite.startHiveContainer(
-        ImmutableMap.of(HiveContainer.HIVE_RUNTIME_VERSION, HiveContainer.HIVE3));
+        ImmutableMap.of(
+            HiveContainer.HIVE_RUNTIME_VERSION,
+            HiveContainer.HIVE3,
+            HiveContainer.ENABLE_SERDE_SCHEMA_TESTS,
+            "true"));
 
     hiveMetastoreUris =
         String.format(

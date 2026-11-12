@@ -26,7 +26,11 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -540,6 +544,60 @@ public class CatalogMysqlIT extends BaseIT {
   }
 
   @Test
+  void testBooleanDefaultValues() throws SQLException {
+    NameIdentifier ident =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("bool_defaults"));
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            new Column[] {
+              Column.of(
+                  "enabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("true", Types.BooleanType.get())),
+              Column.of(
+                  "disabled",
+                  Types.BooleanType.get(),
+                  null,
+                  false,
+                  false,
+                  Literals.of("false", Types.BooleanType.get()))
+            },
+            null,
+            ImmutableMap.of());
+    Table created = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(true), created.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(false), created.columns()[1].defaultValue());
+
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            ident,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"enabled"}, Literals.of("0", Types.BooleanType.get())),
+            TableChange.updateColumnDefaultValue(
+                new String[] {"disabled"}, Literals.of("1", Types.BooleanType.get())));
+    Table altered = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals(Literals.booleanLiteral(false), altered.columns()[0].defaultValue());
+    Assertions.assertEquals(Literals.booleanLiteral(true), altered.columns()[1].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
+
+    // MODIFY COLUMN re-renders the loaded BIT(1) default. Before Boolean reloading, the loaded
+    // b'0' value was an unparsed expression and this comment change failed.
+    catalog
+        .asTableCatalog()
+        .alterTable(ident, TableChange.updateColumnComment(new String[] {"enabled"}, "flag"));
+    Table commented = catalog.asTableCatalog().loadTable(ident);
+    Assertions.assertEquals("flag", commented.columns()[0].comment());
+    Assertions.assertEquals(Literals.booleanLiteral(false), commented.columns()[0].defaultValue());
+    assertBooleanDefaultInsert(ident, false, true);
+  }
+
+  @Test
   void testColumnDefaultValueWithDatetimePrecision() {
     // MySQL rejects `DATETIME(6) DEFAULT CURRENT_TIMESTAMP`: once a column declares a fractional
     // seconds precision, CURRENT_TIMESTAMP has to carry the same one.
@@ -740,7 +798,7 @@ public class CatalogMysqlIT extends BaseIT {
               Literals.decimalLiteral(Decimal.of("1.2", 6, 2)), column.defaultValue());
           break;
         case "bit_col_1":
-          Assertions.assertEquals(UnparsedExpression.of("b'1'"), column.defaultValue());
+          Assertions.assertEquals(Literals.booleanLiteral(true), column.defaultValue());
           break;
         default:
           Assertions.fail(
@@ -1947,44 +2005,51 @@ public class CatalogMysqlIT extends BaseIT {
     String sql = String.format("CREATE DATABASE `%s`", testSchemaName);
     mysqlService.executeQuery(sql);
 
-    Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
-    Assertions.assertEquals(testSchemaName, schema.name());
+    try {
+      Schema schema = catalog.asSchemas().loadSchema(testSchemaName);
+      Assertions.assertEquals(testSchemaName, schema.name());
 
-    String[] schemaIdents = catalog.asSchemas().listSchemas();
-    Assertions.assertTrue(Arrays.asList(schemaIdents).contains(testSchemaName));
+      String[] schemaIdents = catalog.asSchemas().listSchemas();
+      Assertions.assertTrue(Arrays.asList(schemaIdents).contains(testSchemaName));
 
-    Exception exception =
-        Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> catalog.asSchemas().createSchema(testSchemaName, null, Collections.emptyMap()));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Can't create database '//'; database exists"));
+      SchemaAlreadyExistsException exception =
+          Assertions.assertThrows(
+              SchemaAlreadyExistsException.class,
+              () -> catalog.asSchemas().createSchema(testSchemaName, null, Collections.emptyMap()));
+      // The registration preflight may reject this before MySQL executes CREATE DATABASE.
+      Assertions.assertTrue(
+          exception.getMessage().contains(testSchemaName), exception.getMessage());
 
-    Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
-    Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
+      Assertions.assertTrue(catalog.asSchemas().dropSchema(testSchemaName, false));
+      Assertions.assertFalse(catalog.asSchemas().schemaExists(testSchemaName));
 
-    // test operate illegal table name from MySQL
-    mysqlService.executeQuery(sql);
-    String testTableName = "//";
-    sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
-    mysqlService.executeQuery(sql);
-    NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
+      // test operate illegal table name from MySQL
+      mysqlService.executeQuery(sql);
+      String testTableName = "//";
+      sql = String.format("CREATE TABLE `%s`.`%s` (id int)", testSchemaName, testTableName);
+      mysqlService.executeQuery(sql);
+      NameIdentifier tableIdent = NameIdentifier.of(testSchemaName, testTableName);
 
-    Table table = catalog.asTableCatalog().loadTable(tableIdent);
-    Assertions.assertEquals(testTableName, table.name());
+      Table table = catalog.asTableCatalog().loadTable(tableIdent);
+      Assertions.assertEquals(testTableName, table.name());
 
-    NameIdentifier[] tableIdents =
-        catalog.asTableCatalog().listTables(Namespace.of(testSchemaName));
-    Assertions.assertTrue(Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
+      NameIdentifier[] tableIdents =
+          catalog.asTableCatalog().listTables(Namespace.of(testSchemaName));
+      Assertions.assertTrue(
+          Arrays.stream(tableIdents).anyMatch(t -> t.name().equals(testTableName)));
 
-    Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
-    Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> {
-          catalog.asTableCatalog().purgeTable(tableIdent);
-        });
-    catalog.asSchemas().dropSchema(testSchemaName, true);
+      Assertions.assertTrue(catalog.asTableCatalog().dropTable(tableIdent));
+      Assertions.assertFalse(catalog.asTableCatalog().tableExists(tableIdent));
+      Assertions.assertThrows(
+          UnsupportedOperationException.class,
+          () -> {
+            catalog.asTableCatalog().purgeTable(tableIdent);
+          });
+    } finally {
+      // This name is shared by the inherited MySQL suites. Clean both source and registration
+      // even when an assertion fails, so later suites do not inherit a non-empty catalog.
+      catalog.asSchemas().dropSchema(testSchemaName, true);
+    }
 
     // sql injection
     String schemaName = RandomNameUtils.genRandomName("ct_db");
@@ -2578,6 +2643,26 @@ public class CatalogMysqlIT extends BaseIT {
           "loadTable must succeed for table that appeared in listTables");
     } finally {
       mysqlService.executeQuery("DROP DATABASE IF EXISTS `" + dottedSchemaName + "`");
+    }
+  }
+
+  private void assertBooleanDefaultInsert(NameIdentifier ident, boolean enabled, boolean disabled)
+      throws SQLException {
+    String qualified = "`" + schemaName + "`.`" + ident.name() + "`";
+    try (Connection connection =
+            DriverManager.getConnection(
+                MYSQL_CONTAINER.getJdbcUrl(TEST_DB_NAME),
+                MYSQL_CONTAINER.getUsername(),
+                MYSQL_CONTAINER.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate("DELETE FROM " + qualified);
+      statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+      try (ResultSet rows = statement.executeQuery("SELECT enabled, disabled FROM " + qualified)) {
+        Assertions.assertTrue(rows.next());
+        Assertions.assertEquals(enabled, rows.getBoolean("enabled"));
+        Assertions.assertEquals(disabled, rows.getBoolean("disabled"));
+        Assertions.assertFalse(rows.next());
+      }
     }
   }
 }

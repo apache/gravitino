@@ -21,11 +21,13 @@ package org.apache.gravitino.catalog.doris.converter;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.BIGINT;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.CHAR;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.DATETIME;
+import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.DATEV2;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.DECIMAL;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.DOUBLE;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.FLOAT;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.INT;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.SMALLINT;
+import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.STRING;
 import static org.apache.gravitino.catalog.doris.converter.DorisTypeConverter.TINYINT;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
@@ -76,8 +78,14 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return super.fromGravitino(defaultValue);
       }
       // Doris 1.2 parses literal defaults as quoted strings and uses MySQL-style escaping.
-      if (literal.dataType() instanceof Type.NumericType
-          || literal.dataType() instanceof Types.StringType
+      if (literal.dataType() instanceof Type.NumericType) {
+        String value = String.valueOf(literal.value());
+        if (!value.isBlank()) {
+          value = super.fromGravitino(defaultValue);
+        }
+        return quoteDorisLiteral(value, doubleEscapeBackslashes, useSingleQuoteDelimiter);
+      }
+      if (literal.dataType() instanceof Types.StringType
           || literal.dataType() instanceof Types.VarCharType
           || literal.dataType() instanceof Types.FixedCharType) {
         return quoteDorisLiteral(
@@ -87,6 +95,44 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     // Doris accepts the base converter's standard SQL syntax for date/time literals and
     // expressions.
     return super.fromGravitino(defaultValue);
+  }
+
+  /**
+   * Converts a CREATE TABLE default value to Doris SQL.
+   *
+   * <p>Doris 2.1 and later keep the text of a string default unchanged when the table is created
+   * and parse it again as a double-quoted literal when a row takes the default, so string defaults
+   * must use that form there. Earlier versions decode the literal when the table is created and use
+   * the shared single-quoted form.
+   *
+   * @param defaultValue the Gravitino default value
+   * @param useDoubleQuotedLiteral whether string literals use double quotes with backslash escapes
+   * @return the Doris SQL representation, or {@code null} when the default is unset
+   */
+  @Nullable
+  public String fromGravitinoForCreateTable(
+      Expression defaultValue, boolean useDoubleQuotedLiteral) {
+    if (useDoubleQuotedLiteral && isNonNullStringLiteral(defaultValue)) {
+      return quoteDorisLiteral(String.valueOf(((Literal<?>) defaultValue).value()), false, false);
+    }
+    return super.fromGravitino(defaultValue);
+  }
+
+  /**
+   * Returns whether a default value is a non-null string, varchar or char literal.
+   *
+   * @param defaultValue the Gravitino default value
+   * @return whether the value is a non-null string literal
+   */
+  public static boolean isNonNullStringLiteral(Expression defaultValue) {
+    if (!(defaultValue instanceof Literal)) {
+      return false;
+    }
+    Literal<?> literal = (Literal<?>) defaultValue;
+    return literal.value() != null
+        && (literal.dataType() instanceof Types.StringType
+            || literal.dataType() instanceof Types.VarCharType
+            || literal.dataType() instanceof Types.FixedCharType);
   }
 
   /**
@@ -169,6 +215,7 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, columnType.getColumnSize(), columnType.getScale()));
       case JdbcTypeConverter.DATE:
+      case DATEV2:
         return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIMESTAMP:
       case DATETIME:
@@ -185,6 +232,7 @@ public class DorisColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
             unescapeDorisLiteral(columnDefaultValue),
             Types.FixedCharType.of(columnType.getColumnSize()));
       case JdbcTypeConverter.TEXT:
+      case STRING:
         return Literals.stringLiteral(unescapeDorisLiteral(columnDefaultValue));
       default:
         return UnparsedExpression.of(columnDefaultValue);

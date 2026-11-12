@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -148,5 +149,40 @@ public class TestGlueCatalogCredentials {
   private static List<String> splitProviders(Map<String, String> withProviders) {
     String providers = withProviders.get(CredentialConstants.CREDENTIAL_PROVIDERS);
     return Arrays.stream(providers.split(",")).map(String::trim).collect(Collectors.toList());
+  }
+
+  @Test
+  void testValidateOnCreateRunsLocalConfigChecks() {
+    GlueCatalog catalog =
+        new GlueCatalog()
+            .withCatalogConf(
+                Map.of(
+                    GlueConstants.AWS_REGION,
+                    "us-east-1",
+                    GlueConstants.AWS_ACCESS_KEY_ID,
+                    "AKIAEXAMPLE"));
+
+    assertTrue(catalog.shouldValidateOnCreate());
+    IllegalArgumentException partial =
+        assertThrows(IllegalArgumentException.class, catalog::validateOnCreate);
+    assertTrue(partial.getMessage().contains(GlueConstants.AWS_SECRET_ACCESS_KEY));
+
+    GlueCatalog temporaryKey =
+        new GlueCatalog()
+            .withCatalogConf(
+                Map.of(
+                    GlueConstants.AWS_REGION,
+                    "us-east-1",
+                    GlueConstants.AWS_ACCESS_KEY_ID,
+                    "ASIAEXAMPLE",
+                    GlueConstants.AWS_SECRET_ACCESS_KEY,
+                    "secret"));
+    IllegalArgumentException temporary =
+        assertThrows(IllegalArgumentException.class, temporaryKey::validateOnCreate);
+    assertTrue(temporary.getMessage().contains("session token"), temporary.getMessage());
+
+    new GlueCatalog()
+        .withCatalogConf(Map.of(GlueConstants.AWS_REGION, "us-east-1"))
+        .validateOnCreate();
   }
 }

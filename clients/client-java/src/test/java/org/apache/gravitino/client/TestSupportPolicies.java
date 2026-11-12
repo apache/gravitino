@@ -44,14 +44,15 @@ import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.NameListResponse;
-import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyNameListResponse;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Types;
@@ -320,14 +321,15 @@ public class TestSupportPolicies extends TestBase {
             + "/policies";
 
     String[] policies = new String[] {"policy1", "policy2"};
-    NameListResponse resp = new NameListResponse(policies);
+    PolicyNameListResponse resp = new PolicyNameListResponse(policies, true);
     buildMockResource(Method.GET, path, null, resp, SC_OK);
 
-    String[] actualPolicies = supportsPolicies.listPolicies();
-    Assertions.assertArrayEquals(policies, actualPolicies);
+    PolicyList<String> policyList = supportsPolicies.listPoliciesWithVisibility();
+    Assertions.assertArrayEquals(policies, policyList.policies());
+    Assertions.assertTrue(policyList.hasInaccessiblePolicies());
 
     // Return empty list
-    NameListResponse resp1 = new NameListResponse(new String[0]);
+    PolicyNameListResponse resp1 = new PolicyNameListResponse(new String[0], false);
     buildMockResource(Method.GET, path, null, resp1, SC_OK);
 
     String[] actualPolicies1 = supportsPolicies.listPolicies();
@@ -378,19 +380,22 @@ public class TestSupportPolicies extends TestBase {
             .withAudit(AuditDTO.builder().withCreator("test").build())
             .build();
     PolicyDTO[] policies = new PolicyDTO[] {policy1, policy2};
-    PolicyListResponse resp = new PolicyListResponse(policies);
+    MetadataObjectPolicyListResponse resp = new MetadataObjectPolicyListResponse(policies, true);
     buildMockResource(
         Method.GET, path, Collections.singletonMap("details", "true"), null, resp, SC_OK);
 
-    Policy[] actualPolicies = supportsPolicies.listPolicyInfos();
+    PolicyList<Policy> policyList = supportsPolicies.listPolicyInfosWithVisibility();
+    Policy[] actualPolicies = policyList.policies();
     Assertions.assertEquals(2, actualPolicies.length);
     Assertions.assertEquals("policy1", actualPolicies[0].name());
     Assertions.assertEquals("policy2", actualPolicies[1].name());
     Assertions.assertFalse(actualPolicies[0].inherited().orElseThrow());
     Assertions.assertTrue(actualPolicies[1].inherited().orElseThrow());
+    Assertions.assertTrue(policyList.hasInaccessiblePolicies());
 
     // Return empty list
-    PolicyListResponse resp1 = new PolicyListResponse(new PolicyDTO[0]);
+    MetadataObjectPolicyListResponse resp1 =
+        new MetadataObjectPolicyListResponse(new PolicyDTO[0], false);
     buildMockResource(
         Method.GET, path, Collections.singletonMap("details", "true"), null, resp1, SC_OK);
 
