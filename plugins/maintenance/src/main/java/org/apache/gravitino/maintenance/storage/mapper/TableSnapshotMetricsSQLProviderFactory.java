@@ -57,16 +57,11 @@ public class TableSnapshotMetricsSQLProviderFactory {
   }
 
   /**
-   * @param tableId table id
-   * @param policyId policy id
-   * @param snapshotId snapshot id
+   * @param metricsId metrics row id
    * @return SELECT statement
    */
-  public static String selectMetrics(
-      @Param("tableId") long tableId,
-      @Param("policyId") long policyId,
-      @Param("snapshotId") long snapshotId) {
-    return getProvider().selectMetrics(tableId, policyId, snapshotId);
+  public static String selectById(@Param("metricsId") long metricsId) {
+    return getProvider().selectById(metricsId);
   }
 
   static TableSnapshotMetricsBaseSQLProvider getProvider() {

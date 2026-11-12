@@ -54,6 +54,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.rel.Column;
@@ -77,6 +78,8 @@ import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -154,6 +157,59 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   public void resetSchema() throws InterruptedException {
     catalog.asSchemas().dropSchema(schemaName, true);
     createSchema();
+  }
+
+  /** Verifies dataset lookup for a managed Lance table in the Generic catalog. */
+  @Test
+  public void testSemanticModelLookupForManagedTable() {
+    NameIdentifier source = NameIdentifier.of(schemaName, tableName);
+    catalog
+        .asTableCatalog()
+        .createTable(
+            source,
+            new Column[] {Column.of("id", Types.LongType.get())},
+            null,
+            Map.of(
+                Table.PROPERTY_TABLE_FORMAT,
+                LANCE_TABLE_FORMAT,
+                Table.PROPERTY_LOCATION,
+                tempDirectory + "/source_lookup.lance"));
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(
+                new org.apache.gravitino.semantic.Dataset[] {
+                  org.apache.gravitino.semantic.Dataset.builder()
+                      .withName("managed.alias")
+                      .withSource(NameIdentifier.of(catalogName, schemaName, tableName))
+                      .build()
+                })
+            .build();
+    NameIdentifier model = NameIdentifier.of(schemaName, "source_lookup_model");
+    try {
+      catalog.asSemanticModelCatalog().createSemanticModel(model, null, definition, Map.of());
+      Assertions.assertArrayEquals(
+          new NameIdentifier[] {
+            NameIdentifier.of(metalakeName, catalogName, schemaName, model.name(), "managed.alias")
+          },
+          catalog
+              .asTableCatalog()
+              .loadTable(source)
+              .supportsSemanticModels()
+              .listSemanticModelDatasets());
+      catalog
+          .asSemanticModelCatalog()
+          .alterSemanticModel(model, SemanticModelChange.replaceDefinition(definition));
+      Assertions.assertEquals(
+          1,
+          catalog
+              .asTableCatalog()
+              .loadTable(source)
+              .supportsSemanticModels()
+              .listSemanticModelDatasets()
+              .length);
+    } finally {
+      catalog.asSemanticModelCatalog().dropSemanticModel(model);
+    }
   }
 
   @Test
@@ -756,6 +812,8 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
   protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
+    // This suite exercises explicit data deletion, including purge and create-overwrite.
+    properties.put("lance.allow-external-table-purge", "true");
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
     catalog = metalake.loadCatalog(catalogName);
@@ -1207,7 +1265,7 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
   @Test
   void testRegisterWithNonExistLocation() {
-    // Now try to register a table with non-existing location with CREATE mode - should succeed
+    // Registration must reject a missing dataset without creating catalog metadata or a directory.
     String newTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
     NameIdentifier newTableIdentifier = NameIdentifier.of(schemaName, newTableName);
     Map<String, String> newCreateProperties = createProperties();
@@ -1220,26 +1278,24 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
     newCreateProperties.put(Table.PROPERTY_EXTERNAL, "true");
     newCreateProperties.put(LANCE_TABLE_REGISTER, "true");
 
-    Table nonExistingTable =
-        catalog
-            .asTableCatalog()
-            .createTable(
-                newTableIdentifier,
-                new Column[0],
-                "Updated comment",
-                newCreateProperties,
-                Transforms.EMPTY_TRANSFORM,
-                Distributions.NONE,
-                new SortOrder[0]);
-
-    Assertions.assertNotNull(nonExistingTable);
-    Assertions.assertEquals(
-        newLocation, nonExistingTable.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(dirExists, new File(newLocation).exists());
-
-    // Now try to drop table, there should no problem here
-    boolean dropSuccess = catalog.asTableCatalog().dropTable(newTableIdentifier);
-    Assertions.assertTrue(dropSuccess);
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalog
+                    .asTableCatalog()
+                    .createTable(
+                        newTableIdentifier,
+                        new Column[0],
+                        "Updated comment",
+                        newCreateProperties,
+                        Transforms.EMPTY_TRANSFORM,
+                        Distributions.NONE,
+                        new SortOrder[0]));
+    Assertions.assertTrue(failure.getMessage().contains("Could not validate location"));
+    Assertions.assertFalse(new File(newLocation).exists());
+    Assertions.assertThrows(
+        NoSuchTableException.class, () -> catalog.asTableCatalog().loadTable(newTableIdentifier));
   }
 
   @Test

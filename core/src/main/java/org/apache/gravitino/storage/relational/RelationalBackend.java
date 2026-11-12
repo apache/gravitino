@@ -35,9 +35,38 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 
 /** Interface defining the operations for a Relation Backend. */
 public interface RelationalBackend extends Closeable, SupportsRelationOperations {
+
+  /**
+   * Reads metric identifiers in a schema without loading complete Semantic Models.
+   *
+   * @param namespace The full schema namespace.
+   * @return Metric identifiers from one consistent statement or read snapshot.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    throw new UnsupportedOperationException("Metric listing is not supported");
+  }
+
+  /**
+   * Reads complete metrics in a schema without loading unrelated definition fields.
+   *
+   * @param namespace The full schema namespace.
+   * @return Decoded metrics from one consistent statement or read snapshot, without authorization
+   *     filtering.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws IOException If the read fails.
+   * @throws UnsupportedOperationException If metric discovery is not supported.
+   */
+  default List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    throw new UnsupportedOperationException("Metric info listing is not supported");
+  }
 
   /**
    * Initializes the Relational Backend environment with the provided configuration.
@@ -79,10 +108,15 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   /**
    * Stores the entity, possibly overwriting an existing entity if specified.
    *
+   * <p>A schema overwrite must not replace a different active identity at the same name or move an
+   * active identity from another catalog. Such conflicts require explicit reconciliation, even when
+   * {@code overwritten} is true; an overwrite must not cascade-delete the old schema metadata.
+   *
    * @param <E> The type of the entity returned.
    * @param e The entity which need be stored.
    * @param overwritten If true, overwrites the existing value.
-   * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false.
+   * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false, or a
+   *     schema overwrite conflicts with an active identity.
    * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)

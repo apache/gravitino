@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
+import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_FILESET_PLACEHOLDER;
@@ -463,6 +464,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           if (StringUtils.isBlank(name)) {
             throw new IllegalArgumentException("Location name must not be blank");
           }
+          EntityFieldLimits.checkMaxLength(
+              name,
+              EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+              "storage location name",
+              Entity.EntityType.FILESET);
           if (StringUtils.isBlank(path)) {
             throw new IllegalArgumentException(
                 "Storage location must not be blank for location name: " + name);
@@ -520,6 +526,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     Map<String, Path> filesetPaths =
         calculateFilesetPaths(
             schemaIdent.name(), ident.name(), storageLocations, schemaPaths, properties);
+    // The names inherited from the catalog or schema locations are only known now, check them
+    // before any directory is created.
+    filesetPaths
+        .keySet()
+        .forEach(
+            name ->
+                EntityFieldLimits.checkMaxLength(
+                    name,
+                    EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH,
+                    "storage location name",
+                    Entity.EntityType.FILESET));
     properties = setDefaultLocationIfAbsent(properties, filesetPaths);
 
     ImmutableMap.Builder<String, Path> filesetPathsBuilder = ImmutableMap.builder();
@@ -542,10 +559,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           });
     } else {
       try {
-        // formalize the path to avoid path without scheme, uri, authority, etc.
+        boolean allowExistingLocationAsManaged =
+            (boolean)
+                propertiesMetadata
+                    .filesetPropertiesMetadata()
+                    .getOrDefault(properties, PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED);
+        Map<String, Map<String, String>> fileSystemConfigurations = Maps.newHashMap();
+        // Formalize and validate every location before creating any directories. Otherwise,
+        // creating a child location can make another location in the request non-empty.
         for (Map.Entry<String, Path> entry : filesetPaths.entrySet()) {
           Map<String, String> fsConf =
               mergeUpLevelConfigurations(ident, properties, entry.getValue());
+          fileSystemConfigurations.put(entry.getKey(), fsConf);
           FileSystem tmpFs = getFileSystemWithCache(entry.getValue(), fsConf);
           Path formalizePath =
               entry.getValue().makeQualified(tmpFs.getUri(), tmpFs.getWorkingDirectory());
@@ -553,14 +578,39 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           filesetPathsBuilder.put(entry.getKey(), formalizePath);
           FileSystem fs = getFileSystemWithCache(formalizePath, fsConf);
 
-          if (fs.exists(formalizePath) && fs.getFileStatus(formalizePath).isFile()) {
-            throw new IllegalArgumentException(
-                "Fileset location cannot be a file: "
-                    + formalizePath
-                    + ", location name: "
-                    + entry.getKey());
+          if (fs.exists(formalizePath)) {
+            if (fs.getFileStatus(formalizePath).isFile()) {
+              throw new IllegalArgumentException(
+                  "Fileset location cannot be a file: "
+                      + formalizePath
+                      + ", location name: "
+                      + entry.getKey());
+            }
+            // A managed fileset takes its data with it on drop, so silently adopting a location
+            // that already holds files would put data Gravitino never created at risk.
+            if (type == Fileset.Type.MANAGED
+                && !allowExistingLocationAsManaged
+                && fs.listStatusIterator(formalizePath).hasNext()) {
+              throw new IllegalArgumentException(
+                  "Location "
+                      + formalizePath
+                      + " for managed fileset "
+                      + ident
+                      + " already exists and is not empty, location name: "
+                      + entry.getKey()
+                      + ". Register it as an "
+                      + Fileset.Type.EXTERNAL
+                      + " fileset with this location set explicitly, or set "
+                      + PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED
+                      + "=true to manage it anyway");
+            }
           }
+        }
 
+        for (Map.Entry<String, Path> entry : filesetPathsBuilder.build().entrySet()) {
+          Path formalizePath = entry.getValue();
+          FileSystem fs =
+              getFileSystemWithCache(formalizePath, fileSystemConfigurations.get(entry.getKey()));
           if (!fs.exists(formalizePath)) {
             if (!fs.mkdirs(formalizePath)) {
               throw new RuntimeException(
@@ -1152,8 +1202,15 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                           + locationName);
                 }
               } catch (IOException e) {
-                throw ExceptionMessages.wrap(
-                    "Failed to check if fileset catalog location exists: " + v, e);
+                // REST responses can include the cause chain. Keep backend diagnostics in the log.
+                LOG.warn(
+                    "Failed to check {} for Fileset catalog {}.{}",
+                    k,
+                    catalogInfo.namespace(),
+                    catalogInfo.name(),
+                    e);
+                throw new ConnectionFailedException(
+                    "Failed to check Fileset catalog storage at %s (%s)", k, failureCategory(e));
               }
             }
 
@@ -1421,7 +1478,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             return getFileSystem(path, conf);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s, conf: %s", path, conf);
+                e, "Failed to get FileSystem for fileset: path: %s", path);
           }
         });
   }
@@ -1578,7 +1635,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       executeFileSystemTask(
           () -> {
             try (FileSystem fileSystem =
-                createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
+                createProbeFileSystem(path, probeConf, scheme, fileSystemProvider)) {
               Path qualifiedPath =
                   path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
               try {
@@ -1691,6 +1748,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return provider.getFileSystem(path, config);
   }
 
+  private FileSystem createProbeFileSystem(
+      Path path, Map<String, String> config, String scheme, FileSystemProvider provider)
+      throws IOException {
+    try {
+      return createFileSystem(path, config, scheme, provider);
+    } catch (Exception e) {
+      throw new ProbeInitializationException(e);
+    }
+  }
+
   private String displayLocationName(String locationName) {
     return LOCATION_NAME_UNKNOWN.equals(locationName) ? "location" : "location-" + locationName;
   }
@@ -1707,6 +1774,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   private String failureCategory(Throwable throwable) {
+    boolean initializationFailure = throwable instanceof ProbeInitializationException;
     Throwable current = throwable;
     while (current != null) {
       String simpleName = current.getClass().getSimpleName().toLowerCase(Locale.ROOT);
@@ -1728,7 +1796,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         return "access denied";
       }
       if (simpleName.contains("filenotfound") || simpleName.contains("notfound")) {
-        return "location not found";
+        return initializationFailure
+            ? "filesystem initialization failed; check credentials and configuration"
+            : "location not found";
       }
       if (current instanceof ConnectionFailedException) {
         return "credential generation failed";
@@ -1936,6 +2006,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         targetLocationName,
         fileset.name());
     return targetLocation;
+  }
+
+  private static final class ProbeInitializationException extends IOException {
+
+    private ProbeInitializationException(Throwable cause) {
+      super("Failed to initialize filesystem for connection test", cause);
+    }
   }
 
   private static final class InvalidProbeLocationException extends IllegalArgumentException {

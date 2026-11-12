@@ -36,7 +36,7 @@ public class TopicEntity implements Entity, Auditable, HasIdentifier {
   public static final Field ID =
       Field.required("id", Long.class, "The unique id of the topic entity.");
   public static final Field NAME =
-      Field.required("name", String.class, "The name of the topic entity.");
+      Field.required("name", "The name of the topic entity.", EntityFieldLimits.MAX_NAME_LENGTH);
   public static final Field COMMENT =
       Field.optional(
           "comment",

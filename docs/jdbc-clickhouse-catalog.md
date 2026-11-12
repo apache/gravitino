@@ -223,6 +223,15 @@ is not copied or materialized, and Gravitino does not manage projection `ALTER T
 Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
 `VarChar(n)` is rejected when creating or adding a column because ClickHouse cannot enforce its length limit.
 Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
+In the REST API and JSON payloads, `FixedChar(n)` is written as `char(n)`, for example `"type": "char(10)"`.
+By default, ClickHouse rejects `FixedString(n)` with `n` greater than 256 unless the server setting
+`allow_suspicious_fixed_string_types` is set to `1`.
+
+Literal column default values are checked against the column type before the DDL is sent, because
+ClickHouse does not validate them when creating or altering a table. Integer defaults must be in the
+range of the type, `Decimal(p,s)` defaults must fit the precision, `Date` defaults must be between
+`1970-01-01` and `2149-06-06`, `UUID` defaults must be valid UUID strings, and `Float`/`Double`
+defaults must be numbers. Default values of other types, such as `Timestamp`, are not checked.
 
 ### Table Properties
 
@@ -297,6 +306,7 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
   - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
   - `DATA_SKIPPING_NGRAMBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `ngram_size`, `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
   - `DATA_SKIPPING_TOKENBFV1` (`GRANULARITY` customizable via `Index.properties()`, default 1; requires `bloom_filter_size`, `hash_functions`, `random_seed` in `Index.properties()`)
+  - `DATA_SKIPPING_TEXT` (native ClickHouse text indexes are recognized when loading a table; `tokenizer` is exposed as `tokens` or `ngrams`, with `ngram_size` from 1 to 8 for `ngrams`; creating or altering text indexes through Gravitino is not supported yet)
   - `DATA_SKIPPING_VECTOR_SIMILARITY` (requires ClickHouse 25.8+; default `GRANULARITY 100000000`; requires `type=hnsw`, `distance_function`, and `dimensions` in `Index.properties()`)
 
   `DATA_SKIPPING_VECTOR_SIMILARITY` supports `distance_function` values `L2Distance` and `cosineDistance` on ClickHouse 25.8+. Optional properties are `quantization` (`f64`, `f32`, `f16`, `bf16`, `i8`, or `b1`; default `bf16`), `hnsw_max_connections_per_layer` (default 32), and `hnsw_candidate_list_size_for_construction` (default 128). A value of 0 for either HNSW numeric property requests the ClickHouse default. Custom `granularity` must be a positive integer. See the [ClickHouse vector similarity index documentation](https://clickhouse.com/docs/reference/engines/table-engines/mergetree-family/annindexes) for server-side vector-column restrictions.

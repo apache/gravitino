@@ -146,10 +146,14 @@ public interface TagDispatcher {
   /**
    * Add one policy association for a tag.
    *
+   * <p>A tag-value selector must satisfy the tag's value constraint. Validation and the association
+   * write occur in one storage transaction.
+   *
    * @param metalake The name of the metalake.
    * @param tagName The name of the tag.
    * @param policyName The name of the policy.
    * @param selector The non-null policy association selector.
+   * @throws IllegalArgumentException If the selector value violates the tag's value constraint.
    */
   default void addPolicyForTag(
       String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {

@@ -19,9 +19,11 @@
 
 import json
 import unittest
+from decimal import Decimal
 from unittest.mock import patch
 
 import httpx
+import simplejson
 from fastmcp import Client
 from fastmcp.exceptions import ToolError
 
@@ -35,8 +37,18 @@ from tests.unit.tools import MockOperation
 
 _NAMESPACE = {"catalog_name": "sales", "schema_name": "mart"}
 _MODEL_ARGS = {**_NAMESPACE, "semantic_model_name": "sales_model"}
+_SOURCE_ARGS = {
+    **_NAMESPACE,
+    "source_type": "table",
+    "source_name": "orders",
+}
 _MODELS_PATH = (
     "/api/metalakes/test_metalake/catalogs/sales/schemas/mart/semantic-models"
+)
+_METRICS_PATH = "/api/metalakes/test_metalake/catalogs/sales/schemas/mart/semantic-model-metrics"
+_METRIC_TOOLS = (
+    ("list_metrics", "identifiers", "false"),
+    ("list_metric_infos", "metrics", "true"),
 )
 
 
@@ -85,7 +97,15 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
 
     def _respond(self, request):
         self.requests.append(request)
-        return httpx.Response(self.status, json=self.response)
+        return httpx.Response(
+            self.status,
+            content=(
+                self.response
+                if isinstance(self.response, bytes)
+                else simplejson.dumps(self.response, use_decimal=True)
+            ),
+            headers={"Content-Type": "application/json"},
+        )
 
     def _create_client(self, *args, **kwargs):
         # Keep the production factory/client wiring and inject only transport.
@@ -101,7 +121,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             return client
 
         with patch(
-            "mcp_server.client.plain.plain_rest_client_operation.httpx.AsyncClient",
+            "mcp_server.client.plain.plain_rest_client_operation._GravitinoAsyncClient",
             side_effect=create_http_client,
         ):
             return PlainRESTClientOperation(*args, **kwargs)
@@ -109,7 +129,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
     async def _call(self, name, arguments):
         async with Client(self.mcp) as client:
             result = await client.call_tool(name, arguments)
-            return json.loads(result.content[0].text)
+            return json.loads(result.content[0].text, parse_float=Decimal)
 
     def _assert_request(self, method, path, body=None):
         request = self.requests[-1]
@@ -138,6 +158,358 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 result = await self._call("list_of_semantic_models", _NAMESPACE)
                 self.assertEqual(result, identifiers)
                 self._assert_request("GET", _MODELS_PATH)
+
+    async def test_list_metrics_preserves_full_identifiers_and_order(self):
+        namespace = ["test_metalake", "sales", "mart", "a.model"]
+        identifiers = [
+            {"namespace": namespace, "name": name}
+            for name in ("Revenue", "revenue", "收入 /é+%")
+        ] + [{"namespace": namespace[:-1] + ["b"], "name": "Revenue"}]
+        self.response = {"code": 0, "identifiers": identifiers}
+        self.assertEqual(
+            identifiers, await self._call("list_metrics", _NAMESPACE)
+        )
+        self.assertEqual(1, len(self.requests))
+        self._assert_request("GET", _METRICS_PATH + "?details=false")
+
+    async def test_source_lookup_preserves_identifiers_and_server_order(self):
+        namespace = ["test_metalake", "models", "semantic", "a"]
+        identifiers = [
+            {"namespace": namespace, "name": name}
+            for name in ("Orders.raw", "orders.raw", "\U00010000", "\ue000")
+        ] + [
+            {
+                "namespace": ["test_metalake", "other", "schema", "model"],
+                "name": "orders.raw",
+            }
+        ]
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                self.requests.clear()
+                self.response = {"code": 0, "identifiers": identifiers}
+                result = await self._call(
+                    "list_semantic_model_datasets",
+                    {**_SOURCE_ARGS, "source_type": source_type},
+                )
+                self.assertEqual(identifiers, result)
+                self.assertEqual(1, len(self.requests))
+                self._assert_request(
+                    "GET",
+                    f"/api/metalakes/test_metalake/objects/{source_type}/"
+                    "sales.mart.orders/semantic-model-datasets",
+                )
+
+    async def test_source_lookup_empty_results(self):
+        self.response = {"code": 0, "identifiers": []}
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                self.assertEqual(
+                    [],
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {**_SOURCE_ARGS, "source_type": source_type},
+                    ),
+                )
+
+    async def test_source_lookup_path_encoding_and_request_scope(self):
+        self.response = {"code": 0, "identifiers": []}
+        for source_type in ("table", "view"):
+            with self.subTest(source_type=source_type):
+                with patch(
+                    "mcp_server.core.context._get_request_authorization",
+                    return_value="Bearer request-test-token",
+                ):
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {
+                            "metalake": "ml/雪",
+                            "source_type": source_type,
+                            "catalog_name": "cat?",
+                            "schema_name": "sch #+%",
+                            "source_name": "orders/雪",
+                        },
+                    )
+                request = self.requests[-1]
+                self.assertEqual(
+                    f"/api/metalakes/ml%2F%E9%9B%AA/objects/{source_type}/"
+                    "cat%3F.sch%20%23%2B%25.orders%2F%E9%9B%AA/semantic-model-datasets",
+                    request.url.raw_path.decode(),
+                )
+                self.assertEqual(
+                    "Bearer request-test-token",
+                    request.headers["Authorization"],
+                )
+                await self._call("list_semantic_model_datasets", _SOURCE_ARGS)
+                self._assert_request(
+                    "GET",
+                    "/api/metalakes/test_metalake/objects/table/"
+                    "sales.mart.orders/semantic-model-datasets",
+                )
+
+    async def test_source_lookup_rejects_invalid_source_types(self):
+        for source_type in ("", "TABLE", "catalog", "table/view", None):
+            with self.subTest(source_type=source_type):
+                with self.assertRaisesRegex(ToolError, "source_type"):
+                    await self._call(
+                        "list_semantic_model_datasets",
+                        {**_SOURCE_ARGS, "source_type": source_type},
+                    )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_rejects_ambiguous_path_names(self):
+        for argument in (
+            "metalake",
+            "catalog_name",
+            "schema_name",
+            "source_name",
+        ):
+            invalid_names = (
+                (".", "..") if argument == "metalake" else ("", ".", "..")
+            )
+            for name in invalid_names:
+                with self.subTest(argument=argument, name=name):
+                    with self.assertRaisesRegex(ToolError, "REST path names"):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {**_SOURCE_ARGS, argument: name},
+                        )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_rejects_dots_in_source_components(self):
+        for source_type in ("table", "view"):
+            for argument in ("catalog_name", "schema_name", "source_name"):
+                with self.subTest(source_type=source_type, argument=argument):
+                    with self.assertRaisesRegex(
+                        ToolError, "Source lookup does not support dots"
+                    ):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {
+                                **_SOURCE_ARGS,
+                                "source_type": source_type,
+                                argument: "name.with.dot",
+                            },
+                        )
+        self.assertEqual([], self.requests)
+
+    async def test_source_lookup_propagates_rest_failures(self):
+        for source_type in ("table", "view"):
+            for status, code, error_type in (
+                (400, 1001, "IllegalArgumentException"),
+                (401, 1011, "UnauthorizedException"),
+                (403, 1008, "ForbiddenException"),
+                (404, 1003, "NoSuchMetadataObjectException"),
+                (404, 1003, "NotFoundException"),
+                (500, 1002, "RuntimeException"),
+            ):
+                with self.subTest(source_type=source_type, status=status):
+                    self.status = status
+                    self.response = {
+                        "code": code,
+                        "type": error_type,
+                        "message": "Source lookup rejected",
+                        "identifiers": [],
+                    }
+                    with self.assertRaisesRegex(ToolError, error_type):
+                        await self._call(
+                            "list_semantic_model_datasets",
+                            {**_SOURCE_ARGS, "source_type": source_type},
+                        )
+
+    async def test_source_lookup_rejects_invalid_responses(self):
+        for body in (
+            [],
+            {},
+            {"identifiers": []},
+            {"code": 0},
+            {"code": 0, "identifiers": None},
+            {"code": 0, "identifiers": {}},
+            {"code": 0, "identifiers": "[]"},
+            b"not JSON",
+        ):
+            with self.subTest(body=body):
+                self.response = body
+                with self.assertRaisesRegex(
+                    ToolError, "Invalid Gravitino response"
+                ):
+                    await self._call(
+                        "list_semantic_model_datasets", _SOURCE_ARGS
+                    )
+        self.status = 502
+        self.response = {"code": 0, "identifiers": []}
+        with self.assertRaisesRegex(ToolError, "502"):
+            await self._call("list_semantic_model_datasets", _SOURCE_ARGS)
+
+    async def test_metric_infos_preserve_complete_metrics_and_numbers(self):
+        metric = {
+            "name": "Revenue",
+            "expression": {
+                "dialects": [
+                    {"dialect": "ANSI_SQL", "expression": "SUM(orders.amount)"},
+                    {
+                        "dialect": "SPARK_SQL",
+                        "expression": "sum(orders.amount)",
+                    },
+                ]
+            },
+            "description": "Revenue - café 雪",
+            "datatype": "Decimal",
+            "aiContext": {
+                "instructions": "Use certified values",
+                "synonyms": ["Sales"],
+                "examples": ["Revenue by year"],
+                "nested": {
+                    "precise": Decimal("0.12345678901234567890123456789"),
+                    "large": 1234567890123456789012345678901234567890,
+                    "values": [True, None, "extra", Decimal("1.00")],
+                },
+            },
+            "customExtensions": [
+                {"vendorName": "vendor", "data": '{"opaque": "雪"}'}
+            ],
+        }
+        namespace = ["test_metalake", "sales", "mart", "a"]
+        infos = [
+            {"namespace": namespace, "metric": metric},
+            {
+                "namespace": namespace,
+                "metric": {
+                    **metric,
+                    "name": "revenue",
+                    "aiContext": "Certified",
+                },
+            },
+            {
+                "namespace": namespace[:-1] + ["b"],
+                "metric": {
+                    "name": "Revenue",
+                    "expression": metric["expression"],
+                },
+            },
+        ]
+        self.response = {"code": 0, "metrics": infos}
+        result = await self._call("list_metric_infos", _NAMESPACE)
+        self.assertEqual(infos, result)
+        self.assertIsInstance(
+            result[0]["metric"]["aiContext"]["nested"]["precise"], Decimal
+        )
+        self.assertEqual(1, len(self.requests))
+        self._assert_request("GET", _METRICS_PATH + "?details=true")
+
+        self.definition["metrics"] = [metric]
+        self.response = {"code": 0, "semanticModel": self.model}
+        model = await self._call("load_semantic_model", _MODEL_ARGS)
+        self.assertEqual(model, self.model)
+        self.assertEqual(result[0]["metric"], model["definition"]["metrics"][0])
+        self._assert_request("GET", f"{_MODELS_PATH}/sales_model")
+
+    async def test_metric_discovery_empty_results(self):
+        for tool, field, details in _METRIC_TOOLS:
+            with self.subTest(tool=tool):
+                self.requests.clear()
+                self.response = {"code": 0, field: []}
+                self.assertEqual([], await self._call(tool, _NAMESPACE))
+                self.assertEqual(1, len(self.requests))
+                self._assert_request(
+                    "GET", _METRICS_PATH + "?details=" + details
+                )
+
+    async def test_metric_discovery_path_encoding_and_request_scope(self):
+        self.response = {"code": 0, "identifiers": [], "metrics": []}
+        arguments = {
+            "metalake": "ml/雪",
+            "catalog_name": "cat?",
+            "schema_name": "sch #+%",
+        }
+        path = "/api/metalakes/ml%2F%E9%9B%AA/catalogs/cat%3F/schemas/sch%20%23%2B%25/semantic-model-metrics"
+        for tool, _, details in _METRIC_TOOLS:
+            with self.subTest(tool=tool):
+                with patch(
+                    "mcp_server.core.context._get_request_authorization",
+                    return_value="Bearer request-test-token",
+                ):
+                    await self._call(tool, arguments)
+                request = self.requests[-1]
+                self.assertEqual(
+                    path + "?details=" + details, request.url.raw_path.decode()
+                )
+                self.assertEqual(
+                    "Bearer request-test-token",
+                    request.headers["Authorization"],
+                )
+                await self._call(tool, _NAMESPACE)
+                self._assert_request(
+                    "GET", _METRICS_PATH + "?details=" + details
+                )
+
+    async def test_metric_discovery_rejects_ambiguous_path_names(self):
+        for tool, _, _ in _METRIC_TOOLS:
+            for argument in ("metalake", "catalog_name", "schema_name"):
+                invalid_names = (
+                    (".", "..") if argument == "metalake" else ("", ".", "..")
+                )
+                for name in invalid_names:
+                    with self.subTest(tool=tool, argument=argument, name=name):
+                        with self.assertRaisesRegex(
+                            ToolError, "REST path names"
+                        ):
+                            await self._call(
+                                tool, {**_NAMESPACE, argument: name}
+                            )
+        self.assertEqual([], self.requests)
+
+    async def test_metric_discovery_propagates_rest_failures(self):
+        for tool, field, _ in _METRIC_TOOLS:
+            for status, code, error_type in (
+                (401, 1011, "UnauthorizedException"),
+                (403, 1008, "ForbiddenException"),
+                (404, 1003, "NoSuchSchemaException"),
+                (500, 1002, "RuntimeException"),
+                (501, 1006, "UnsupportedOperationException"),
+            ):
+                with self.subTest(tool=tool, status=status):
+                    self.status = status
+                    self.response = {
+                        "code": code,
+                        "type": error_type,
+                        "message": "Discovery rejected",
+                        field: [],
+                    }
+                    with self.assertRaisesRegex(ToolError, error_type):
+                        await self._call(tool, _NAMESPACE)
+
+    async def test_metric_discovery_rejects_invalid_responses(self):
+        for tool, field, _ in _METRIC_TOOLS:
+            for body in (
+                [],
+                {},
+                {field: []},
+                {"code": 0},
+                {"code": 0, field: None},
+                {"code": 0, field: {}},
+                {"code": 0, field: "[]"},
+            ):
+                with self.subTest(tool=tool, body=body):
+                    self.response = body
+                    with self.assertRaisesRegex(
+                        ToolError, "Invalid Gravitino response"
+                    ):
+                        await self._call(tool, _NAMESPACE)
+            self.status = 502
+            self.response = {"code": 0, field: []}
+            with self.assertRaisesRegex(ToolError, "502"):
+                await self._call(tool, _NAMESPACE)
+            for body in (b"Bad Gateway", b'\xff\xfe{"code":0}'):
+                with self.subTest(tool=tool, body=body):
+                    self.response = body
+                    self.status = 502
+                    with self.assertRaisesRegex(ToolError, "502"):
+                        await self._call(tool, _NAMESPACE)
+                    self.status = 200
+                    with self.assertRaisesRegex(
+                        ToolError, "Invalid Gravitino response: invalid JSON"
+                    ):
+                        await self._call(tool, _NAMESPACE)
 
     async def test_load_semantic_model_preserves_native_definition(self):
         result = await self._call("load_semantic_model", _MODEL_ARGS)
@@ -354,7 +726,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             )
         self.assertEqual(self.requests, [])
 
-    async def test_semantic_model_tag_exposes_all_five_tools(self):
+    async def test_semantic_model_tag_exposes_all_tools(self):
         self.mcp = GravitinoMCPServer(
             Setting("test_metalake", tags={"semantic_model"})
         ).mcp
@@ -364,6 +736,9 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             set(tools),
             {
                 "list_of_semantic_models",
+                "list_metrics",
+                "list_metric_infos",
+                "list_semantic_model_datasets",
                 "load_semantic_model",
                 "create_semantic_model",
                 "alter_semantic_model",
@@ -372,6 +747,32 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
         )
         for tool in tools.values():
             self.assertIn("metalake", tool.inputSchema["properties"])
+        for name, _, _ in _METRIC_TOOLS:
+            tool = tools[name]
+            self.assertEqual(
+                {"catalog_name", "schema_name"},
+                set(tool.inputSchema["required"]),
+            )
+        for name in (
+            "list_of_semantic_models",
+            "list_metrics",
+            "list_metric_infos",
+            "list_semantic_model_datasets",
+            "load_semantic_model",
+        ):
+            tool = tools[name]
+            self.assertTrue(tool.annotations.readOnlyHint)
+            self.assertTrue(tool.annotations.idempotentHint)
+            self.assertFalse(tool.annotations.destructiveHint)
+        source_tool = tools["list_semantic_model_datasets"]
+        self.assertEqual(
+            {"source_type", "catalog_name", "schema_name", "source_name"},
+            set(source_tool.inputSchema["required"]),
+        )
+        self.assertEqual(
+            ["table", "view"],
+            source_tool.inputSchema["properties"]["source_type"]["enum"],
+        )
         self.assertEqual(
             set(tools["create_semantic_model"].inputSchema["required"]),
             {"catalog_name", "schema_name", "name", "definition"},
@@ -391,6 +792,9 @@ class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
         model = {"name": "mock_semantic_model"}
         cases = (
             ("list_of_semantic_models", _NAMESPACE, []),
+            ("list_metrics", _NAMESPACE, []),
+            ("list_metric_infos", _NAMESPACE, []),
+            ("list_semantic_model_datasets", _SOURCE_ARGS, []),
             ("load_semantic_model", model_args, model),
             (
                 "create_semantic_model",

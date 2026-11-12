@@ -298,6 +298,12 @@ public class CatalogOperations {
     }
 
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleCatalogException(OperationType.SET, catalogName, metalake, e);
+    }
+
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {

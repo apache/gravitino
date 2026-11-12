@@ -20,7 +20,7 @@ package org.apache.gravitino.maintenance.storage;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import org.apache.gravitino.maintenance.storage.service.OccupancyClaim;
+import org.apache.gravitino.maintenance.model.OccupancyClaim;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
@@ -48,11 +48,11 @@ public final class TableMaintenanceActionTestUtils {
                 .getConnection()
                 .prepareStatement(
                     "UPDATE table_maintenance_action SET created_at = ? "
-                        + "WHERE id = ? AND job_id IS NULL AND finished_at = 0")) {
+                        + "WHERE action_id = ? AND job_id IS NULL AND finished_at = 0")) {
       statement.setLong(1, expiredAt);
-      statement.setLong(2, claim.id());
+      statement.setLong(2, claim.actionId());
       Assertions.assertEquals(1, statement.executeUpdate());
     }
-    return new OccupancyClaim(claim.id(), expiredAt);
+    return new OccupancyClaim(claim.actionId(), expiredAt);
   }
 }

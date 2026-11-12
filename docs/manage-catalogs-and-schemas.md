@@ -306,6 +306,25 @@ schema = catalog.as_schemas().create_schema(
 
 ### Load a Schema
 
+If schema creation reports that the source object was created but Gravitino registration failed,
+resolve the entity-store error and verify the source object's identity. Use `loadSchema` (or the
+load-schema REST API below) to import the existing object. Repeating `createSchema` returns an
+already-exists error; creation is not automatically replayed. Secrets referenced by the created
+object are retained. Import reads the properties available from the source; if that source omits
+secret references, reconcile those references separately before deleting any retained secrets.
+
+Creating an external schema with an existing Gravitino registration is rejected before source
+creation. External schema creation now checks the entity store before calling the source; a failed
+registration lookup stops creation without issuing source DDL. Managed schema creation does not
+perform this additional lookup.
+A different source identifier does not prove that the old object was deleted: it may have been
+renamed. For an external rename that preserves the Gravitino identifier, load the new name first
+to move the registration before creating the old name again. If the old source identity was
+actually deleted, verify that fact before explicitly removing its stale registration. Conflicting
+registrations are never automatically cascade-deleted by an overwrite; children and governance
+metadata remain intact. A concurrent registration after the preflight can still cause a partial
+create failure, since source creation and the entity-store write are not one transaction.
+
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
 

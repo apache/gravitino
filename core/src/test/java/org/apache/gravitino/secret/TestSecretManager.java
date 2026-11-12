@@ -72,6 +72,41 @@ public class TestSecretManager {
   }
 
   @Test
+  void testToPlaintextOrMaskedWhenMissing() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> props = new HashMap<>();
+      List<SecretUrn> urns = sm.buildSecretBindingUrns("catalog", 42L, BINDINGS);
+      SecretPropertyUtils.putSecretUrns(props, urns);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> sm.toPlaintextProperties(props));
+      Map<String, String> masked = sm.toPlaintextOrMasked(props);
+      Assertions.assertEquals(
+          org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+          masked.get("jdbc-password"));
+    }
+  }
+
+  @Test
+  void testAssembleRejectsMaskedPlaceholderPlaintext() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>();
+      Map<String, SecretBinding> bindings =
+          Map.of(
+              "jdbc-password",
+              new SecretBinding(
+                  "memory", org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE));
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  sm.assembleSecretMaterials(
+                      Map.of(), entityProps, "catalog", 42L, bindings, Map.of()));
+      Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
+      Assertions.assertTrue(ex.getMessage().contains("jdbc-password"));
+    }
+  }
+
+  @Test
   void testRejectReferenceUrns() {
     try (SecretManager sm = memorySecretManager()) {
       Assertions.assertThrows(

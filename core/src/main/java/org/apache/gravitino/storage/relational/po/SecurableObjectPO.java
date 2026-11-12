@@ -20,8 +20,11 @@ package org.apache.gravitino.storage.relational.po;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 
 public class SecurableObjectPO {
+
+  @Nullable private Long id;
 
   private Long roleId;
   private Long metadataObjectId;
@@ -31,6 +34,19 @@ public class SecurableObjectPO {
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;
+
+  /**
+   * Returns the generated relation-row identity when it was selected by the query.
+   *
+   * <p>The ID is not an insert input. A role can contain multiple stored rows for the same target;
+   * aggregate result mappings must use this physical identity to preserve every row.
+   *
+   * @return the stored row ID, or null when it was not selected
+   */
+  @Nullable
+  public Long getId() {
+    return id;
+  }
 
   public Long getRoleId() {
     return roleId;
