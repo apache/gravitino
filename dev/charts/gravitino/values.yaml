@@ -122,7 +122,8 @@ postgresql:
     ##
     host: ""
     ## @param init.existingSecret Kubernetes Secret name for the init container POSTGRES_PASSWORD.
-    ## When postgresql.enabled is true and this is empty, defaults to {{ .Release.Name }}-postgresql.
+    ## When postgresql.enabled is true and this is empty, defaults to postgresql.auth.existingSecret
+    ## if set, otherwise {{ .Release.Name }}-postgresql.
     ## Set this when the password Secret does not follow the Bitnami release name convention.
     ##
     existingSecret: ""
