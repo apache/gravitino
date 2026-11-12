@@ -22,6 +22,7 @@ package org.apache.gravitino.authorization;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.LongConsumer;
 import org.apache.gravitino.MetadataObject;
 
 /** Dispatcher interface for managing owners of metadata objects. */
@@ -37,6 +38,29 @@ public interface OwnerDispatcher {
    */
   void setOwner(
       String metalake, MetadataObject metadataObject, String ownerName, Owner.Type ownerType);
+
+  /**
+   * Prepares an identity-conditional initial owner assignment before an object is created.
+   *
+   * <p>This call must check implementation support without writing an owner or holding database
+   * resources across creation. After a successful create, invoke the returned writer once with the
+   * Gravitino entity ID captured in the creation result. The writer must atomically fence that ID
+   * and preserve any existing owner. Deleted objects and existing owners are successful no-ops;
+   * principal and storage failures propagate. It must never re-resolve a replacement by name or
+   * fall back to {@link #setOwner}. Explicit owner transfers continue to use setOwner.
+   *
+   * @param metalake the metalake name
+   * @param metadataObject the object about to be created
+   * @param ownerName the creator's user name
+   * @return the writer that consumes the created Gravitino entity ID
+   * @throws UnsupportedOperationException before creation if the implementation or object type
+   *     cannot provide conditional initialization
+   */
+  default LongConsumer prepareInitialOwner(
+      String metalake, MetadataObject metadataObject, String ownerName) {
+    throw new UnsupportedOperationException(
+        "Identity-conditional owner initialization is unsupported");
+  }
 
   /**
    * Sets the same owner on multiple metadata objects in iteration order. Semantics match repeated

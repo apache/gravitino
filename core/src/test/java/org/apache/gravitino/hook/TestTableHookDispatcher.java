@@ -28,11 +28,12 @@ import static org.mockito.ArgumentMatchers.eq;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.List;
+import java.util.function.LongConsumer;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
@@ -41,7 +42,6 @@ import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
@@ -119,8 +119,10 @@ public class TestTableHookDispatcher {
     CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
+    LongConsumer writer = Mockito.mock(LongConsumer.class);
+    Mockito.when(ownerDispatcher.prepareInitialOwner(any(), any(), any())).thenReturn(writer);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    Table createdTable = Mockito.mock(Table.class);
+    Table createdTable = tableWithId();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdTable);
     TableDispatcher hook =
@@ -141,8 +143,8 @@ public class TestTableHookDispatcher {
             new Index[0]));
 
     ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
-    Mockito.verify(ownerDispatcher)
-        .setOwner(eq(METALAKE), captor.capture(), any(), eq(Owner.Type.USER));
+    Mockito.verify(ownerDispatcher).prepareInitialOwner(eq(METALAKE), captor.capture(), any());
+    Mockito.verify(writer).accept(42L);
     assertEquals("my_table", captor.getValue().name());
     assertEquals(CATALOG + ".schema_norm", captor.getValue().parent());
   }
@@ -151,7 +153,7 @@ public class TestTableHookDispatcher {
   public void testCreateTableSkipsOwnerWhenAuthorizationDisabled() {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    Table createdTable = Mockito.mock(Table.class);
+    Table createdTable = tableWithId();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdTable);
     TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> null);
@@ -174,12 +176,15 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableThrowsWhenSetOwnerFails() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.doThrow(new RuntimeException("Set owner failed"))
-        .when(ownerDispatcher)
-        .setOwner(any(), any(), any(), any());
+    Mockito.when(ownerDispatcher.prepareInitialOwner(any(), any(), any()))
+        .thenReturn(
+            id -> {
+              throw new RuntimeException("Set owner failed");
+            });
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Table createdTable = tableWithId();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Mockito.mock(Table.class));
+        .thenReturn(createdTable);
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
     Mockito.when(catalog.capability()).thenReturn(Capability.DEFAULT);
@@ -206,11 +211,9 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableSucceedsWhenTableDroppedBeforeOwnerSet() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.doThrow(new NoSuchMetadataObjectException("The table is gone"))
-        .when(ownerDispatcher)
-        .setOwner(any(), any(), any(), any());
+    Mockito.when(ownerDispatcher.prepareInitialOwner(any(), any(), any())).thenReturn(id -> {});
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
-    Table createdTable = Mockito.mock(Table.class);
+    Table createdTable = tableWithId();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(createdTable);
     TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> ownerDispatcher);
@@ -221,15 +224,45 @@ public class TestTableHookDispatcher {
   @Test
   public void testCreateTableThrowsWhenOwnerNotFound() throws Exception {
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.doThrow(new NotFoundException("The owner is missing"))
-        .when(ownerDispatcher)
-        .setOwner(any(), any(), any(), any());
+    Mockito.when(ownerDispatcher.prepareInitialOwner(any(), any(), any()))
+        .thenReturn(
+            id -> {
+              throw new NotFoundException("The owner is missing");
+            });
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
+    Table createdTable = tableWithId();
     Mockito.when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
-        .thenReturn(Mockito.mock(Table.class));
+        .thenReturn(createdTable);
     TableHookDispatcher hook = new TableHookDispatcher(dispatcher, () -> ownerDispatcher);
 
     assertThrows(NotFoundException.class, () -> createTable(hook));
+  }
+
+  @Test
+  void testUnsupportedInitializerFailsBeforeCreate() {
+    OwnerDispatcher owner = Mockito.mock(OwnerDispatcher.class, Mockito.CALLS_REAL_METHODS);
+    TableDispatcher tables = Mockito.mock(TableDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(tables, () -> owner);
+    assertThrows(UnsupportedOperationException.class, () -> createTable(hook));
+    Mockito.verifyNoInteractions(tables);
+  }
+
+  @Test
+  void testNullInitializerFailsBeforeCreate() {
+    OwnerDispatcher owner = Mockito.mock(OwnerDispatcher.class);
+    TableDispatcher tables = Mockito.mock(TableDispatcher.class);
+    assertThrows(
+        IllegalStateException.class,
+        () -> createTable(new TableHookDispatcher(tables, () -> owner)));
+    Mockito.verifyNoInteractions(tables);
+  }
+
+  private static Table tableWithId() {
+    Table table = Mockito.mock(Table.class);
+    Mockito.when(table.properties())
+        .thenReturn(
+            StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(42L), ImmutableMap.of()));
+    return table;
   }
 
   private static Table createTable(TableHookDispatcher hook) {

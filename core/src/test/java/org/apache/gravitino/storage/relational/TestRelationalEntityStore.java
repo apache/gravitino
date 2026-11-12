@@ -22,6 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -41,6 +42,7 @@ import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -62,6 +64,36 @@ public class TestRelationalEntityStore {
 
     FieldUtils.writeField(store, "backend", backend, true);
     FieldUtils.writeField(store, "cache", Mockito.spy(new NoOpsCache(config)), true);
+  }
+
+  @Test
+  void testInitialOwnerCacheInvalidationOnlyAfterActualWrite() throws Exception {
+    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    NameIdentifier user = NameIdentifier.of("metalake", "user");
+    RelationUpdate update =
+        RelationUpdate.of(
+                SupportsRelationOperations.Type.OWNER_REL,
+                table,
+                Entity.EntityType.TABLE,
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(user, Entity.EntityType.USER, null)
+                },
+                new RelationEdgeTarget[0])
+            .withExpectedSourceId(42L);
+    EntityCache cache = (EntityCache) FieldUtils.readField(store, "cache", true);
+    Mockito.when(backend.updateEntityRelations(update)).thenReturn(Collections.emptyList());
+    Assertions.assertTrue(store.updateEntityRelations(update).isEmpty());
+    Mockito.verify(cache, Mockito.never()).invalidate(Mockito.any(), Mockito.any());
+    UserEntity owner = Mockito.mock(UserEntity.class);
+    Mockito.when(backend.updateEntityRelations(update))
+        .thenAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(Mockito.any(), Mockito.any());
+              return List.of(owner);
+            });
+    Assertions.assertEquals(List.of(owner), store.updateEntityRelations(update));
+    Mockito.verify(cache).invalidate(table, Entity.EntityType.TABLE);
+    Mockito.verify(cache).invalidate(user, Entity.EntityType.USER);
   }
 
   @Test
@@ -248,7 +280,7 @@ public class TestRelationalEntityStore {
         IllegalArgumentException.class,
         () ->
             store.updateEntityRelations(
-                SupportsRelationOperations.Type.OWNER_REL,
+                SupportsRelationOperations.Type.ROLE_USER_REL,
                 src,
                 Entity.EntityType.TABLE,
                 new NameIdentifier[0],

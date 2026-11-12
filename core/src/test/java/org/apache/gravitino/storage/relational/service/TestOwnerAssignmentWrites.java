@@ -42,13 +42,19 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -66,6 +72,171 @@ import org.junit.jupiter.api.function.Executable;
  */
 class TestOwnerAssignmentWrites extends TestJDBCBackend {
   private static final String METALAKE = "owner_write_metalake";
+
+  @TestTemplate
+  void testInitialOwnerSkipsSameNameReplacementBeforeItsOwnerIsSet() throws Exception {
+    TableEntity original = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    assertTrue(backend.delete(original.nameIdentifier(), Entity.EntityType.TABLE, false));
+    TableEntity replacement = createAndInsertTableEntity(original.namespace(), original.name());
+    assertTrue(initialOwner(original, creator).isEmpty());
+    assertFalse(
+        OwnerMetaService.getInstance()
+            .getOwner(replacement.nameIdentifier(), replacement.type())
+            .isPresent());
+    OwnerMetaService.getInstance()
+        .setOwner(
+            replacement.nameIdentifier(), replacement.type(), creator, Entity.EntityType.USER);
+    assertTrue(initialOwner(original, creator).isEmpty());
+    assertEquals(1, tableOwnerRows(replacement.id()));
+    assertEquals(0, tableOwnerRows(original.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerWritesOnceAndPreservesExplicitTransfer() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    NameIdentifier transferee = insertPrincipal(false, "transferee");
+    assertEquals(1, initialOwner(table, creator).size());
+    assertTrue(initialOwner(table, creator).isEmpty());
+    OwnerMetaService.getInstance()
+        .setOwner(table.nameIdentifier(), table.type(), transferee, Entity.EntityType.USER);
+    assertTrue(initialOwner(table, creator).isEmpty());
+    assertEquals(
+        "transferee",
+        ((UserEntity)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
+            .name());
+    assertEquals(1, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerWaitsForCommittedOwnerAndDoesNotUseEarlierSnapshot() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    NameIdentifier winner = insertPrincipal(false, "winner");
+    Throwable failure =
+        whileTransactionHeld(
+            () ->
+                OwnerMetaService.getInstance()
+                    .setOwner(table.nameIdentifier(), table.type(), winner, Entity.EntityType.USER),
+            () -> {
+              // Populate the session-local owner read before the initializer waits on the table.
+              SessionUtils.getWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper -> mapper.selectOwnerByMetadataObjectIdAndType(table.id(), "TABLE"));
+              assertTrue(initialOwner(table, creator).isEmpty());
+            });
+    assertNull(failure);
+    assertEquals(
+        "winner",
+        ((UserEntity)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
+            .name());
+    assertEquals(1, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerWaitsForRolledBackOwnerThenAssigns() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    NameIdentifier loser = insertPrincipal(false, "loser");
+    Throwable failure =
+        whileTransactionHeld(
+            () ->
+                OwnerMetaService.getInstance()
+                    .setOwner(table.nameIdentifier(), table.type(), loser, Entity.EntityType.USER),
+            () -> assertEquals(1, initialOwner(table, creator).size()),
+            () -> {},
+            false);
+    assertNull(failure);
+    assertEquals(
+        "creator",
+        ((UserEntity)
+                OwnerMetaService.getInstance().getOwner(table.nameIdentifier(), table.type()).get())
+            .name());
+    assertEquals(1, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerWaitsForDropAndSkipsDeletedIdentity() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    Throwable failure =
+        whileTransactionHeld(
+            () -> assertTrue(backend.delete(table.nameIdentifier(), table.type(), false)),
+            () -> assertTrue(initialOwner(table, creator).isEmpty()));
+    assertNull(failure);
+    assertEquals(0, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerDoesNotHideMissingPrincipal() throws Exception {
+    TableEntity table = initialOwnerTable();
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> initialOwner(table, AuthorizationUtils.ofUser(METALAKE, "missing")));
+    assertEquals(0, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerWaitsForPrincipalDeleteAndFails() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    Throwable failure =
+        whileTransactionHeld(
+            () -> deletePrincipal(false, creator), () -> initialOwner(table, creator));
+    assertInstanceOf(NoSuchEntityException.class, failure);
+    assertEquals(0, tableOwnerRows(table.id()));
+  }
+
+  @TestTemplate
+  void testInitialOwnerRejectsRequestsWithoutIdentityOrWithAudit() throws Exception {
+    TableEntity table = initialOwnerTable();
+    NameIdentifier creator = insertPrincipal(false, "creator");
+    RelationUpdate update =
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.OWNER_REL,
+            table.nameIdentifier(),
+            table.type(),
+            new RelationEdgeTarget[] {RelationEdgeTarget.of(creator, Entity.EntityType.USER, null)},
+            new RelationEdgeTarget[0]);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> backend.updateEntityRelations(update));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            backend.updateEntityRelations(
+                update.withExpectedSourceId(table.id()).withAuditInfo(table.auditInfo())));
+    assertEquals(0, tableOwnerRows(table.id()));
+  }
+
+  private TableEntity initialOwnerTable() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    createAndInsertCatalog(METALAKE, "catalog");
+    createAndInsertSchema(METALAKE, "catalog", "schema");
+    return createAndInsertTableEntity(Namespace.of(METALAKE, "catalog", "schema"), "table");
+  }
+
+  private List<UserEntity> initialOwner(TableEntity table, NameIdentifier user) throws IOException {
+    return backend.updateEntityRelations(
+        RelationUpdate.of(
+                SupportsRelationOperations.Type.OWNER_REL,
+                table.nameIdentifier(),
+                Entity.EntityType.TABLE,
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(user, Entity.EntityType.USER, null)
+                },
+                new RelationEdgeTarget[0])
+            .withExpectedSourceId(table.id()));
+  }
+
+  private long tableOwnerRows(long id) throws Exception {
+    return queryLong(
+        "SELECT COUNT(*) FROM owner_meta WHERE metadata_object_id = "
+            + id
+            + " AND metadata_object_type = 'TABLE' AND deleted_at = 0");
+  }
 
   @TestTemplate
   void testAssignmentWaitsForUncommittedPrincipalDeleteAndFails() throws Exception {

@@ -42,6 +42,7 @@ public final class RelationUpdate {
   private final RelationEdgeTarget[] targetsToAdd;
   private final RelationEdgeTarget[] targetsToRemove;
   @Nullable private final Audit auditInfo;
+  @Nullable private final Long expectedSourceId;
 
   private RelationUpdate(
       SupportsRelationOperations.Type relationType,
@@ -49,13 +50,15 @@ public final class RelationUpdate {
       Entity.EntityType sourceEntityType,
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove,
-      @Nullable Audit auditInfo) {
+      @Nullable Audit auditInfo,
+      @Nullable Long expectedSourceId) {
     this.relationType = relationType;
     this.sourceIdentifier = sourceIdentifier;
     this.sourceEntityType = sourceEntityType;
     this.targetsToAdd = copyTargets(targetsToAdd, "targetsToAdd");
     this.targetsToRemove = copyTargets(targetsToRemove, "targetsToRemove");
     this.auditInfo = auditInfo;
+    this.expectedSourceId = expectedSourceId;
   }
 
   /**
@@ -78,7 +81,13 @@ public final class RelationUpdate {
     Preconditions.checkArgument(sourceIdentifier != null, "sourceIdentifier must not be null");
     Preconditions.checkArgument(sourceEntityType != null, "sourceEntityType must not be null");
     return new RelationUpdate(
-        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, null);
+        relationType,
+        sourceIdentifier,
+        sourceEntityType,
+        targetsToAdd,
+        targetsToRemove,
+        null,
+        null);
   }
 
   /**
@@ -91,7 +100,48 @@ public final class RelationUpdate {
   public RelationUpdate withAuditInfo(Audit auditInfo) {
     Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
     return new RelationUpdate(
-        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, auditInfo);
+        relationType,
+        sourceIdentifier,
+        sourceEntityType,
+        targetsToAdd,
+        targetsToRemove,
+        auditInfo,
+        expectedSourceId);
+  }
+
+  /**
+   * Conditions initial owner assignment on the identity returned by creation.
+   *
+   * <p>Currently supported only for {@code OWNER_REL} updates whose source is a table, with one
+   * USER target and no removals, relation values or explicit audit metadata. The relational store
+   * locks the active source row by this ID and inserts only if it has no live owner relation.
+   * Missing/deleted sources and existing owners return an empty result; a successful insert returns
+   * the assigned user. Principal and storage failures propagate. Other relation updates must not
+   * silently ignore the condition.
+   *
+   * @param expectedSourceId the original entity ID, never re-resolved by source name
+   * @return a copy carrying the expected source ID
+   * @throws IllegalArgumentException if this is not an OWNER_REL update
+   */
+  public RelationUpdate withExpectedSourceId(long expectedSourceId) {
+    Preconditions.checkArgument(
+        relationType == SupportsRelationOperations.Type.OWNER_REL,
+        "Expected source identity is currently supported only for OWNER_REL");
+    return new RelationUpdate(
+        relationType,
+        sourceIdentifier,
+        sourceEntityType,
+        targetsToAdd,
+        targetsToRemove,
+        auditInfo,
+        expectedSourceId);
+  }
+
+  /**
+   * @return the optional source identity condition for initial owner assignment
+   */
+  public Optional<Long> expectedSourceId() {
+    return Optional.ofNullable(expectedSourceId);
   }
 
   /**

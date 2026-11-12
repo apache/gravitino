@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.LongConsumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.Getter;
@@ -31,12 +32,15 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.RelationalEntityStore;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -129,6 +133,63 @@ public class OwnerManager implements OwnerDispatcher {
           metadataObject.fullName(),
           ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public LongConsumer prepareInitialOwner(
+      String metalake, MetadataObject metadataObject, String ownerName) {
+    if (!(store instanceof RelationalEntityStore)
+        || metadataObject.type() != MetadataObject.Type.TABLE) {
+      throw new UnsupportedOperationException(
+          "Initial table ownership requires the built-in relational entity store");
+    }
+    return expectedId -> initializeOwner(metalake, metadataObject, expectedId, ownerName);
+  }
+
+  /**
+   * Initializes a table owner only while the exact created entity is live and unowned.
+   *
+   * <p>Explicit owner transfers continue to use {@link #setOwner}. Plugin callbacks retain their
+   * existing post-commit, name-based semantics; they are not part of the database transaction.
+   *
+   * @param metalake the metalake name
+   * @param metadataObject the created table metadata object
+   * @param expectedId the Gravitino ID returned by creation
+   * @param ownerName the creator's user name
+   * @return true if assigned; false if the table was deleted or already owned
+   */
+  private boolean initializeOwner(
+      String metalake, MetadataObject metadataObject, long expectedId, String ownerName) {
+    RelationUpdate update =
+        RelationUpdate.of(
+                SupportsRelationOperations.Type.OWNER_REL,
+                MetadataObjectUtil.toEntityIdent(metalake, metadataObject),
+                MetadataObjectUtil.toEntityType(metadataObject),
+                new RelationEdgeTarget[] {
+                  RelationEdgeTarget.of(
+                      AuthorizationUtils.ofUser(metalake, ownerName), Entity.EntityType.USER, null)
+                },
+                new RelationEdgeTarget[0])
+            .withExpectedSourceId(expectedId);
+    try {
+      List<UserEntity> assigned = store.relationOperations().updateEntityRelations(update);
+      if (assigned.isEmpty()) {
+        return false;
+      }
+      OwnerImpl newOwner = new OwnerImpl();
+      newOwner.name = assigned.get(0).name();
+      newOwner.type = Owner.Type.USER;
+      AuthorizationUtils.callAuthorizationPluginForMetadataObject(
+          metalake, metadataObject, plugin -> plugin.onOwnerSet(metadataObject, null, newOwner));
+      notifyOwnerChange(null, metalake, metadataObject);
+      return true;
+    } catch (NoSuchEntityException missing) {
+      throw new NotFoundException(missing, "Initial owner user %s is not found", ownerName);
+    } catch (IOException failure) {
+      throw new RuntimeException(
+          "Failed to initialize owner for " + metadataObject.fullName(), failure);
     }
   }
 

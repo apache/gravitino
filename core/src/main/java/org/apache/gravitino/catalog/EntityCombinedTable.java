@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
@@ -172,6 +173,21 @@ public final class EntityCombinedTable implements Table {
     return tableEntity == null
         ? table.auditInfo()
         : mergedAudit.merge(tableEntity.auditInfo(), true /* overwrite */);
+  }
+
+  /**
+   * Returns the Gravitino entity ID captured with this snapshot, without reloading by name.
+   *
+   * @return the stored entity ID, or the managed table's embedded Gravitino identifier
+   * @throws IllegalStateException if this snapshot has no Gravitino identity
+   */
+  public long id() {
+    if (tableEntity != null) {
+      return tableEntity.id();
+    }
+    StringIdentifier identifier = stringIdentifier();
+    Preconditions.checkState(identifier != null, "The created table has no Gravitino identity");
+    return identifier.id();
   }
 
   StringIdentifier stringIdentifier() {

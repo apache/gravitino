@@ -18,17 +18,19 @@
  */
 package org.apache.gravitino.hook;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongConsumer;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
-import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
@@ -41,8 +43,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableHookDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -50,17 +50,18 @@ import org.slf4j.LoggerFactory;
  * or after the underlying operations.
  */
 public class TableHookDispatcher implements TableDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(TableHookDispatcher.class);
-
   private final TableDispatcher dispatcher;
   private final Supplier<OwnerDispatcher> ownerDispatcher;
 
   /**
    * Creates a table hook dispatcher.
    *
-   * @param dispatcher the underlying table dispatcher
+   * @param dispatcher the underlying table dispatcher. With authorization enabled, each create
+   *     result must retain the original Gravitino ID in an {@link EntityCombinedTable} snapshot or
+   *     an embedded {@link StringIdentifier} property. A missing ID fails after creation; the ID
+   *     must never be reloaded by name.
    * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
-   *     disabled
+   *     disabled; authorized creation requires identity-conditional owner initialization
    */
   public TableHookDispatcher(
       TableDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
@@ -89,24 +90,30 @@ public class TableHookDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
+    LongConsumer initialOwnerWriter =
+        ownerManager == null
+            ? null
+            : ownerManager.prepareInitialOwner(
+                ident.namespace().level(0),
+                NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
+                PrincipalUtils.getCurrentUserName());
+    Preconditions.checkState(
+        ownerManager == null || initialOwnerWriter != null,
+        "Owner initialization preparation must return a writer");
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
-
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = ownerDispatcher.get();
-    if (ownerManager != null) {
-      try {
-        ownerManager.setOwner(
-            ident.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      } catch (NoSuchMetadataObjectException e) {
-        // The create has already committed and a concurrent drop removed the table, so the create
-        // still succeeded. There is no table left to own.
-        LOG.warn("Table {} was dropped before its owner could be set", ident, e);
+    if (initialOwnerWriter != null) {
+      long id;
+      if (table instanceof EntityCombinedTable) {
+        id = ((EntityCombinedTable) table).id();
+      } else {
+        StringIdentifier identifier = StringIdentifier.fromProperties(table.properties());
+        Preconditions.checkState(identifier != null, "The created table has no Gravitino identity");
+        id = identifier.id();
       }
+      initialOwnerWriter.accept(id);
     }
     return table;
   }
