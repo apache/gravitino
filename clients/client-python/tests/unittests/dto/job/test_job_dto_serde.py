@@ -67,6 +67,32 @@ class TestJobDTOSerDe(unittest.TestCase):
         self.assertEqual(queued_at, deser_job_dto.queued_at())
         self.assertIsNone(deser_job_dto.started_at())
         self.assertIsNone(deser_job_dto.finished_at())
+        self.assertIsNone(deser_job_dto.stdout())
+        self.assertIsNone(deser_job_dto.stderr())
+
+    def test_ser_de_with_output(self):
+        stdout = ["line1", "line2"]
+        stderr = ["err1"]
+        job_dto = JobDTO(
+            _job_id="job-111",
+            _job_template_name="test_template",
+            _status=JobHandle.Status.SUCCEEDED,
+            _audit=AuditDTO(_creator="test", _create_time=datetime.now(timezone.utc)),
+            _queued_at=datetime.now(timezone.utc),
+            _started_at=datetime.now(timezone.utc),
+            _finished_at=datetime.now(timezone.utc),
+            _stdout=stdout,
+            _stderr=stderr,
+        )
+
+        json_str = job_dto.to_json()
+        self.assertIn("stdout", json_str)
+        self.assertIn("stderr", json_str)
+
+        deser_job_dto = JobDTO.from_json(json_str)
+        self.assertEqual(job_dto, deser_job_dto)
+        self.assertEqual(stdout, deser_job_dto.stdout())
+        self.assertEqual(stderr, deser_job_dto.stderr())
 
     def test_deserialize_from_string(self):
         json_str = (

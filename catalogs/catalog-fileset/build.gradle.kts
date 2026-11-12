@@ -79,6 +79,8 @@ dependencies {
   testImplementation(libs.testcontainers)
   testImplementation(libs.testcontainers.mysql)
 
+  // The RustFS fixture uses the S3 SDK v2; Hadoop's AWS bundle supplies the S3 SDK v1.
+  testRuntimeOnly(libs.aws.s3)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 

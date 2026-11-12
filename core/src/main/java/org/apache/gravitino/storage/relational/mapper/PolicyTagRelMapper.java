@@ -92,6 +92,24 @@ public interface PolicyTagRelMapper {
   int softDeleteByMetalakeId(@Param("metalakeId") Long metalakeId);
 
   /**
+   * Soft-deletes every active tag relation for a policy.
+   *
+   * @param policyId The policy ID.
+   * @return The number of affected rows.
+   */
+  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByPolicyId")
+  int softDeleteByPolicyId(@Param("policyId") Long policyId);
+
+  /**
+   * Soft-deletes every active policy relation for a tag.
+   *
+   * @param tagId The tag ID.
+   * @return The number of affected rows.
+   */
+  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByTagId")
+  int softDeleteByTagId(@Param("tagId") Long tagId);
+
+  /**
    * Physically deletes expired relation rows.
    *
    * @param legacyTimeline The exclusive deletion timestamp upper bound.

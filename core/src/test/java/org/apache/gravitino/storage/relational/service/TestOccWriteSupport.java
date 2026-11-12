@@ -21,12 +21,16 @@ package org.apache.gravitino.storage.relational.service;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
@@ -50,6 +54,48 @@ public class TestOccWriteSupport {
     Long parentId() {
       return parentId;
     }
+  }
+
+  @Test
+  void testOverwritePrefersNaturalKey() {
+    DummyPO target = new DummyPO("target", 1L);
+    assertSame(
+        target,
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> target,
+            () -> {
+              throw new AssertionError("ID lookup must be skipped");
+            },
+            po -> true));
+  }
+
+  @Test
+  void testOverwriteFallsBackToIdInSameParent() {
+    DummyPO target = new DummyPO("renamed", 1L);
+    assertSame(
+        target,
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> null, () -> target, po -> po.parentId() == 1L));
+  }
+
+  @Test
+  void testOverwriteRejectsIdInDifferentParent() {
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            OccWriteSupport.findAndLockForOverwrite(
+                () -> null, () -> new DummyPO("foreign", 2L), po -> po.parentId() == 1L));
+  }
+
+  @Test
+  void testOverwriteReturnsNullWhenBothLookupsMiss() {
+    assertNull(
+        OccWriteSupport.findAndLockForOverwrite(
+            () -> null,
+            () -> null,
+            po -> {
+              throw new AssertionError("No row to validate");
+            }));
   }
 
   @Test
@@ -120,6 +166,23 @@ public class TestOccWriteSupport {
   }
 
   @Test
+  void testUpdateWithVersionSuccess() {
+    assertDoesNotThrow(
+        () ->
+            OccWriteSupport.updateWithVersion(
+                () -> 1, () -> new RuntimeException("Should not be thrown")));
+  }
+
+  @Test
+  void testUpdateWithVersionThrowsOnMiss() {
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            OccWriteSupport.updateWithVersion(
+                () -> 0, () -> new OptimisticLockException("test conflict")));
+  }
+
+  @Test
   void testDeleteChildrenWithVersionsEmptyOrNull() {
     NameIdentifier parentIdent = NameIdentifier.of("parent");
     assertDoesNotThrow(
@@ -170,6 +233,56 @@ public class TestOccWriteSupport {
                 Entity.EntityType.METALAKE,
                 children,
                 list -> 1));
+  }
+
+  @Test
+  void testDeleteChildrenWithVersionsSplitsIntoChunks() {
+    NameIdentifier parentIdent = NameIdentifier.of("parent");
+    int batchSize = OccWriteSupport.CHILD_DELETE_BATCH_SIZE;
+    List<DummyPO> children = new ArrayList<>();
+    for (int i = 0; i < batchSize * 2 + 1; i++) {
+      children.add(new DummyPO("c" + i, 1L));
+    }
+    List<Integer> chunkSizes = new ArrayList<>();
+
+    OccWriteSupport.deleteChildrenWithVersions(
+        parentIdent,
+        Entity.EntityType.SCHEMA,
+        Entity.EntityType.CATALOG,
+        children,
+        chunk -> {
+          chunkSizes.add(chunk.size());
+          return chunk.size();
+        });
+
+    assertEquals(List.of(batchSize, batchSize, 1), chunkSizes);
+  }
+
+  @Test
+  void testDeleteChildrenWithVersionsStopsAtFirstShortChunk() {
+    NameIdentifier parentIdent = NameIdentifier.of("parent");
+    int batchSize = OccWriteSupport.CHILD_DELETE_BATCH_SIZE;
+    List<DummyPO> children = new ArrayList<>();
+    for (int i = 0; i < batchSize * 2 + 1; i++) {
+      children.add(new DummyPO("c" + i, 1L));
+    }
+    List<Integer> chunkSizes = new ArrayList<>();
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            OccWriteSupport.deleteChildrenWithVersions(
+                parentIdent,
+                Entity.EntityType.SCHEMA,
+                Entity.EntityType.CATALOG,
+                children,
+                chunk -> {
+                  chunkSizes.add(chunk.size());
+                  // The second chunk misses one child, as if it was changed concurrently.
+                  return chunkSizes.size() == 2 ? chunk.size() - 1 : chunk.size();
+                }));
+
+    assertEquals(List.of(batchSize, batchSize), chunkSizes);
   }
 
   @Test

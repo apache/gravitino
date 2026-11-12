@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobPO;
@@ -63,39 +62,12 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteJobMetaByMetalakeAndTemplate(
-      @Param("metalakeName") String metalakeName,
-      @Param("jobTemplateName") String jobTemplateName) {
-    return "UPDATE "
-        + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE metalake_id IN ("
-        + " SELECT metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " WHERE metalake_name = #{metalakeName} AND deleted_at = 0)"
-        + " AND job_template_id IN ("
-        + " SELECT job_template_id FROM "
-        + JobTemplateMetaMapper.TABLE_NAME
-        + " WHERE job_template_name = #{jobTemplateName} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
-  @Override
   public String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
-    return "UPDATE "
-        + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = "
-        + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
   }
 
   @Override
@@ -115,5 +87,24 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " WHERE job_run_id IN (SELECT job_run_id FROM "
         + JobMetaMapper.TABLE_NAME
         + " WHERE deleted_at < #{legacyTimeline} AND deleted_at > 0 LIMIT #{limit})";
+  }
+
+  @Override
+  public String softDeleteJobByRunIdWithVersion(
+      @Param("jobRunId") Long jobRunId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE job_run_id = #{jobRunId} AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
+  @Override
+  public String softDeleteJobsByTemplateId(@Param("jobTemplateId") Long jobTemplateId) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE job_template_id = #{jobTemplateId} AND deleted_at = 0";
   }
 }

@@ -60,4 +60,10 @@ public class EntityChangeLogPostgreSQLProvider extends EntityChangeLogBaseSQLPro
         + ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE
         + ")";
   }
+
+  /** {@inheritDoc} */
+  @Override
+  protected String currentTimeMillisSql() {
+    return CURRENT_TIME_MILLIS_SQL;
+  }
 }

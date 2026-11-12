@@ -20,6 +20,9 @@
 package org.apache.gravitino.policy;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.annotation.Evolving;
@@ -119,15 +122,6 @@ public interface PolicyDispatcher {
   boolean deletePolicy(String metalake, String policyName);
 
   /**
-   * List all metadata objects associated with the specified policy under a metalake.
-   *
-   * @param metalake the name of the metalake
-   * @param policyName the name of the policy
-   * @return The array of metadata objects associated with the specified policy.
-   */
-  MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName);
-
-  /**
    * List tag names directly associated with the specified policy.
    *
    * @param metalake The name of the metalake.
@@ -174,28 +168,17 @@ public interface PolicyDispatcher {
   PolicyEntity[] listPolicyInfosForMetadataObject(String metalake, MetadataObject metadataObject);
 
   /**
-   * Associate policies to a metadata object under a metalake.
+   * Lists effective policies for several metadata objects in the same metalake.
    *
-   * @param metalake the name of the metalake
-   * @param metadataObject the metadata object to associate policies with
-   * @param policiesToAdd the policies to be added to the metadata object
-   * @param policiesToRemove the policies to remove from the metadata object
-   * @return An array of updated policy names.
+   * @param metalake the metalake name
+   * @param metadataObjects the objects to resolve
+   * @return policies keyed by metadata object, including empty results
    */
-  String[] associatePoliciesForMetadataObject(
-      String metalake,
-      MetadataObject metadataObject,
-      String[] policiesToAdd,
-      String[] policiesToRemove);
-
-  /**
-   * Get a specific policy associated with the specified metadata object.
-   *
-   * @param metalake the name of the metalake
-   * @param metadataObject the metadata object for which to retrieve the policy
-   * @param policyName the name of the policy to retrieve
-   * @return The policy associated with the metadata object.
-   */
-  PolicyEntity getPolicyForMetadataObject(
-      String metalake, MetadataObject metadataObject, String policyName);
+  default Map<MetadataObject, PolicyEntity[]> listPolicyInfosForMetadataObjects(
+      String metalake, List<MetadataObject> metadataObjects) {
+    Map<MetadataObject, PolicyEntity[]> result = new LinkedHashMap<>();
+    metadataObjects.forEach(
+        object -> result.put(object, listPolicyInfosForMetadataObject(metalake, object)));
+    return result;
+  }
 }

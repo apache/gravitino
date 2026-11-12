@@ -29,6 +29,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -37,6 +38,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -103,17 +105,28 @@ public class JobMetaService {
       JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(metalakeId);
       JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
 
-      SessionUtils.doWithCommit(
-          JobMetaMapper.class,
-          mapper -> {
-            if (overwrite) {
-              mapper.insertJobMetaOnDuplicateKeyUpdate(jobPO);
-            } else {
-              mapper.insertJobMeta(jobPO);
-            }
-          });
+      long templateId =
+          JobTemplateMetaService.getInstance()
+              .getJobTemplateIdByMetalakeIdAndName(metalakeId, jobEntity.jobTemplateName());
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              MetalakeMetaService.getInstance().lockMetalakeForChildWrite(metalakeName, metalakeId),
+          () ->
+              JobTemplateMetaService.getInstance()
+                  .lockTemplateForJobWrite(jobEntity.jobTemplateName(), templateId, metalakeId),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  JobMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertJobMetaOnDuplicateKeyUpdate(jobPO);
+                    } else {
+                      mapper.insertJobMeta(jobPO);
+                    }
+                  }));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB, jobEntity.id().toString());
+      throw e;
     }
   }
 
@@ -132,38 +145,31 @@ public class JobMetaService {
     JobPO.JobPOBuilder newBuilder = JobPO.builder().withMetalakeId(oldJobPO.metalakeId());
     JobPO newJobPO = JobPO.updateJobPO(oldJobPO, newJobEntity, newBuilder);
 
-    Integer result;
     try {
-      result =
-          SessionUtils.doWithCommitAndFetchResult(
-              JobMetaMapper.class, mapper -> mapper.updateJobMeta(newJobPO, oldJobPO));
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              OccWriteSupport.updateWithVersion(
+                  () ->
+                      SessionUtils.getWithoutCommit(
+                          JobMetaMapper.class, mapper -> mapper.updateJobMeta(newJobPO, oldJobPO)),
+                  () -> writeFailure(jobIdent, oldJobPO)));
     } catch (RuntimeException e) {
-      ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB, oldJobEntity.name());
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB, jobIdent.name());
       throw e;
     }
-
-    if (result == null || result == 0) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.JOB.name().toLowerCase(Locale.ROOT),
-          oldJobEntity.name());
-    } else if (result > 1) {
-      throw new IOException(
-          String.format(
-              "Failed to update job: %s, because more than one rows are updated: %d",
-              oldJobEntity.name(), result));
-    } else {
-      return newJobEntity;
-    }
+    return newJobEntity;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
-    long jobRunIdLong = parseJobRunId(jobIdent.name());
-    int result =
-        SessionUtils.doWithCommitAndFetchResult(
-            JobMetaMapper.class, mapper -> mapper.softDeleteJobMetaByRunId(jobRunIdLong));
-    return result > 0;
+    // Preserve malformed-ID validation even for an otherwise missing job.
+    parseJobRunId(jobIdent.name());
+    try {
+      deleteJobWithVersion(jobIdent, getJobPO(jobIdent));
+      return true;
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
   }
 
   @Monitored(
@@ -239,5 +245,39 @@ public class JobMetaService {
               .map(po -> JobPO.fromJobPO(po, firstIdent.namespace()))
               .collect(Collectors.toList());
         });
+  }
+
+  /** Deletes a job and its owner relation only if the observed version is still active. */
+  void deleteJobWithVersion(NameIdentifier ident, JobPO observed) {
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        JobMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteJobByRunIdWithVersion(
+                                observed.jobRunId(), observed.currentVersion())),
+                () -> writeFailure(ident, observed)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        observed.jobRunId(), MetadataObject.Type.JOB.name())));
+  }
+
+  private RuntimeException writeFailure(NameIdentifier ident, JobPO observed) {
+    // Read only the job row: joining and locking the template here would invert cascade lock order.
+    return OccWriteSupport.writeFailure(
+        ident,
+        Entity.EntityType.JOB,
+        () ->
+            SessionUtils.getWithoutCommit(
+                JobMetaMapper.class,
+                mapper ->
+                    mapper.selectJobRunIdForUpdate(observed.jobRunId(), observed.metalakeId())),
+        null,
+        null);
   }
 }

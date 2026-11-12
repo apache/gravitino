@@ -159,6 +159,7 @@ public interface TagOperations {
    * @param selector The non-null policy association selector.
    * @return The resulting association.
    * @throws PolicyAlreadyAssociatedException If the policy is already associated with the tag.
+   * @throws IllegalArgumentException If the selector violates the tag's value constraint.
    * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
    */
   default PolicyTagAssociation addPolicyForTag(

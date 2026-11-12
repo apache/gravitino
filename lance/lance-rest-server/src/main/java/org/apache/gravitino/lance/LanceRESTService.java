@@ -32,7 +32,9 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
+import org.apache.gravitino.lance.service.LanceRequestBodyReaderInterceptor;
 import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
 import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
@@ -40,11 +42,13 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.ClientAddressResolver;
 import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.OutOfMemoryErrorListener;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
@@ -75,13 +79,19 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
     LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
-    JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
+    JettyServerConfig serverConfig =
+        JettyServerConfig.fromServiceConfig(lanceConfig, LanceConfig.LANCE_CONFIG_PREFIX);
+    LanceExceptionMapper.setIncludeErrorStackTrace(serverConfig.isIncludeErrorStackTrace());
 
     server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
+    boolean metricsEnabled = shouldEnableMetrics(auxMode, lanceConfig);
+    if (metricsEnabled) {
+      server.addMetricsServlets(metricsSystem);
+    }
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
@@ -104,8 +114,11 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
-    resourceConfig.register(JacksonFeature.class);
+    resourceConfig.register(JacksonFeature.withoutExceptionMappers());
+    resourceConfig.register(LanceRequestBodyReaderInterceptor.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
+    resourceConfig.register(LanceExceptionMapper.class);
+    resourceConfig.register(new OutOfMemoryErrorListener());
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -132,12 +145,15 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(container, LANCE_SPEC);
     // Registered before HttpAuditFilter so audit events dispatched during this request carry the
     // request's query parameters and remote address, exactly as on the main server.
-    server.addFilter(new RequestContextFilter(eventBus), LANCE_SPEC);
-    server.addFilter(
-        new HttpAuditFilter(
-            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
-        LANCE_SPEC);
-    server.addCustomFilters(LANCE_SPEC);
+    ClientAddressResolver clientAddressResolver = serverConfig.getClientAddressResolver();
+    server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), LANCE_SPEC);
+    server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), LANCE_SPEC);
+    if (metricsEnabled) {
+      for (String pathSpec : JettyServer.METRICS_PATH_SPECS) {
+        server.addFilter(new RequestContextFilter(eventBus, clientAddressResolver), pathSpec);
+        server.addFilter(createHttpAuditFilter(eventBus, clientAddressResolver), pathSpec);
+      }
+    }
     server.addSystemFilters(LANCE_SPEC);
     if (auxMode) {
       server.addFilter(
@@ -147,14 +163,28 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
     // systems that expect a /health endpoint.
+    // HealthAliasServlet forwards every request into /lance/health*, which LANCE_SPEC already
+    // covers via the servlet container's FORWARD dispatcher type, so binding the filter again
+    // here would double-log every probe.
     server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
+
+    if (metricsEnabled) {
+      server.addCustomFilters(
+          LANCE_SPEC, JettyServer.METRICS_PATH_SPECS.get(0), JettyServer.METRICS_PATH_SPECS.get(1));
+    } else {
+      server.addCustomFilters(LANCE_SPEC);
+    }
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
         auxMode ? "auxiliary" : "standalone",
         enableMetadataAuthorization ? "enabled" : "disabled");
+  }
+
+  static boolean shouldEnableMetrics(boolean auxiliaryMode, LanceConfig lanceConfig) {
+    return !auxiliaryMode && lanceConfig.get(LanceConfig.METRICS_ENABLED);
   }
 
   @Override
@@ -195,5 +225,14 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
       throw new RuntimeException("Failed to load namespace implementation", e);
     }
+  }
+
+  private static HttpAuditFilter createHttpAuditFilter(
+      EventBus eventBus, ClientAddressResolver clientAddressResolver) {
+    return new HttpAuditFilter(
+        eventBus,
+        EventSource.GRAVITINO_LANCE_REST_SERVER,
+        new LanceHealthCheckPathMatcher(),
+        clientAddressResolver);
   }
 }

@@ -126,7 +126,12 @@ class DTOConverters:
             dto = cast(LiteralDTO, arg)
             if dto.value() is None or dto.data_type() == Types.NullType.get():
                 return Literals.NULL
-            return Literals.of(dto.value(), dto.data_type())
+            data_type = dto.data_type()
+            if DTOConverters._is_binary_or_fixed(data_type):
+                return Literals.of(
+                    DTOConverters._decode_binary_hex(dto.value(), data_type), data_type
+                )
+            return Literals.of(dto.value(), data_type)
         if arg_type is FunctionArg.ArgType.FIELD:
             dto = cast(FieldReferenceDTO, arg)
             return NamedReference.field(dto.field_name())
@@ -220,15 +225,29 @@ class DTOConverters:
         Returns:
             Column: The column.
         """
-        if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET:
+        if (
+            dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            and dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+        ):
             return dto
+        default_value = (
+            Column.DEFAULT_VALUE_NOT_SET
+            if dto.default_value() == Column.DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.default_value())
+        )
+        initial_default_value = (
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            if dto.initial_default_value() == Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            else DTOConverters.from_function_arg(dto.initial_default_value())
+        )
         return Column.of(
             dto.name(),
             dto.data_type(),
             dto.comment(),
             dto.nullable(),
             dto.auto_increment(),
-            DTOConverters.from_function_arg(dto.default_value()),
+            default_value,
+            initial_default_value,
         )
 
     @from_dto.register
@@ -450,7 +469,11 @@ class DTOConverters:
                 return LiteralDTO.NULL
             return (
                 LiteralDTO.builder()
-                .with_value(str(expression.value()))
+                .with_value(
+                    DTOConverters._literal_value_to_dto_string(
+                        expression.value(), expression.data_type()
+                    )
+                )
                 .with_data_type(expression.data_type())
                 .build()
             )
@@ -545,6 +568,12 @@ class DTOConverters:
                 if obj.default_value() is None
                 or obj.default_value() is Column.DEFAULT_VALUE_NOT_SET
                 else DTOConverters.to_function_arg(obj.default_value())
+            )
+            .with_initial_default_value(
+                Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                if obj.initial_default_value() is None
+                or obj.initial_default_value() is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                else DTOConverters.to_function_arg(obj.initial_default_value())
             )
             .build()
         )
@@ -844,3 +873,41 @@ class DTOConverters:
         raise IllegalArgumentException(
             f"Unknown change type: {change.__class__.__name__}"
         )
+
+    @staticmethod
+    def _is_binary_or_fixed(data_type) -> bool:
+        return isinstance(data_type, (Types.BinaryType, Types.FixedType))
+
+    @staticmethod
+    def _literal_value_to_dto_string(value, data_type) -> Optional[str]:
+        if value is None:
+            return None
+        # Match Java DTOConverters / #14609: 0x + lowercase hex for binary/fixed bytes.
+        if DTOConverters._is_binary_or_fixed(data_type) and isinstance(
+            value, (bytes, bytearray)
+        ):
+            return "0x" + bytes(value).hex()
+        return str(value)
+
+    @staticmethod
+    def _decode_binary_hex(value: str, data_type):
+        # Match Java DTOConverters: decode 0x-prefixed hex; keep unprefixed strings for
+        # provider-specific interpretation (#14609).
+        if not value.lower().startswith("0x"):
+            return value
+        hex_value = value[2:]
+        try:
+            decoded = bytes.fromhex(hex_value)
+        except ValueError as exc:
+            raise IllegalArgumentException(
+                "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs"
+            ) from exc
+        if (
+            isinstance(data_type, Types.FixedType)
+            and len(decoded) != data_type.length()
+        ):
+            raise IllegalArgumentException(
+                f"Fixed literal length mismatch: expected {data_type.length()} bytes, "
+                f"got {len(decoded)}"
+            )
+        return decoded

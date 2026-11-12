@@ -27,23 +27,27 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
+import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupJob;
 import org.apache.gravitino.iceberg.service.cleanup.IcebergCleanupManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -68,6 +72,8 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
+    TableEntity.NAME.validate(createTableRequest.name(), Entity.EntityType.TABLE);
+    IcebergColumnFieldValidator.validateSchema(createTableRequest.schema());
     IcebergCleanupHelper.rejectIfBeingPurged(
         cleanupManager, context.catalogName(), namespace, createTableRequest.name());
 
@@ -113,15 +119,22 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
+    if (updateTableRequest.requirements().stream()
+        .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance)) {
+      TableEntity.NAME.validate(tableIdentifier.name(), Entity.EntityType.TABLE);
+    }
+    IcebergColumnFieldValidator.validateUpdate(updateTableRequest);
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
-        .updateTable(tableIdentifier, updateTableRequest);
+        .updateTable(
+            tableIdentifier,
+            IcebergOwnerPropertyGuard.protect(updateTableRequest, context.userName()));
   }
 
   @Override
   public void dropTable(
       IcebergRequestContext context, TableIdentifier tableIdentifier, boolean purgeRequested) {
-    IcebergCatalogWrapper wrapper =
+    CatalogWrapperForREST wrapper =
         icebergCatalogWrapperManager.getCatalogWrapper(context.catalogName());
     if (!purgeRequested) {
       wrapper.dropTable(tableIdentifier);
@@ -129,7 +142,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     }
 
     // Async cleanup is opt-in per request and only wired in auxiliary mode; otherwise purge inline.
-    if (!context.asyncPurge()) {
+    if (!context.asyncPurge() || !wrapper.supportsAsyncPurge()) {
       wrapper.purgeTable(tableIdentifier);
       return;
     }
@@ -187,6 +200,7 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
 
   @Override
   public void renameTable(IcebergRequestContext context, RenameTableRequest renameTableRequest) {
+    TableEntity.NAME.validate(renameTableRequest.destination().name(), Entity.EntityType.TABLE);
     icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .renameTable(renameTableRequest);
@@ -229,6 +243,16 @@ public class IcebergTableOperationExecutor implements IcebergTableOperationDispa
     return icebergCatalogWrapperManager
         .getCatalogWrapper(context.catalogName())
         .planTableScan(tableIdentifier, scanRequest, context.requestCredentialVending(), privilege);
+  }
+
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request) {
+    return icebergCatalogWrapperManager
+        .getCatalogWrapper(context.catalogName())
+        .fetchScanTasks(tableIdentifier, request);
   }
 
   @Override

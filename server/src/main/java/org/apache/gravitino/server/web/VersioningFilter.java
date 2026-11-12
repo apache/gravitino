@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.server.web;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -37,6 +38,7 @@ import javax.servlet.ServletResponse;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletRequestWrapper;
 import javax.servlet.http.HttpServletResponse;
+import javax.ws.rs.core.MediaType;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -94,8 +96,35 @@ public class VersioningFilter implements Filter {
   private static final String ACCEPT_VERSION_HEADER = "Accept";
   private static final String CONTENT_TYPE_HEADER = "Content-Type";
 
+  private final ObjectMapper objectMapper;
+
+  /** Creates a versioning filter with the backward-compatible error response behavior. */
+  public VersioningFilter() {
+    this.objectMapper = ObjectMapperProvider.objectMapper();
+  }
+
+  /**
+   * Creates a versioning filter with explicit error stack-trace response behavior.
+   *
+   * @param includeErrorStackTrace whether error responses should include diagnostic stack traces
+   */
+  public VersioningFilter(boolean includeErrorStackTrace) {
+    this.objectMapper = ObjectMapperProvider.objectMapper(includeErrorStackTrace);
+  }
+
   private static String getAcceptVersion(int version) {
     return String.format("application/vnd.gravitino.v%d+json", version);
+  }
+
+  // Keeps the client's own Accept values after the versioned media type, so that resources which
+  // intentionally produce a different type (e.g. application/json for OpenLineage) still match.
+  // A request without Accept accepts any media type, so "*/*" is kept explicitly: the versioned
+  // type alone would turn "accept anything" into "accept only the versioned type".
+  private static String prependAcceptVersion(int version, List<String> acceptHeaders) {
+    String versionedAccept = getAcceptVersion(version);
+    return acceptHeaders.isEmpty()
+        ? versionedAccept + ", " + MediaType.WILDCARD
+        : versionedAccept + ", " + String.join(", ", acceptHeaders);
   }
 
   @Override
@@ -105,7 +134,8 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Integer acceptVersion = versionFromHeaders(req.getHeaders(ACCEPT_VERSION_HEADER));
+    List<String> acceptHeaders = Collections.list(req.getHeaders(ACCEPT_VERSION_HEADER));
+    Integer acceptVersion = versionFromHeaders(Collections.enumeration(acceptHeaders));
     if (acceptVersion != null) {
       if (isUnsupportedVersion(acceptVersion, response)) {
         return;
@@ -122,10 +152,12 @@ public class VersioningFilter implements Filter {
         return;
       }
 
-      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(contentTypeVersion));
+      mutableRequest.putHeader(
+          ACCEPT_VERSION_HEADER, prependAcceptVersion(contentTypeVersion, acceptHeaders));
     } else {
       ApiVersion defaultVersion = ApiVersion.defaultVersion();
-      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(defaultVersion.version()));
+      mutableRequest.putHeader(
+          ACCEPT_VERSION_HEADER, prependAcceptVersion(defaultVersion.version(), acceptHeaders));
     }
 
     chain.doFilter(mutableRequest, response);
@@ -151,8 +183,7 @@ public class VersioningFilter implements Filter {
     return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
   }
 
-  private static boolean isUnsupportedVersion(int version, ServletResponse response)
-      throws IOException {
+  private boolean isUnsupportedVersion(int version, ServletResponse response) throws IOException {
     if (ApiVersion.isSupportedVersion(version)) {
       return false;
     }
@@ -168,7 +199,7 @@ public class VersioningFilter implements Filter {
     resp.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
     resp.setContentType("application/json");
     resp.setCharacterEncoding(StandardCharsets.UTF_8.name());
-    ObjectMapperProvider.objectMapper().writeValue(resp.getWriter(), errorResponse);
+    objectMapper.writeValue(resp.getWriter(), errorResponse);
     return true;
   }
 

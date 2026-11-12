@@ -320,7 +320,7 @@ public class TestIcebergTableEventDispatcher {
   private static HttpServletRequest requestWithHeader(String name, String value) {
     HttpServletRequest request = mock(HttpServletRequest.class);
     Enumeration<String> headerNames = Collections.enumeration(Collections.singleton(name));
-    when(request.getRemoteHost()).thenReturn("localhost");
+    when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     when(request.getHeaderNames()).thenReturn(headerNames);
     when(request.getHeader(name)).thenReturn(value);
     return request;

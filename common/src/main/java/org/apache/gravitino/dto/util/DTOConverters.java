@@ -21,7 +21,10 @@ package org.apache.gravitino.dto.util;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.base.Preconditions;
+import com.google.common.io.BaseEncoding;
 import java.util.Arrays;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.ArrayUtils;
@@ -89,6 +92,8 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDTO;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -102,9 +107,17 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
+import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.ColumnMaskContent;
+import org.apache.gravitino.policy.ExecutablePolicyContent;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
+import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
+import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
+import org.apache.gravitino.policy.RowFilterContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -129,13 +142,24 @@ import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Utility class for converting between DTOs and domain objects. */
 public class DTOConverters {
+
+  /**
+   * Gravitino's string-valued literal wire API encodes {@code binary}/{@code fixed} {@code byte[]}
+   * values as {@code 0x} plus lowercase hex pairs (see #14609). This is a reversible encoding of
+   * the same bytes Iceberg stores as unprefixed hex in Appendix D / REST OpenAPI.
+   */
+  private static final BaseEncoding BINARY_HEX = BaseEncoding.base16().lowerCase();
+
+  private static final String BINARY_HEX_PREFIX = "0x";
 
   private DTOConverters() {}
 
@@ -274,6 +298,11 @@ public class DTOConverters {
                     || column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET))
                 ? Column.DEFAULT_VALUE_NOT_SET
                 : toFunctionArg(column.defaultValue()))
+        .withInitialDefaultValue(
+            (column.initialDefaultValue() == null
+                    || column.initialDefaultValue().equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET))
+                ? Column.INITIAL_DEFAULT_VALUE_NOT_SET
+                : toFunctionArg(column.initialDefaultValue()))
         .build();
   }
 
@@ -287,8 +316,14 @@ public class DTOConverters {
     return TableDTO.builder()
         .withName(table.name())
         .withComment(table.comment())
+        // Connector results are snapshotted through here before the table dispatcher rejects a
+        // missing column list with a clear error, so a null list must not throw here.
         .withColumns(
-            Arrays.stream(table.columns()).map(DTOConverters::toDTO).toArray(ColumnDTO[]::new))
+            table.columns() == null
+                ? null
+                : Arrays.stream(table.columns())
+                    .map(DTOConverters::toDTO)
+                    .toArray(ColumnDTO[]::new))
         .withProperties(table.properties())
         .withSortOrders(toDTOs(table.sortOrder()))
         .withDistribution(toDTO(table.distribution()))
@@ -315,6 +350,22 @@ public class DTOConverters {
         .withDefaultSchema(view.defaultSchema())
         .withProperties(view.properties())
         .withAudit(toDTO(view.auditInfo()))
+        .build();
+  }
+
+  /**
+   * Converts a {@link SemanticModel} implementation to a {@link SemanticModelDTO}.
+   *
+   * @param semanticModel The Semantic Model implementation.
+   * @return The Semantic Model DTO.
+   */
+  public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
+    return SemanticModelDTO.builder()
+        .withName(semanticModel.name())
+        .withComment(semanticModel.comment())
+        .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))
+        .withProperties(semanticModel.properties())
+        .withAudit(toDTO(semanticModel.auditInfo()))
         .build();
   }
 
@@ -368,7 +419,7 @@ public class DTOConverters {
    * @return The distribution DTO.
    */
   public static DistributionDTO toDTO(Distribution distribution) {
-    if (Distributions.NONE.equals(distribution) || null == distribution) {
+    if (Distributions.isNone(distribution)) {
       return DistributionDTO.NONE;
     }
 
@@ -647,6 +698,12 @@ public class DTOConverters {
       return (PolicyContentDTO) policyContent;
     }
 
+    PolicyExecutionSpec executionSpec = null;
+    if (policyContent instanceof ExecutablePolicyContent) {
+      PolicyExecutionSpec spec = ((ExecutablePolicyContent) policyContent).executionSpec();
+      executionSpec = spec.hasAny() ? spec : null;
+    }
+
     if (policyContent instanceof PolicyContents.CustomContent) {
       PolicyContents.CustomContent customContent = (PolicyContents.CustomContent) policyContent;
       return PolicyContentDTO.CustomContentDTO.builder()
@@ -656,6 +713,35 @@ public class DTOConverters {
           .build();
     }
 
+    if (policyContent instanceof IcebergOrphanFileRemovalContent) {
+      IcebergOrphanFileRemovalContent content = (IcebergOrphanFileRemovalContent) policyContent;
+      return PolicyContentDTO.IcebergOrphanFileRemovalContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withLocation(content.location())
+          .withDryRun(content.dryRun())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergRewriteManifestsContent) {
+      IcebergRewriteManifestsContent content = (IcebergRewriteManifestsContent) policyContent;
+      return PolicyContentDTO.IcebergRewriteManifestsContentDTO.builder()
+          .withManifestCountCritical(content.manifestCountCritical())
+          .withManifestCountWarning(content.manifestCountWarning())
+          .withAvgManifestSizeThresholdBytes(content.avgManifestSizeThresholdBytes())
+          .withSpecId(content.specId())
+          .withUseCaching(content.useCaching())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+    if (policyContent instanceof IcebergSnapshotExpirationContent) {
+      IcebergSnapshotExpirationContent content = (IcebergSnapshotExpirationContent) policyContent;
+      return PolicyContentDTO.IcebergSnapshotExpirationContentDTO.builder()
+          .withOlderThanDays(content.olderThanDays())
+          .withRetainLast(content.retainLast())
+          .withStreamResults(content.streamResults())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
     if (policyContent instanceof IcebergDataCompactionContent) {
       IcebergDataCompactionContent icebergCompactionContent =
           (IcebergDataCompactionContent) policyContent;
@@ -665,7 +751,32 @@ public class DTOConverters {
           .withDataFileMseWeight(icebergCompactionContent.dataFileMseWeight())
           .withDeleteFileNumberWeight(icebergCompactionContent.deleteFileNumberWeight())
           .withMaxPartitionNum(icebergCompactionContent.maxPartitionNum())
+          .withRewriteStrategy(icebergCompactionContent.rewriteStrategy())
+          .withSortOrder(icebergCompactionContent.sortOrder())
           .withRewriteOptions(icebergCompactionContent.rewriteOptions())
+          .withExecutionSpec(executionSpec)
+          .build();
+    }
+
+    if (policyContent instanceof RowFilterContent) {
+      RowFilterContent content = (RowFilterContent) policyContent;
+      return PolicyContentDTO.RowFilterContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof ColumnMaskContent) {
+      ColumnMaskContent content = (ColumnMaskContent) policyContent;
+      return PolicyContentDTO.ColumnMaskContentDTO.builder()
+          .withExpression(content.expression())
+          .build();
+    }
+
+    if (policyContent instanceof AccessControlContent) {
+      AccessControlContent accessControlContent = (AccessControlContent) policyContent;
+      return PolicyContentDTO.AccessControlContentDTO.builder()
+          .withPrivileges(accessControlContent.privileges())
+          .withApplicableRoles(accessControlContent.applicableRoles())
           .build();
     }
 
@@ -713,10 +824,11 @@ public class DTOConverters {
         return LiteralDTO.NULL;
       }
 
-      Object value = ((Literal) expression).value();
+      Literal<?> literal = (Literal<?>) expression;
+      Object value = literal.value();
       return LiteralDTO.builder()
-          .withValue(value == null ? null : value.toString())
-          .withDataType(((Literal) expression).dataType())
+          .withValue(value == null ? null : literalValueToDtoString(value, literal.dataType()))
+          .withDataType(literal.dataType())
           .build();
     } else if (expression instanceof NamedReference.FieldReference) {
       return FieldReferenceDTO.builder()
@@ -1042,11 +1154,13 @@ public class DTOConverters {
   public static Expression fromFunctionArg(FunctionArg arg) {
     switch (arg.argType()) {
       case LITERAL:
-        if (((LiteralDTO) arg).value() == null
-            || ((LiteralDTO) arg).dataType().equals(Types.NullType.get())) {
+        LiteralDTO literalDTO = (LiteralDTO) arg;
+        if (literalDTO.value() == null || literalDTO.dataType().equals(Types.NullType.get())) {
           return Literals.NULL;
         }
-        return Literals.of(((LiteralDTO) arg).value(), ((LiteralDTO) arg).dataType());
+        Type dataType = literalDTO.dataType();
+        Object value = literalValueFromDtoString(literalDTO.value(), dataType);
+        return Literals.of(value, dataType);
       case FIELD:
         return NamedReference.field(((FieldReferenceDTO) arg).fieldName());
       case FUNCTION:
@@ -1211,7 +1325,10 @@ public class DTOConverters {
    * @return The column.
    */
   public static Column fromDTO(ColumnDTO column) {
-    if (column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET)) {
+    boolean defaultUnset = column.defaultValue().equals(Column.DEFAULT_VALUE_NOT_SET);
+    boolean initialUnset =
+        column.initialDefaultValue().equals(Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+    if (defaultUnset && initialUnset) {
       return column;
     }
     return Column.of(
@@ -1220,7 +1337,12 @@ public class DTOConverters {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        fromFunctionArg((FunctionArg) column.defaultValue()));
+        defaultUnset
+            ? Column.DEFAULT_VALUE_NOT_SET
+            : fromFunctionArg((FunctionArg) column.defaultValue()),
+        initialUnset
+            ? Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            : fromFunctionArg((FunctionArg) column.initialDefaultValue()));
   }
 
   /**
@@ -1513,19 +1635,85 @@ public class DTOConverters {
           customContentDTO.properties());
     }
 
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) {
+      return ((PolicyContentDTO.IcebergOrphanFileRemovalContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergRewriteManifestsContentDTO) {
+      return ((PolicyContentDTO.IcebergRewriteManifestsContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
+    if (policyContentDTO instanceof PolicyContentDTO.IcebergSnapshotExpirationContentDTO) {
+      return ((PolicyContentDTO.IcebergSnapshotExpirationContentDTO) policyContentDTO)
+          .toDomainContent();
+    }
     if (policyContentDTO instanceof PolicyContentDTO.IcebergCompactionContentDTO) {
-      PolicyContentDTO.IcebergCompactionContentDTO icebergCompactionContentDTO =
-          (PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO;
-      return PolicyContents.icebergDataCompaction(
-          icebergCompactionContentDTO.minDataFileMse(),
-          icebergCompactionContentDTO.minDeleteFileNumber(),
-          icebergCompactionContentDTO.dataFileMseWeight(),
-          icebergCompactionContentDTO.deleteFileNumberWeight(),
-          icebergCompactionContentDTO.maxPartitionNum(),
-          icebergCompactionContentDTO.rewriteOptions());
+      return ((PolicyContentDTO.IcebergCompactionContentDTO) policyContentDTO).toDomainContent();
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.RowFilterContentDTO) {
+      PolicyContentDTO.RowFilterContentDTO contentDTO =
+          (PolicyContentDTO.RowFilterContentDTO) policyContentDTO;
+      return PolicyContents.rowFilter(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.ColumnMaskContentDTO) {
+      PolicyContentDTO.ColumnMaskContentDTO contentDTO =
+          (PolicyContentDTO.ColumnMaskContentDTO) policyContentDTO;
+      return PolicyContents.columnMask(contentDTO.expression());
+    }
+
+    if (policyContentDTO instanceof PolicyContentDTO.AccessControlContentDTO) {
+      PolicyContentDTO.AccessControlContentDTO accessControlContentDTO =
+          (PolicyContentDTO.AccessControlContentDTO) policyContentDTO;
+      return PolicyContents.accessControl(
+          accessControlContentDTO.privileges(), accessControlContentDTO.applicableRoles());
     }
 
     throw new IllegalArgumentException(
         "Unsupported policy content type: " + policyContentDTO.getClass());
+  }
+
+  private static boolean isBinaryOrFixed(Type dataType) {
+    return dataType instanceof Types.BinaryType || dataType instanceof Types.FixedType;
+  }
+
+  private static String literalValueToDtoString(Object value, Type dataType) {
+    // byte[].toString() is an object identity and cannot preserve the literal's bytes.
+    if (isBinaryOrFixed(dataType) && value instanceof byte[]) {
+      return BINARY_HEX_PREFIX + BINARY_HEX.encode((byte[]) value);
+    }
+    return value.toString();
+  }
+
+  /**
+   * Decodes {@code 0x}-prefixed hex for binary/fixed. Unprefixed values keep their previous string
+   * interpretation for provider-specific handling (#14609).
+   */
+  private static Object literalValueFromDtoString(String value, Type dataType) {
+    if (!isBinaryOrFixed(dataType) || value == null) {
+      return value;
+    }
+    if (!value.regionMatches(true, 0, BINARY_HEX_PREFIX, 0, BINARY_HEX_PREFIX.length())) {
+      // Retain unprefixed wire values for JDBC and other providers (e.g. DEFAULT 'AB').
+      return value;
+    }
+    String hex = value.substring(BINARY_HEX_PREFIX.length());
+    byte[] bytes;
+    try {
+      bytes = BINARY_HEX.decode(hex.toLowerCase(Locale.ROOT));
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Invalid binary/fixed literal value: use 0x followed by hexadecimal byte pairs", e);
+    }
+    if (dataType instanceof Types.FixedType) {
+      int expected = ((Types.FixedType) dataType).length();
+      Preconditions.checkArgument(
+          bytes.length == expected,
+          "Fixed literal length mismatch: expected %s bytes, got %s",
+          expected,
+          bytes.length);
+    }
+    return bytes;
   }
 }

@@ -41,31 +41,6 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   }
 
   @Override
-  public String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return "INSERT INTO "
-        + FunctionMetaMapper.TABLE_NAME
-        + " (function_id, function_name, metalake_id, catalog_id, schema_id,"
-        + " function_type, \"deterministic\", function_current_version, function_latest_version, audit_info, deleted_at)"
-        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName}, #{functionMeta.metalakeId},"
-        + " #{functionMeta.catalogId}, #{functionMeta.schemaId}, #{functionMeta.functionType},"
-        + " #{functionMeta.deterministic},"
-        + " #{functionMeta.functionCurrentVersion}, #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
-        + " #{functionMeta.deletedAt})"
-        + " ON CONFLICT (function_id) DO UPDATE SET"
-        + " function_name = #{functionMeta.functionName},"
-        + " metalake_id = #{functionMeta.metalakeId},"
-        + " catalog_id = #{functionMeta.catalogId},"
-        + " schema_id = #{functionMeta.schemaId},"
-        + " function_type = #{functionMeta.functionType},"
-        + " \"deterministic\" = #{functionMeta.deterministic},"
-        + " function_current_version = #{functionMeta.functionCurrentVersion},"
-        + " function_latest_version = #{functionMeta.functionLatestVersion},"
-        + " audit_info = #{functionMeta.auditInfo},"
-        + " deleted_at = #{functionMeta.deletedAt}";
-  }
-
-  @Override
   public String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT fm.function_id, fm.function_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.function_type, fm.\"deterministic\", fm.function_current_version, fm.function_latest_version,"
@@ -102,12 +77,14 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   }
 
   @Override
-  public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
+  public String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE function_id = #{functionId} AND deleted_at = 0";
+        + " WHERE function_id = #{functionId}"
+        + " AND function_current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -170,14 +147,7 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
         + " audit_info = #{newFunctionMeta.auditInfo},"
         + " deleted_at = #{newFunctionMeta.deletedAt}"
         + " WHERE function_id = #{oldFunctionMeta.functionId}"
-        + " AND function_name = #{oldFunctionMeta.functionName}"
-        + " AND metalake_id = #{oldFunctionMeta.metalakeId}"
-        + " AND catalog_id = #{oldFunctionMeta.catalogId}"
-        + " AND schema_id = #{oldFunctionMeta.schemaId}"
-        + " AND function_type = #{oldFunctionMeta.functionType}"
         + " AND function_current_version = #{oldFunctionMeta.functionCurrentVersion}"
-        + " AND function_latest_version = #{oldFunctionMeta.functionLatestVersion}"
-        + " AND audit_info = #{oldFunctionMeta.auditInfo}"
         + " AND deleted_at = 0";
   }
 }

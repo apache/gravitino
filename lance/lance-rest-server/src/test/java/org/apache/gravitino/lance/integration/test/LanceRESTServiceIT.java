@@ -21,8 +21,13 @@ package org.apache.gravitino.lance.integration.test;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,10 +39,15 @@ import java.util.Objects;
 import java.util.Set;
 import org.apache.arrow.memory.BufferAllocator;
 import org.apache.arrow.memory.RootAllocator;
+import org.apache.arrow.vector.IntVector;
+import org.apache.arrow.vector.VarCharVector;
+import org.apache.arrow.vector.VectorSchemaRoot;
+import org.apache.arrow.vector.ipc.ArrowStreamWriter;
 import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -47,17 +57,20 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lance.common.utils.ArrowUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableChange;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.lance.Dataset;
 import org.lance.namespace.LanceNamespace;
 import org.lance.namespace.client.apache.ApiClient;
 import org.lance.namespace.client.apache.ApiException;
 import org.lance.namespace.client.apache.api.TableApi;
 import org.lance.namespace.errors.ErrorCode;
 import org.lance.namespace.errors.LanceNamespaceException;
+import org.lance.namespace.errors.UnsupportedOperationException;
 import org.lance.namespace.model.AlterColumnsEntry;
 import org.lance.namespace.model.AlterTableAlterColumnsRequest;
 import org.lance.namespace.model.AlterTableAlterColumnsResponse;
@@ -83,6 +96,8 @@ import org.lance.namespace.model.ListNamespacesRequest;
 import org.lance.namespace.model.ListNamespacesResponse;
 import org.lance.namespace.model.ListTablesRequest;
 import org.lance.namespace.model.NamespaceExistsRequest;
+import org.lance.namespace.model.QueryTableRequest;
+import org.lance.namespace.model.QueryTableRequestVector;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.RegisterTableResponse;
 import org.lance.namespace.model.TableExistsRequest;
@@ -228,13 +243,18 @@ public class LanceRESTServiceIT extends BaseIT {
     describeNamespaceReq.addIdItem(catalog.name());
     DescribeNamespaceResponse describeNamespaceResp = ns.describeNamespace(describeNamespaceReq);
 
-    Assertions.assertEquals(catalog.properties(), describeNamespaceResp.getProperties());
+    // Lance describe returns properties merged with plaintext secrets so storage options work.
+    Map<String, String> expectedCatalogProps = new HashMap<>(catalog.properties());
+    expectedCatalogProps.putAll(catalog.supportsSecrets().getSecrets());
+    Assertions.assertEquals(expectedCatalogProps, describeNamespaceResp.getProperties());
 
     // test describe schema via lance rest namespace client
     describeNamespaceReq.addIdItem(schema.name());
     describeNamespaceResp = ns.describeNamespace(describeNamespaceReq);
 
-    Assertions.assertEquals(schema.properties(), describeNamespaceResp.getProperties());
+    Map<String, String> expectedSchemaProps = new HashMap<>(schema.properties());
+    expectedSchemaProps.putAll(schema.supportsSecrets().getSecrets());
+    Assertions.assertEquals(expectedSchemaProps, describeNamespaceResp.getProperties());
 
     // test describe a non-existent catalog namespace
     DescribeNamespaceRequest nonExistentCatalogReq = new DescribeNamespaceRequest();
@@ -449,6 +469,45 @@ public class LanceRESTServiceIT extends BaseIT {
     assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
   }
 
+  /** Verifies unsupported input cannot silently discard records or destroy an existing table. */
+  @Test
+  void testCreateRejectsNonEmptyArrowWithoutSideEffects() throws IOException {
+    catalog = createCatalog(CATALOG_NAME);
+    createSchema();
+    byte[] data = arrowStreamWithEmptyThenNonEmptyBatch();
+    for (String mode : List.of("create", "exist_ok")) {
+      String name = "nonempty_" + mode;
+      Path location = tempDir.resolve(name);
+      assertNonEmptyCreateRejected(
+          List.of(CATALOG_NAME, SCHEMA_NAME, name), location.toString(), data, mode);
+      Assertions.assertFalse(
+          catalog.asTableCatalog().tableExists(NameIdentifier.of(SCHEMA_NAME, name)));
+      Assertions.assertFalse(Files.exists(location));
+    }
+
+    String original = "nonempty_overwrite";
+    List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, original);
+    String location = tempDir.resolve(original).toString();
+    try (VectorSchemaRoot root =
+        VectorSchemaRoot.of(
+            new IntVector("id", allocator), new VarCharVector("value", allocator))) {
+      createTable(
+          ids, location, Map.of(), ArrowUtils.generateIpcStream(root.getSchema()), "create");
+    }
+    assertNonEmptyCreateRejected(ids, location, data, "overwrite");
+    DescribeTableRequest describe = new DescribeTableRequest();
+    describe.setId(ids);
+    Assertions.assertEquals(
+        List.of("id", "value"),
+        ns.describeTable(describe).getSchema().getFields().stream()
+            .map(JsonArrowField::getName)
+            .toList());
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals(0, dataset.countRows());
+      Assertions.assertEquals(2, dataset.getSchema().getFields().size());
+    }
+  }
+
   @Test
   void testCreateTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
@@ -515,6 +574,26 @@ public class LanceRESTServiceIT extends BaseIT {
             "key1", "v2",
             "lance.storage.a", "value_va",
             "lance.storage.b", "value_vb");
+
+    LanceNamespaceException denied =
+        Assertions.assertThrows(
+            LanceNamespaceException.class,
+            () -> createTable(ids, newLocation, overwriteTableProperties, body, "overwrite"));
+    Assertions.assertTrue(
+        denied.getMessage().contains(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+    Assertions.assertEquals(
+        location,
+        catalog
+            .asTableCatalog()
+            .loadTable(NameIdentifier.of(SCHEMA_NAME, ids.get(2)))
+            .properties()
+            .get(Table.PROPERTY_LOCATION));
+    Assertions.assertTrue(new File(location).exists());
+    Assertions.assertFalse(new File(newLocation).exists());
+    catalog =
+        metalake.alterCatalog(
+            CATALOG_NAME,
+            CatalogChange.setProperty(LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE, "true"));
 
     response =
         Assertions.assertDoesNotThrow(
@@ -626,16 +705,31 @@ public class LanceRESTServiceIT extends BaseIT {
     AlterTableDropColumnsRequest dropNonExistingColumnsRequest = new AlterTableDropColumnsRequest();
     dropNonExistingColumnsRequest.setId(ids);
     dropNonExistingColumnsRequest.setColumns(List.of("non_existing_column"));
-    Exception dropColumnException =
+    long versionBeforeRejectedDrop;
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      versionBeforeRejectedDrop = dataset.version();
+    }
+    ApiException dropColumnException =
         Assertions.assertThrows(
-            Exception.class,
+            ApiException.class,
             () ->
                 tableApi.alterTableDropColumns(
                     String.join(delimiter, ids), dropNonExistingColumnsRequest, delimiter));
-    Assertions.assertTrue(
-        dropColumnException
-            .getMessage()
-            .contains("Column non_existing_column does not exist in the dataset"));
+    Assertions.assertEquals(400, dropColumnException.getCode());
+    ErrorResponse error =
+        JsonUtils.anyFieldMapper()
+            .readValue(dropColumnException.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+    Assertions.assertTrue(error.getError().contains("non_existing_column"));
+    Assertions.assertEquals("", error.getDetail());
+    Assertions.assertEquals(
+        List.of("id"),
+        ns.describeTable(describeTableRequest).getSchema().getFields().stream()
+            .map(JsonArrowField::getName)
+            .toList());
+    try (Dataset dataset = Dataset.open().uri(newLocation).build()) {
+      Assertions.assertEquals(versionBeforeRejectedDrop, dataset.version());
+    }
   }
 
   @Test
@@ -679,6 +773,59 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
+  void testUnimplementedOperationUsesUnsupportedError() throws Exception {
+    QueryTableRequest request = new QueryTableRequest();
+    request.setId(List.of("missing", "schema", "table"));
+    request.setK(1);
+    request.setVector(new QueryTableRequestVector().singleVector(List.of(1.0f, 2.0f)));
+    request.setVectorColumn("vector");
+    UnsupportedOperationException error =
+        Assertions.assertThrows(UnsupportedOperationException.class, () -> ns.queryTable(request));
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), error.getCode());
+    // The native client classifies by code but does not retain instance; inspect diagnostics
+    // on the wire independently rather than requiring it to preserve every response field.
+    HttpRequest httpRequest =
+        HttpRequest.newBuilder(
+                URI.create(getLanceRestServiceUrl() + "/v1/table/missing.schema.table/query"))
+            .header("Content-Type", "application/json")
+            .POST(
+                HttpRequest.BodyPublishers.ofString(
+                    JsonUtils.anyFieldMapper().writeValueAsString(request)))
+            .build();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient().send(httpRequest, HttpResponse.BodyHandlers.ofString());
+    Assertions.assertEquals(406, response.statusCode());
+    ErrorResponse body = JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.UNSUPPORTED.getCode(), body.getCode());
+    Assertions.assertTrue(body.getInstance().startsWith("POST "));
+    Assertions.assertTrue(body.getInstance().endsWith("/query"));
+    Assertions.assertTrue(body.getError().contains(body.getInstance()));
+    Assertions.assertEquals("", body.getDetail());
+  }
+
+  @Test
+  void testInvalidJsonRequestUsesLanceEnvelope() throws Exception {
+    HttpClient http = HttpClient.newHttpClient();
+    for (String body : List.of("{", "[]")) {
+      HttpRequest request =
+          HttpRequest.newBuilder(
+                  URI.create(getLanceRestServiceUrl() + "/v1/namespace/missing/create"))
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body))
+              .build();
+      HttpResponse<String> response = http.send(request, HttpResponse.BodyHandlers.ofString());
+      Assertions.assertEquals(400, response.statusCode());
+      Assertions.assertTrue(
+          response.headers().firstValue("Content-Type").orElse("").contains("application/json"));
+      ErrorResponse error =
+          JsonUtils.anyFieldMapper().readValue(response.body(), ErrorResponse.class);
+      Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), error.getCode());
+      Assertions.assertEquals("Invalid JSON request", error.getError());
+      Assertions.assertEquals("", error.getDetail());
+    }
+  }
+
+  @Test
   void testAlterColumns() throws Exception {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
@@ -696,6 +843,33 @@ public class LanceRESTServiceIT extends BaseIT {
 
     TableApi tableApi = createTableApi();
     String delimiter = DELIMITER;
+
+    AlterTableAlterColumnsRequest conflictRequest = new AlterTableAlterColumnsRequest();
+    conflictRequest.setId(ids);
+    AlterColumnsEntry conflict = new AlterColumnsEntry();
+    conflict.setPath("id");
+    conflict.setRename("value");
+    conflictRequest.setAlterations(List.of(conflict));
+    ApiException conflictError =
+        Assertions.assertThrows(
+            ApiException.class,
+            () ->
+                tableApi.alterTableAlterColumns(
+                    String.join(delimiter, ids), conflictRequest, delimiter));
+    Assertions.assertEquals(400, conflictError.getCode());
+    ErrorResponse conflictBody =
+        JsonUtils.anyFieldMapper().readValue(conflictError.getResponseBody(), ErrorResponse.class);
+    Assertions.assertEquals(ErrorCode.INVALID_INPUT.getCode(), conflictBody.getCode());
+    Assertions.assertTrue(conflictBody.getError().contains("value"));
+    Assertions.assertEquals("", conflictBody.getDetail());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .alterTable(
+                    NameIdentifier.of(SCHEMA_NAME, ids.get(2)),
+                    TableChange.renameColumn(new String[] {"id"}, "value")));
 
     AlterTableAlterColumnsRequest alterRequest = new AlterTableAlterColumnsRequest();
     alterRequest.setId(ids);
@@ -724,11 +898,12 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testRegisterTable() {
+  void testRegisterTable() throws IOException {
     catalog = createCatalog(CATALOG_NAME);
     createSchema();
 
     String location = tempDir + "/" + "register/";
+    LanceDatasetTestUtils.createDataset(location);
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_register");
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setLocation(location);
@@ -738,9 +913,9 @@ public class LanceRESTServiceIT extends BaseIT {
 
     RegisterTableResponse response = ns.registerTable(registerTableRequest);
     Assertions.assertNotNull(response);
-    // The location should not exist yet as we do not create it in advanced.
+    // Registration retains the existing dataset.
     Assertions.assertEquals(location, response.getLocation());
-    Assertions.assertFalse(new File(location).exists());
+    Assertions.assertTrue(new File(location).exists());
 
     DescribeTableRequest describeTableRequest = new DescribeTableRequest();
     describeTableRequest.setId(ids);
@@ -749,19 +924,30 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertEquals(location, loadTable.getLocation());
     Assertions.assertTrue(loadTable.getMetadata().containsKey("key1"));
 
+    // An existing name must report a conflict without trying to open the new location.
+    String missingLocation = tempDir + "/register-missing/";
+    registerTableRequest.setLocation(missingLocation);
+    RuntimeException conflict =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.registerTable(registerTableRequest));
+    assertLanceErrorCode(conflict, ErrorCode.TABLE_ALREADY_EXISTS);
+    Assertions.assertFalse(new File(missingLocation).exists());
+    Assertions.assertEquals(location, ns.describeTable(describeTableRequest).getLocation());
+
     // Test register again with OVERWRITE mode
     String newLocation = tempDir + "/" + "register_new/";
+    LanceDatasetTestUtils.createDataset(newLocation);
     registerTableRequest.setMode("overwrite");
     registerTableRequest.setLocation(newLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(newLocation, response.getLocation());
-    // The location should not exist yet as we do not create it in advanced.
-    Assertions.assertFalse(new File(newLocation).exists());
+    // Registration retains the existing dataset.
+    Assertions.assertTrue(new File(newLocation).exists());
 
     // Register a new table with location exists
     String existingLocation = tempDir + "/" + "existing_location/";
-    new File(existingLocation).mkdirs();
+    LanceDatasetTestUtils.createDataset(existingLocation);
     Assertions.assertTrue(new File(existingLocation).exists());
     registerTableRequest.setMode("create");
     registerTableRequest.setLocation(existingLocation);
@@ -795,17 +981,19 @@ public class LanceRESTServiceIT extends BaseIT {
 
     // Test Overwrite again after deregister
     String nonExistingLocation = tempDir + "/" + "non_existing_location/";
+    LanceDatasetTestUtils.createDataset(nonExistingLocation);
     registerTableRequest.setMode("overwrite");
     registerTableRequest.setId(ids);
     registerTableRequest.setLocation(nonExistingLocation);
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertNotNull(response);
     Assertions.assertEquals(nonExistingLocation, response.getLocation());
-    Assertions.assertFalse(new File(nonExistingLocation).exists());
+    Assertions.assertTrue(new File(nonExistingLocation).exists());
 
     // Test registerTable with null mode after deregister should succeed
     registerTableRequest.setMode(null);
     String verifyNullModeLocation = tempDir + "/" + "verify_null_mode_location/";
+    LanceDatasetTestUtils.createDataset(verifyNullModeLocation);
     registerTableRequest.setLocation(verifyNullModeLocation);
     registerTableRequest.setId(List.of(CATALOG_NAME, SCHEMA_NAME, "verify_null_mode_location"));
     response = Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
@@ -888,7 +1076,7 @@ public class LanceRESTServiceIT extends BaseIT {
 
   @Test
   void testDropTable() {
-    catalog = createCatalog(CATALOG_NAME);
+    catalog = createCatalog(CATALOG_NAME, true);
     createSchema();
 
     List<String> ids = List.of(CATALOG_NAME, SCHEMA_NAME, "table_to_drop");
@@ -968,6 +1156,40 @@ public class LanceRESTServiceIT extends BaseIT {
     Assertions.assertFalse(new File(anotherLocation).exists());
   }
 
+  private void assertNonEmptyCreateRejected(
+      List<String> ids, String location, byte[] data, String mode) {
+    ApiException error =
+        Assertions.assertThrows(
+            ApiException.class,
+            () ->
+                createTableApi()
+                    .createTable(
+                        String.join(DELIMITER, ids),
+                        data,
+                        DELIMITER,
+                        mode,
+                        null,
+                        null,
+                        Map.of(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location)));
+    Assertions.assertEquals(406, error.getCode());
+  }
+
+  private byte[] arrowStreamWithEmptyThenNonEmptyBatch() throws IOException {
+    try (VectorSchemaRoot root = VectorSchemaRoot.of(new IntVector("id", allocator));
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ArrowStreamWriter writer = new ArrowStreamWriter(root, null, output)) {
+      root.allocateNew();
+      root.setRowCount(0);
+      writer.start();
+      writer.writeBatch();
+      ((IntVector) root.getVector("id")).setSafe(0, 42);
+      root.setRowCount(1);
+      writer.writeBatch();
+      writer.end();
+      return output.toByteArray();
+    }
+  }
+
   private CreateTableResponse createTable(
       List<String> ids,
       String location,
@@ -1037,13 +1259,14 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   @Test
-  void testDropTableWhenLocationMissingOrNotCreated() {
-    catalog = createCatalog(CATALOG_NAME);
+  void testDropTableWhenLocationMissingOrNotCreated() throws IOException {
+    catalog = createCatalog(CATALOG_NAME, true);
     createSchema();
 
-    // Create table via register with non-existent location
+    // Register a valid dataset, then remove its location before dropping the table
     List<String> registerIds = List.of(CATALOG_NAME, SCHEMA_NAME, "register_missing_location");
     String missingLocation = tempDir + "/" + "register_missing_location/";
+    LanceDatasetTestUtils.createDataset(missingLocation);
     RegisterTableRequest registerTableRequest = new RegisterTableRequest();
     registerTableRequest.setId(registerIds);
     registerTableRequest.setLocation(missingLocation);
@@ -1051,6 +1274,7 @@ public class LanceRESTServiceIT extends BaseIT {
     RegisterTableResponse registerTableResponse =
         Assertions.assertDoesNotThrow(() -> ns.registerTable(registerTableRequest));
     Assertions.assertEquals(missingLocation, registerTableResponse.getLocation());
+    FileUtils.deleteQuietly(new File(missingLocation));
     Assertions.assertFalse(new File(missingLocation).exists());
 
     DropTableRequest dropRegisteredTable = new DropTableRequest();
@@ -1064,7 +1288,7 @@ public class LanceRESTServiceIT extends BaseIT {
     // Register table with an existing location, then delete the location before drop
     List<String> existingIds = List.of(CATALOG_NAME, SCHEMA_NAME, "existing_then_deleted");
     String existingLocation = tempDir + "/" + "existing_then_deleted/";
-    new File(existingLocation).mkdirs();
+    LanceDatasetTestUtils.createDataset(existingLocation);
     Assertions.assertTrue(new File(existingLocation).exists());
 
     RegisterTableRequest existingRegisterRequest = new RegisterTableRequest();
@@ -1090,9 +1314,14 @@ public class LanceRESTServiceIT extends BaseIT {
   }
 
   private Catalog createCatalog(String catalogName) {
+    return createCatalog(catalogName, false);
+  }
+
+  private Catalog createCatalog(String catalogName, boolean allowExternalPurge) {
     Map<String, String> catalogProperties =
         ImmutableMap.<String, String>builder()
             .putAll(properties)
+            .put("lance.allow-external-table-purge", Boolean.toString(allowExternalPurge))
             .put("lance.storage.endpoint", MINIO_ENDPOINT)
             .put("lance.storage.allow_http", "true")
             .put("lance.storage.access_key_id", MINIO_ACCESS_KEY)

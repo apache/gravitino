@@ -23,6 +23,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Optional;
 import javax.inject.Inject;
@@ -42,6 +43,10 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
+import org.apache.gravitino.dto.policy.PolicyForTagAssociationDTO;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
@@ -49,12 +54,19 @@ import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.policy.HiddenPolicyTag;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -110,6 +122,7 @@ public class TagOperations {
               } else {
                 tagDTOs =
                     Arrays.stream(tags)
+                        .filter(tag -> !HiddenPolicyTag.isReservedName(tag.name()))
                         .map(t -> DTOConverters.toDTO(t, Optional.empty()))
                         .toArray(TagDTO[]::new);
               }
@@ -126,6 +139,10 @@ public class TagOperations {
             } else {
               String[] tagNames = tagDispatcher.listTags(metalake);
               tagNames = tagNames == null ? new String[0] : tagNames;
+              tagNames =
+                  Arrays.stream(tagNames)
+                      .filter(name -> !HiddenPolicyTag.isReservedName(name))
+                      .toArray(String[]::new);
               tagNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
@@ -168,6 +185,7 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
+            validateTagName(metalake, request.getName());
             Tag tag =
                 tagDispatcher.createTag(
                     metalake,
@@ -202,6 +220,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, name);
             Tag tag = tagDispatcher.getTag(metalake, name);
             LOG.info("Get tag: {} under metalake: {}", name, metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
@@ -236,11 +255,16 @@ public class TagOperations {
           httpRequest,
           () -> {
             request.validate();
-
+            checkVisibleTag(metalake, name);
             TagChange[] changes =
                 request.getUpdates().stream()
                     .map(TagUpdateRequest::tagChange)
                     .toArray(TagChange[]::new);
+            for (TagChange change : changes) {
+              if (change instanceof TagChange.RenameTag) {
+                validateTagName(metalake, ((TagChange.RenameTag) change).getNewName());
+              }
+            }
             Tag tag = tagDispatcher.alterTag(metalake, name, changes);
 
             LOG.info("Altered tag: {} under metalake: {}", name, metalake);
@@ -267,6 +291,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, name);
             boolean deleted = tagDispatcher.deleteTag(metalake, name);
             if (!deleted) {
               LOG.warn("Cannot find to be deleted tag {} under metalake {}", name, metalake);
@@ -304,6 +329,7 @@ public class TagOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
+            checkVisibleTag(metalake, tagName);
             MetadataObject[] objects =
                 tagDispatcher.listMetadataObjectsForTag(metalake, tagName, value);
             objects = objects == null ? new MetadataObject[0] : objects;
@@ -322,6 +348,126 @@ public class TagOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.LIST, "", tagName, e);
+    }
+  }
+
+  @GET
+  @Path("{tag}/policies")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "list-policies-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "list-policies-for-tag", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_TAG_AUTHORIZATION_EXPRESSION)
+  public Response listPoliciesForTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+    LOG.info("Received list policy associations for tag: {} under metalake: {}", tagName, metalake);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            checkVisibleTag(metalake, tagName);
+            RelationalEntity<?>[] associations =
+                tagDispatcher.listPolicyAssociationsForTag(metalake, tagName);
+            associations =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.POLICY,
+                    associations,
+                    association ->
+                        NameIdentifierUtil.ofPolicy(metalake, association.targetEntity().name()));
+            if (!verbose) {
+              String[] names =
+                  Arrays.stream(associations)
+                      .map(association -> association.targetEntity().name())
+                      .toArray(String[]::new);
+              return Utils.ok(new NameListResponse(names));
+            }
+
+            PolicyForTagAssociationDTO[] associationDTOs =
+                Arrays.stream(associations)
+                    .map(
+                        association ->
+                            new PolicyForTagAssociationDTO(
+                                PolicyOperations.toDTO(
+                                    (PolicyEntity) association.targetEntity(), Optional.empty()),
+                                PolicyOperations.toSelectorDTO(association)))
+                    .toArray(PolicyForTagAssociationDTO[]::new);
+            return Utils.ok(new PolicyForTagAssociationListResponse(associationDTOs));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.LIST, tagName, metalake, e);
+    }
+  }
+
+  @POST
+  @Path("{tag}/policies/{policy}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "add-policy-for-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "add-policy-for-tag", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && (POLICY::OWNER || ANY_APPLY_POLICY))")
+  public Response addPolicyForTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          String policyName,
+      PolicyTagAddRequest request) {
+    LOG.info(
+        "Received add policy: {} for tag: {} under metalake: {}", policyName, tagName, metalake);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            checkVisibleTag(metalake, tagName);
+            PolicyTagAddRequest effectiveRequest =
+                request == null ? new PolicyTagAddRequest() : request;
+            effectiveRequest.validate();
+            PolicyAssociationSelector selector = effectiveRequest.selector();
+            tagDispatcher.addPolicyForTag(metalake, tagName, policyName, selector);
+            return Utils.ok(
+                new PolicyTagAssociationResponse(
+                    policyName, tagName, PolicyAssociationSelectorDTO.fromSelector(selector)));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, tagName, metalake, e);
+    }
+  }
+
+  @DELETE
+  @Path("{tag}/policies/{policy}")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "remove-policy-from-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "remove-policy-from-tag", absolute = true)
+  @AuthorizationExpression(
+      expression =
+          "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && (POLICY::OWNER || ANY_APPLY_POLICY))")
+  public Response removePolicyFromTag(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY)
+          String policyName) {
+    LOG.info(
+        "Received remove policy: {} from tag: {} under metalake: {}",
+        policyName,
+        tagName,
+        metalake);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            checkVisibleTag(metalake, tagName);
+            tagDispatcher.removePolicyFromTag(metalake, tagName, policyName);
+            return Response.noContent().build();
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleTagException(OperationType.REMOVE, tagName, metalake, e);
     }
   }
 
@@ -374,7 +520,8 @@ public class TagOperations {
   @Timed(name = "get-object-tag." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-object-tag", absolute = true)
   @AuthorizationExpression(
-      expression = "METALAKE::OWNER || ((TAG::OWNER || ANY_APPLY_TAG) && CAN_ACCESS_METADATA)")
+      expression =
+          "METALAKE::OWNER || ((TAG::OWNER || ANY_VIEW_TAG || ANY_APPLY_TAG) && CAN_ACCESS_METADATA)")
   public Response getTagForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -409,5 +556,27 @@ public class TagOperations {
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
+  }
+
+  static void checkVisibleTag(String metalake, String name) {
+    if (HiddenPolicyTag.isReservedName(name)) {
+      throw new NoSuchTagException(
+          "Tag with name %s under metalake %s does not exist", name, metalake);
+    }
+  }
+
+  static void checkVisibleTag(String metalake, MetadataObject object) {
+    if (object.type() == MetadataObject.Type.TAG
+        && HiddenPolicyTag.isReservedName(object.fullName())) {
+      throw new NoSuchMetadataObjectException(
+          "Tag with name %s under metalake %s does not exist", object.fullName(), metalake);
+    }
+  }
+
+  private static void validateTagName(String metalake, String name) {
+    Preconditions.checkArgument(
+        !HiddenPolicyTag.isReservedName(name), "Tag name is reserved for internal policy bindings");
+    NameIdentifierUtil.checkMetadataObjectName(
+        NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
   }
 }

@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
@@ -33,6 +34,7 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.junit.jupiter.api.AfterAll;
@@ -119,6 +121,67 @@ public class TestIcebergCatalogWrapperManagerForREST {
             .contains("gravitino.iceberg-rest.catalog-config-provider=dynamic-config-provider"));
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testServiceAccountAuthorizationValidatedByWrapper(boolean authorizationEnabled)
+      throws Exception {
+    IcebergConfigProvider provider = Mockito.mock(DynamicIcebergConfigProvider.class);
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "rest",
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                "service-account"));
+    Mockito.when(provider.getIcebergCatalogConfig("remote")).thenReturn(Optional.of(config));
+    try (IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(ImmutableMap.of(), provider, false, "metalake")) {
+      IcebergRESTServerContext.create(provider, authorizationEnabled, true, true, manager);
+      if (authorizationEnabled) {
+        Assertions.assertInstanceOf(
+            FederatedCatalogWrapper.class, manager.getCatalogWrapper("remote"));
+      } else {
+        IllegalArgumentException failure =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> manager.getCatalogWrapper("remote"));
+        Assertions.assertTrue(
+            failure.getMessage().contains("requires authorization to be enabled"));
+      }
+    }
+  }
+
+  @Test
+  void testRejectedWrapperIsClosedAndNotCached() throws Exception {
+    IcebergConfigProvider provider = Mockito.mock(IcebergConfigProvider.class);
+    IcebergConfig config = new IcebergConfig(ImmutableMap.of());
+    Mockito.when(provider.getIcebergCatalogConfig("test")).thenReturn(Optional.of(config));
+    CatalogWrapperForREST wrapper = Mockito.mock(CatalogWrapperForREST.class);
+    Mockito.when(wrapper.getIcebergConfig()).thenReturn(config);
+    IllegalArgumentException failure = new IllegalArgumentException("invalid server configuration");
+    try (IcebergCatalogWrapperManager manager =
+        Mockito.spy(
+            new IcebergCatalogWrapperManager(ImmutableMap.of(), provider, false, "metalake"))) {
+      Mockito.doReturn(wrapper)
+          .when(manager)
+          .createCatalogWrapper(Mockito.eq("test"), Mockito.any());
+      IcebergRESTServerContext context =
+          IcebergRESTServerContext.create(provider, false, false, true, manager);
+      Mockito.doThrow(failure).when(wrapper).validateServerContext(context);
+
+      Assertions.assertSame(
+          failure,
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> manager.getCatalogWrapper("test")));
+      Mockito.verify(wrapper).close();
+      Mockito.verify(wrapper, Mockito.never()).reloadHadoopConf();
+
+      Mockito.doNothing().when(wrapper).validateServerContext(context);
+      Assertions.assertSame(wrapper, manager.getCatalogWrapper("test"));
+      Mockito.verify(wrapper, Mockito.times(2)).validateServerContext(context);
+      Mockito.verify(wrapper).reloadHadoopConf();
+    }
+  }
+
   @Test
   public void testCreateFederatedWrapperForRestBackend() {
     IcebergConfig icebergConfig =
@@ -187,6 +250,70 @@ public class TestIcebergCatalogWrapperManagerForREST {
           manager.getCatalogWrapper(IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG);
       Assertions.assertNotSame(original, replacement);
     }
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosWithoutTokenExpiryUsesAccessEviction() {
+    IcebergConfig config =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(1);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosCapsByGcsTokenExpiry() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.HOURS.toMillis(1); // token valid for 1h
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    long accessEvictionNanos = TimeUnit.HOURS.toNanos(2);
+    long expected =
+        TimeUnit.MILLISECONDS.toNanos(
+            TimeUnit.HOURS.toMillis(1) - IcebergCatalogWrapperManager.GCS_TOKEN_REFRESH_BUFFER_MS);
+    Assertions.assertEquals(
+        expected,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(config, accessEvictionNanos, now));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosExpiresImmediatelyWhenPastRefreshDeadline() {
+    long now = 1_700_000_000_000L;
+    long expiresAt = now + TimeUnit.MINUTES.toMillis(2); // within 5-minute buffer
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                String.valueOf(expiresAt)));
+    Assertions.assertEquals(
+        0L,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, TimeUnit.HOURS.toNanos(1), now));
+  }
+
+  @Test
+  public void testComputeCacheDurationNanosIgnoresInvalidExpiresAt() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.ICEBERG_GCS_OAUTH2_TOKEN_EXPIRES_AT,
+                "not-a-number"));
+    long accessEvictionNanos = TimeUnit.MINUTES.toNanos(30);
+    Assertions.assertEquals(
+        accessEvictionNanos,
+        IcebergCatalogWrapperManager.computeCacheDurationNanos(
+            config, accessEvictionNanos, System.currentTimeMillis()));
   }
 
   private static IcebergCatalogWrapperManager newManager() {

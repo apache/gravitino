@@ -45,6 +45,8 @@ public abstract class BaseColumn implements Column {
 
   protected Expression defaultValue;
 
+  protected Expression initialDefaultValue = Column.INITIAL_DEFAULT_VALUE_NOT_SET;
+
   /**
    * Returns the name of the column.
    *
@@ -99,6 +101,15 @@ public abstract class BaseColumn implements Column {
   }
 
   /**
+   * @return The initial default value of this column, {@link Column#INITIAL_DEFAULT_VALUE_NOT_SET}
+   *     if not specified
+   */
+  @Override
+  public Expression initialDefaultValue() {
+    return initialDefaultValue;
+  }
+
+  /**
    * Builder interface for creating instances of {@link BaseColumn}.
    *
    * @param <SELF> The type of the builder.
@@ -118,6 +129,8 @@ public abstract class BaseColumn implements Column {
 
     SELF withDefaultValue(Expression defaultValue);
 
+    SELF withInitialDefaultValue(Expression initialDefaultValue);
+
     T build();
   }
 
@@ -136,6 +149,8 @@ public abstract class BaseColumn implements Column {
     protected boolean nullable = true;
     protected boolean autoIncrement = false;
     protected Expression defaultValue;
+
+    protected Expression initialDefaultValue;
 
     /**
      * Sets the name of the column.
@@ -206,6 +221,18 @@ public abstract class BaseColumn implements Column {
     @Override
     public SELF withDefaultValue(Expression defaultValue) {
       this.defaultValue = defaultValue;
+      return self();
+    }
+
+    /**
+     * Sets the initial default value of the column.
+     *
+     * @param initialDefaultValue The initial default value of the column.
+     * @return The builder instance.
+     */
+    @Override
+    public SELF withInitialDefaultValue(Expression initialDefaultValue) {
+      this.initialDefaultValue = initialDefaultValue;
       return self();
     }
 

@@ -42,8 +42,7 @@ public class LanceRESTAuthInterceptionService implements InterceptionService {
   public static final String METALAKE_BINDING = "lanceAuthorizationMetalake";
 
   // Membership here only routes a class through the interceptor; each method still opts in with
-  // @AuthorizationExpression, and a method without one runs unauthorized. The table writes
-  // (create, register, drop, alter) are still to be annotated.
+  // @AuthorizationExpression. Endpoint coverage tests ensure no REST operation omits it.
   private static final Set<String> INTERCEPTED_CLASSES =
       ImmutableSet.of(
           LanceNamespaceOperations.class.getName(), LanceTableOperations.class.getName());

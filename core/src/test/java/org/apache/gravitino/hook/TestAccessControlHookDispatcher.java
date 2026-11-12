@@ -26,6 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
+import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
@@ -34,6 +35,8 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -87,6 +90,20 @@ public class TestAccessControlHookDispatcher {
                     "test_metalake", "test_role", Collections.emptyMap(), Collections.emptyList()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createRole(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testCreateRolesSetsOwnerWithInternalDispatcher() {
+    List<RoleAdd> roles =
+        Collections.singletonList(
+            new RoleAdd("test_role", Collections.emptyMap(), Collections.emptyList()));
+    List<BulkItemResult<Role>> results =
+        Collections.singletonList(BulkItemResult.success(0, "test_role", mock(Role.class)));
+    when(mockDispatcher.createRoles("test_metalake", roles)).thenReturn(results);
+
+    Assertions.assertSame(results, hookDispatcher.createRoles("test_metalake", roles));
+
+    verify(mockOwnerDispatcher).setOwner(any(), any(), any(), any());
   }
 
   @Test

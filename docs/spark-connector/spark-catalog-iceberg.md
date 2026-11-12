@@ -18,9 +18,8 @@ Spark clients use a different Iceberg version than the Gravitino server (1.11.0)
 
 | Spark version | Scala          | Iceberg version | Iceberg client runtime artifact                         | Gravitino connector runtime artifact                                              |
 |---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
-| 3.3           | 2.12 or 2.13   | 1.8.1           | `iceberg-spark-runtime-3.3_${scala-version}-1.8.1.jar`  | `gravitino-spark-connector-runtime-3.3_${scala-version}-${gravitino-version}.jar` |
-| 3.4           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.4_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.4_${scala-version}-${gravitino-version}.jar` |
 | 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
+| 4.0           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.0_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.0_2.13-${gravitino-version}.jar`             |
 
 Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
 
@@ -197,6 +196,12 @@ spark.sql.gravitino.iceberg.rest.rest.auth.basic.password  <password>
 
 See [Connect Spark to Iceberg REST](../iceberg-rest-engine/spark.md) for the full set of supported
 `rest.auth.*` properties and how to configure them when connecting directly to the IRC endpoint.
+
+When the Gravitino client uses Basic authentication (`spark.sql.gravitino.authType=basic`), the connector reuses its user name and password for IRC. Any `rest.auth.*` or `token` property set through `spark.sql.gravitino.iceberg.rest.*` disables the reuse.
+
+When the Gravitino client uses token authentication (`spark.sql.gravitino.authType=token`), the connector passes its bearer token to IRC as the Iceberg `token` property. The token is read when the catalog is initialized and isn't refreshed afterwards. Any `rest.auth.*` or `token` property set through `spark.sql.gravitino.iceberg.rest.*` disables the reuse.
+
+Kerberos can't be carried to IRC because the Iceberg REST client doesn't support SPNEGO. With `spark.sql.gravitino.authType=kerberos`, a routed Iceberg catalog fails at initialization unless its authentication is configured through `spark.sql.gravitino.iceberg.rest.*`.
 
 When the Gravitino client uses OAuth2, the connector reuses its OAuth2 client configuration for IRC by
 default. This avoids duplicating configuration when both endpoints accept the same client identity. The

@@ -22,6 +22,7 @@ import httpx
 from mcp_server.client import (
     CatalogOperation,
     GravitinoOperation,
+    MetalakeOperation,
     ModelOperation,
     PolicyOperation,
     SchemaOperation,
@@ -29,6 +30,7 @@ from mcp_server.client import (
     TagOperation,
 )
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
 )
@@ -37,6 +39,9 @@ from mcp_server.client.plain.plain_rest_client_fileset_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_job_operation import (
     PlainRESTClientJobOperation,
+)
+from mcp_server.client.plain.plain_rest_client_metalake_operation import (
+    PlainRESTClientMetalakeOperation,
 )
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
@@ -49,6 +54,9 @@ from mcp_server.client.plain.plain_rest_client_policy_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_schema_operation import (
     PlainRESTClientSchemaOperation,
+)
+from mcp_server.client.plain.plain_rest_client_semantic_model_operation import (
+    PlainRESTClientSemanticModelOperation,
 )
 from mcp_server.client.plain.plain_rest_client_statistic_operation import (
     PlainRESTClientStatisticOperation,
@@ -65,7 +73,32 @@ from mcp_server.client.plain.plain_rest_client_topic_operation import (
 from mcp_server.client.plain.plain_rest_client_view_operation import (
     PlainRESTClientViewOperation,
 )
+from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.topic_operation import TopicOperation
+
+
+class _GravitinoAsyncClient(httpx.AsyncClient):
+    """Preserve actionable timeout details instead of FastMCP's generic timeout."""
+
+    async def send(self, request, **kwargs):
+        try:
+            return await super().send(request, **kwargs)
+        except httpx.ReadTimeout as exc:
+            # OAuth hooks can time out on their own token request, with a different budget.
+            # Preserve that exception instead of misreporting a Gravitino timeout.
+            if exc.request.url != request.url:
+                raise
+            # Include only the encoded path: queries, userinfo and credentials are excluded.
+            resource = request.url.raw_path.split(b"?", 1)[0].decode(
+                "ascii", errors="backslashreplace"
+            )
+            # Do not retry writes: the upstream operation may already have committed.
+            raise GravitinoException(
+                f"The MCP server stopped waiting for Gravitino ({request.method} "
+                f"{resource}) after a response read "
+                f"timeout of {self.timeout.read:g} seconds. The operation may still "
+                "complete on the server; check its result before retrying."
+            ) from exc
 
 
 # pylint: disable=too-many-instance-attributes
@@ -77,6 +110,7 @@ class PlainRESTClientOperation(GravitinoOperation):
         authorization: str = "",
         *,
         auth: Optional[httpx.Auth] = None,
+        read_timeout: float = 60.0,
     ):
         """Create a REST client for one identity.
 
@@ -87,14 +121,20 @@ class PlainRESTClientOperation(GravitinoOperation):
                 on every request (for example ``"Bearer <token>"`` for OAuth2 or
                 ``"Basic <base64(user:secret)>"`` for simple or Basic auth).
                 Empty string means anonymous (no header sent).
+            read_timeout: Response read timeout in seconds (default 60).
             auth: Optional httpx auth hook used instead of a frozen header
                 (OAuth client-credentials refresh).
         """
         headers = {}
         if authorization:
             headers["Authorization"] = authorization
-        _rest_client = httpx.AsyncClient(
-            base_url=uri, headers=headers, auth=auth
+        _rest_client = _GravitinoAsyncClient(
+            base_url=uri,
+            headers=headers,
+            auth=auth,
+            timeout=httpx.Timeout(
+                read_timeout, connect=5.0, pool=5.0, write=5.0
+            ),
         )
         # Kept so the shared connection pool can be closed (see close()).
         self._rest_client = _rest_client
@@ -134,10 +174,20 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._view_operation = PlainRESTClientViewOperation(
             metalake_name, _rest_client
         )
+        self._semantic_model_operation = PlainRESTClientSemanticModelOperation(
+            metalake_name, _rest_client
+        )
+        # Not metalake-scoped: addresses the server's top-level endpoint.
+        self._metalake_operation = PlainRESTClientMetalakeOperation(
+            _rest_client
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client and release its connection pool."""
         await self._rest_client.aclose()
+
+    def as_metalake_operation(self) -> MetalakeOperation:
+        return self._metalake_operation
 
     def as_catalog_operation(self) -> CatalogOperation:
         return self._catalog_operation
@@ -174,3 +224,6 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_view_operation(self):
         return self._view_operation
+
+    def as_semantic_model_operation(self) -> SemanticModelOperation:
+        return self._semantic_model_operation

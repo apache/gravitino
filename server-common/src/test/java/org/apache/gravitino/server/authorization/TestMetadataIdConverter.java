@@ -20,15 +20,19 @@
 package org.apache.gravitino.server.authorization;
 
 import static org.mockito.Answers.CALLS_REAL_METHODS;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -40,7 +44,11 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
@@ -52,14 +60,17 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class TestMetadataIdConverter {
@@ -72,6 +83,7 @@ public class TestMetadataIdConverter {
   private NameIdentifier ident6;
   private NameIdentifier ident7;
   private NameIdentifier ident8;
+  private NameIdentifier ident9;
 
   // Test Entities
   private BaseMetalake entity1;
@@ -82,12 +94,52 @@ public class TestMetadataIdConverter {
   private FilesetEntity entity6;
   private TopicEntity entity7;
   private GroupEntity entity8;
+  private SemanticModelEntity entity9;
 
   @BeforeAll
   void initTest() throws IOException {
     initTestNameIdentifier();
     initTestEntities();
     initMockCache();
+  }
+
+  @Test
+  void testSemanticModelLookupPreservesLeafCase() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    Capability capability =
+        new Capability() {
+          @Override
+          public CapabilityResult caseSensitiveOnName(Scope scope) {
+            return CapabilityResult.unsupported("lowercase");
+          }
+        };
+    when(catalog.capability()).thenReturn(capability);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    SemanticModelEntity model = mock(SemanticModelEntity.class);
+    when(model.id()).thenReturn(91L);
+    NameIdentifier normalized = NameIdentifier.of("metalake", "catalog", "schema", "SalesModel");
+    when(store.get(normalized, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
+        .thenReturn(model);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          Optional.of(91L),
+          MetadataIdConverter.getID(
+              MetadataObjects.parse(
+                  "catalog.SCHEMA.SalesModel", MetadataObject.Type.SEMANTIC_MODEL),
+              "metalake"));
+    }
   }
 
   @Test
@@ -152,6 +204,12 @@ public class TestMetadataIdConverter {
                   MetadataIdConverter.normalizeCaseSensitive(
                       eq(ident8), eq(null), eq(mockCatalogManager)))
           .thenReturn(ident8);
+      mockedStatic
+          .when(
+              () ->
+                  MetadataIdConverter.normalizeCaseSensitive(
+                      eq(ident9), eq(Capability.Scope.SEMANTIC_MODEL), eq(mockCatalogManager)))
+          .thenReturn(ident9);
 
       Optional<Long> metalakeConvertedId =
           MetadataIdConverter.getID(
@@ -185,6 +243,12 @@ public class TestMetadataIdConverter {
               MetadataObjects.of(
                   ImmutableList.of("catalog", "schema", "topic"), MetadataObject.Type.TOPIC),
               "metalake");
+      Optional<Long> semanticModelConvertedId =
+          MetadataIdConverter.getID(
+              MetadataObjects.of(
+                  ImmutableList.of("catalog", "schema", "sales_model"),
+                  MetadataObject.Type.SEMANTIC_MODEL),
+              "metalake");
 
       Assertions.assertEquals(Optional.of(1L), metalakeConvertedId);
       Assertions.assertEquals(Optional.of(2L), catalogConvertedId);
@@ -193,6 +257,7 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(Optional.of(5L), modelConvertedId);
       Assertions.assertEquals(Optional.of(6L), filesetConvertedId);
       Assertions.assertEquals(Optional.of(7L), topicConvertedId);
+      Assertions.assertEquals(Optional.of(9L), semanticModelConvertedId);
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
@@ -216,7 +281,8 @@ public class TestMetadataIdConverter {
     MetadataObject fileset =
         MetadataObjects.of(
             ImmutableList.of("missing_catalog", "schema", "fileset"), MetadataObject.Type.FILESET);
-    when(mockCatalogManager.loadCatalogAndWrap(NameIdentifier.of("metalake", "missing_catalog")))
+    when(mockCatalogManager.doWithCatalog(
+            eq(NameIdentifier.of("metalake", "missing_catalog")), any()))
         .thenThrow(
             new NoSuchCatalogException("Catalog %s does not exist", "metalake.missing_catalog"));
 
@@ -230,6 +296,140 @@ public class TestMetadataIdConverter {
     }
   }
 
+  @Test
+  void testTableAuthorizationResolvesPhysicalNameSameAsDispatcher() {
+    // The authorization path must resolve a table to the same physical name the dispatcher operates
+    // on. Here the catalog's ops implements SupportsTableNameResolution and maps the normalized
+    // name T_NORM to the stored physical name t_phys; normalizeCaseSensitive (used by getID for
+    // authorization) must return t_phys, so authorization and the operation target the same table.
+    NameIdentifier tableIdent = NameIdentifier.of("metalake", "catalog", "schema", "T_NORM");
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+
+    // A capability that leaves the name unchanged, to isolate the resolution step.
+    Capability identityCapability = new Capability() {};
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(identityCapability);
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+
+    // doWithCatalog runs the callback with the mock catalog (used by both getCapability and the
+    // shared resolver inside normalizeCaseSensitive).
+    doAnswer(
+            invocation -> {
+              org.apache.gravitino.utils.ThrowableFunction<BaseCatalog, Object> fn =
+                  invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    NameIdentifier authorized =
+        MetadataIdConverter.normalizeCaseSensitive(
+            tableIdent, Capability.Scope.TABLE, mockCatalogManager);
+
+    Assertions.assertEquals(
+        "t_phys",
+        authorized.name(),
+        "authorization must resolve to the physical name the dispatcher operates on");
+    Assertions.assertEquals(physical, authorized);
+  }
+
+  @Test
+  void testColumnAuthorizationResolvesParentPhysicalName() {
+    // Tag operations and authorization share one helper, so a column's parent table resolves to
+    // the same physical name as a table does.
+    NameIdentifier physical = NameIdentifier.of("metalake", "catalog", "schema", "t_phys");
+    CatalogOperations resolvingOps =
+        mock(
+            CatalogOperations.class,
+            withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    when(((SupportsTableNameResolution) resolvingOps).resolveTableName(any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier norm = invocation.getArgument(0);
+              return "T_NORM".equals(norm.name()) ? physical : norm;
+            });
+    BaseCatalog<?> mockCatalog = mock(BaseCatalog.class);
+    when(mockCatalog.capability()).thenReturn(new Capability() {});
+    when(mockCatalog.ops()).thenReturn(resolvingOps);
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+    doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> fn = invocation.getArgument(1);
+              return fn.apply(mockCatalog);
+            })
+        .when(mockCatalogManager)
+        .doWithCatalog(any(), any());
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "t_phys", "col"),
+        MetadataIdConverter.normalizeCaseSensitive(
+            NameIdentifier.of("metalake", "catalog", "schema", "T_NORM", "col"),
+            Capability.Scope.COLUMN,
+            mockCatalogManager));
+  }
+
+  @Test
+  void testColumnAuthorizationKeepsExactStoredColumnName() throws Exception {
+    CatalogManager catalogs = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    when(catalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("lowercase");
+              }
+            });
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog<?>, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogs)
+        .doWithCatalog(any(), any());
+    EntityStore store = mock(EntityStore.class);
+    TableEntity table = mock(TableEntity.class);
+    ColumnEntity column = mock(ColumnEntity.class);
+    when(column.name()).thenReturn("MyCol");
+    when(table.columns()).thenReturn(Collections.singletonList(column));
+    when(store.get(
+            NameIdentifier.of("metalake", "catalog", "schema", "orders"),
+            Entity.EntityType.TABLE,
+            TableEntity.class))
+        .thenReturn(table);
+    GravitinoEnv env = mock(GravitinoEnv.class);
+    when(env.catalogManager()).thenReturn(catalogs);
+    when(env.entityStore()).thenReturn(store);
+    try (MockedStatic<GravitinoEnv> mocked = mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      Assertions.assertEquals(
+          "catalog.schema.orders.MyCol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse("catalog.SCHEMA.ORDERS.MyCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
+      Assertions.assertEquals(
+          "catalog.schema.orders.othercol",
+          MetadataIdConverter.normalizeMetadataObject(
+                  MetadataObjects.parse(
+                      "catalog.SCHEMA.ORDERS.OtherCol", MetadataObject.Type.COLUMN),
+                  "metalake")
+              .fullName());
+    }
+  }
+
   private void initTestNameIdentifier() {
     ident1 = NameIdentifier.of("metalake");
     ident2 = NameIdentifier.of("metalake", "catalog");
@@ -239,6 +439,7 @@ public class TestMetadataIdConverter {
     ident6 = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
     ident7 = NameIdentifier.of("metalake", "catalog", "schema", "topic");
     ident8 = NameIdentifier.of("metalake", "group");
+    ident9 = NameIdentifier.of("metalake", "catalog", "schema", "sales_model");
   }
 
   private void initTestEntities() {
@@ -259,6 +460,8 @@ public class TestMetadataIdConverter {
         getTestTopicEntity(
             7L, "topic", Namespace.of("metalake", "catalog", "schema"), "test_topic");
     entity8 = getTestGroupEntity(8L, "group", Namespace.of("metalake"));
+    entity9 = mock(SemanticModelEntity.class);
+    when(entity9.id()).thenReturn(9L);
   }
 
   private void initMockCache() throws IOException {
@@ -272,6 +475,8 @@ public class TestMetadataIdConverter {
     when(mockStore.get(ident6, Entity.EntityType.FILESET, FilesetEntity.class)).thenReturn(entity6);
     when(mockStore.get(ident7, Entity.EntityType.TOPIC, TopicEntity.class)).thenReturn(entity7);
     when(mockStore.get(ident8, Entity.EntityType.GROUP, GroupEntity.class)).thenReturn(entity8);
+    when(mockStore.get(ident9, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class))
+        .thenReturn(entity9);
   }
 
   private BaseMetalake getTestMetalake(long id, String name, String comment) {

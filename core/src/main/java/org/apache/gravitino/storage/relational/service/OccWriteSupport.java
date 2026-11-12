@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.Lists;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
@@ -27,6 +29,7 @@ import java.util.function.Supplier;
 import java.util.function.ToIntFunction;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -37,7 +40,42 @@ import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
  */
 public class OccWriteSupport {
 
+  /**
+   * The most children one versioned batch soft delete may guard. Every child adds an {@code (id = ?
+   * AND current_version = ?)} term to the statement, and a long OR chain is slow to plan on MySQL
+   * and exceeds the 65,535 bind parameter limit of PostgreSQL beyond 32,767 children.
+   */
+  @VisibleForTesting static final int CHILD_DELETE_BATCH_SIZE = 500;
+
   private OccWriteSupport() {}
+
+  /**
+   * Resolves an overwrite target by locking its natural key, then falling back to its stable ID.
+   *
+   * <p>A missing row is not locked. Callers must handle concurrent insert conflicts and roll back
+   * the whole write before retrying. A stable ID under another parent must never be adopted without
+   * fencing that parent.
+   *
+   * @param <T> the persistent object type
+   * @param byNameLookup the locking natural-key lookup
+   * @param byIdLookup the locking stable-ID lookup
+   * @param sameParent checks whether the stable-ID match belongs to the target parent
+   * @return the locked target, or null if both lookups miss
+   * @throws EntityAlreadyExistsException if the stable ID belongs to another parent
+   */
+  @Nullable
+  public static <T> T findAndLockForOverwrite(
+      Supplier<T> byNameLookup, Supplier<T> byIdLookup, Predicate<T> sameParent) {
+    T current = byNameLookup.get();
+    if (current != null) {
+      return current;
+    }
+    current = byIdLookup.get();
+    if (current != null && !sameParent.test(current)) {
+      throw new EntityAlreadyExistsException("The entity ID already belongs to a different parent");
+    }
+    return current;
+  }
 
   /**
    * Classifies a write-failure for an entity during an optimistic concurrency control operation.
@@ -116,10 +154,26 @@ public class OccWriteSupport {
   }
 
   /**
+   * Executes a single-row compare-and-set update for an entity guarded by version.
+   *
+   * @param updateOps an operation supplying the number of rows affected by the update
+   * @param onMissSupplier a supplier providing the RuntimeException when zero rows are updated
+   */
+  public static void updateWithVersion(
+      IntSupplier updateOps, Supplier<RuntimeException> onMissSupplier) {
+    int updated = updateOps.getAsInt();
+    if (updated == 0) {
+      throw onMissSupplier.get();
+    }
+  }
+
+  /**
    * Executes a batch soft delete of child entities guarded by their individual versions.
    *
-   * <p>If the affected row count does not match the size of the child list, throws a concurrent
-   * child modification exception via {@link ExceptionUtils#concurrentChildModification}.
+   * <p>The children are deleted in chunks of at most {@link #CHILD_DELETE_BATCH_SIZE}. All chunks
+   * run in the caller's transaction, so a failure rolls back the chunks already deleted. If the
+   * affected row count does not match the size of the child list, throws a concurrent child
+   * modification exception via {@link ExceptionUtils#concurrentChildModification}.
    *
    * @param <T> the persistent object (PO) type of the child entities
    * @param parentIdentifier the name identifier of the parent entity
@@ -137,9 +191,11 @@ public class OccWriteSupport {
     if (children == null || children.isEmpty()) {
       return;
     }
-    int deleted = softDeleteOps.applyAsInt(children);
-    if (deleted != children.size()) {
-      throw ExceptionUtils.concurrentChildModification(childType, parentType, parentIdentifier);
+    for (List<T> chunk : Lists.partition(children, CHILD_DELETE_BATCH_SIZE)) {
+      int deleted = softDeleteOps.applyAsInt(chunk);
+      if (deleted != chunk.size()) {
+        throw ExceptionUtils.concurrentChildModification(childType, parentType, parentIdentifier);
+      }
     }
   }
 

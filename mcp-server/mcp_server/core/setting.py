@@ -15,8 +15,14 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import math
 from dataclasses import dataclass, field
 from typing import Set
+
+# Tag carried by the metalake discovery tools. Defined here because
+# Setting is what interprets --include-tool-tags; tools/metalake.py
+# imports it so the tag and the check below cannot drift apart.
+METALAKE_TOOL_TAG = "metalake"
 
 
 @dataclass
@@ -28,7 +34,10 @@ class DefaultSetting:
 
 @dataclass
 class Setting:  # pylint: disable=too-many-instance-attributes
-    metalake: str
+    # Default metalake, used by any tool call that does not name one itself
+    # via the `metalake` argument. Optional on every transport: a deployment
+    # serving several metalakes can leave it unset and let each call choose.
+    metalake: str = ""
     gravitino_uri: str = DefaultSetting.default_gravitino_uri
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
@@ -55,6 +64,20 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     # HTTP only: reject requests with no Authorization when service OAuth or
     # --token is configured instead of falling back to the service identity.
     no_service_identity_fallback: bool = False
+    gravitino_read_timeout: float = 60.0
+
+    def __post_init__(self) -> None:
+        # A whitespace-only --metalake (e.g. a shell-quoting mistake) must be
+        # treated as "no default configured", the same as an empty string,
+        # rather than silently used as a nonsensical metalake name.
+        self.metalake = self.metalake.strip()
+        if (
+            not math.isfinite(self.gravitino_read_timeout)
+            or self.gravitino_read_timeout <= 0
+        ):
+            raise ValueError(
+                "Gravitino read timeout must be a finite positive number of seconds"
+            )
 
     def has_oauth_client(self) -> bool:
         """Return True when client-credentials is fully configured."""
@@ -63,6 +86,15 @@ class Setting:  # pylint: disable=too-many-instance-attributes
             and self.oauth_client_id.strip()
             and self.oauth_client_secret.strip()
         )
+
+    def exposes_metalake_discovery(self) -> bool:
+        """Whether the `list_metalakes` tool is reachable in this deployment.
+
+        --include-tool-tags is an allowlist, so a tag filter that omits
+        "metalake" hides the discovery tool. Callers use this to avoid telling
+        an agent to call a tool it cannot see.
+        """
+        return not self.tags or METALAKE_TOOL_TAG in self.tags
 
     def has_service_identity(self) -> bool:
         """Return True when a static token or OAuth client-credentials is set."""
@@ -99,6 +131,7 @@ class Setting:  # pylint: disable=too-many-instance-attributes
         return (
             f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
             f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "
+            f"gravitino_read_timeout={self.gravitino_read_timeout}, "
             f"token={token_display}, tls_cert={self.tls_cert}, "
             f"tls_key={self.tls_key}, "
             f"oauth_token_endpoint={self.oauth_token_endpoint}, "

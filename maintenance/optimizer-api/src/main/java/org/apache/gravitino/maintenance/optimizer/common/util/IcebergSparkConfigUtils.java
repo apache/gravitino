@@ -50,11 +50,14 @@ public final class IcebergSparkConfigUtils {
   /** Build default Spark template configs for Iceberg jobs. */
   public static Map<String, String> buildTemplateSparkConfigs() {
     Map<String, String> configs = new HashMap<>();
-    configs.put("spark.master", "{{spark_master}}");
-    configs.put("spark.executor.instances", "{{spark_executor_instances}}");
-    configs.put("spark.executor.cores", "{{spark_executor_cores}}");
-    configs.put("spark.executor.memory", "{{spark_executor_memory}}");
-    configs.put("spark.driver.memory", "{{spark_driver_memory}}");
+    // An empty value leaves the Spark configuration unset: spark-submit then runs the job with
+    // its default master, local[*], and the k8s job executor lets the operator decide it.
+    configs.put("spark.master", "{{spark_master:-}}");
+    configs.put("spark.executor.instances", "{{spark_executor_instances:-1}}");
+    configs.put("spark.executor.cores", "{{spark_executor_cores:-1}}");
+    configs.put("spark.executor.memory", "{{spark_executor_memory:-1g}}");
+    configs.put("spark.driver.memory", "{{spark_driver_memory:-1g}}");
+    // The catalog connection has no default that fits every catalog, so it stays required.
     configs.put(
         SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}", "org.apache.iceberg.spark.SparkCatalog");
     configs.put(SPARK_SQL_CATALOG_PREFIX + "{{catalog_name}}.type", "{{catalog_type}}");

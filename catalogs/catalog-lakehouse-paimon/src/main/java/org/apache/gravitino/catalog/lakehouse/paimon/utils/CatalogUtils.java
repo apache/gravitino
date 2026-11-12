@@ -43,6 +43,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.authentication.Authenticati
 import org.apache.gravitino.catalog.lakehouse.paimon.authentication.kerberos.KerberosConfig;
 import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonBackendCatalogWrapper;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.catalog.CatalogContext;
@@ -88,7 +89,7 @@ public class CatalogUtils {
         Catalog catalog = loadCatalogBackendWithKerberosAuth(paimonConfig, configuration);
         return new PaimonBackendCatalogWrapper(catalog, kerberosClient);
       } catch (Exception e) {
-        throw new RuntimeException("Failed to login with kerberos", e);
+        throw ExceptionMessages.wrap("Failed to login with kerberos", e);
       }
     } else {
       throw new UnsupportedOperationException(
@@ -133,13 +134,20 @@ public class CatalogUtils {
     } catch (RuntimeException e) {
       if (e.getCause() instanceof SQLException
           && e.getCause().getMessage().contains("Access denied")) {
-        throw new ConnectionFailedException(e, e.getMessage());
+        throw new ConnectionFailedException(e, "%s", e.getMessage());
       }
       throw e;
     }
   }
 
-  private static void checkPaimonConfig(PaimonConfig paimonConfig) {
+  /**
+   * Validates the Paimon catalog configuration without contacting the catalog backend.
+   *
+   * @param paimonConfig The Paimon configuration.
+   * @throws IllegalArgumentException if a required setting is missing or the JDBC driver cannot be
+   *     loaded
+   */
+  public static void checkPaimonConfig(PaimonConfig paimonConfig) {
     String metastore = paimonConfig.get(CATALOG_BACKEND);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(metastore), "Paimon Catalog metastore cannot be null or empty");

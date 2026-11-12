@@ -70,9 +70,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoHiveCatalog class is an implementation of the BaseCatalog class that is used to
- * proxy the HiveCatalog class.
+ * proxy the HiveCatalog class. Abstract because {@link #catalogCompat()} differs per Flink version;
+ * every concrete, version-specific catalog overrides it.
  */
-public class GravitinoHiveCatalog extends BaseCatalog {
+public abstract class GravitinoHiveCatalog extends BaseCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoHiveCatalog.class);
 
   private HiveCatalog hiveCatalog;

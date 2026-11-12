@@ -35,9 +35,17 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
@@ -100,10 +108,14 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testAdd", user.name());
     Assertions.assertTrue(user.enabled());
     Assertions.assertTrue(user.groupNames().isEmpty());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, user.auditInfo().creator());
+    Assertions.assertNotNull(user.auditInfo().createTime());
+    Assertions.assertNull(user.auditInfo().lastModifier());
 
     IdpUser disabled = manager.addUser("testAddDisabled", VALID_PASSWORD, false);
     Assertions.assertFalse(disabled.enabled());
     Assertions.assertFalse(manager.getUser("testAddDisabled").enabled());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, disabled.auditInfo().creator());
 
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
@@ -115,6 +127,8 @@ public class TestIdpUserGroupManager {
 
     IdpUser user = manager.getUser("testGet");
     Assertions.assertEquals("testGet", user.name());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, user.auditInfo().creator());
+    Assertions.assertNotNull(user.auditInfo().createTime());
 
     Throwable exception =
         Assertions.assertThrows(NotFoundException.class, () -> manager.getUser("not-exist"));
@@ -134,10 +148,30 @@ public class TestIdpUserGroupManager {
     manager.addUser("testChangePassword", VALID_PASSWORD);
 
     Assertions.assertTrue(manager.changePassword("testChangePassword", NEW_VALID_PASSWORD));
-    Assertions.assertEquals("testChangePassword", manager.getUser("testChangePassword").name());
+    IdpUser updated = manager.getUser("testChangePassword");
+    Assertions.assertEquals("testChangePassword", updated.name());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, updated.auditInfo().creator());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, updated.auditInfo().lastModifier());
+    Assertions.assertNotNull(updated.auditInfo().lastModifiedTime());
 
     Assertions.assertThrows(
         NotFoundException.class, () -> manager.changePassword("not-exist", VALID_PASSWORD));
+  }
+
+  @Test
+  public void testChangePasswordWithOldPassword() throws IOException {
+    manager.addUser("testChangeWithOld", VALID_PASSWORD);
+
+    Assertions.assertTrue(
+        manager.changePassword("testChangeWithOld", NEW_VALID_PASSWORD, VALID_PASSWORD));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.changePassword("testChangeWithOld", VALID_PASSWORD, "wrong-old-password"));
+    Assertions.assertEquals(
+        "testChangeWithOld", manager.authenticate("testChangeWithOld", NEW_VALID_PASSWORD).name());
   }
 
   @Test
@@ -148,7 +182,10 @@ public class TestIdpUserGroupManager {
         "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
 
     Assertions.assertTrue(manager.updateEnabled("testEnabled", false));
-    Assertions.assertFalse(manager.getUser("testEnabled").enabled());
+    IdpUser disabled = manager.getUser("testEnabled");
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, disabled.auditInfo().lastModifier());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifiedTime());
     Assertions.assertThrows(
         UnauthorizedException.class, () -> manager.authenticate("testEnabled", VALID_PASSWORD));
 
@@ -162,16 +199,25 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
-  public void testCannotDisableServiceAdmin() throws IOException {
+  public void testCannotUpdateEnabledOfServiceAdmin() throws IOException {
     loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
     manager.addUser("svcAdminDisable", VALID_PASSWORD);
 
-    IllegalArgumentException exception =
+    IllegalArgumentException disableException =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
-    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        disableException.getMessage());
     Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
-    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+
+    IllegalArgumentException enableException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", true));
+    Assertions.assertEquals(
+        "Cannot update the enabled flag of service admin svcAdminDisable",
+        enableException.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
   }
 
   @Test
@@ -192,6 +238,9 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("testAddGroup", group.name());
     Assertions.assertEquals("", group.comment());
     Assertions.assertTrue(group.usernames().isEmpty());
+    Assertions.assertEquals(AuthConstants.ANONYMOUS_USER, group.auditInfo().creator());
+    Assertions.assertNotNull(group.auditInfo().createTime());
+    Assertions.assertNull(group.auditInfo().lastModifier());
 
     IdpGroup commented = manager.addGroup("testAddGroupComment", "on-call rotation");
     Assertions.assertEquals("on-call rotation", commented.comment());
@@ -342,6 +391,36 @@ public class TestIdpUserGroupManager {
         "initAdminSame1", manager.authenticate("initAdminSame1", VALID_PASSWORD).name());
     Assertions.assertEquals(
         "initAdminSame2", manager.authenticate("initAdminSame2", VALID_PASSWORD).name());
+  }
+
+  @Test
+  public void testInitializeConfiguredServiceAdminsIgnoresConcurrentCreateRace() throws Exception {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "initAdminRace1");
+
+    int threads = 8;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    CountDownLatch start = new CountDownLatch(1);
+    List<Future<?>> futures = new ArrayList<>();
+    try {
+      for (int i = 0; i < threads; i++) {
+        futures.add(
+            executor.submit(
+                () -> {
+                  start.await();
+                  manager.initializeConfiguredServiceAdmins(config, VALID_PASSWORD);
+                  return null;
+                }));
+      }
+      start.countDown();
+      for (Future<?> future : futures) {
+        future.get(30, TimeUnit.SECONDS);
+      }
+    } finally {
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(
+        "initAdminRace1", manager.authenticate("initAdminRace1", VALID_PASSWORD).name());
   }
 
   private static Config createH2Config(Path h2Path) {

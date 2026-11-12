@@ -179,7 +179,9 @@ class GenericModelCatalog extends BaseSchemaCatalog implements ModelCatalog {
             ErrorHandlers.modelErrorHandler());
     resp.validate();
 
-    return resp.getVersions();
+    return Arrays.stream(resp.getVersions())
+        .map(v -> new GenericModelVersion(v))
+        .toArray(ModelVersion[]::new);
   }
 
   @Override

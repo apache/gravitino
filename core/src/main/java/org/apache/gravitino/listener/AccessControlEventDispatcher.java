@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -591,6 +592,34 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    roles.forEach(
+        role ->
+            eventBus.dispatchEvent(
+                new CreateRolePreEvent(
+                    initiator, metalake, role.name(), role.properties(), role.securableObjects())));
+
+    try {
+      List<BulkItemResult<Role>> results = dispatcher.createRoles(metalake, roles);
+      results.forEach(result -> dispatchCreateRoleResultEvent(initiator, metalake, roles, result));
+      return results;
+    } catch (Exception e) {
+      roles.forEach(
+          role ->
+              eventBus.dispatchEvent(
+                  new CreateRoleFailureEvent(
+                      initiator,
+                      metalake,
+                      e,
+                      new RoleInfo(role.name(), role.properties(), role.securableObjects()))));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
@@ -620,6 +649,25 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new DeleteRoleFailureEvent(initiator, metalake, e, role));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<BulkItemResult<String>> deleteRoles(String metalake, List<String> roles)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    roles.forEach(
+        role -> eventBus.dispatchEvent(new DeleteRolePreEvent(initiator, metalake, role)));
+
+    try {
+      List<BulkItemResult<String>> results = dispatcher.deleteRoles(metalake, roles);
+      results.forEach(result -> dispatchDeleteRoleResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      roles.forEach(
+          role -> eventBus.dispatchEvent(new DeleteRoleFailureEvent(initiator, metalake, e, role)));
       throw e;
     }
   }
@@ -771,6 +819,34 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     } else {
       eventBus.dispatchEvent(
           new RemoveGroupFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchCreateRoleResultEvent(
+      String initiator, String metalake, List<RoleAdd> roles, BulkItemResult<Role> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new CreateRoleEvent(initiator, metalake, new RoleInfo(result.value().get())));
+    } else {
+      RoleAdd role = roles.get(result.index());
+      eventBus.dispatchEvent(
+          new CreateRoleFailureEvent(
+              initiator,
+              metalake,
+              result.error().get(),
+              new RoleInfo(role.name(), role.properties(), role.securableObjects())));
+    }
+  }
+
+  private void dispatchDeleteRoleResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new DeleteRoleEvent(initiator, metalake, result.name(), true));
+    } else if (result.error().get() instanceof NoSuchRoleException) {
+      eventBus.dispatchEvent(new DeleteRoleEvent(initiator, metalake, result.name(), false));
+    } else {
+      eventBus.dispatchEvent(
+          new DeleteRoleFailureEvent(initiator, metalake, result.error().get(), result.name()));
     }
   }
 }

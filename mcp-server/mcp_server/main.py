@@ -17,11 +17,13 @@
 
 import argparse
 import logging
+import math
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import (
     GravitinoMCPServer,
+    log_metalake_policy,
     log_service_identity_fallback_policy,
 )
 from mcp_server.tools import SUPPORTED_TOOL_TAGS
@@ -35,6 +37,7 @@ def do_main():
     args = _parse_args()
     setting = Setting(
         metalake=args.metalake,
+        gravitino_read_timeout=args.gravitino_read_timeout,
         gravitino_uri=args.gravitino_uri,
         tags=args.include_tool_tags,
         transport=args.transport,
@@ -54,6 +57,7 @@ def do_main():
     except ValueError as exc:
         logging.error("%s", exc)
         raise SystemExit(1) from None
+    log_metalake_policy(setting)
     log_service_identity_fallback_policy(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
@@ -81,6 +85,20 @@ def _comma_separated_set(value) -> set:
     return set(item.strip() for item in value.split(",") if item.strip())
 
 
+def _positive_timeout(value):
+    try:
+        timeout = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        ) from exc
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        )
+    return timeout
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
@@ -90,14 +108,24 @@ def _parse_args():
     parser.add_argument(
         "--metalake",
         type=str,
-        required=True,
-        help="Gravitino metalake name.",
+        default="",
+        help="Default Gravitino metalake name, used by any tool call that "
+        "does not name one itself via its 'metalake' argument. Optional: a "
+        "server with no default serves whichever metalake each call names.",
     )
     parser.add_argument(
         "--gravitino-uri",
         type=str,
         default=DefaultSetting.default_gravitino_uri,
         help=f"The uri of Gravitino server. (default: {DefaultSetting.default_gravitino_uri})",
+    )
+
+    parser.add_argument(
+        "--gravitino-read-timeout",
+        type=_positive_timeout,
+        default=os.environ.get("GRAVITINO_READ_TIMEOUT", "60"),
+        help="Gravitino response read timeout in seconds (default: 60). "
+        "Can also be set with GRAVITINO_READ_TIMEOUT. Must be finite and positive.",
     )
 
     parser.add_argument(

@@ -30,6 +30,7 @@ import lombok.Getter;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 
 /** Represents an error response. */
 @Getter
@@ -162,6 +163,31 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
+   * Create a new service unavailable error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse serviceUnavailable(String message) {
+    return serviceUnavailable(message, null);
+  }
+
+  /**
+   * Create a new service unavailable error instance of {@link ErrorResponse}.
+   *
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse serviceUnavailable(String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.SERVICE_UNAVAILABLE_CODE,
+        ServiceUnavailableException.class.getSimpleName(),
+        message,
+        getStackTrace(throwable));
+  }
+
+  /**
    * Create a new not found error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.
@@ -203,11 +229,21 @@ public class ErrorResponse extends BaseResponse {
    * @return The new instance.
    */
   public static ErrorResponse internalError(String message, Throwable throwable) {
+    return internalError(RuntimeException.class.getSimpleName(), message, throwable);
+  }
+
+  /**
+   * Creates an internal error response with an explicit error type.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error, if available.
+   * @return The new error response.
+   */
+  public static ErrorResponse internalError(
+      String type, String message, @Nullable Throwable throwable) {
     return new ErrorResponse(
-        ErrorConstants.INTERNAL_ERROR_CODE,
-        RuntimeException.class.getSimpleName(),
-        message,
-        getStackTrace(throwable));
+        ErrorConstants.INTERNAL_ERROR_CODE, type, message, getStackTrace(throwable));
   }
 
   /**

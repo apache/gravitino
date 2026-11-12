@@ -56,3 +56,26 @@ describe('auth store', () => {
     expect(state.isServiceAdmin).toBe(false)
   })
 })
+
+describe('refreshToken', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  it('reads the token from the response body, as the login flow does', async () => {
+    // `loginApi` resolves to the response body, not to the Axios envelope.
+    loginApi.mockResolvedValue({ access_token: 'refreshed-token', expires_in: 499 })
+
+    const store = configureStore({ reducer: { auth: authReducer } })
+
+    const action = await store.dispatch(refreshToken())
+
+    expect(action.type).toBe(refreshToken.fulfilled.type)
+    expect(action.payload).toEqual({ token: 'refreshed-token', expiredIn: 499 })
+    expect(store.getState().auth.authToken).toBe('refreshed-token')
+    expect(localStorage.getItem('accessToken')).toBe('refreshed-token')
+    expect(localStorage.getItem('expiredIn')).toBe('499')
+  })
+})

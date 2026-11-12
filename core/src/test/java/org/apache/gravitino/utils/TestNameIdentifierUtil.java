@@ -165,12 +165,85 @@ public class TestNameIdentifierUtil {
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
 
-    // test model version
-    Throwable e3 =
+    // test model version is not convertible to MetadataObject
+    NameIdentifier modelVersion =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+  }
+
+  @Test
+  public void testRejectDottedMetadataObjectName() {
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    IllegalNameIdentifierException tableException =
         assertThrows(
-            IllegalArgumentException.class,
-            () -> NameIdentifierUtil.toMetadataObject(model, Entity.EntityType.MODEL_VERSION));
-    assertTrue(e3.getMessage().contains("Entity type MODEL_VERSION is not supported"));
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(table, Entity.EntityType.TABLE));
+    assertEquals(
+        "The TABLE name 'sales.2024' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        tableException.getMessage());
+
+    NameIdentifier topic =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "orders.created.v1");
+    IllegalNameIdentifierException topicException =
+        assertThrows(
+            IllegalNameIdentifierException.class,
+            () -> NameIdentifierUtil.toMetadataObject(topic, Entity.EntityType.TOPIC));
+    assertEquals(
+        "The TOPIC name 'orders.created.v1' is unsupported because '.' is reserved as the "
+            + "qualified-name separator.",
+        topicException.getMessage());
+  }
+
+  /** Legacy tag/policy names retain their literal name and type for authorization and cleanup. */
+  @Test
+  public void testLegacyDottedTagAndPolicyMetadataObjects() {
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      NameIdentifier ident =
+          type == Entity.EntityType.TAG
+              ? NameIdentifierUtil.ofTag("metalake1", "legacy.with.dot")
+              : NameIdentifierUtil.ofPolicy("metalake1", "legacy.with.dot");
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.toMetadataObject(ident, type));
+      MetadataObject object = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
+      assertEquals("legacy.with.dot", object.name());
+      assertEquals("legacy.with.dot", object.fullName());
+      assertEquals(MetadataObject.Type.valueOf(type.name()), object.type());
+      assertEquals(null, object.parent());
+      assertEquals(ident, MetadataObjectUtil.toEntityIdent("metalake1", object));
+      assertThrows(
+          IllegalNameIdentifierException.class,
+          () -> NameIdentifierUtil.checkMetadataObjectName(ident, type));
+    }
+  }
+
+  /** The read conversion retains namespace and external-object name validation. */
+  @Test
+  public void testReadConversionRetainsStrictValidation() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(null, Entity.EntityType.TAG));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("tag"), null));
+    for (Entity.EntityType type :
+        new Entity.EntityType[] {Entity.EntityType.TAG, Entity.EntityType.POLICY}) {
+      assertThrows(
+          IllegalNamespaceException.class,
+          () -> NameIdentifierUtil.toMetadataObjectForRead(NameIdentifier.of("legacy.tag"), type));
+    }
+    NameIdentifier table = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales.2024");
+    assertThrows(
+        IllegalNameIdentifierException.class,
+        () -> NameIdentifierUtil.toMetadataObjectForRead(table, Entity.EntityType.TABLE));
+    NameIdentifier valid = NameIdentifier.of("metalake1", "catalog1", "schema1", "sales");
+    assertEquals(
+        NameIdentifierUtil.toMetadataObject(valid, Entity.EntityType.TABLE),
+        NameIdentifierUtil.toMetadataObjectForRead(valid, Entity.EntityType.TABLE));
   }
 
   @Test

@@ -21,8 +21,12 @@ package org.apache.gravitino.exceptions;
 import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
-/** This exception is thrown when an entity is not found. */
-public class NoSuchEntityException extends RuntimeException {
+/**
+ * This exception is thrown when an entity is not found. It belongs to the {@link NotFoundException}
+ * hierarchy so callers catching Gravitino runtime or not-found exceptions see it, like every other
+ * NoSuch* exception.
+ */
+public class NoSuchEntityException extends NotFoundException {
   /** The no such entity message for the exception. */
   public static final String NO_SUCH_ENTITY_MESSAGE = "No such %s entity: %s";
 
@@ -34,7 +38,7 @@ public class NoSuchEntityException extends RuntimeException {
    */
   @FormatMethod
   public NoSuchEntityException(@FormatString String message, Object... args) {
-    super(String.format(message, args));
+    super(message, args);
   }
 
   /**
@@ -46,6 +50,6 @@ public class NoSuchEntityException extends RuntimeException {
    */
   @FormatMethod
   public NoSuchEntityException(Throwable cause, @FormatString String message, Object... args) {
-    super(String.format(message, args), cause);
+    super(cause, message, args);
   }
 }

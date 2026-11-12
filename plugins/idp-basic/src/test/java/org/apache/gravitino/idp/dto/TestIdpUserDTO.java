@@ -20,8 +20,10 @@
 package org.apache.gravitino.idp.dto;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -30,10 +32,13 @@ public class TestIdpUserDTO {
 
   @Test
   public void testIdpUserDTOSerDe() throws JsonProcessingException {
+    AuditDTO audit =
+        AuditDTO.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build();
     IdpUserDTO userDTO =
         IdpUserDTO.builder()
             .withName("test_user")
             .withGroups(Arrays.asList("group1", "group2"))
+            .withAudit(audit)
             .build();
 
     String json = JsonUtils.objectMapper().writeValueAsString(userDTO);
@@ -42,6 +47,7 @@ public class TestIdpUserDTO {
     Assertions.assertEquals(userDTO, deserialized);
     Assertions.assertEquals("test_user", deserialized.name());
     Assertions.assertEquals(Arrays.asList("group1", "group2"), deserialized.groups());
+    Assertions.assertEquals(audit, deserialized.audit());
 
     // Test with default groups
     IdpUserDTO userDTO1 = IdpUserDTO.builder().withName("test_user").build();
@@ -52,15 +58,17 @@ public class TestIdpUserDTO {
     Assertions.assertEquals(userDTO1, deserialized1);
     Assertions.assertEquals("test_user", deserialized1.name());
     Assertions.assertTrue(deserialized1.groups().isEmpty());
+    Assertions.assertNull(deserialized1.audit());
     Assertions.assertEquals(
-        "IdpUserDTO(name=test_user, enabled=true, groups=[])", deserialized1.toString());
+        "IdpUserDTO(name=test_user, enabled=true, groups=[], audit=null)",
+        deserialized1.toString());
 
     IdpUserDTO deserializedWithNullGroups =
         JsonUtils.objectMapper()
             .readValue("{\"name\":\"test_user\",\"groups\":null}", IdpUserDTO.class);
     Assertions.assertTrue(deserializedWithNullGroups.groups().isEmpty());
     Assertions.assertEquals(
-        "IdpUserDTO(name=test_user, enabled=true, groups=[])",
+        "IdpUserDTO(name=test_user, enabled=true, groups=[], audit=null)",
         deserializedWithNullGroups.toString());
 
     Assertions.assertThrows(

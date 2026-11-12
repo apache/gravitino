@@ -36,11 +36,13 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
+import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
@@ -67,6 +69,22 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
       IdGenerator idGenerator,
       SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
+  }
+
+  /**
+   * Checks whether a topic exists in a catalog that supports topics.
+   *
+   * @param ident the topic identifier
+   * @return whether the topic exists
+   */
+  @Override
+  public boolean topicExists(NameIdentifier ident) {
+    boolean supportsTopics =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TopicCatalog),
+            RuntimeException.class);
+    return supportsTopics && TopicDispatcher.super.topicExists(ident);
   }
 
   /**
@@ -143,10 +161,10 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     schemaDispatcher.loadSchema(schemaIdent);
 
+    // Lock the topic node, not the schema, so topics in the same schema can be created
+    // concurrently. See TableOperationDispatcher#createTable for the reasoning and trade-off.
     return TreeLockUtils.doWithTreeLock(
-        NameIdentifier.of(ident.namespace().levels()),
-        LockType.WRITE,
-        () -> internalCreateTopic(ident, comment, dataLayout, properties));
+        ident, LockType.WRITE, () -> internalCreateTopic(ident, comment, dataLayout, properties));
   }
 
   /**
@@ -254,6 +272,8 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
             droppedFromStore = store.delete(ident, TOPIC);
           } catch (NoSuchEntityException e) {
             LOG.warn("The topic to be dropped does not exist in the store: {}", ident, e);
+          } catch (OptimisticLockException e) {
+            throw e;
           } catch (Exception e) {
             throw new RuntimeException(e);
           }
@@ -310,6 +330,9 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
 
     try {
       store.put(topicEntity, true);
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
       throw new RuntimeException("Failed to import topic entity to the store", e);

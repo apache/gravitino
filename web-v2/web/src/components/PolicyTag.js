@@ -154,7 +154,7 @@ export default function PolicyTag({ ...props }) {
           <Tag
             key={policy.name + index}
             color={color}
-            closable={!policy.inherited}
+            closable={!readOnly && !policy.inherited}
             icon={policy.inherited ? <LockOutlined /> : null}
             onClick={handleClick(policy.name)}
             className='cursor-pointer'
