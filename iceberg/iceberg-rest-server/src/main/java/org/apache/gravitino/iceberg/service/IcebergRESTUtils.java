@@ -58,6 +58,11 @@ import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
 import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
+<<<<<<< HEAD
+=======
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.BaseScanTaskResponse;
+>>>>>>> 91c0d7e1c ([#14432] fix(iceberg-rest): validate create-table transforms before dispatch (#14935))
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -386,6 +391,7 @@ public class IcebergRESTUtils {
   /**
    * Checks that a request body was sent and passes the request's own validation, so a missing or
    * incomplete body is answered with 400 instead of failing later with an internal error.
+   * Create-table partition and sort transforms are also checked against the source column types.
    *
    * @param request the deserialized request body, which is null when no body was sent
    * @param requestType the request type named in the error message
@@ -398,7 +404,17 @@ public class IcebergRESTUtils {
     if (request instanceof RESTRequest) {
       try {
         ((RESTRequest) request).validate();
-      } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+        if (request instanceof CreateTableRequest) {
+          // validate() only checks required fields. Bind transforms before the request is rebuilt
+          // to set its owner; binding failures would otherwise become 406.
+          CreateTableRequest create = (CreateTableRequest) request;
+          create.spec();
+          create.writeOrder();
+        }
+      } catch (IllegalArgumentException
+          | IllegalStateException
+          | UnsupportedOperationException
+          | NullPointerException e) {
         throw new BadRequestException(
             "Invalid %s: %s",
             requestType, e.getMessage() == null ? "a required field is missing" : e.getMessage());
