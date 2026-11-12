@@ -27,7 +27,12 @@
 #   scan.sh scan NAME PATH [TYPE]      Scan one target directory. TYPE is rootfs (default) or fs.
 #   scan.sh scan-all DIR [TYPE]        Scan every sub-directory of DIR as its own target.
 #   scan.sh stage DIR NAME GLOB        Copy the one jar matching GLOB (not *-empty.jar) to DIR/NAME.
-#   scan.sh stage-requirements SRC DEST  Merge the pinned Python client requirements; fail if none.
+#   scan.sh stage-python SRC DEST      Resolve the Python package in SRC with all extras except dev
+#                                      into DEST/requirements.txt (name==version, with transitive
+#                                      dependencies). Needs python3 with pip >= 22.2 and network.
+#   scan.sh pip-report-to-requirements REPORT DEST ROOT
+#                                      Convert a 'pip install --report' file into DEST/requirements.txt,
+#                                      leaving out the package ROOT itself. Works offline.
 #   scan.sh unused REPORT_DIR          Warn about exemptions that matched nothing in the reports.
 #   scan.sh check-exemptions           Fail when an exemption violates the policy in README.md.
 #
@@ -43,6 +48,7 @@
 #   TRIVY_POLICY_DIR    Directory holding trivyignore.yaml and vex.openvex.json
 #                       (default: the directory of this script).
 #   TRIVY_EXEMPTIONS    Set to "off" to scan without exemptions (used to generate a baseline).
+#   PYTHON              Interpreter used by 'stage-python' (default: python3).
 #   GITHUB_STEP_SUMMARY When set, the Markdown report is appended to it as well.
 
 set -euo pipefail
@@ -275,24 +281,105 @@ cmd_stage() {
   cp "${matches[0]}" "${dest}/${name}/"
 }
 
-# Merges the pinned requirements files of the Python client into DEST/requirements.txt:
-# stage_requirements SRC_DIR DEST. Fails (fail closed) when the merged file has no pinned '==' line,
-# for example because the glob matched nothing or the files only hold comments.
-cmd_stage_requirements() {
-  local src=$1 dest=$2 file out="$2/requirements.txt"
-  mkdir -p "${dest}" || return 1
-  for file in "${src}"/requirements*.txt; do
-    [[ -f "${file}" ]] || continue
-    case "${file##*/}" in
-      requirements-dev.txt | requirements-ray-iceberg.txt) continue ;;
-    esac
-    grep -hv '^#' "${file}" || true
-  done | sort -u >"${out}" || return 1
-  if ! grep -Eq '^[^#[:space:]][^#]*==' "${out}"; then
-    log "::error title=client-python::No pinned '==' requirement found in '${src}/requirements*.txt'"
-    rm -rf "${dest}"
+# Normalizes a Python package name as in PEP 503: lower case, runs of '-', '_' and '.' become '-'.
+normalize_name() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[-_.]+/-/g'
+}
+
+# Converts the report of 'pip install --dry-run --report' into DEST/requirements.txt, one
+# 'name==version' line per installed package without the root package itself:
+# pip_report_to_requirements REPORT DEST ROOT_NAME. Fails closed (and removes DEST) when the report
+# is not valid, an item has no name or version, or no dependency is left.
+cmd_pip_report_to_requirements() {
+  local report=$1 dest=$2 root lines
+  root="$(normalize_name "$3")"
+  if [[ -z "${root}" ]]; then
+    log "::error title=client-python::The name of the root package is empty"
     return 1
   fi
+  if ! jq -e '(.install | type) == "array"' "${report}" >/dev/null 2>&1; then
+    log "::error title=client-python::Invalid pip report '${report}': it is not JSON with an install list"
+    return 1
+  fi
+  if ! lines="$(jq -r --arg root "${root}" '
+      def norm: ascii_downcase | gsub("[-_.]+"; "-");
+      .install[]
+      | if ((.metadata.name | type) != "string") or (.metadata.name == "")
+          or ((.metadata.version | type) != "string") or (.metadata.version == "")
+        then error("an item has no name or version")
+        else . end
+      | select((.metadata.name | norm) != $root)
+      | .metadata.name + "==" + .metadata.version' "${report}" 2>&1)"; then
+    log "::error title=client-python::Invalid pip report '${report}': ${lines}"
+    return 1
+  fi
+  lines="$(sort -u <<<"${lines}")"
+  if [[ -z "${lines}" ]]; then
+    log "::error title=client-python::The pip report lists no dependency besides the package itself"
+    return 1
+  fi
+  mkdir -p "${dest}" || return 1
+  printf '%s\n' "${lines}" >"${dest}/requirements.txt" || return 1
+}
+
+# Resolves what 'pip install apache-gravitino[<every extra except dev>]' installs and writes it as
+# concrete versions to DEST/requirements.txt: stage_python SRC_DIR DEST. A requirements file would
+# neither hold version ranges nor transitive dependencies, which Trivy needs to look up.
+# The resolution only downloads metadata and installs nothing. It runs in a throwaway virtualenv, so
+# no package of the machine leaks into the result.
+cmd_stage_python() {
+  local src=$1 dest=$2 py="${PYTHON:-python3}" tmp rc=0
+  if ! command -v "${py}" >/dev/null 2>&1; then
+    log "::error title=client-python::Python interpreter '${py}' not found; set PYTHON"
+    return 1
+  fi
+  tmp="$(mktemp -d)" || return 1
+  stage_python_in "${src}" "${dest}" "${py}" "${tmp}" || rc=$?
+  rm -rf "${tmp}"
+  ((rc == 0)) || rm -rf "${dest}"
+  return "${rc}"
+}
+
+stage_python_in() {
+  local src=$1 dest=$2 py=$3 tmp=$4 vpy major minor root extras spec
+  vpy="${tmp}/venv/bin/python"
+  export PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_INPUT=1
+  # pip may build the metadata inside the source tree, so work on a copy.
+  mkdir "${tmp}/src" && cp -R "${src}/." "${tmp}/src/" || return 1
+  if ! "${py}" -m venv "${tmp}/venv"; then
+    log "::error title=client-python::Could not create a virtualenv with '${py}'"
+    return 1
+  fi
+  read -r major minor < <("${vpy}" -m pip --version 2>/dev/null |
+    sed -nE 's/^pip ([0-9]+)\.([0-9]+).*/\1 \2/p') || true
+  if [[ ! "${major:-}" =~ ^[0-9]+$ || ! "${minor:-}" =~ ^[0-9]+$ ]] ||
+    ((major < 22 || (major == 22 && minor < 2))); then
+    log "::error title=client-python::pip >= 22.2 (for 'pip install --report') is required, found '${major:-none}.${minor:-}'"
+    return 1
+  fi
+  if ! "${vpy}" -m pip install --dry-run --ignore-installed --quiet \
+    --report "${tmp}/base.json" "${tmp}/src"; then
+    log "::error title=client-python::pip could not resolve '${src}'"
+    return 1
+  fi
+  root="$(jq -r '[.install[]? | select(.is_direct == true)] | if length == 1 then .[0].metadata.name else empty end' \
+    "${tmp}/base.json" 2>/dev/null)" || root=''
+  if [[ -z "${root}" ]]; then
+    log "::error title=client-python::Could not find the root package in the pip report for '${src}'"
+    return 1
+  fi
+  # Every extra but dev, taken from the package so that new extras are covered automatically.
+  extras="$(jq -r '[.install[] | select(.is_direct == true) | .metadata.provides_extra // [] | .[]
+    | select((ascii_downcase) != "dev")] | unique | join(",")' "${tmp}/base.json")" || return 1
+  spec="${tmp}/src"
+  [[ -z "${extras}" ]] || spec="${tmp}/src[${extras}]"
+  log "Resolving ${root} with extras: ${extras:-none}"
+  if ! "${vpy}" -m pip install --dry-run --ignore-installed --quiet \
+    --report "${tmp}/full.json" "${spec}"; then
+    log "::error title=client-python::pip could not resolve '${src}' with the extras ${extras:-none}"
+    return 1
+  fi
+  cmd_pip_report_to_requirements "${tmp}/full.json" "${dest}" "${root}"
 }
 
 # Fails when a target fails, and also when there is nothing to scan (fail closed).
@@ -420,16 +507,16 @@ vex_violations() {
                 or ($s.products | any(((.["@id"] // "") | text) | not))
               then "products must be a non-empty list of products with an @id" else empty end,
               if ($s.status | text) | not then "missing status"
-              elif (["not_affected", "fixed", "under_investigation", "affected"] | index($s.status)) == null
-              then "unknown status \($s.status)"
               elif $s.status == "not_affected" then
                 ( if (justifications | index($s.justification)) == null
                   then "not_affected needs a justification from the OpenVEX list" else empty end,
                   if ($s.impact_statement | text) | not
                   then "not_affected needs an impact_statement that cites the code or analysis" else empty end )
-              elif $s.status == "affected" then
-                ( if ($s.action_statement | text) | not then "affected needs an action_statement" else empty end )
-              else empty end
+              elif $s.status == "fixed" then
+                "status fixed is not allowed: Trivy would suppress the finding without evidence; upgrade the dependency instead"
+              elif (["affected", "under_investigation"] | index($s.status)) != null then
+                "status \($s.status) is not allowed: it does not suppress anything, so the statement is meaningless here"
+              else "unknown status \($s.status)" end
             ) | $label + ": " + .)
       )
     end' "${VEX_FILE}"
@@ -484,9 +571,13 @@ main() {
       [[ $# -eq 3 ]] || { log 'usage: scan.sh stage DIR NAME GLOB'; exit 2; }
       cmd_stage "$@"
       ;;
-    stage-requirements)
-      [[ $# -eq 2 ]] || { log 'usage: scan.sh stage-requirements SRC_DIR DEST_DIR'; exit 2; }
-      cmd_stage_requirements "$@"
+    stage-python)
+      [[ $# -eq 2 ]] || { log 'usage: scan.sh stage-python SRC_DIR DEST_DIR'; exit 2; }
+      cmd_stage_python "$@"
+      ;;
+    pip-report-to-requirements)
+      [[ $# -eq 3 ]] || { log 'usage: scan.sh pip-report-to-requirements REPORT DEST_DIR ROOT_NAME'; exit 2; }
+      cmd_pip_report_to_requirements "$@"
       ;;
     check-exemptions) cmd_check_exemptions ;;
     unused)
@@ -494,7 +585,7 @@ main() {
       cmd_unused "$@"
       ;;
     *)
-      log 'usage: scan.sh {pull|download-db|db-info|scan|scan-all|stage|stage-requirements|unused|check-exemptions} ...'
+      log 'usage: scan.sh {pull|download-db|db-info|scan|scan-all|stage|stage-python|pip-report-to-requirements|unused|check-exemptions} ...'
       exit 2
       ;;
   esac
