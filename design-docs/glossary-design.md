@@ -160,7 +160,7 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
   its own parent.
 - **Depth limit**: a `BROADER` chain has at most 20 levels. A new link that makes a chain longer
   fails with 400. This bounds the cycle check and the hierarchy read. 20 is a first estimate. The
-  performance test in Critical User Journeys sets the final value.
+  performance test (T18 in Testing) sets the final value.
 - **No overlap**: two terms cannot be `RELATED` if one is an ancestor of the other. Adding such a
   `RELATED` link, or a `BROADER` link that creates such a pair, fails with 400. This follows the
   SKOS rule. The check uses the same walk as the cycle check.
@@ -746,30 +746,403 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
 
-## Critical User Journeys
+## Testing
+
+AI agents will write most of the Step 1 code and tests, and few people will read the tests. So
+this chapter is the test spec. It says where each test goes, how to run it, and what it must check.
+
+- A task is done when every case listed for it has a test, all of them pass, and the rules below
+  hold.
+- If the code and this chapter disagree, fix the code, or change this chapter in the same PR and
+  say why in the PR description. Never change a test only to make it match the code.
+- Each case has an ID, like `T5.4`: the task number and the case number. Case IDs do not change.
+  New cases get new numbers.
+
+### Rules for every test
+
+1. **Trace each case.** The Javadoc (or docstring) of a test names the cases it covers, for
+   example `Covers T5.4, T5.5.` Each case ID of the task must appear in the test code. The PR
+   checks this with `grep`.
+2. **Check the exact failure.** A negative test checks the exception class, or the HTTP code and
+   the error type. "Something failed" is not enough.
+3. **Check that nothing changed.** After a failed write, read the term again. Its fields, `version`,
+   relations, domains and bindings must be the same as before. No success event was sent.
+4. **Check the invariants.** Every database test of the glossary calls
+   `GlossaryInvariants.assertHolds(metalake)` in `@AfterEach` (see Invariants).
+5. **Prove that guards work.** Some cases are marked **(guard)**. For each one, the author removes
+   the check from the code, runs the test, sees it fail, and puts the check back. The PR description
+   lists each guard, the check that was removed and the test that failed.
+6. **No flaky tricks.** No `@Disabled`, no retries, and no `Thread.sleep` to order threads. Use
+   `CountDownLatch` or `CyclicBarrier`. Wrap every concurrent test in `assertTimeoutPreemptively`,
+   so a hang fails the test instead of the build. Run each race at least 20 rounds.
+7. **Keep old tests.** Do not change an existing test to make new code pass. If one must change,
+   the PR description says why.
+8. **Fixed data.** Use fixed names and values. A test must not depend on the time zone, the
+   locale or the test order. Tests of `key()` also run with the default locale set to Turkish
+   (`tr-TR`), where `"I".toLowerCase()` is not `"i"`.
+9. **All three databases.** Database tests extend `TestJDBCBackend` (`@CoreBackend.All`) and pass
+   on H2, MySQL and PostgreSQL. Integration tests pass with `-PjdbcBackend=h2`, `mysql` and
+   `postgresql`.
+10. **Show the results.** The PR description lists each command it ran and, for each backend, the
+    number of tests run and passed, from the JUnit XML files in `build/test-results/`. A class that
+    ran 0 tests counts as a failure.
+11. **Run only what changed.** Use `--tests` filters. Never run a whole module suite such as
+    `:core:test`.
+
+### Invariants
+
+`GlossaryInvariants` is a test helper in `core/src/test`. T2 adds it, and T3, T7 and T11 extend it.
+For one metalake, it reads the glossary tables directly and checks the live rows
+(`deleted_at = 0`):
+
+1. Every `name_key` equals `key(name)`, and every `synonym_key` equals `key(synonym)`. No two terms
+   have the same `name_key`.
+2. No synonym equals the `name_key` of another term.
+3. No synonym, relation, domain link or binding points to a deleted or missing term, domain or
+   object.
+4. The `BROADER` links have no cycle. The longest chain has at most the depth limit of links.
+5. No `RELATED` pair has one term as an ancestor of the other. Each `RELATED` row has
+   `from_term_id < to_term_id`.
+6. `metric_name` is set on a binding exactly when its object type is `SEMANTIC_MODEL`.
+7. `glossary_term_version_info` has no rows.
+8. `glossary_hierarchy_lock` has at most one row for the metalake.
+
+Integration tests cannot read the tables. They use the REST form of the helper. It reads all terms
+and their hierarchies as the metalake owner, and checks rules 2, 4 and 5.
+
+### Rules the tests fix
+
+The design does not say these things. The tests use the answers below. If a reviewer wants a
+different answer, change it here first.
+
+1. **Order of checks**: if the caller cannot see the term, 404. If the caller can see it but has
+   no privilege for the action, 403. For example, `CREATE_DEFINITION` dropping its own
+   `DEPRECATED` term gets 403. If the caller has the privilege but the change breaks a rule, 400
+   or 409. For example, anyone dropping an `APPROVED` term gets 400.
+2. **Revision**: a new term has `version` 1. Each successful alter call adds exactly 1, even when
+   it has several updates. A bind or unbind call adds 1 to each term whose bindings changed. Owner
+   and tag changes add nothing.
+3. **Repeats are ignored**: adding a synonym, link, domain or binding that already exists, or
+   removing one that does not exist, is not an error and writes nothing. It still counts as a
+   successful call for the revision of an alter.
+4. **Depth** is the number of `BROADER` links on the longest chain. A chain of 21 terms has 20
+   links and is allowed. A link that joins two chains counts the links above and below it.
+5. **Hidden terms in a hierarchy**: the hierarchy read stops at a term that the caller cannot see.
+   It shows neither that term nor the terms behind it.
+6. **Names**: the server trims spaces at both ends before it stores a name or a synonym. The case
+   is kept. An empty name, or one longer than 128 characters, fails with 400. A synonym equal to
+   the name of its own term fails with 400.
+7. **`key()`** treats every whitespace character (space, tab, new line) as a space.
+8. **`nameContains`** treats `%`, `_` and `\` as plain characters.
+9. **`bindings=true`** without `match` and `details=true` fails with 400.
+10. **The depth limit** is a constant in `GlossaryManager`. Tests can change it. Users cannot.
+
+### Where tests go and how to run them
+
+All Gradle commands below take a `--tests` filter for the new classes. Database and Docker runs
+also need `-PskipDockerTests=false` and a running Docker.
+
+| Layer                | Test classes                                                                     | Command                                                                  |
+| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Storage              | `core/.../storage/relational/service/TestGlossaryTerm*MetaService`               | `./gradlew :core:coreH2Test`, then `coreMySQLTest`, `corePostgreSQLTest` |
+| Schema and upgrade   | the existing `core/.../storage/TestSQLScripts`                                   | the same three tasks                                                     |
+| Manager              | `core/.../glossary/TestGlossaryManager*`                                         | the same three tasks                                                     |
+| Authorization rules  | `server-common/.../authorization/jcasbin/TestJcasbinAuthorizer`                  | `./gradlew :server-common:test`                                          |
+| REST                 | `server/.../web/rest/TestGlossaryOperations`, `TestMetadataObjectTermOperations` | `./gradlew :server:test`                                                 |
+| Java client          | `clients/client-java/.../client/TestGlossary*` (mock server)                     | `./gradlew :clients:client-java:test -PskipITs`                          |
+| Python client        | `clients/client-python/tests/unittests/test_glossary*.py`                        | `./gradlew :clients:client-python:unitTests`                             |
+| MCP server           | `mcp-server/tests/unit/tools/test_glossary.py`                                   | `./gradlew :mcp-server:testPython`                                       |
+| Integration and CUJs | `clients/client-java/.../integration/test/Glossary*IT`                           | `./gradlew :clients:client-java:test -PskipTests -PjdbcBackend=<db>`     |
+| Performance          | `core/.../glossary/GlossaryHierarchyPerformanceTest`                             | run by hand; not part of CI                                              |
+
+### Cases per task
+
+**T1. API**
+
+- T1.1 Each new enum, privilege and type has a `fromString` / name round trip.
+- T1.2 `MetadataObject.Type.GLOSSARY_TERM` parses a full name that contains `/`.
+- T1.3 The three new privileges accept `METALAKE` in `canBindTo` and reject every other type.
+  **(guard)**
+- T1.4 The existing tests of `Privilege` and `MetadataObject` still pass without change.
+
+**T2. Term storage**
+
+- T2.1 Insert, get by name, list and update a term with every field set. All fields read back the
+  same, including links, properties and the source reference.
+- T2.2 `Churn` exists. Insert ` churn ` and `CHURN`: both fail as a duplicate. The stored name is
+  still `Churn`. **(guard)**
+- T2.3 `Active   Customer` (three spaces), `active customer` and `Active\tCustomer` have the same
+  key.
+- T2.4 With the default locale `tr-TR`, `key("TITLE")` is `title`.
+- T2.5 `Cafe` and `Café` are two different terms, on all three databases. (This checks the
+  collation of the new tables.)
+- T2.6 Names with `/`, Chinese characters and emoji read back the same on all three databases.
+- T2.7 A name of 128 characters works on all three databases.
+- T2.8 Two terms can have no source reference. Two terms with the same source reference fail as a
+  duplicate.
+- T2.9 Two terms can share a synonym. Each synonym is one row.
+- T2.10 Soft-delete a term, then create a term with the same name. The new term has a new ID, and
+  the old rows stay soft-deleted.
+- T2.11 Drop the metalake. All glossary rows of the metalake are soft-deleted. The terms of a second
+  metalake are not touched.
+- T2.12 Garbage collection removes soft-deleted glossary rows after the retention time.
+- T2.13 `TestSQLScripts`: the 2.0.0 schema and the result of the `upgrade-1.3.0-to-2.0.0` scripts
+  have the same glossary tables, columns and keys. Running the MySQL upgrade script twice works.
+
+**T3. Relation storage**
+
+- T3.1 Insert and remove `BROADER` and `RELATED` links. List the broader, narrower and related
+  terms of a term.
+- T3.2 `RELATED` from A to B and from B to A is one row, with `from_term_id < to_term_id`. Adding
+  the second one is a duplicate.
+- T3.3 Diamond: A → B, A → C, B → D, C → D. Walking up from A returns B, C and D, each once.
+- T3.4 The walk sends one query per level. For a chain of 5 levels, it sends 5 queries. (Count the
+  calls on the mapper.) **(guard: a version with one query per term fails this test.)**
+- T3.5 The first use of the hierarchy lock inserts its row. A second use does not insert another
+  row. Two threads using it for the first time at the same time both succeed.
+
+**T4. Manager**
+
+- T4.1 Create with only a name and a definition. Status is `APPROVED`, `version` is 1, and the
+  owner is the caller.
+- T4.2 Create with status `DRAFT` and with `DEPRECATED`. The status is stored as given.
+- T4.3 Each update type changes only its field and adds 1 to `version`. An alter with three
+  updates adds 1 in total.
+- T4.4 An alter where one update fails (for example, a rename to a taken name) changes nothing.
+  **(guard)**
+- T4.5 B has synonym `client`. Creating term `Client`, or renaming A to `client`, fails with 400.
+  **(guard)**
+- T4.6 Term `Client` exists. Adding synonym ` CLIENT ` to another term fails with 400. **(guard)**
+- T4.7 Adding synonym `Customer` to term `Customer` fails with 400.
+- T4.8 Empty name, a name of only spaces, and a name of 129 characters fail with 400.
+- T4.9 `updateLinks` replaces the whole list. A link with an empty label or URL fails with 400.
+- T4.10 Rename keeps the ID, synonyms, relations, domains and bindings.
+- T4.11 Race: two threads add different synonyms to the same term at the same time. Both synonyms
+  are stored and `version` grows by 2.
+- T4.12 `TermChangeHandler`: a test handler records each change. Every write sends exactly one
+  change of the right kind. A test handler that rejects the change leaves the store unchanged.
+- T4.13 Drop a `DRAFT` term. Its synonyms, relations, domain links and bindings are soft-deleted in
+  the same transaction.
+- T4.14 Dropping an `APPROVED` term fails with 400. **(guard)**
+
+**T5. Relations in the manager**
+
+- T5.1 A → A fails with 400. **(guard)**
+- T5.2 A → B exists. B → A fails with 400. **(guard)**
+- T5.3 A → B → C → D exists. D → A fails with 400.
+- T5.4 A chain of 20 links works. One more link at the top or the bottom fails with 400.
+  **(guard)**
+- T5.5 Chain X has 10 links and chain Y has 10 links. Add a link from the top of X to the bottom
+  of Y. The new chain, from the bottom of X to the top of Y, has 21 links, so the link fails with
+  400. (A check that only walks up from the new parent fails this test.) **(guard)**
+- T5.6 C is an ancestor of A. Adding `RELATED` between A and C fails with 400, in both directions.
+  **(guard)**
+- T5.7 A `RELATED` C exists. Adding A → B, where B → C, fails with 400. **(guard)**
+- T5.8 Race: A → B and C → D exist. Two threads add B → C and D → A at the same time. Exactly one
+  succeeds and the other fails with 400, in every round. **(guard: without the hierarchy lock,
+  some rounds end with a cycle.)**
+- T5.9 Race: B is a `DRAFT`. One thread adds A → B while another drops B. Either the link is added and then removed
+  by the drop, or the add fails with 404. No live link to B is left.
+- T5.10 A has parents B and C, and B is `DEPRECATED`. Drop B. A keeps C. The audit has one entry for A losing B.
+- T5.11 The hierarchy read of a diamond returns each term once, in both directions.
+- T5.12 The hierarchy read stops at a term the caller cannot see.
+- T5.13 Setting the broader term of A needs `VIEW_DEFINITION` on the parent. A hidden `DRAFT`
+  parent fails with 404.
+- T5.14 Mixed load: 8 threads run 500 random relation adds, relation removes, edits and deletes on
+  30 terms, on MySQL and PostgreSQL. No deadlock or lock-wait timeout happens, and the invariants
+  hold at the end.
+
+**T6. Authorization**
+
+The users for these cases:
+
+| User       | Privileges on the metalake                                              |
+| ---------- | ----------------------------------------------------------------------- |
+| `viewer`   | `VIEW_DEFINITION`                                                       |
+| `writer`   | `CREATE_DEFINITION`; owns term `Own`                                    |
+| `writer2`  | `CREATE_DEFINITION`; owns nothing                                       |
+| `admin`    | `MANAGE_DEFINITIONS`                                                    |
+| `denied`   | `MANAGE_DEFINITIONS` from one role, deny `VIEW_DEFINITION` from another |
+| `outsider` | none                                                                    |
+| `owner`    | owner of the metalake, no grants                                        |
+
+- T6.1 Matrix: for each user, each status (`DRAFT`, `APPROVED`, `DEPRECATED`), and the terms `Own`
+  and `Other` (owned by `admin`), run get, list, alter, set status and drop. The expected result
+  of each cell comes from the Access control and Status tables, and from "Order of checks". The
+  test keeps the expected results in one table in the test code. **(guard: remove the owner check,
+  and the `writer2` cells fail.)**
+- T6.2 `denied` sees nothing: get returns 404 and list is empty.
+- T6.3 `owner` passes every check.
+- T6.4 A group owns a term. A member of the group can edit it. A user outside the group with
+  `CREATE_DEFINITION` cannot.
+- T6.5 Granting any definition privilege on a catalog, or anything on `GLOSSARY_TERM`, fails with
+  400.
+- T6.6 `Child` has a hidden `DRAFT` parent and a visible parent. `viewer` sees only the visible one
+  in `broader`. `admin` sees both.
+- T6.7 Known leak: `writer2` creates a term with the name of a hidden draft and gets 409. The error
+  message does not contain the definition, owner or domains of the hidden term.
+
+**T7. Domain membership**
+
+- T7.1 Create with two domains. Get returns both.
+- T7.2 Create in a domain without `USE_DOMAIN` on it fails with 403, and no term is created.
+- T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
+  leaves out the terms of hidden subdomains.
+- T7.4 Dropping a domain with terms fails with 409 (`NonEmptyDomainException`). After
+  `removeDomain`, the drop works. **(guard)**
+- T7.5 Race: one thread adds a term to a domain while another drops the domain. Either the term is
+  added and the drop fails with 409, or the drop wins and the add fails with 404.
+- T7.6 With Option A, a tag on a term never changes its domains, even if the tag backs a domain.
+
+**T8. REST**
+
+- T8.1 Each endpoint returns the response type in the REST API table, and each error in the Errors
+  list maps to its HTTP code.
+- T8.2 Term `a/b` works in every path as `a%2Fb`.
+- T8.3 A term named `resolve` works with get, alter and drop.
+- T8.4 An unknown update type, and an empty update list, fail with 400.
+- T8.5 Each DTO turns into JSON and back with no loss. Missing optional fields keep their defaults.
+- T8.6 `./gradlew :docs:build` passes, and the spec has every endpoint in the REST API table.
+
+**T9. Tags on terms**
+
+- T9.1 Tag a term, list its tags, list the terms of a tag, and remove the tag.
+- T9.2 Tagging a term does not change its `version`.
+- T9.3 Dropping the term or the metalake removes its tag relations.
+
+**T10. Events and audit**
+
+- T10.1 Each write sends a pre event and a success event with the term name and the new `version`.
+- T10.2 A failed write sends a pre event and a failure event, and no success event.
+- T10.3 Dropping a term with two children writes one audit entry for each child.
+
+**T11. Bindings**
+
+- T11.1 Bind and unbind a term on each of the 8 object types and on a metric.
+- T11.2 Binding a tag, a role or a term fails with 400. Binding a missing object or metric fails
+  with 404.
+- T11.3 An object admin binds an `APPROVED` term: it works. The same admin binds a `DRAFT` term:
+  400. **(guard)**
+- T11.4 A term editor with only read access to the object binds a `DRAFT` term: it works.
+- T11.5 One request binds two terms, and the caller passes neither check for the second one. The
+  request fails with 403, and the first term is not bound either. **(guard)**
+- T11.6 Binding the same term to the same object twice keeps one row.
+- T11.7 Drop the table. Its bindings and its column bindings are soft-deleted. Dropping the schema,
+  the catalog and the metalake works the same way.
+- T11.8 Drop one column with `alterTable`. Its bindings are gone. The bindings of the other columns
+  and of the table stay.
+- T11.9 Rename the table, and rename a column. The bindings stay.
+- T11.10 Alter a semantic model to remove a metric. Its bindings are gone. A renamed metric loses
+  its bindings.
+- T11.11 Race: one thread binds a term to a table while another drops the table. No live binding
+  to the dropped table is left.
+
+**T12. Binding reads**
+
+- T12.1 `GET /terms/{term}/objects` leaves out objects the caller cannot access. For a metric, the
+  caller needs access to the semantic model.
+- T12.2 `GET /objects/.../terms` leaves out terms the caller cannot see.
+- T12.3 `children=true` on a table with 3 columns, where 2 have terms, returns 2 entries in
+  `children`. It sends one query to `glossary_term_binding`.
+- T12.4 `children=true` on a type other than table, view or semantic model fails with 400.
+
+**T13. Lookup**
+
+- T13.1 `match=  ACTIVE   user ` finds `Active Customer` by its synonym `active user`, with
+  `matchedBy` `SYNONYM`.
+- T13.2 `match=customers` does not find `Customer`.
+- T13.3 One term matches two words. It is returned once, with two `matchedBy` entries.
+- T13.4 A word that only matches a `DEPRECATED` term returns nothing with `status=APPROVED`.
+- T13.5 20 words work. 21 words fail with 400. **(guard)**
+- T13.6 A term with 21 bindings returns 20, with `bindingsTruncated` true. A term with 20 returns 20,
+  with `bindingsTruncated` false.
+- T13.7 `nameContains=%` and `nameContains=_` return only names that contain those characters.
+  **(guard)**
+- T13.8 `domain` and `match` together return only matching terms of the domain and its visible
+  subdomains.
+- T13.9 `bindings=true` without `match`, or without `details=true`, fails with 400.
+
+**T14 and T15. Clients**
+
+- T14.1 / T15.1 Each client method sends the expected REST call (checked with a mock server) and
+  reads the response.
+- T14.2 / T15.2 Each REST error turns into the matching client exception.
+- T14.3 / T15.3 `matchTerms` / `match_terms` returns only `APPROVED` terms, with their bindings.
+
+**T16. MCP tools**
+
+- T16.1 With the fixture of the example in Agent integration, `resolve_business_term` returns the
+  JSON in that example. The test compares it with a stored JSON file.
+- T16.2 25 words send two REST calls (20 and 5). The results keep the order of the words.
+- T16.3 No tool output ever contains a `DRAFT` or `DEPRECATED` term. The test checks every tool in
+  the tool table.
+- T16.4 Each call forwards the caller's `Authorization` header.
+- T16.5 The tool descriptions contain the four rules for agents.
+- T16.6 The tools exist only when the `glossary` tool tag is enabled.
+
+**T17. CUJ integration tests**: the cases are the CUJs in Critical user journeys below.
+
+**T18. Performance**
+
+- T18.1 Measure adding a link and reading the hierarchy, for chains of 10, 20 and 50 links, with
+  3 parents per term, on MySQL and PostgreSQL. Report p50 and p95 over 100 runs.
+- T18.2 The final depth limit is the largest of 10, 20 and 50 whose p95 for adding a link is under
+  100 ms on both databases. The PR description has the result table.
+
+**T19. User documentation**
+
+- T19.1 Every request and response example in `docs/glossary.md` comes from a run of the
+  integration tests, not from hand writing.
+- T19.2 `./gradlew :docs:build` passes.
+
+### Critical user journeys
 
 A critical user journey (CUJ) is a main path a user takes through the feature, from start to end.
-Each CUJ below becomes one end-to-end test. Step 1 ships only when all of them pass on H2, MySQL
+T17 turns each CUJ into one end-to-end test. Step 1 ships only when all of them pass on H2, MySQL
 and PostgreSQL.
 
-| #   | Journey                             | Steps                                                                                                                         | Expected result                                                                                                      |
-| --- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| 1   | Define terms                        | An admin creates `Customer` in a domain. An analyst creates `Active Customer` with a synonym, a broader term, links and a tag | Both terms are `APPROVED` by default and visible to `VIEW_DEFINITION`; the hierarchy read shows the parent and child |
-| 2   | Link terms to data                  | Bind a term to a table, a column and a metric; then list the terms of each object                                             | Implemented by and Used by show the objects; each object lists the term                                              |
-| 3   | Agent lookup                        | Call `resolve_business_term` with a synonym, a name and an unknown word                                                       | The first two return the term and its data; the unknown word is in `unmatched`; `DRAFT` and `DEPRECATED` never show  |
-| 4   | Privileges                          | Users with only `VIEW_`, only `CREATE_` and with `MANAGE_DEFINITIONS` try to read and edit terms                              | `VIEW_` reads only; `CREATE_` edits only its own terms; `MANAGE_` edits any term; a hidden draft never shows         |
-| 5   | Status and delete                   | Set a term to `DRAFT`, back to `APPROVED`, then to `DEPRECATED`; try to delete it in each state                               | Who can see and delete it follows Status and versions; the revision grows on each change                             |
-| 6   | Bad relations                       | Add a link that makes a cycle, a chain longer than the limit, and a `RELATED` link between a term and its ancestor            | Each one fails with 400 and nothing changes; the same holds when two servers add the links at the same time          |
-| 7   | Cleanup                             | Drop a bound column and table, a domain that has terms, a term with children, and the metalake                                | Bindings go away with the object; the domain drop fails with 409; children keep other parents; all rows go away      |
-| 8   | Edit on one server, read on another | Edit, move or bind a term on one server, then read it on a second server                                                      | The second server returns the new data at once (nothing is cached)                                                   |
+- **Fixture**: one metalake with the users of T6; domains `Sales` (with subdomain `Retail`) and
+  `Finance`; the catalogs that `TagIT` uses (Hive for tables and columns, plus fileset and model
+  catalogs); and a semantic model with metrics `net_revenue` and `active_customers`. Each CUJ
+  starts from this fixture and creates its own terms.
+- **Clients**: each CUJ runs through the Java client. CUJs 1, 2 and 3 also run through the Python
+  client, and CUJ 3 also runs through MCP.
+- **Checks**: after each CUJ, the REST form of `GlossaryInvariants` must pass.
 
-A performance test also measures the cycle check and the hierarchy read for chains of 10, 20 and
-50 levels, with many parents per term. The result sets the final depth limit (20 for now).
+1. **Define terms.** `admin` creates `Customer` in `Sales`. `writer` creates `Active Customer`
+   with synonym `active user`, broader term `Customer`, one link and one tag. Expected: both terms
+   are `APPROVED`, `viewer` can read both, and the hierarchy read of `Customer` shows
+   `Active Customer` as its child.
+2. **Link terms to data.** Bind `Customer` to a table, `Active Customer` to a column, and
+   `Active Customer` to metric `active_customers`. Expected: Implemented by and Used by list the
+   objects; each object lists its term; the table read with `children=true` shows the column term.
+3. **Agent lookup.** Call `resolve_business_term(["net revenue", "active user", "VIP"])` as
+   `viewer`. Expected: `active user` returns `Active Customer` by synonym, with its column and
+   metric; `VIP` is in `unmatched`; a `DRAFT` term named `VIP` and a `DEPRECATED` term never show.
+4. **Privileges.** `viewer`, `writer2` and `admin` each try to read, edit, set the status of and
+   drop `Active Customer`. Expected: the results match the T6.1 table.
+5. **Status and delete.** `writer` sets `Active Customer` to `DRAFT`, then back to `APPROVED`,
+   then to `DEPRECATED`. `writer` tries to drop it while it is `APPROVED` (400) and `DEPRECATED`
+   (403), and then `admin` drops it. `writer` also creates a `DRAFT` term and drops it. Expected:
+   `viewer` can read the term in each state as the Status table says; only the allowed drops work;
+   `version` grows by 1 on each status change.
+6. **Bad relations.** Add a link that makes a cycle, a chain of 21 links, and a `RELATED` link
+   between a term and its ancestor. Expected: each fails with 400, and nothing changes. Then two
+   servers add the two links of T5.8 at the same time, 20 rounds: exactly one succeeds each round.
+7. **Cleanup.** Drop a bound column, a bound table, a domain that has terms, a term with two
+   parents and one child (set to `DEPRECATED` first), and then the metalake. Expected: the
+   bindings go away with the objects; the domain drop fails with 409; the child keeps its other
+   parent; after the metalake drop, no glossary data of the metalake can be read.
+8. **Edit on one server, read on another.** Start two servers on the same database. Edit, rename,
+   relate and bind a term on server 1, and read it on server 2 right after each change. Expected:
+   server 2 returns the new data each time (nothing is cached). If the test framework can start
+   only one server, T17 adds a way to start a second one. It must not replace this CUJ with a
+   single-server test.
 
 ## Task Breakdown
 
-Step 1 is split into one issue per PR, under one epic. Each PR has its own unit tests, and REST
-PRs update the OpenAPI spec (`./gradlew :docs:build`). Tasks in the same group can be done in
+Step 1 is split into one issue per PR, under one epic. Each PR adds the tests of its cases in
+Testing, and follows the rules there. REST PRs update the OpenAPI spec (`./gradlew :docs:build`). Tasks in the same group can be done in
 parallel once the tasks they depend on are merged.
 
 ### Prerequisites
@@ -838,8 +1211,8 @@ parallel once the tasks they depend on are merged.
 
 ### Group F: Release checks
 
-- [ ] **T17. Add CUJ integration tests.** End-to-end tests for CUJs 1–8 through the Java client,
-      the REST API and MCP, on H2, MySQL and PostgreSQL (Docker). Depends on: T14, T16.
+- [ ] **T17. Add CUJ integration tests.** End-to-end tests for CUJs 1–8 as described in Critical
+      user journeys, on H2, MySQL and PostgreSQL (Docker). Depends on: T14, T16.
 - [ ] **T18. Add a hierarchy performance test** and set the final depth limit from it. Depends on:
       T5.
 - [ ] **T19. Add Glossary user documentation** (`docs/`). Depends on: T14, T15.
