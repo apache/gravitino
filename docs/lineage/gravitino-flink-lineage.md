@@ -71,14 +71,21 @@ The lineage output will be `name = "kafka_catalog.default.user_events"` (logical
 DataStream connectors report a physical identifier (for example, namespace `kafka://broker1:9092`
 and name `events`) with no Flink catalog context. The plugin converts it as follows:
 
-- The connector type is inferred from the namespace scheme: `kafka://` is `kafka`, `hive://` or
-  `thrift://` is `hive`, `jdbc:` is `jdbc`, `paimon://` is `paimon`, and `iceberg://` is `iceberg`
-  (Flink1 plugin only). Any other scheme is reported as `unknown`.
+- The connector type is inferred from the namespace scheme (see the table below). Any other scheme
+  is reported as `unknown`.
 - The inferred connector type is used as the catalog name unless it is remapped with
   `openlineage.gravitino.catalogMappings`. For DataStream datasets, the mapping keys are connector
   types, for example `kafka:kafka_catalog`.
 - A name of the form `db.table` becomes `${catalogName}.db.table`. A single-segment name (such as a
   Kafka topic) becomes `${catalogName}.default.${name}`.
+
+| Namespace scheme        | Inferred connector type | Flink2 plugin | Flink1 plugin |
+|-------------------------|-------------------------|---------------|---------------|
+| `kafka://`              | `kafka`                 | Yes           | Yes           |
+| `hive://` / `thrift://` | `hive`                  | Yes           | Yes           |
+| `jdbc:`                 | `jdbc`                  | Yes           | Yes           |
+| `paimon://`             | `paimon`                | Yes           | Yes           |
+| `iceberg://`            | `iceberg`               | No            | Yes           |
 
 For example, with `openlineage.gravitino.catalogMappings: kafka:kafka_catalog`, the Kafka topic
 `events` is reported as `name = "kafka_catalog.default.events"`. Without the mapping it is reported
@@ -154,7 +161,7 @@ symlinks are not populated in that case, while table-level symlinks and lineage 
 
 ## Getting Started (Flink2 plugin)
 
-1. Download [Gravitino OpenLineage Flink2 plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/flink-plugin/) (`openlineage-flink2-<version>.jar`) and place it in the Flink `lib/` directory.
+1. Download the [Gravitino OpenLineage Flink2 plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/flink-plugin/1.45.0-datastrato-1) (`openlineage-flink2-1.45.0-datastrato-1.jar`) and place it in the Flink `lib/` directory. The plugin jars are published in the [gravitino-openlineage-plugins](https://github.com/datastrato/gravitino-openlineage-plugins) repository, the same location as the [Spark plugin](./gravitino-spark-lineage.md) jar. Check the repository README for newer versions and the changelog.
 2. For Kafka transport, ensure `kafka-clients` jar is in Flink `lib/`.
 3. Add configuration to Flink to enable lineage collection.
 
@@ -222,7 +229,7 @@ Refer to [OpenLineage Flink guides](https://openlineage.io/docs/integrations/fli
 
 ## Getting Started (Flink1 plugin)
 
-1. Download [Gravitino OpenLineage Flink1 plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/flink-plugin/) (`openlineage-flink1-<version>.jar`) and place it in the Flink `lib/` directory.
+1. Download the [Gravitino OpenLineage Flink1 plugin jar](https://github.com/datastrato/gravitino-openlineage-plugins/tree/main/flink-plugin/1.45.0-datastrato-1) (`openlineage-flink1-1.45.0-datastrato-1.jar`) and place it in the Flink `lib/` directory. See the Flink2 plugin section above for where the jars are published.
 2. Register the listener in your application code:
 
 ```java
@@ -294,6 +301,9 @@ The configurations are grouped by purpose. Unless noted otherwise, they apply to
 ### Transport configuration
 
 These are standard OpenLineage transport options; the Gravitino plugin passes them through unchanged.
+In the **Required** column, `Yes` means required for every transport, while `Yes (Kafka)` and `Yes (HTTP)` mean the option is required only when
+`openlineage.transport.type` is `kafka` or `http` respectively. The `console` transport needs no
+additional options. All of these options can alternatively be provided in an `openlineage.yml` file.
 
 | Configuration item                   | Description                                                                                                                               | Default value | Required    | Since Version |
 |--------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------|---------------|
