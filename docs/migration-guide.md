@@ -11,6 +11,18 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ## Upgrading from Gravitino 1.3 to 2.0
 
+### Domains
+
+- Domains add business groupings within a metalake, backed by explicit tag bindings. Existing tags
+  and assignments are preserved; they are not automatically converted into domains.
+- Complete the standard 1.3-to-2.0 database schema upgrade before using Domain APIs. The H2, MySQL
+  and PostgreSQL upgrade scripts include the Domain metadata and hierarchy tables. Use matching
+  server and client versions; a client upgrade alone does not add server-side Domain support.
+- With authorization enabled, grant `MANAGE_DOMAIN` or `USE_DOMAIN` separately from tag and data
+  permissions. Existing tag/data privileges do not grant Domain management or discovery.
+- See [Manage domains](./manage-domains-in-gravitino.md) for the workflow and
+  [Upgrade Gravitino](./how-to-upgrade.md) for the database upgrade procedure.
+
 ### Audit client address behind a reverse proxy
 
 - Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever
