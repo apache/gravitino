@@ -19,6 +19,7 @@
 package org.apache.gravitino.client;
 
 import static org.apache.gravitino.server.web.TestTlsServerUtils.TEST_STORE_PASSWORD;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.google.common.collect.ImmutableMap;
@@ -154,6 +155,40 @@ public class TestHTTPClientTLS {
     }
   }
 
+  /*
+   * The current test server uses a self-signed certificate that is not trusted by the JVM's
+   * default truststore. Therefore, a successful keystore-only mTLS handshake cannot be
+   * demonstrated with the existing test fixtures.
+   *
+   * This test verifies that withKeyStore() preserves default JVM certificate verification
+   * and rejects the untrusted server certificate.
+   *
+   * A future test fixture using a server certificate trusted by the test JVM should allow
+   * a successful handshake to be tested without configuring a custom client truststore.
+   */
+
+  /*
+   * TODO: Add a successful keystore-only mTLS test when a test server certificate
+   * trusted by the default JVM truststore is available.
+   *
+   * The future test should:
+   * 1. Start an HTTPS server requiring client authentication with a certificate
+   *    trusted by the test JVM.
+   * 2. Configure the client using only withKeyStore().
+   * 3. Verify that the HTTPS request succeeds.
+   *
+   * Example client configuration:
+   *
+   * TLSConfigurer tlsConfigurer =
+   *     TLSConfigurers.withKeyStore(
+   *         TestTlsServerUtils.testResource(TEST_TRUSTED_CLIENT_KEYSTORE),
+   *         TEST_STORE_PASSWORD);
+   *
+   * try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
+   *   client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {});
+   * }
+   */
+
   @Test
   public void testMutualTLSWithDefaultTrustStoreRejectsUntrustedServer() throws Exception {
     int port =
@@ -164,8 +199,6 @@ public class TestHTTPClientTLS {
         TLSConfigurers.withKeyStore(
             TestTlsServerUtils.testResource(TEST_TRUSTED_CLIENT_KEYSTORE), TEST_STORE_PASSWORD);
 
-    // Due to utilizing the default JVM trust store, the client will not trust either test
-    // certificate, which is self-signed so expect a handshake failure.
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
       RESTException exception =
           assertThrows(
@@ -310,6 +343,26 @@ public class TestHTTPClientTLS {
 
       TestTlsServerUtils.assertHandshakeFailure(exception);
     }
+  }
+
+  @Test
+  public void testUnsupportedTlsProtocolFailsAtBuild() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> TLSConfigurers.builder().protocols("TLSv9.9").build());
+
+    assertEquals("Unsupported TLS protocol: TLSv9.9", exception.getMessage());
+  }
+
+  @Test
+  public void testUnsupportedTlsCipherSuiteFailsAtBuild() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> TLSConfigurers.builder().cipherSuites("INVALID_CIPHER").build());
+
+    assertEquals("Unsupported TLS cipher suite: INVALID_CIPHER", exception.getMessage());
   }
 
   private static HTTPClient createHttpsClient(int port, TLSConfigurer tlsConfigurer) {

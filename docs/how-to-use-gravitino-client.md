@@ -74,6 +74,8 @@ GravitinoClient gravitinoClient =
         .build();
 ```
 
+**Note:** Configuring a custom truststore with `withTrustStore()` replaces the JVM's default trust configuration for this client rather than merging with it. Certificates trusted only by the JVM's default truststore will no longer be trusted automatically. If the client needs to connect to servers using both private and public certificate authorities, the custom truststore must contain the necessary trusted certificates.
+
 #### Mutual TLS Authentication
 
 To authenticate with a client certificate while using a custom truststore to verify the server certificate, use `withMutualTls()`:
@@ -100,6 +102,7 @@ TLSConfigurer tlsConfigurer =
 
 The default JVM truststore is used to verify the server certificate, while the client keystore provides the certificate used for client authentication.
 
+Use `withKeyStore()` when the server certificate is already trusted by the JVM. If the server uses a private CA or a self-signed certificate that is not trusted by the JVM, use withMutualTls() to configure both the client keystore and a custom truststore.
 
 #### TLS Protocol and Cipher Suite Configuration
    

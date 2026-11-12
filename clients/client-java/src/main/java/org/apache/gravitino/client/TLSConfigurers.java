@@ -25,8 +25,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
+import java.util.Arrays;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLParameters;
 import javax.net.ssl.TrustManagerFactory;
 
 /** Provides utility methods for creating {@link TLSConfigurer} instances. */
@@ -57,7 +59,11 @@ public final class TLSConfigurers {
   }
 
   /**
-   * Creates a TLS configurer using a default JVM truststore and a custom client keystore.
+   * Creates a TLS configurer using the default JVM truststore and a custom client keystore.
+   *
+   * <p>The server certificate must already be trusted by the JVM. If the server uses a private CA
+   * or a self-signed certificate that the JVM does not trust, use {@link #withMutualTls(Path,
+   * String, Path, String)} instead.
    *
    * @param path path to the client keystore
    * @param password keystore password
@@ -101,7 +107,8 @@ public final class TLSConfigurers {
     /**
      * Configures the allowed TLS protocols.
      *
-     * <p>If no protocols are specified, the default TLS protocols are used.
+     * <p>If no protocols are specified, the default TLS protocols are used. Unsupported protocols
+     * are rejected when {@link #build()} is called.
      *
      * @param protocols allowed TLS protocols, such as {@code TLSv1.3}
      * @return this builder
@@ -121,7 +128,8 @@ public final class TLSConfigurers {
     /**
      * Configures the allowed TLS cipher suites.
      *
-     * <p>If no cipher suites are specified, the default TLS cipher suites are used.
+     * <p>If no cipher suites are specified, the default TLS cipher suites are used. Unsupported
+     * cipher suites are rejected when {@link #build()} is called.
      *
      * @param cipherSuites allowed TLS cipher suites
      * @return this builder
@@ -139,8 +147,28 @@ public final class TLSConfigurers {
       return this;
     }
 
+    private void validateTlsSettings(SSLContext sslContext) {
+      SSLParameters supportedParameters = sslContext.getSupportedSSLParameters();
+
+      for (String protocol : protocols) {
+        Preconditions.checkArgument(
+            Arrays.asList(supportedParameters.getProtocols()).contains(protocol),
+            "Unsupported TLS protocol: %s",
+            protocol);
+      }
+
+      for (String cipherSuite : cipherSuites) {
+        Preconditions.checkArgument(
+            Arrays.asList(supportedParameters.getCipherSuites()).contains(cipherSuite),
+            "Unsupported TLS cipher suite: %s",
+            cipherSuite);
+      }
+    }
+
     /**
      * Configures the truststore used to verify the server certificate.
+     *
+     * <p>An empty password is permitted if supported by the truststore format.
      *
      * @param path path to the truststore
      * @param password password for the truststore
@@ -157,6 +185,8 @@ public final class TLSConfigurers {
 
     /**
      * Configures the client keystore used for mutual TLS authentication.
+     *
+     * <p>An empty password is permitted if supported by the keystore format.
      *
      * @param path path to the client keystore
      * @param password password for the client keystore
@@ -190,11 +220,14 @@ public final class TLSConfigurers {
      * Builds a {@link TLSConfigurer} using the configured truststore and optional client keystore.
      *
      * @return the configured TLS configurer
-     * @throws IllegalArgumentException if required configuration is missing or the stores cannot be
-     *     loaded
+     * @throws IllegalArgumentException if the TLS configuration is invalid, unsupported, or cannot
+     *     be initialized
      */
     public TLSConfigurer build() {
       SSLContext sslContext = buildSslContext();
+
+      validateTlsSettings(sslContext);
+
       String[] configuredProtocols = protocols.clone();
       String[] configuredCipherSuites = cipherSuites.clone();
 
