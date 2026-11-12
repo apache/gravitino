@@ -36,7 +36,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
-import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.junit.jupiter.api.Assertions;
@@ -44,7 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 /** Unit tests for {@link GravitinoJdbcCatalog}. */
-public class TestGravitinoJdbcCatalog {
+public abstract class TestGravitinoJdbcCatalog {
 
   private static class PlainCatalogStub implements Catalog {
     @Override
@@ -180,17 +179,7 @@ public class TestGravitinoJdbcCatalog {
       options.put(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE, "gravitino");
       options.put(JdbcPropertiesConstants.FLINK_JDBC_USER, "user");
       options.put(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD, "password");
-      GravitinoJdbcCatalog catalog =
-          new GravitinoJdbcCatalog(
-              catalogContext(options),
-              "public",
-              Mockito.mock(SchemaAndTablePropertiesConverter.class),
-              Mockito.mock(PartitionConverter.class)) {
-            @Override
-            protected Catalog catalog() {
-              throw new NoSuchCatalogException("Catalog %s does not exist", "test");
-            }
-          };
+      GravitinoJdbcCatalog catalog = createNativeCatalog(catalogContext(options), "public");
 
       // Nothing listens on the port, so the native catalog fails on its first connection and
       // reports the URL. The MySQL catalog connects when it is created, PostgreSQL in open().
@@ -204,6 +193,16 @@ public class TestGravitinoJdbcCatalog {
           message);
     }
   }
+
+  /**
+   * Creates a JDBC catalog using the implementation for the Flink version under test.
+   *
+   * @param context the catalog factory context
+   * @param defaultDatabase the default Flink database
+   * @return the version-specific JDBC catalog
+   */
+  protected abstract GravitinoJdbcCatalog createNativeCatalog(
+      CatalogFactory.Context context, String defaultDatabase);
 
   private static CatalogFactory.Context catalogContext(Map<String, String> options) {
     return new FactoryUtil.DefaultCatalogContext(
