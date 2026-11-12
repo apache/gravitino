@@ -69,6 +69,15 @@ Override postgresql.auth.password (or set postgresql.auth.existingSecret)
 before any non-trial deployment.
 {{- end }}
 
+{{- if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" }}
+
+NOTE: External PostgreSQL metadata backend detected. The init-postgresql
+container requires postgresql.init.host and postgresql.init.existingSecret
+(operator-managed Secret with the application user password). The database
+name is taken from entity.jdbcUrl. Ensure the Secret key matches
+postgresql.init.existingSecretPasswordKey (default: password).
+{{- end }}
+
 To check pod status:
 
   kubectl get pods --namespace {{ include "gravitino.namespace" . }}
