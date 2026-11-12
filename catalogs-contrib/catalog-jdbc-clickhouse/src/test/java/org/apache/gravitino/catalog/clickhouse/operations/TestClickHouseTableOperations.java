@@ -1196,7 +1196,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             Distributions.NONE,
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
-    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
+    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toYYYYMMDD(`c1`)"));
 
     String multiPartitionSql =
         ops.buildCreateSql(
@@ -1209,7 +1209,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(
-        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toDate(`c1`))"));
+        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toYYYYMMDD(`c1`))"));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -1528,6 +1528,112 @@ public class TestClickHouseTableOperations extends TestClickHouse {
                     Indexes.EMPTY_INDEXES,
                     ClickHouseUtils.getSortOrders("id")));
     Assertions.assertTrue(exception.getMessage().contains("auto increment"));
+  }
+
+  @Test
+  void testDayAndNestedPartitionRoundTrip() throws Exception {
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement statement = connection.createStatement()) {
+      for (String[] expression :
+          new String[][] {
+            {"toYYYYMMDD(event_time)", "toYYYYMMDD(event_time)", "day", "DateTime"},
+            {"toDate(event_time)", "toYYYYMMDD(event_time)", "day", "Date"},
+            {"toYYYYMM(toDate(event_time))", "toYYYYMM(event_time)", "month", "Date"},
+            {"toYear(toDate(event_time))", "toYear(event_time)", "year", "Date"}
+          }) {
+        String source = RandomStringUtils.randomAlphabetic(16);
+        String target = source + "_copy";
+        try {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, source, expression[3], expression[0]));
+          JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), source);
+          Assertions.assertArrayEquals(
+              new Transform[] {
+                switch (expression[2]) {
+                  case "day" -> Transforms.day("event_time");
+                  case "month" -> Transforms.month("event_time");
+                  default -> Transforms.year("event_time");
+                }
+              },
+              loaded.partitioning());
+          TABLE_OPERATIONS.create(
+              TEST_DB_NAME.toString(),
+              target,
+              Arrays.stream(loaded.columns())
+                  .map(JdbcColumn.class::cast)
+                  .toArray(JdbcColumn[]::new),
+              null,
+              Collections.emptyMap(),
+              loaded.partitioning(),
+              Distributions.NONE,
+              Indexes.EMPTY_INDEXES,
+              getSortOrders("event_time"));
+          JdbcTable recreated = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), target);
+          Assertions.assertArrayEquals(loaded.partitioning(), recreated.partitioning());
+          Assertions.assertEquals(
+              expression[1], recreated.properties().get(TableConstants.PARTITION_KEY));
+        } finally {
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, target));
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, source));
+        }
+      }
+    }
+  }
+
+  @Test
+  void testUnsafePartitionCastsRetainNativeExpression() throws Exception {
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement statement = connection.createStatement()) {
+      // DateTime -> Date can clamp the epoch boundary even though the source type is temporal.
+      try (ResultSet result =
+          statement.executeQuery(
+              "SELECT toYear(toDateTime(0, 'America/New_York')), "
+                  + "toYear(toDate(toDateTime(0, 'America/New_York')))")) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(1969, result.getInt(1));
+        Assertions.assertEquals(1970, result.getInt(2));
+      }
+      for (String[] definition :
+          new String[][] {
+            {"String", "toYYYYMM(toDate(event_time))"},
+            {"UInt32", "toYear(toDate(event_time))"},
+            {"Date32", "toYear(toDate(event_time))"},
+            {"DateTime64(0)", "toYear(toDate(event_time))"},
+            {"DateTime64(3)", "toYear(toDate(event_time))"},
+            {"DateTime('Asia/Shanghai')", "toYear(toDate(event_time))"},
+            {"Date", "toYear(toDateTime(event_time))"},
+            {"DateTime", "toYear(toDate(event_time))"},
+            {"DateTime", "toDate(event_time)"},
+            {"String", "toDate(event_time)"},
+            {"UInt32", "toDate(event_time)"}
+          }) {
+        String table = RandomStringUtils.randomAlphabetic(16);
+        try {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, table, definition[0], definition[1]));
+          JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), table);
+          Assertions.assertEquals(0, loaded.partitioning().length, definition[0]);
+          Assertions.assertEquals(
+              definition[1], loaded.properties().get(TableConstants.PARTITION_KEY));
+        } finally {
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, table));
+        }
+      }
+    }
   }
 
   @Test
