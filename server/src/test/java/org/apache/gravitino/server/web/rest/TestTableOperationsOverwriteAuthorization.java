@@ -29,10 +29,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import java.time.Instant;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.TableDispatcher;
@@ -70,6 +72,10 @@ public class TestTableOperationsOverwriteAuthorization {
     when(table.name()).thenReturn("table1");
     when(table.columns()).thenReturn(new Column[0]);
     when(table.properties()).thenReturn(ImmutableMap.of());
+    Audit audit = mock(Audit.class);
+    when(audit.creator()).thenReturn("user1");
+    when(audit.createTime()).thenReturn(Instant.now());
+    when(table.auditInfo()).thenReturn(audit);
     when(dispatcher.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(table);
     operations = new TableOperations(dispatcher);
