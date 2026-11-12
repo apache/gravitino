@@ -117,10 +117,10 @@ populate this facet.
 
 **Table-level resolution** (no Gravitino Server needed):
 
-| Connector                | Physical namespace            | Physical name | Source            |
-|--------------------------|-------------------------------|---------------|-------------------|
+| Connector                | Physical namespace                                       | Physical name | Source            |
+|--------------------------|----------------------------------------------------------|---------------|-------------------|
 | `kafka` / `upsert-kafka` | `kafka://<first broker in properties.bootstrap.servers>` | topic name    | DDL `WITH` clause |
-| `jdbc`                   | JDBC URL (`url`)              | table-name    | DDL `WITH` clause |
+| `jdbc`                   | JDBC URL (`url`)                                         | table-name    | DDL `WITH` clause |
 
 **Catalog-level resolution** (requires Gravitino Server):
 
@@ -277,11 +277,11 @@ The configurations are grouped by purpose. Unless noted otherwise, they apply to
 
 ### Gravitino identifier configuration
 
-| Configuration item                             | Description                                                                                                                                                                                                                                                                                                                                                    | Default value | Required | Since Version |
-|------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `openlineage.gravitino.metalake`               | The Gravitino metalake name used as the dataset namespace. If not set, falls back to `table.catalog-store.gravitino.gravitino.metalake`; the Flink1 plugin then falls back to `execution.job-listener.openlineage.namespace`. If none is set, Gravitino identifier conversion is skipped.                                                                                                                                                                                                                       | None          | Yes, unless a fallback is set | 2.0.0         |
-| `openlineage.gravitino.useGravitinoIdentifier` | Whether to transform the dataset identifier to the Gravitino format. When `false`, the original OpenLineage identifier is used (e.g. `kafka://broker:9092` as the namespace for Kafka tables); note that for the Paimon/Hive/JDBC SQL path the original namespace is empty, since the Flink Planner does not populate physical addresses for these connectors. | `true`        | No       | 2.0.0         |
-| `openlineage.gravitino.catalogMappings`        | Catalog name mapping rules. For SQL datasets (Flink2), the keys are Flink catalog names and are used when the Flink catalog registration name differs from the Gravitino catalog name. For DataStream datasets, the keys are the inferred connector types (such as `kafka`, `hive`, `jdbc`, `paimon`). Format: `origin1:gravitino1,origin2:gravitino2`.                                                                                                                                                                                                  | None          | No       | 2.0.0         |
+| Configuration item                             | Description                                                                                                                                                                                                                                                                                                                                                     | Default value | Required                      | Since Version |
+|------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|-------------------------------|---------------|
+| `openlineage.gravitino.metalake`               | The Gravitino metalake name used as the dataset namespace. If not set, falls back to `table.catalog-store.gravitino.gravitino.metalake`; the Flink1 plugin then falls back to `execution.job-listener.openlineage.namespace`. If none is set, Gravitino identifier conversion is skipped.                                                                       | None          | Yes, unless a fallback is set | 2.0.0         |
+| `openlineage.gravitino.useGravitinoIdentifier` | Whether to transform the dataset identifier to the Gravitino format. When `false`, the original OpenLineage identifier is used (e.g. `kafka://broker:9092` as the namespace for Kafka tables); note that for the Paimon/Hive/JDBC SQL path the original namespace is empty, since the Flink Planner does not populate physical addresses for these connectors.  | `true`        | No                            | 2.0.0         |
+| `openlineage.gravitino.catalogMappings`        | Catalog name mapping rules. For SQL datasets (Flink2), the keys are Flink catalog names and are used when the Flink catalog registration name differs from the Gravitino catalog name. For DataStream datasets, the keys are the inferred connector types (such as `kafka`, `hive`, `jdbc`, `paimon`). Format: `origin1:gravitino1,origin2:gravitino2`.         | None          | No                            | 2.0.0         |
 
 ### Flink2 plugin configuration
 
