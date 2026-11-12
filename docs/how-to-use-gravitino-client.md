@@ -11,8 +11,8 @@ license: "This software is licensed under the Apache License version 2."
 Use Gravitino Java client library with Spark, Spring and other Java environment or
 use Gravitino Python client library with Spark, PyTorch, Tensorflow, Ray and Python environment.
 
-First of all, you must have a Gravitino server set up and run, you can refer document of 
-[how to install Gravitino](./how-to-install.md) to build Gravitino server from source code and 
+First of all, you must have a Gravitino server set up and run, you can refer document of
+[how to install Gravitino](./how-to-install.md) to build Gravitino server from source code and
 install it in your local.
 
 ## Java Client
@@ -21,35 +21,42 @@ Customize the Gravitino Java client by using `withClientConfig` like this:
 
 ```java
 Map<String, String> properties =
-        ImmutableMap.of(
-            "gravitino.client.connectionTimeoutMs", "10", 
-            "gravitino.client.socketTimeoutMs", "10"
-        );
+    ImmutableMap.of(
+        "gravitino.client.connectionTimeoutMs", "10",
+        "gravitino.client.socketTimeoutMs", "10");
 
-GravitinoClient gravitinoClient = GravitinoClient.builder("http://localhost:8090")
-.withMetalake("metalake")
-.withClientConfig(properties) // add custom client config (optional)
-.build();
+GravitinoClient gravitinoClient =
+    GravitinoClient.builder("http://localhost:8090")
+        .withMetalake("metalake")
+        .withClientConfig(properties) // add custom client config (optional)
+        .build();
 
-GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http://localhost:8090")
-.withClientConfig(properties) // add custom client config (optional)
-.build();
+GravitinoAdminClient gravitinoAdminClient =
+    GravitinoAdminClient.builder("http://localhost:8090")
+        .withClientConfig(properties) // add custom client config (optional)
+        .build();
 // ...
 ```
 
 ### Java Client Configuration
 
-| Configuration item                     | Description                                          | Default value       | Required |
-|----------------------------------------|------------------------------------------------------|---------------------|----------|
-| `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No       |
+| Configuration item | Description | Default value | Required |
+|--------------------|-------------|---------------|----------|
+| `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No |
 | `gravitino.client.retryTimes` | Maximum automatic HTTP retries after the initial request. Must be a nonnegative integer; `0` disables retries. | `1` | No |
-| `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | `180000`(3 minutes) | No       |
+| `gravitino.client.socketTimeoutMs` | An optional http socket timeout in milliseconds. | `180000`(3 minutes) | No |
 
 **Note:** Invalid configuration properties will result in exceptions.
 
 ### Java Client TLS Configuration
 
-To connect to a Gravitino server over HTTPS using a private certificate authority or a custom trust store, configure a `TLSConfigurer` and pass it to the client builder:
+The Gravitino Java client supports custom TLS configuration through `TLSConfigurers`. This includes custom truststores, mutual TLS (mTLS) authentication, and restrictions on TLS protocols and cipher suites.
+
+For HTTPS connections using the default JVM truststore without client certificate authentication, no additional TLS configuration is required.
+
+#### Custom Truststore
+
+To connect to a server using a private certificate authority (CA) or a self-signed certificate, use `withTrustStore()`:
 
 ```java
 import java.nio.file.Path;
@@ -66,6 +73,11 @@ TLSConfigurer tlsConfigurer =
 GravitinoClient gravitinoClient =
     GravitinoClient.builder("https://localhost:8433")
         .withMetalake("metalake")
+        .withTlsConfigurer(tlsConfigurer)
+        .build();
+
+GravitinoAdminClient gravitinoAdminClient =
+    GravitinoAdminClient.builder("https://localhost:8433")
         .withTlsConfigurer(tlsConfigurer)
         .build();
 ```
@@ -85,8 +97,10 @@ TLSConfigurer tlsConfigurer =
         "keystore-password");
 ```
 
+The truststore contains certificates used to verify the Gravitino server, while the client keystore contains the client certificate and private key used for authentication.
+
 #### Mutual TLS with Default JVM Truststore
-   
+
 If the server certificate is already trusted by the default JVM truststore, only a client keystore is required:
 
 ```java
@@ -98,10 +112,10 @@ TLSConfigurer tlsConfigurer =
 
 The default JVM truststore is used to verify the server certificate, while the client keystore provides the certificate used for client authentication.
 
-Use `withKeyStore()` when the server certificate is already trusted by the JVM. If the server uses a private CA or a self-signed certificate that is not trusted by the JVM, use withMutualTls() to configure both the client keystore and a custom truststore.
+Use `withKeyStore()` when the server certificate is already trusted by the JVM. If the server uses a private CA or a self-signed certificate that is not trusted by the JVM, use `withMutualTls()` to configure both the client keystore and a custom truststore.
 
 #### TLS Protocol and Cipher Suite Configuration
-   
+
 Use the builder to restrict the TLS protocols and cipher suites that the client may negotiate:
 
 ```java
@@ -142,8 +156,8 @@ Customize the Gravitino Python client with config properties like this:
 
 ```python
 gravitino_admin_client = GravitinoAdminClient(
-   uri="http://localhost:8090",
-   client_config={"gravitino_client_request_timeout": 60},
+    uri="http://localhost:8090",
+    client_config={"gravitino_client_request_timeout": 60},
 )
 try:
     # ...
@@ -151,9 +165,9 @@ finally:
     gravitino_admin_client.close()
 
 gravitino_client = GravitinoClient(
-   uri="http://localhost:8090",
-   metalake_name="test",
-   client_config={"gravitino_client_request_timeout": 60},
+    uri="http://localhost:8090",
+    metalake_name="test",
+    client_config={"gravitino_client_request_timeout": 60},
 )
 try:
     # ...
@@ -163,11 +177,11 @@ finally:
 
 ### Python Client Configuration
 
-| Configuration item                 | Description                            | Default value | Required |
-|------------------------------------|----------------------------------------|---------------|----------|
-| `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10`          | No       |
+| Configuration item | Description | Default value | Required |
+|--------------------|-------------|---------------|----------|
+| `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10` | No |
 
-**Note:** Invalid configuration properties will result in exceptions. 
+**Note:** Invalid configuration properties will result in exceptions.
 
 ## Retrying concurrent metadata changes
 
@@ -176,6 +190,7 @@ or a model-version link, the server may return HTTP 409 with error code `1012`. 
 rename wins. A model-version read may also return this conflict if concurrent changes prevent
 obtaining consistent metadata within the server's bounded read attempts. The Java and Python
 clients raise `OptimisticLockException` for error code `1012`.
+
 Import the exception in Java:
 
 ```java
