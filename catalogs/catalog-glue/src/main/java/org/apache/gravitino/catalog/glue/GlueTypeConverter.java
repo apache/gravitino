@@ -65,6 +65,15 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   static final String STRUCT = "struct";
   static final String UNIONTYPE = "uniontype";
 
+  // Hive length limits, see
+  // https://cwiki.apache.org/confluence/display/hive/languagemanual+types
+  static final int MAX_CHAR_LENGTH = 255;
+  static final int MAX_VARCHAR_LENGTH = 65535;
+
+  // Hive types carry no nullability, so a nested field cannot be NOT NULL.
+  private static final String NESTED_NOT_NULL_UNSUPPORTED =
+      "Glue/Hive does not support NOT NULL on nested fields, got %s";
+
   // Matches name(body): char(10), varchar(255), decimal(10,2)
   private static final Pattern PAREN_TYPE_PATTERN = Pattern.compile("(\\w+)\\(([^)]*)\\)");
   // Matches name<body>: array<string>, map<string,int>, struct<id:bigint>
@@ -75,7 +84,9 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
   public Type toGravitino(String glueType) {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(glueType), "Glue column type must not be blank");
-    String lower = glueType.trim().toLowerCase(ROOT);
+    // Keywords are matched in lower case, but struct field names keep their original case.
+    String trimmed = glueType.trim();
+    String lower = trimmed.toLowerCase(ROOT);
 
     switch (lower) {
       case BOOLEAN:
@@ -92,7 +103,11 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
       case FLOAT:
         return Types.FloatType.get();
       case DOUBLE:
+      case DOUBLE_PRECISION:
         return Types.DoubleType.get();
+      case DECIMAL:
+        // Hive reads a decimal without precision and scale as decimal(10,0).
+        return Types.DecimalType.of(10, 0);
       case STRING:
         return Types.StringType.get();
       case DATE:
@@ -134,9 +149,9 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     }
 
     // name<body> types: array<T>, map<K,V>, struct<...>, uniontype<...>
-    m = ANGLE_TYPE_PATTERN.matcher(lower);
+    m = ANGLE_TYPE_PATTERN.matcher(trimmed);
     if (m.matches()) {
-      String typeName = m.group(1);
+      String typeName = m.group(1).toLowerCase(ROOT);
       String body = m.group(2).trim();
       switch (typeName) {
         case ARRAY:
@@ -184,6 +199,12 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
 
   @Override
   public String fromGravitino(Type type) {
+    if (type instanceof Type.IntegralType && !((Type.IntegralType) type).signed()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Unsigned type %s is not supported by Glue; Glue/Hive has signed integers only",
+              type.simpleString()));
+    }
     if (type instanceof Types.BooleanType) return BOOLEAN;
     if (type instanceof Types.ByteType) return TINYINT;
     if (type instanceof Types.ShortType) return SMALLINT;
@@ -200,7 +221,7 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
       if (tsType.hasTimeZone()) {
         throw new IllegalArgumentException(
             "Unsupported Gravitino type for Glue: "
-                + type
+                + type.simpleString()
                 + ". Glue/Hive does not support TIMESTAMP WITH TIME ZONE.");
       }
       return TIMESTAMP;
@@ -209,27 +230,50 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.IntervalYearType) return INTERVAL_YEAR_MONTH;
     if (type instanceof Types.IntervalDayType) return INTERVAL_DAY_TIME;
     if (type instanceof Types.FixedCharType) {
-      return String.format("%s(%d)", CHAR, ((Types.FixedCharType) type).length());
+      int length = ((Types.FixedCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_CHAR_LENGTH,
+          "Glue/Hive char length must be in [1, %s], got %s",
+          MAX_CHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", CHAR, length);
     }
     if (type instanceof Types.VarCharType) {
-      return String.format("%s(%d)", VARCHAR, ((Types.VarCharType) type).length());
+      int length = ((Types.VarCharType) type).length();
+      Preconditions.checkArgument(
+          length >= 1 && length <= MAX_VARCHAR_LENGTH,
+          "Glue/Hive varchar length must be in [1, %s], got %s",
+          MAX_VARCHAR_LENGTH,
+          length);
+      return String.format("%s(%d)", VARCHAR, length);
     }
     if (type instanceof Types.DecimalType) {
       Types.DecimalType d = (Types.DecimalType) type;
       return String.format("%s(%d,%d)", DECIMAL, d.precision(), d.scale());
     }
     if (type instanceof Types.ListType) {
-      return String.format("%s<%s>", ARRAY, fromGravitino(((Types.ListType) type).elementType()));
+      Types.ListType listType = (Types.ListType) type;
+      Preconditions.checkArgument(
+          listType.elementNullable(), NESTED_NOT_NULL_UNSUPPORTED, listType.simpleString());
+      return String.format("%s<%s>", ARRAY, fromGravitino(listType.elementType()));
     }
     if (type instanceof Types.MapType) {
       Types.MapType mapType = (Types.MapType) type;
+      Preconditions.checkArgument(
+          mapType.valueNullable(), NESTED_NOT_NULL_UNSUPPORTED, mapType.simpleString());
       return String.format(
           "%s<%s,%s>", MAP, fromGravitino(mapType.keyType()), fromGravitino(mapType.valueType()));
     }
     if (type instanceof Types.StructType) {
       String fields =
           Arrays.stream(((Types.StructType) type).fields())
-              .map(f -> String.format("%s:%s", f.name(), fromGravitino(f.type())))
+              .map(
+                  f -> {
+                    Preconditions.checkArgument(
+                        f.nullable(), NESTED_NOT_NULL_UNSUPPORTED, "struct field " + f.name());
+                    return String.format(
+                        "%s:%s", checkStructFieldName(f.name()), fromGravitino(f.type()));
+                  })
               .collect(Collectors.joining(","));
       return String.format("%s<%s>", STRUCT, fields);
     }
@@ -243,7 +287,20 @@ public class GlueTypeConverter implements DataTypeConverter<String, String> {
     if (type instanceof Types.ExternalType) {
       return ((Types.ExternalType) type).catalogString();
     }
-    throw new IllegalArgumentException("Unsupported Gravitino type for Glue: " + type);
+    throw new IllegalArgumentException(
+        "Unsupported Gravitino type for Glue: " + type.simpleString());
+  }
+
+  private static String checkStructFieldName(String name) {
+    // Glue type strings have no quoting, so these characters would change how the type parses.
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name)
+            && name.equals(name.trim())
+            && !StringUtils.containsAny(name, ":,<>()"),
+        "Struct field name '%s' is not supported by Glue: it must not be blank, start or end with"
+            + " whitespace, or contain ':', ',', '<', '>', '(' or ')'",
+        name);
+    return name;
   }
 
   /**

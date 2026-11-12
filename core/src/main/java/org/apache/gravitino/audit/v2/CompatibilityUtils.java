@@ -62,6 +62,7 @@ public class CompatibilityUtils {
           .put(OperationType.RENAME_TABLE, Operation.RENAME_TABLE)
           .put(OperationType.REGISTER_TABLE, Operation.REGISTER_TABLE)
           .put(OperationType.TABLE_EXISTS, Operation.TABLE_EXISTS)
+          .put(OperationType.REPORT_TABLE_METRICS, Operation.REPORT_TABLE_METRICS)
           .put(OperationType.CREATE_TAG, Operation.CREATE_TAG)
           .put(OperationType.GET_TAG, Operation.GET_TAG)
           .put(OperationType.GET_TAG_FOR_METADATA_OBJECT, Operation.GET_TAG_FOR_METADATA_OBJECT)
@@ -202,6 +203,9 @@ public class CompatibilityUtils {
           .put(OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL)
           .put(OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL)
           .put(OperationType.LIST_SEMANTIC_MODEL_METRIC, Operation.LIST_SEMANTIC_MODEL_METRIC)
+          .put(
+              OperationType.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+              Operation.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE)
           .put(
               OperationType.LIST_SEMANTIC_MODEL_METRIC_INFOS,
               Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS)

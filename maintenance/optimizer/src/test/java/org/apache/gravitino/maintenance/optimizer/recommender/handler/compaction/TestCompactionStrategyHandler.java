@@ -128,6 +128,34 @@ class TestCompactionStrategyHandler {
   }
 
   @Test
+  void testShouldTriggerFalseWhenPartitionStatisticsAreEmpty() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+    Mockito.when(tableMetadata.sortOrder()).thenReturn(new SortOrder[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(
+                List.of(new StatisticEntryImpl("datafile_mse", StatisticValues.longValue(999999L))))
+            .withPartitionStatistics(Map.of())
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    Assertions.assertFalse(
+        handler.shouldTrigger(),
+        "Empty partition statistics must not trigger, even with high table-level metrics");
+  }
+
+  @Test
   void testShouldTriggerUsingTableMetadata() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Map<String, Object> rules = new HashMap<>();
@@ -200,7 +228,34 @@ class TestCompactionStrategyHandler {
   }
 
   @Test
-  void testShouldTriggerShortCircuitsWhenTableLevelExprEvaluatesToFalse() {
+  void testNonPartitionTablePrefersMetadataOverDuplicateStatisticKey() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Strategy strategy = buildStrategyWithTriggerExpr("row_count_limit > 100");
+
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(new org.apache.gravitino.rel.expressions.transforms.Transform[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    Mockito.when(tableMetadata.sortOrder()).thenReturn(new SortOrder[0]);
+    // Metadata value satisfies the trigger; a same-named table statistic would not.
+    Mockito.when(tableMetadata.properties()).thenReturn(Map.of("row_count_limit", "500"));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(
+                List.of(new StatisticEntryImpl("row_count_limit", StatisticValues.longValue(1L))))
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    Assertions.assertTrue(
+        handler.shouldTrigger(),
+        "Non-partitioned evaluation must prefer table metadata over a same-named table statistic");
+  }
+
+  @Test
+  void testShouldTriggerUsesMetadataWithPartitionStatsWhenCombinedExprIsFalse() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);
     Mockito.when(tableMetadata.partitioning())
@@ -212,8 +267,6 @@ class TestCompactionStrategyHandler {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
 
-    // Since sort_order_count == 0, QL evaluator short-circuits the && and returns false
-    // without needing to resolve the partition-level variable
     Strategy strategy = buildStrategyWithTriggerExpr("sort_order_count > 0 && datafile_mse > 0");
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
@@ -233,12 +286,11 @@ class TestCompactionStrategyHandler {
     CompactionStrategyHandler handler = new CompactionStrategyHandler();
     handler.initialize(context);
     Assertions.assertFalse(
-        handler.shouldTrigger(),
-        "Should short-circuit to false when table-level predicate is first and evaluates to false");
+        handler.shouldTrigger(), "Per-partition eval stays false when metadata predicate is false");
   }
 
   @Test
-  void testShouldTriggerShortCircuitsWhenTableLevelExprEvaluatesToTrue() {
+  void testShouldTriggerUsesMetadataWithPartitionStatsWhenCombinedExprIsTrue() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);
     Mockito.when(tableMetadata.partitioning())
@@ -251,8 +303,6 @@ class TestCompactionStrategyHandler {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
 
-    // Since sort_order_count == 1, QL evaluator short-circuits the || and returns true
-    // without needing to resolve the partition-level variable
     Strategy strategy = buildStrategyWithTriggerExpr("sort_order_count > 0 || datafile_mse == 0");
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
@@ -272,12 +322,11 @@ class TestCompactionStrategyHandler {
     CompactionStrategyHandler handler = new CompactionStrategyHandler();
     handler.initialize(context);
     Assertions.assertTrue(
-        handler.shouldTrigger(),
-        "Should short-circuit to true when table-level predicate is first and evaluates to true");
+        handler.shouldTrigger(), "Per-partition eval is true when metadata predicate is true");
   }
 
   @Test
-  void testShouldTriggerShortCircuitsWhenTableLevelOnlyExpr() {
+  void testShouldTriggerUsesMetadataOnlyExprAgainstEachPartition() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);
     Mockito.when(tableMetadata.partitioning())
@@ -290,7 +339,6 @@ class TestCompactionStrategyHandler {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
 
-    // Expression uses only table-level variable, should evaluate once without partition iteration
     Strategy strategy = buildStrategyWithTriggerExpr("sort_order_count > 0");
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
@@ -309,11 +357,51 @@ class TestCompactionStrategyHandler {
     handler.initialize(context);
     Assertions.assertTrue(
         handler.shouldTrigger(),
-        "Should short-circuit to true when table-level-only expression evaluates to true");
+        "Metadata-only expressions still evaluate true for each partition");
   }
 
   @Test
-  void testShouldTriggerFallsBackToPartitionEvalWhenTableLevelExprIsNotFirst() {
+  void testShouldTriggerIgnoresStaleTableLevelStatisticsForPartitionedTable() {
+    NameIdentifier tableId = NameIdentifier.of("db", "table");
+    Table tableMetadata = Mockito.mock(Table.class);
+    Mockito.when(tableMetadata.partitioning())
+        .thenReturn(
+            new org.apache.gravitino.rel.expressions.transforms.Transform[] {
+              Transforms.identity("p")
+            });
+    Mockito.when(tableMetadata.sortOrder()).thenReturn(new SortOrder[0]);
+    Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
+    Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
+
+    Strategy strategy = buildStrategyWithTriggerExpr("custom-data-file-mse >= 1000");
+
+    Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
+        Map.of(
+            PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "1"))),
+            List.of(new StatisticEntryImpl("custom-data-file-mse", StatisticValues.longValue(10L))),
+            PartitionPath.of(Arrays.asList(new PartitionEntryImpl("p", "2"))),
+            List.of(
+                new StatisticEntryImpl("custom-data-file-mse", StatisticValues.longValue(20L))));
+
+    StrategyHandlerContext context =
+        StrategyHandlerContext.builder(tableId, strategy)
+            .withTableMetadata(tableMetadata)
+            .withTableStatistics(
+                List.of(
+                    new StatisticEntryImpl(
+                        "custom-data-file-mse", StatisticValues.longValue(999999999L))))
+            .withPartitionStatistics(partitionStats)
+            .build();
+
+    CompactionStrategyHandler handler = new CompactionStrategyHandler();
+    handler.initialize(context);
+    Assertions.assertFalse(
+        handler.shouldTrigger(),
+        "Stale table-level MSE must not trigger when every partition is below the threshold");
+  }
+
+  @Test
+  void testShouldTriggerUsesPartitionStatisticsWhenTableLevelWouldDisagree() {
     NameIdentifier tableId = NameIdentifier.of("db", "table");
     Table tableMetadata = Mockito.mock(Table.class);
     Mockito.when(tableMetadata.partitioning())
@@ -325,8 +413,6 @@ class TestCompactionStrategyHandler {
     Mockito.when(tableMetadata.columns()).thenReturn(new Column[0]);
     Mockito.when(tableMetadata.properties()).thenReturn(Map.of());
 
-    // Partition-level predicate first: datafile_mse > 0 && sort_order_count > 0
-    // tryToEvaluateBool will fail on missing 'datafile_mse', so falls back to per-partition eval
     Strategy strategy = buildStrategyWithTriggerExpr("datafile_mse > 0 && sort_order_count > 0");
 
     Map<PartitionPath, List<StatisticEntry<?>>> partitionStats =
@@ -343,10 +429,8 @@ class TestCompactionStrategyHandler {
 
     CompactionStrategyHandler handler = new CompactionStrategyHandler();
     handler.initialize(context);
-    // sort_order_count == 0 so per-partition eval will also return false
     Assertions.assertFalse(
-        handler.shouldTrigger(),
-        "Falls back to per-partition eval; still false because sort_order_count is 0");
+        handler.shouldTrigger(), "Per-partition eval stays false because sort_order_count is 0");
   }
 
   @Test

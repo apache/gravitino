@@ -33,6 +33,7 @@ public enum OperationType {
   RENAME_TABLE,
   REGISTER_TABLE,
   TABLE_EXISTS,
+  REPORT_TABLE_METRICS,
 
   // Tag operations
   CREATE_TAG,
@@ -218,6 +219,8 @@ public enum OperationType {
   LIST_SEMANTIC_MODEL,
   /** List identifiers of metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC,
+  /** Lists datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
   /** List complete metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC_INFOS,
   /** Import a Semantic Model from an Ossie document. */

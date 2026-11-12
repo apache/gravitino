@@ -108,10 +108,15 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
   /**
    * Stores the entity, possibly overwriting an existing entity if specified.
    *
+   * <p>A schema overwrite must not replace a different active identity at the same name or move an
+   * active identity from another catalog. Such conflicts require explicit reconciliation, even when
+   * {@code overwritten} is true; an overwrite must not cascade-delete the old schema metadata.
+   *
    * @param <E> The type of the entity returned.
    * @param e The entity which need be stored.
    * @param overwritten If true, overwrites the existing value.
-   * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false.
+   * @throws EntityAlreadyExistsException If the entity already exists and overwrite is false, or a
+   *     schema overwrite conflicts with an active identity.
    * @throws IOException If the store operation fails
    */
   <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)

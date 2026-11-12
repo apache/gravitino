@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -27,12 +28,14 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -307,6 +310,14 @@ public class LanceTableOperations extends ManagedTableOperations {
       Table table = super.loadTable(ident);
       validateLanceTable(ident, table);
       boolean external = LancePropertiesUtils.isExternalTable(table.properties());
+      if (external
+          && !Boolean.parseBoolean(catalogProperties.get(LANCE_ALLOW_EXTERNAL_TABLE_PURGE))) {
+        throw new UnsupportedOperationException(
+            "Purging external Lance tables is disabled. Use dropTable or Lance REST deregister"
+                + " to remove metadata only. A catalog administrator may enable "
+                + LANCE_ALLOW_EXTERNAL_TABLE_PURGE
+                + " to allow physical deletion of external data.");
+      }
 
       // NOTE: the two steps below (metadata removal and dataset deletion) are NOT atomic.
       // If the process crashes between them, the entity-store record will be gone but the
@@ -329,7 +340,7 @@ public class LanceTableOperations extends ManagedTableOperations {
 
     } catch (NoSuchTableException e) {
       return false;
-    } catch (IllegalArgumentException e) {
+    } catch (IllegalArgumentException | UnsupportedOperationException e) {
       throw e;
     } catch (OptimisticLockException e) {
       // The table metadata conflicted with a concurrent writer, e.g. a lock wait timeout, and was
@@ -872,7 +883,11 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
-      for (TableChange change : changes) {
+      List<TableChange> changesToApply =
+          Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.ColumnChange)
+              ? validateLanceColumnNames(dataset, changes)
+              : Arrays.asList(changes);
+      for (TableChange change : changesToApply) {
         if (change instanceof TableChange.AddColumn addColumn) {
           String columnName = addColumn.fieldName()[0];
 
@@ -911,6 +926,40 @@ public class LanceTableOperations extends ManagedTableOperations {
       throw ExceptionMessages.wrap(
           "Failed to handle alterations to Lance dataset at location " + location, e);
     }
+  }
+
+  private static List<TableChange> validateLanceColumnNames(
+      Dataset dataset, TableChange[] changes) {
+    // Use the dataset schema, including out-of-band changes, and validate the whole ordered
+    // request before applying any changes. A late name conflict must not leave earlier edits.
+    Set<String> columnNames =
+        dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+    List<TableChange> changesToApply = new ArrayList<>(changes.length);
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        String name = addColumn.fieldName()[0];
+        Preconditions.checkArgument(columnNames.add(name), "Column already exists: %s", name);
+      } else if (change instanceof TableChange.DeleteColumn deleteColumn) {
+        String name = deleteColumn.fieldName()[0];
+        boolean exists = columnNames.remove(name);
+        Preconditions.checkArgument(
+            exists || Boolean.TRUE.equals(deleteColumn.getIfExists()),
+            "Column does not exist: %s",
+            name);
+        if (!exists) {
+          // Honor ifExists before reaching Lance, whose dropColumns rejects missing fields.
+          continue;
+        }
+      } else if (change instanceof TableChange.RenameColumn renameColumn) {
+        String oldName = renameColumn.fieldName()[0];
+        String newName = renameColumn.getNewName();
+        Preconditions.checkArgument(
+            columnNames.remove(oldName), "Column does not exist: %s", oldName);
+        Preconditions.checkArgument(columnNames.add(newName), "Column already exists: %s", newName);
+      }
+      changesToApply.add(change);
+    }
+    return changesToApply;
   }
 
   private static void validateLanceTableChanges(TableChange[] changes) {

@@ -23,7 +23,8 @@ import com.google.common.collect.Sets;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.commons.lang.StringUtils;
+import java.util.stream.Stream;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.authorization.AuthorizationPrivilege;
 import org.apache.gravitino.authorization.AuthorizationSecurableObject;
 import org.apache.gravitino.authorization.Owner;
@@ -142,12 +143,12 @@ public class RangerHelper {
                 RangerPolicy.RangerPolicyItemAccess access =
                     new RangerPolicy.RangerPolicyItemAccess();
                 access.setType(rangerPrivilege.getName());
-                policyItem.getAccesses().add(access);
-                policyItem.getRoles().add(generateGravitinoRoleName(roleName));
+                policyItem.addAccess(access);
+                policyItem.addRole(generateGravitinoRoleName(roleName));
                 if (Privilege.Condition.ALLOW == rangerPrivilege.condition()) {
-                  policy.getPolicyItems().add(policyItem);
+                  policy.addPolicyItem(policyItem);
                 } else {
-                  policy.getDenyPolicyItems().add(policyItem);
+                  policy.addDenyPolicyItem(policyItem);
                 }
               } else {
                 // If the policy item exists, then add the role to the policy item
@@ -158,7 +159,7 @@ public class RangerHelper {
                           if (!policyItem
                               .getRoles()
                               .contains(generateGravitinoRoleName(roleName))) {
-                            policyItem.getRoles().add(generateGravitinoRoleName(roleName));
+                            policyItem.addRole(generateGravitinoRoleName(roleName));
                           }
                         });
               }
@@ -171,11 +172,15 @@ public class RangerHelper {
   }
 
   public static boolean hasGravitinoManagedPolicyItem(RangerPolicy policy) {
-    List<RangerPolicy.RangerPolicyItem> policyItems = policy.getPolicyItems();
-    policyItems.addAll(policy.getDenyPolicyItems());
-    policyItems.addAll(policy.getRowFilterPolicyItems());
-    policyItems.addAll(policy.getDataMaskPolicyItems());
-    return policyItems.stream().anyMatch(RangerHelper::isGravitinoManagedPolicyItemAccess);
+    // Do not add the items to policy.getPolicyItems(): that list belongs to the policy, which is
+    // sent back to Ranger later, and it can be immutable in Ranger 2.8.
+    return Stream.<List<? extends RangerPolicy.RangerPolicyItem>>of(
+            policy.getPolicyItems(),
+            policy.getDenyPolicyItems(),
+            policy.getRowFilterPolicyItems(),
+            policy.getDataMaskPolicyItems())
+        .flatMap(List::stream)
+        .anyMatch(RangerHelper::isGravitinoManagedPolicyItemAccess);
   }
 
   public void removeAllGravitinoManagedPolicyItem(RangerPolicy policy) {
@@ -360,11 +365,11 @@ public class RangerHelper {
           if (newOwner != null) {
             if (newOwner.type() == Owner.Type.USER) {
               if (!policyItem.getUsers().contains(newOwner.name())) {
-                policyItem.getUsers().add(newOwner.name());
+                policyItem.addUser(newOwner.name());
               }
             } else {
               if (!policyItem.getGroups().contains(newOwner.name())) {
-                policyItem.getGroups().add(newOwner.name());
+                policyItem.addGroup(newOwner.name());
               }
             }
           }
@@ -388,19 +393,18 @@ public class RangerHelper {
             // Add lost owner's privilege to the policy
             ownerPrivilege -> {
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem
-                  .getAccesses()
-                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.addAccess(
+                  new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
               if (newOwner != null) {
                 if (newOwner.type() == Owner.Type.USER) {
-                  policyItem.getUsers().add(newOwner.name());
+                  policyItem.addUser(newOwner.name());
                 } else {
-                  policyItem.getGroups().add(newOwner.name());
+                  policyItem.addGroup(newOwner.name());
                 }
                 // mark the policy item is created by Gravitino
                 addRoleToPolicyItemIfNoExists(policyItem, GRAVITINO_OWNER_ROLE);
               }
-              policy.getPolicyItems().add(policyItem);
+              policy.addPolicyItem(policyItem);
             });
   }
 
@@ -447,11 +451,10 @@ public class RangerHelper {
             // Add lost owner's privilege to the policy
             ownerPrivilege -> {
               RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
-              policyItem
-                  .getAccesses()
-                  .add(new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
+              policyItem.addAccess(
+                  new RangerPolicy.RangerPolicyItemAccess(ownerPrivilege.getName()));
               addRoleToPolicyItemIfNoExists(policyItem, ownerRoleName);
-              policy.getPolicyItems().add(policyItem);
+              policy.addPolicyItem(policyItem);
             });
   }
 
@@ -459,7 +462,7 @@ public class RangerHelper {
       RangerPolicy.RangerPolicyItem policyItem, String roleName) {
     String gravitinoRoleName = generateGravitinoRoleName(roleName);
     if (!policyItem.getRoles().contains(gravitinoRoleName)) {
-      policyItem.getRoles().add(gravitinoRoleName);
+      policyItem.addRole(gravitinoRoleName);
     }
   }
 

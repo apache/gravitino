@@ -47,7 +47,13 @@ Next, when you create the JDBC catalog in Gravitino, add the `flink.bypass.defau
 flink.bypass.default-database=db  
 ```
 
-For a PostgreSQL catalog, if `flink.bypass.default-database` is not set, it falls back to the catalog's `jdbc-database` property. This distinction matters for PostgreSQL because a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself; the JDBC connection always targets `jdbc-database` (or the `flink.bypass.default-database` override), while `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
+For a PostgreSQL catalog, a Flink "database" corresponds to a PostgreSQL schema, not the PostgreSQL database itself. `flink.bypass.default-database` sets the schema Flink uses after `USE CATALOG` (for example, `public`) and falls back to `jdbc-database` when not set. The JDBC connection always targets `jdbc-database`, or the database in `jdbc-url` when `jdbc-database` is not set. `SHOW TABLES FROM <schema>` and table scans address tables within that database using the schema name.
+
+:::note
+`flink.bypass.default-database` does not select the PostgreSQL database to connect to. If you previously set it to a PostgreSQL database name for that purpose, set `jdbc-database` instead.
+:::
+
+If Flink must reach the database through a different address than the Gravitino server, set `flink.bypass.base-url` in the form `jdbc:<dialect>://<host>:<port>` (for example, `jdbc:postgresql://127.0.0.1:5432/`). It overrides the `base-url` derived from `jdbc-url`, and Flink validates it like a `base-url` set on a Flink JDBC catalog.
 
 ### SQL Example
 
@@ -138,10 +144,10 @@ SELECT * FROM jdbc_table_a;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 
-| Gravitino catalog property name | Flink JDBC connector configuration | Description                                                                                 |
-|:--------------------------------|:-----------------------------------|:--------------------------------------------------------------------------------------------|
-| `jdbc-url`                      | `base-url`                         | JDBC URL for the catalog                                                                    |
-| `username`                      | `username`                         | Username of the account                                                                     |
-| `password`                      | `password`                         | Password of the account                                                                     |
-| `flink.bypass.default-database` | `default-database`                 | Default database to connect to. For PostgreSQL, falls back to `jdbc-database` when not set. |
-| `jdbc-database`                 | (see above)                        | Required for PostgreSQL catalogs; the PostgreSQL database the catalog connects to.          |
+| Gravitino catalog property name | Flink JDBC connector configuration | Description                                                                                       |
+|:--------------------------------|:-----------------------------------|:--------------------------------------------------------------------------------------------------|
+| `jdbc-url`                      | `base-url`                         | JDBC URL for the catalog. `flink.bypass.base-url` overrides the derived `base-url`.               |
+| `username`                      | `username`                         | Username of the account                                                                           |
+| `password`                      | `password`                         | Password of the account                                                                           |
+| `flink.bypass.default-database` | `default-database`                 | Default database. For PostgreSQL, the default schema; falls back to `jdbc-database`.              |
+| `jdbc-database`                 | (see above)                        | The PostgreSQL database the catalog connects to. Optional when `jdbc-url` contains the database.  |
