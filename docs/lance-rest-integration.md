@@ -111,7 +111,7 @@ first supplied version remains the primary for the normal `test` task.
 # tests/integration/test_lance_ray.py against each. The Gradle wrapper
 # below starts / stops Gravitino automatically.
 ./gradlew :clients:client-python:lanceRayMatrixTest \
-    -PlanceRayVersions=0.4.2,0.3.0
+    -PlanceRayVersions=0.5.0,0.4.2,0.3.0
 ```
 
 ### Rationale

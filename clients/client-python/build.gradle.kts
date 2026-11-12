@@ -426,6 +426,12 @@ tasks {
     group = "verification"
     description = "Verify installed core SDK artifacts in isolated Ray dependency environments."
     dependsOn(distribution)
+    val serverHome = rootDir.resolve("distribution/package")
+    val serverHomeAll = rootDir.resolve("distribution/package-all")
+    // compileDistribution cleans both directories, which may contain existing data.
+    if (!serverHome.exists() && !serverHomeAll.exists()) {
+      dependsOn(":compileDistribution")
+    }
 
     fun interpreter(version: String, property: String): String {
       val explicit = (project.findProperty(property) as? String)?.takeIf { it.isNotBlank() }
@@ -442,11 +448,11 @@ tasks {
     }
 
     doLast {
-      val serverHome = rootDir.resolve("distribution/package")
       if (!serverHome.resolve("bin/gravitino.sh").isFile ||
           !serverHome.resolve("libs").isDirectory) {
         throw GradleException(
-          "Build the Gravitino server first with ./gradlew compileDistribution -PskipWeb=true -x test"
+          "Gravitino server distribution is incomplete; protect existing distribution data " +
+            "before rebuilding with ./gradlew compileDistribution -PskipWeb=true -x test"
         )
       }
       val artifacts = projectDir.resolve("dist").listFiles { file ->
