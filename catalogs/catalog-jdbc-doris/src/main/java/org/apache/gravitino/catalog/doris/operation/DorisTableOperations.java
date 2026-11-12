@@ -85,7 +85,6 @@ import org.apache.gravitino.utils.ExceptionMessages;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
-  private static final String BACK_QUOTE = "`";
   private static final String DORIS_AUTO_INCREMENT = "AUTO_INCREMENT";
   private static final String NEW_LINE = "\n";
   private static final Pattern INDEX_PROPERTY_PATTERN =
@@ -138,9 +137,9 @@ public class DorisTableOperations extends JdbcTableOperations {
       if (!comment.equals(loadTableComment(connection, databaseName, tableName))) {
         JdbcConnectorUtils.executeUpdate(
             connection,
-            "ALTER TABLE `"
-                + tableName
-                + "` MODIFY COMMENT \""
+            "ALTER TABLE "
+                + quote(tableName)
+                + " MODIFY COMMENT \""
                 + escapeSqlLiteral(comment, '"')
                 + "\"");
       }
@@ -169,16 +168,17 @@ public class DorisTableOperations extends JdbcTableOperations {
       LOG.debug("generateCreateTableSql: tableName={}, indexCount={}", tableName, indexes.length);
     }
 
-    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
-    validateAutoIncrementVersion(columns);
-    boolean useDoubleQuotedStringDefaults = useDoubleQuotedCreateTableStringDefaults(columns);
-
     validateIncrementCol(columns, indexes);
     validateDistribution(distribution, columns);
 
+    // Doris auto-increment requires 2.1.0+. Validate before delegating to base class.
+    Optional<String> createTableDorisVersion = validateAutoIncrementVersion(columns);
+    boolean useDoubleQuotedStringDefaults =
+        useDoubleQuotedCreateTableStringDefaults(columns, createTableDorisVersion);
+
     StringBuilder sqlBuilder = new StringBuilder();
 
-    sqlBuilder.append(String.format("CREATE TABLE `%s` (", tableName)).append(NEW_LINE);
+    sqlBuilder.append(String.format("CREATE TABLE %s (", quote(tableName))).append(NEW_LINE);
 
     // Add columns
     sqlBuilder.append(
@@ -186,11 +186,7 @@ public class DorisTableOperations extends JdbcTableOperations {
             .map(
                 column -> {
                   StringBuilder columnsSql = new StringBuilder();
-                  columnsSql
-                      .append(SPACE)
-                      .append(BACK_QUOTE)
-                      .append(column.name())
-                      .append(BACK_QUOTE);
+                  columnsSql.append(SPACE).append(quote(column.name()));
                   appendColumnDefinition(column, columnsSql, useDoubleQuotedStringDefaults);
                   return columnsSql.toString();
                 })
@@ -220,7 +216,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       sqlBuilder.append(NEW_LINE).append(" DISTRIBUTED BY HASH(");
       sqlBuilder.append(
           Arrays.stream(distribution.expressions())
-              .map(column -> BACK_QUOTE + column.toString() + BACK_QUOTE)
+              .map(column -> quote(column.toString()))
               .collect(Collectors.joining(", ")));
       sqlBuilder.append(")");
     } else if (distribution.strategy() == Strategy.EVEN) {
@@ -324,16 +320,17 @@ public class DorisTableOperations extends JdbcTableOperations {
    * introduced in Doris 2.1.0. On older versions, the SQL parser does not recognize the
    * AUTO_INCREMENT keyword and returns a syntax error.
    */
-  private void validateAutoIncrementVersion(JdbcColumn[] columns) {
+  private Optional<String> validateAutoIncrementVersion(JdbcColumn[] columns) {
     boolean hasAutoIncrement = Arrays.stream(columns).anyMatch(Column::autoIncrement);
     if (!hasAutoIncrement) {
-      return;
+      return Optional.empty();
     }
     String version = getDorisVersion("AUTO_INCREMENT compatibility check");
     if (!isVersionAtLeast(version, 2, 1, 0)) {
       throw new UnsupportedOperationException(
           "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
     }
+    return Optional.of(version);
   }
 
   /**
@@ -341,7 +338,8 @@ public class DorisTableOperations extends JdbcTableOperations {
    * version is looked up only when a string default contains a quote or backslash, since plain
    * strings render the same in both forms.
    */
-  private boolean useDoubleQuotedCreateTableStringDefaults(JdbcColumn[] columns) {
+  private boolean useDoubleQuotedCreateTableStringDefaults(
+      JdbcColumn[] columns, Optional<String> dorisVersion) {
     boolean needsVersion =
         Arrays.stream(columns)
             .map(Column::defaultValue)
@@ -354,7 +352,11 @@ public class DorisTableOperations extends JdbcTableOperations {
                         || value.indexOf('\\') >= 0);
     return needsVersion
         && isVersionAtLeast(
-            getDorisVersion("CREATE TABLE default literal compatibility check"), 2, 1, 0);
+            dorisVersion.orElseGet(
+                () -> getDorisVersion("CREATE TABLE default literal compatibility check")),
+            2,
+            1,
+            0);
   }
 
   private String getDorisVersion(String purpose) {
@@ -477,10 +479,11 @@ public class DorisTableOperations extends JdbcTableOperations {
                   String propertiesSql =
                       generateIndexPropertiesSql(index.type(), index.properties());
                   if (usingClause.isEmpty()) {
-                    return String.format("INDEX `%s` (`%s`)", index.name(), fieldName)
+                    return String.format("INDEX %s (%s)", quote(index.name()), quote(fieldName))
                         + propertiesSql;
                   }
-                  return String.format("INDEX `%s` (`%s`) %s", index.name(), fieldName, usingClause)
+                  return String.format(
+                          "INDEX %s (%s) %s", quote(index.name()), quote(fieldName), usingClause)
                       + propertiesSql;
                 })
             .collect(Collectors.joining(",\n"));
@@ -536,7 +539,7 @@ public class DorisTableOperations extends JdbcTableOperations {
             keyIndex -> {
               String cols =
                   Arrays.stream(keyIndex.fieldNames())
-                      .map(field -> BACK_QUOTE + field[0] + BACK_QUOTE)
+                      .map(field -> quote(field[0]))
                       .collect(Collectors.joining(", "));
               sqlBuilder.append(NEW_LINE).append("UNIQUE KEY(").append(cols).append(")");
             });
@@ -578,7 +581,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
     StringBuilder partitionSqlBuilder = new StringBuilder(NEW_LINE);
     String partitionDefinition =
-        String.format(" PARTITION BY RANGE(`%s`)", rangePartition.fieldName()[0]);
+        String.format(" PARTITION BY RANGE(%s)", quote(rangePartition.fieldName()[0]));
     partitionSqlBuilder.append(partitionDefinition).append(NEW_LINE).append("(");
 
     // Assign range partitions
@@ -605,7 +608,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       Preconditions.checkArgument(
           columnNames.contains(filedName[0]), "The partition field must be one of the columns");
 
-      partitionColumnsBuilder.add(BACK_QUOTE + filedName[0] + BACK_QUOTE);
+      partitionColumnsBuilder.add(quote(filedName[0]));
     }
     String partitionColumns =
         partitionColumnsBuilder.build().stream().collect(Collectors.joining(","));
@@ -646,7 +649,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
 
-    String showCreateTableSQL = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSQL = String.format("SHOW CREATE TABLE %s", quote(tableName));
 
     StringBuilder createTableSqlSb = new StringBuilder();
     try (Statement statement = connection.createStatement();
@@ -669,7 +672,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   @Override
   protected List<Index> getIndexes(Connection connection, String databaseName, String tableName)
       throws SQLException {
-    String sql = String.format("SHOW INDEX FROM `%s` FROM `%s`", tableName, databaseName);
+    String sql = String.format("SHOW INDEX FROM %s FROM %s", quote(tableName), quote(databaseName));
 
     // get Indexes from SQL
     try (PreparedStatement preparedStatement = connection.prepareStatement(sql);
@@ -766,7 +769,7 @@ public class DorisTableOperations extends JdbcTableOperations {
   @Override
   protected Transform[] getTablePartitioning(
       Connection connection, String databaseName, String tableName) throws SQLException {
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSql = String.format("SHOW CREATE TABLE %s", quote(tableName));
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       StringBuilder createTableSql = new StringBuilder();
@@ -865,7 +868,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     String sql =
         String.format(
             "SHOW ALTER TABLE COLUMN WHERE TableName = '%s' ORDER BY JobId DESC limit 1",
-            tableName);
+            escapeSqlLiteral(tableName, '\''));
 
     // Just print each column name and type from resultSet
     // TODO: add to table properties or other fields
@@ -897,7 +900,7 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   @Override
   protected String generateRenameTableSql(String oldTableName, String newTableName) {
-    return String.format("ALTER TABLE `%s` RENAME `%s`", oldTableName, newTableName);
+    return String.format("ALTER TABLE %s RENAME %s", quote(oldTableName), quote(newTableName));
   }
 
   @Override
@@ -980,12 +983,12 @@ public class DorisTableOperations extends JdbcTableOperations {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnNullability updateColumnNullability =
             (TableChange.UpdateColumnNullability) change;
-        alterColumnDorisVersion =
-            resolveModifyColumnVersion(
-                updateColumnNullability, lazyLoadTable, alterColumnDorisVersion);
+        JdbcColumn column =
+            validateDorisUpdateColumnNullability(updateColumnNullability, lazyLoadTable);
+        alterColumnDorisVersion = resolveModifyColumnVersion(column, alterColumnDorisVersion);
         alterSql.add(
             updateColumnNullabilityDefinition(
-                updateColumnNullability, lazyLoadTable, alterColumnDorisVersion));
+                updateColumnNullability, column, alterColumnDorisVersion));
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition((TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
@@ -1021,7 +1024,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     // Return the generated SQL statement
     String result =
-        "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", nonEmptyAlterSql) + ";";
+        "ALTER TABLE " + quote(tableName) + "\n" + String.join(",\n", nonEmptyAlterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
   }
@@ -1057,14 +1060,22 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (dorisVersion.isPresent() || change.fieldName().length != 1) {
       return dorisVersion;
     }
-    JdbcColumn column = getJdbcColumnFromTable(table, change.fieldName()[0]);
+    return resolveModifyColumnVersion(
+        getJdbcColumnFromTable(table, change.fieldName()[0]), dorisVersion);
+  }
+
+  private Optional<String> resolveModifyColumnVersion(
+      JdbcColumn column, Optional<String> dorisVersion) {
+    if (dorisVersion.isPresent()) {
+      return dorisVersion;
+    }
     return requiresVersionAwareModifyEscaping(column)
         ? Optional.of(getDorisVersion("MODIFY COLUMN default literal compatibility check"))
         : dorisVersion;
   }
 
-  private String updateColumnNullabilityDefinition(
-      TableChange.UpdateColumnNullability change, JdbcTable table, Optional<String> dorisVersion) {
+  private JdbcColumn validateDorisUpdateColumnNullability(
+      TableChange.UpdateColumnNullability change, JdbcTable table) {
     JdbcColumn column = validateUpdateColumnNullable(change, table);
     String col = change.fieldName()[0];
     // Doris schema change does not allow converting a nullable column to non-nullable.
@@ -1072,6 +1083,14 @@ public class DorisTableOperations extends JdbcTableOperations {
         change.nullable() || !column.nullable(),
         "Doris does not support changing nullable column %s to not null",
         col);
+    return column;
+  }
+
+  private String updateColumnNullabilityDefinition(
+      TableChange.UpdateColumnNullability change,
+      JdbcColumn column,
+      Optional<String> dorisVersion) {
+    String col = change.fieldName()[0];
     JdbcColumn updateColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -1082,9 +1101,7 @@ public class DorisTableOperations extends JdbcTableOperations {
             .withAutoIncrement(column.autoIncrement())
             .build();
     return "MODIFY COLUMN "
-        + BACK_QUOTE
-        + col
-        + BACK_QUOTE
+        + quote(col)
         + appendColumnDefinitionForModify(updateColumn, new StringBuilder(), dorisVersion);
   }
 
@@ -1110,7 +1127,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     String col = updateColumnComment.fieldName()[0];
 
     return String.format(
-        "MODIFY COLUMN `%s` COMMENT '%s'", col, escapeSqlLiteral(newComment, '\''));
+        "MODIFY COLUMN %s COMMENT '%s'", quote(col), escapeSqlLiteral(newComment, '\''));
   }
 
   private String addColumnFieldDefinition(
@@ -1133,9 +1150,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     StringBuilder columnDefinition = new StringBuilder();
     columnDefinition
         .append("ADD COLUMN ")
-        .append(BACK_QUOTE)
-        .append(col)
-        .append(BACK_QUOTE)
+        .append(quote(col))
         .append(SPACE)
         .append(dataType)
         .append(SPACE);
@@ -1164,11 +1179,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       columnDefinition.append("FIRST");
     } else if (addColumn.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) addColumn.getPosition();
-      columnDefinition
-          .append("AFTER ")
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append("AFTER ").append(quote(afterPosition.getColumn()));
     } else if (addColumn.getPosition() instanceof TableChange.Default) {
       // do nothing, follow the default behavior of doris
     } else {
@@ -1237,28 +1248,18 @@ public class DorisTableOperations extends JdbcTableOperations {
     String col = updateColumnPosition.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder columnDefinition = new StringBuilder();
-    columnDefinition.append("MODIFY COLUMN ").append(BACK_QUOTE).append(col).append(BACK_QUOTE);
+    columnDefinition.append("MODIFY COLUMN ").append(quote(col));
     appendColumnDefinitionForModify(column, columnDefinition, dorisVersion);
     if (updateColumnPosition.getPosition() instanceof TableChange.First) {
       columnDefinition.append("FIRST");
     } else if (updateColumnPosition.getPosition() instanceof TableChange.After) {
       TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-      columnDefinition
-          .append("AFTER ")
-          .append(BACK_QUOTE)
-          .append(afterPosition.getColumn())
-          .append(BACK_QUOTE);
+      columnDefinition.append("AFTER ").append(quote(afterPosition.getColumn()));
     } else {
       Arrays.stream(jdbcTable.columns())
           .reduce((column1, column2) -> column2)
           .map(Column::name)
-          .ifPresent(
-              s ->
-                  columnDefinition
-                      .append("AFTER ")
-                      .append(BACK_QUOTE)
-                      .append(s)
-                      .append(BACK_QUOTE));
+          .ifPresent(s -> columnDefinition.append("AFTER ").append(quote(s)));
     }
     return columnDefinition.toString();
   }
@@ -1282,7 +1283,7 @@ public class DorisTableOperations extends JdbcTableOperations {
         throw new IllegalArgumentException("Delete column does not exist: " + col);
       }
     }
-    return "DROP COLUMN " + BACK_QUOTE + col + BACK_QUOTE;
+    return "DROP COLUMN " + quote(col);
   }
 
   private String updateColumnTypeFieldDefinition(
@@ -1294,7 +1295,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     }
     String col = updateColumnType.fieldName()[0];
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
-    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + BACK_QUOTE + col + BACK_QUOTE);
+    StringBuilder sqlBuilder = new StringBuilder("MODIFY COLUMN " + quote(col));
     JdbcColumn newColumn =
         JdbcColumn.builder()
             .withName(col)
@@ -1402,9 +1403,11 @@ public class DorisTableOperations extends JdbcTableOperations {
     String usingClause = mapIndexTypeToUsingClause(addIndex.getType());
     String propertiesSql = generateIndexPropertiesSql(addIndex.getType(), addIndex.getProperties());
     if (usingClause.isEmpty()) {
-      return String.format("ADD INDEX `%s` (`%s`)", addIndex.getName(), fieldName) + propertiesSql;
+      return String.format("ADD INDEX %s (%s)", quote(addIndex.getName()), quote(fieldName))
+          + propertiesSql;
     }
-    return String.format("ADD INDEX `%s` (`%s`) %s", addIndex.getName(), fieldName, usingClause)
+    return String.format(
+            "ADD INDEX %s (%s) %s", quote(addIndex.getName()), quote(fieldName), usingClause)
         + propertiesSql;
   }
 
@@ -1419,14 +1422,14 @@ public class DorisTableOperations extends JdbcTableOperations {
       }
       throw new IllegalArgumentException("Index does not exist: " + deleteIndex.getName());
     }
-    return "DROP INDEX `" + deleteIndex.getName() + "`";
+    return "DROP INDEX " + quote(deleteIndex.getName());
   }
 
   @Override
   protected Distribution getDistributionInfo(
       Connection connection, String databaseName, String tableName) throws SQLException {
 
-    String showCreateTableSql = String.format("SHOW CREATE TABLE `%s`", tableName);
+    String showCreateTableSql = String.format("SHOW CREATE TABLE %s", quote(tableName));
     try (Statement statement = connection.createStatement();
         ResultSet result = statement.executeQuery(showCreateTableSql)) {
       result.next();
@@ -1581,5 +1584,9 @@ public class DorisTableOperations extends JdbcTableOperations {
         "Index '%s' requires a non-blank top-level field in Doris",
         indexName);
     return fieldPath[0];
+  }
+
+  private static String quote(String identifier) {
+    return JdbcConnectorUtils.quoteIdentifier(identifier, '`');
   }
 }

@@ -78,14 +78,11 @@ caffeine = "2.9.3"
 iceberg = '1.11.0'
 datastrato-iceberg = "1.13.0"
 experimental-iceberg-git-commit = "e6118db078e09d960600c3c302e0f220457cb388"
-# Last Iceberg release compatible with Spark 3.3.
-iceberg4spark33 = "1.8.1"
 iceberg4spark35 = "1.11.0"
 iceberg4spark40 = "1.11.0"
 paimon = '1.2.0'
-# spark33 and spark34 are pinned by modules other than the Spark connector for their own tests, so
-# they stay after the connector dropped 3.3 and 3.4; they say nothing about connector support.
-spark33 = "3.3.4"
+# spark34 is pinned by modules other than the Spark connector for their own tests, so it stays
+# after the connector dropped 3.4; it says nothing about connector support.
 spark34 = "3.4.3"
 spark35 = "3.5.3"
 spark40 = "4.0.3"
@@ -155,6 +152,7 @@ paimon4flink22 = "1.4.1"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
+objenesis = "3.3"
 asm = "9.8"
 ranger = "2.8.0"
 zookeeper = "3.8.8"
@@ -318,6 +316,7 @@ iceberg-aws-bundle = { group = "org.apache.iceberg", name = "iceberg-aws-bundle"
 iceberg-azure = { group = "org.apache.iceberg", name = "iceberg-azure", version.ref = "iceberg" }
 iceberg-azure-bundle = { group = "org.apache.iceberg", name = "iceberg-azure-bundle", version.ref = "iceberg" }
 iceberg-core = { group = "org.apache.iceberg", name = "iceberg-core", version.ref = "iceberg" }
+iceberg-common = { group = "org.apache.iceberg", name = "iceberg-common", version.ref = "iceberg" }
 iceberg-api = { group = "org.apache.iceberg", name = "iceberg-api", version.ref = "iceberg" }
 iceberg-hive-metastore = { group = "org.apache.iceberg", name = "iceberg-hive-metastore", version.ref = "iceberg" }
 iceberg-gcp = { group = "org.apache.iceberg", name = "iceberg-gcp", version.ref = "iceberg" }
@@ -373,6 +372,7 @@ kafka-clients = { group = "org.apache.kafka", name = "kafka-clients", version.re
 kafka = { group = "org.apache.kafka", name = "kafka_2.12", version.ref = "kafka" }
 curator-test = { group = "org.apache.curator", name = "curator-test", version.ref = "curator"}
 cglib = { group = "cglib", name = "cglib", version.ref = "cglib"}
+objenesis = { group = "org.objenesis", name = "objenesis", version.ref = "objenesis" }
 asm = { group = "org.ow2.asm", name = "asm", version.ref = "asm"}
 woodstox-core = { group = "com.fasterxml.woodstox", name = "woodstox-core", version.ref = "woodstox-core"}
 thrift = { group = "org.apache.thrift", name = "libthrift", version.ref = "thrift"}

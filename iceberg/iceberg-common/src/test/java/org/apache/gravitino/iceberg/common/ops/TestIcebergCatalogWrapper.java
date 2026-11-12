@@ -52,6 +52,7 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.exceptions.NoSuchViewException;
+import org.apache.iceberg.exceptions.RuntimeIOException;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
@@ -71,6 +72,112 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
+
+  @ParameterizedTest
+  @ValueSource(strings = {"file:///tmp/table", "gs://bucket/table", "/tmp/table", "s3:///table"})
+  void testS3CatalogRejectsInvalidLocationBeforeCreatingTable(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    for (boolean staged : new boolean[] {false, true}) {
+      CreateTableRequest.Builder builder =
+          CreateTableRequest.builder()
+              .withName("invalid_location")
+              .withSchema(new Schema(Types.NestedField.optional(1, "id", Types.LongType.get())))
+              .withLocation(location);
+      if (staged) {
+        builder.stageCreate();
+      }
+      CreateTableRequest request = builder.build();
+      BadRequestException failure =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.createTable(Namespace.of("s"), request));
+      Assertions.assertTrue(failure.getMessage().contains(location));
+    }
+    Mockito.verify(wrapper, Mockito.never()).getCatalog();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"file:///tmp/table", "gs://bucket/table", "/tmp/table", "s3:///table"})
+  void testS3CatalogRejectsInvalidRegisterAndUpdateLocations(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    RegisterTableRequest register =
+        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(location).build();
+    UpdateTableRequest update =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Collections.singletonList(new MetadataUpdate.SetLocation(location)));
+
+    BadRequestException registerFailure =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.registerTable(Namespace.of("s"), register));
+    Assertions.assertTrue(registerFailure.getMessage().contains(location));
+    BadRequestException metadataFailure =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+    Assertions.assertTrue(metadataFailure.getMessage().contains(location));
+    BadRequestException updateFailure =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> wrapper.updateTable(TableIdentifier.of("s", "t"), update));
+    Assertions.assertTrue(updateFailure.getMessage().contains(location));
+    Mockito.verify(wrapper, Mockito.never()).getCatalog();
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3://bucket/table", "s3a://bucket/table", "s3n://bucket/table"})
+  void testS3CatalogAcceptsRegisterAndUpdateLocationSchemes(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.doReturn(catalog).when(wrapper).getCatalog();
+    Mockito.when(catalog.registerTable(Mockito.any(), Mockito.eq(location), Mockito.anyBoolean()))
+        .thenThrow(new IllegalStateException("register backend reached"));
+    Mockito.when(catalog.loadTable(Mockito.any()))
+        .thenThrow(new IllegalStateException("update backend reached"));
+    RegisterTableRequest register =
+        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(location).build();
+    UpdateTableRequest update =
+        new UpdateTableRequest(
+            Collections.emptyList(),
+            Collections.singletonList(new MetadataUpdate.SetLocation(location)));
+
+    IllegalStateException registerFailure =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> wrapper.registerTable(Namespace.of("s"), register));
+    Assertions.assertEquals("register backend reached", registerFailure.getMessage());
+    IllegalStateException updateFailure =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () -> wrapper.updateTable(TableIdentifier.of("s", "t"), update));
+    Assertions.assertEquals("update backend reached", updateFailure.getMessage());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"s3://bucket/table", "s3a://bucket/table", "s3n://bucket/table"})
+  void testS3CatalogAcceptsSupportedLocationSchemes(String location) {
+    IcebergCatalogWrapper wrapper =
+        Mockito.spy(new IcebergCatalogWrapper(new IcebergConfig(unreachableConfig())));
+    Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
+    Catalog catalog = Mockito.mock(Catalog.class);
+    Mockito.doReturn(catalog).when(wrapper).getCatalog();
+    CreateTableRequest request =
+        CreateTableRequest.builder()
+            .withName("valid_location")
+            .withSchema(new Schema(Types.NestedField.optional(1, "id", Types.LongType.get())))
+            .withLocation(location)
+            .build();
+    // Stop after validation, before the mocked backend creates anything.
+    Mockito.when(catalog.buildTable(Mockito.any(), Mockito.any()))
+        .thenThrow(new IllegalStateException("backend reached"));
+    IllegalStateException failure =
+        Assertions.assertThrows(
+            IllegalStateException.class, () -> wrapper.createTable(Namespace.of("s"), request));
+    Assertions.assertEquals("backend reached", failure.getMessage());
+  }
 
   @Test
   void testLoadViewReportsMissingAfterNativeRename(@TempDir Path warehouseDir) throws Exception {
@@ -296,6 +403,9 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Request-supplied metadata-location miss on registerTable → BadRequest, not Iceberg NotFound.
+   */
   @Test
   public void testRegisterTableWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -315,6 +425,7 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /** Request-supplied metadata-location miss on registerView → BadRequest, not Iceberg NotFound. */
   @Test
   public void testRegisterViewWithMissingMetadataIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -335,6 +446,10 @@ public class TestIcebergCatalogWrapper {
     }
   }
 
+  /**
+   * Request-supplied metadata-location miss on loadTableMetadataFromLocation → BadRequest (used by
+   * register-table authz / executor before register).
+   */
   @Test
   public void testLoadTableMetadataFromMissingLocationIsBadRequest(@TempDir Path warehouseDir)
       throws Exception {
@@ -345,6 +460,51 @@ public class TestIcebergCatalogWrapper {
           Assertions.assertThrows(
               BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
       Assertions.assertTrue(e.getMessage().contains("does not exist"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromDirectoryIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path directory = Files.createDirectories(warehouseDir.resolve("not-a-metadata-file"));
+      String location = directory.toUri().toString();
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("is not a valid metadata file"), e.getMessage());
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromCorruptContentIsNotBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      Path metadataFile = warehouseDir.resolve("v1.metadata.json");
+      Files.writeString(metadataFile, "{not-valid-table-metadata", StandardCharsets.UTF_8);
+      String location = metadataFile.toUri().toString();
+      // Codec.fromFileName accepts *.metadata.json; corrupt JSON must not become BadRequest.
+      Assertions.assertThrows(
+          RuntimeIOException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+    }
+  }
+
+  @Test
+  public void testLoadTableMetadataFromUnreadableSchemeIsBadRequest(@TempDir Path warehouseDir)
+      throws Exception {
+    try (IcebergCatalogWrapper wrapper =
+        new IcebergCatalogWrapper(new IcebergConfig(sqliteConfig(warehouseDir)))) {
+      // Local JDBC catalogs have no S3 FileIO; the client-supplied scheme is unreadable.
+      String location = "s3://bucket/path/v1.metadata.json";
+      BadRequestException e =
+          Assertions.assertThrows(
+              BadRequestException.class, () -> wrapper.loadTableMetadataFromLocation(location));
+      Assertions.assertTrue(
+          e.getMessage().contains("unsupported or unreadable scheme"), e.getMessage());
+      Assertions.assertFalse(e.getMessage().contains("No FileSystem"), e.getMessage());
     }
   }
 

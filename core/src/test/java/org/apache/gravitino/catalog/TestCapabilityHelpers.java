@@ -32,6 +32,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -271,6 +272,134 @@ public class TestCapabilityHelpers {
   void testSemanticModelUsesManagedStorageByDefault() {
     Assertions.assertTrue(
         Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
+  }
+
+  @Test
+  void testApplyCapabilitiesRejectsInitialDefaultEvenWhenWriteDefaultSupported() {
+    // Capability.DEFAULT supports write-default (like MySQL), but catalogs do not apply
+    // Iceberg-style initial defaults. Create must reject a set initialDefaultValue rather than
+    // accept a value the backend would silently drop.
+    Assertions.assertTrue(Capability.DEFAULT.columnDefaultValue().supported());
+
+    Column withInitialOnly =
+        Column.of(
+            "country",
+            Types.StringType.get(),
+            null,
+            true,
+            false,
+            Column.DEFAULT_VALUE_NOT_SET,
+            Literals.stringLiteral("US"));
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CapabilityHelpers.applyCapabilities(
+                    new Column[] {withInitialOnly}, Capability.DEFAULT));
+    Assertions.assertTrue(
+        thrown.getMessage().contains("initial default value is read-only"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("catalog capability"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("country"), thrown.getMessage());
+
+    Column unsetInitial =
+        Column.of(
+            "country",
+            Types.StringType.get(),
+            null,
+            true,
+            false,
+            Literals.stringLiteral("US"),
+            Column.INITIAL_DEFAULT_VALUE_NOT_SET);
+    Column[] applied =
+        CapabilityHelpers.applyCapabilities(new Column[] {unsetInitial}, Capability.DEFAULT);
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertEquals(Column.INITIAL_DEFAULT_VALUE_NOT_SET, applied[0].initialDefaultValue());
+    Assertions.assertEquals(Literals.stringLiteral("US"), applied[0].defaultValue());
+  }
+
+  @Test
+  void testApplyCapabilitiesTreatsNullInitialDefaultAsUnset() {
+    // Third-party Column implementations may return null instead of the unset sentinel.
+    Column nullInitial = Mockito.mock(Column.class);
+    Mockito.when(nullInitial.name()).thenReturn("country");
+    Mockito.when(nullInitial.dataType()).thenReturn(Types.StringType.get());
+    Mockito.when(nullInitial.comment()).thenReturn(null);
+    Mockito.when(nullInitial.nullable()).thenReturn(true);
+    Mockito.when(nullInitial.autoIncrement()).thenReturn(false);
+    Mockito.when(nullInitial.defaultValue()).thenReturn(Column.DEFAULT_VALUE_NOT_SET);
+    Mockito.when(nullInitial.initialDefaultValue()).thenReturn(null);
+
+    Column[] applied =
+        CapabilityHelpers.applyCapabilities(new Column[] {nullInitial}, Capability.DEFAULT);
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertEquals(Column.INITIAL_DEFAULT_VALUE_NOT_SET, applied[0].initialDefaultValue());
+  }
+
+  @Test
+  void testLoadThenCreateRejectsColumnsCarryingInitialDefault() {
+    // Iceberg v3 load exposes write-default and initial-default on columns. Feeding those columns
+    // straight into create/add-column (copy-table / load-then-create) must fail: Gravitino create
+    // still rejects initial defaults, and Iceberg create still rejects write defaults via
+    // capability for catalogs that do not support them. Document the failure rather than silently
+    // dropping.
+    Column loadedLikeIcebergV3 =
+        Column.of(
+            "region",
+            Types.StringType.get(),
+            "loaded from Iceberg",
+            true,
+            false,
+            Literals.stringLiteral("EU"),
+            Literals.stringLiteral("US"));
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                CapabilityHelpers.applyCapabilities(
+                    new Column[] {loadedLikeIcebergV3}, Capability.DEFAULT));
+    Assertions.assertTrue(
+        thrown.getMessage().contains("initial default value is read-only"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("catalog capability"), thrown.getMessage());
+    Assertions.assertTrue(thrown.getMessage().contains("region"), thrown.getMessage());
+  }
+
+  @Test
+  void testUpdateColumnDefaultValueDoesNotCheckInitialDefault() {
+    // Alter update-default only validates write-default capability; it must not reject because a
+    // previously loaded Iceberg v3 column carried initialDefaultValue (that field is not on the
+    // TableChange).
+    TableChange[] applied =
+        CapabilityHelpers.applyCapabilities(
+            Capability.DEFAULT,
+            TableChange.updateColumnDefaultValue(
+                new String[] {"region"}, Literals.stringLiteral("EU")));
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertInstanceOf(TableChange.UpdateColumnDefaultValue.class, applied[0]);
+    Assertions.assertEquals(
+        Literals.stringLiteral("EU"),
+        ((TableChange.UpdateColumnDefaultValue) applied[0]).getNewDefaultValue());
+  }
+
+  @Test
+  void testAddColumnDoesNotCarryInitialDefault() {
+    // AddColumn has no initialDefaultValue; capability apply must succeed and leave initial unset.
+    TableChange[] applied =
+        CapabilityHelpers.applyCapabilities(
+            Capability.DEFAULT,
+            TableChange.addColumn(
+                new String[] {"region"},
+                Types.StringType.get(),
+                "comment",
+                TableChange.ColumnPosition.defaultPos(),
+                true,
+                false,
+                Literals.stringLiteral("EU")));
+    Assertions.assertEquals(1, applied.length);
+    Assertions.assertInstanceOf(TableChange.AddColumn.class, applied[0]);
+    Assertions.assertEquals(
+        Literals.stringLiteral("EU"), ((TableChange.AddColumn) applied[0]).getDefaultValue());
   }
 
   @Test

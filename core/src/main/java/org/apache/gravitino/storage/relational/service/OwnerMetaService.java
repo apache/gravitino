@@ -187,7 +187,7 @@ public class OwnerMetaService {
         POConverters.initializeOwnerRelPOsWithVersion(
             metalakeId, ownerType.name(), ownerId, entityType.name(), entityId);
     String metadataObjectType =
-        NameIdentifierUtil.toMetadataObject(entity, entityType).type().name();
+        NameIdentifierUtil.toMetadataObjectForRead(entity, entityType).type().name();
     assignOwner(
         metalake,
         metalakeId,
@@ -237,7 +237,9 @@ public class OwnerMetaService {
     }
     entityIds.sort(Comparator.naturalOrder());
     String metadataObjectType =
-        NameIdentifierUtil.toMetadataObject(ownedObjects.get(0), ownedObjectType).type().name();
+        NameIdentifierUtil.toMetadataObjectForRead(ownedObjects.get(0), ownedObjectType)
+            .type()
+            .name();
 
     List<OwnerRelForDeletion> deletions = new ArrayList<>(entityIds.size());
     List<OwnerRelPO> ownerRelPOs = new ArrayList<>(entityIds.size());
