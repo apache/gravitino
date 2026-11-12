@@ -61,6 +61,11 @@ Notes:
   Scan jobs restore the cache read-only and skip all DB updates, so every report of a run uses the same DB snapshot.
 * A target fails when a HIGH or CRITICAL finding remains after the exemptions, or when Trivy did not
   produce a valid report. All targets are scanned even if one of them fails.
+* One scan of a target is limited by `TRIVY_SCAN_TIMEOUT` (45m by default; a target that hits the limit
+  fails). A scan takes seconds in practice, so the workflow sets a lower limit per job (15m for the
+  server packages, 10m for Trino, 3m for jars and lock files). The limits of all targets of a job
+  add up to less than its `Scan` step limit, so a hanging scan fails that step, and the reports of
+  the other targets are still uploaded, instead of hitting the limit of the whole job.
 * Each daily cache entry holds about 1 GB. It counts against the repository's 10 GB Actions cache, which
   is shared with the Gradle caches of every workflow (least recently used entries are evicted first), and
   a manual run on another branch stores its own entry. Start manual runs from the default branch and

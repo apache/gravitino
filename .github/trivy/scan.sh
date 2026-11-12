@@ -45,6 +45,9 @@
 #   TRIVY_IMAGE         Pinned scanner image (defaults to the digest pinned below).
 #   TRIVY_CACHE_DIR     Vulnerability DB cache directory (default: $HOME/.cache/trivy).
 #   TRIVY_REPORT_DIR    Output directory (default: ./trivy-reports).
+#   TRIVY_SCAN_TIMEOUT  Time limit of one Trivy scan, such as 10m (default: 45m). A target that hits
+#                       it fails. The workflow sets it per job so that all targets of a job fit
+#                       into the job limit.
 #   TRIVY_POLICY_DIR    Directory holding trivyignore.yaml and vex.openvex.json
 #                       (default: the directory of this script).
 #   TRIVY_EXEMPTIONS    Set to "off" to scan without exemptions (used to generate a baseline).
@@ -63,7 +66,7 @@ EXEMPTIONS="${TRIVY_EXEMPTIONS:-on}"
 IGNORE_FILE="${POLICY_DIR}/trivyignore.yaml"
 VEX_FILE="${POLICY_DIR}/vex.openvex.json"
 MAX_EXEMPTION_DAYS=90
-SCAN_TIMEOUT='45m'
+SCAN_TIMEOUT="${TRIVY_SCAN_TIMEOUT:-45m}"
 MAX_ROWS=200
 
 # Flags shared by every container: no network is added here, callers decide.
@@ -73,6 +76,11 @@ trivy_env=(-e TRIVY_CACHE_DIR=/cache -e TRIVY_SKIP_VERSION_CHECK=true
   -e TRIVY_DISABLE_TELEMETRY=true -e TRIVY_NO_PROGRESS=true)
 
 log() { printf '%s\n' "$*" >&2; }
+
+if [[ ! "${SCAN_TIMEOUT}" =~ ^[1-9][0-9]*[smh]$ ]]; then
+  log "TRIVY_SCAN_TIMEOUT must be a duration such as 10m, got '${SCAN_TIMEOUT}'"
+  exit 2
+fi
 
 abs_dir() { (cd "$1" && pwd); }
 
