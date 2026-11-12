@@ -187,7 +187,7 @@ public class AuthorizationExpressionEvaluator {
           if (isMetadataType(type)) {
             MetadataObject metadataObject;
             try {
-              metadataObject = NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+              metadataObject = NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
             } catch (IllegalNameIdentifierException e) {
               throw e;
             } catch (IllegalArgumentException e) {

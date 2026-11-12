@@ -812,6 +812,8 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
   protected void createCatalog() {
     Map<String, String> properties = Maps.newHashMap();
+    // This suite exercises explicit data deletion, including purge and create-overwrite.
+    properties.put("lance.allow-external-table-purge", "true");
     metalake.createCatalog(catalogName, Catalog.Type.RELATIONAL, provider, "comment", properties);
 
     catalog = metalake.loadCatalog(catalogName);

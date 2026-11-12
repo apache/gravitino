@@ -826,7 +826,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void handleMetadataOwnerChange(
       String metalake, Long oldOwnerId, NameIdentifier nameIdentifier, Entity.EntityType type) {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(nameIdentifier, type);
     // Owner mutations may happen after drop/recreate with the same name. Invalidate the
     // name->id mapping as well to prevent using a stale metadataId from metadataIdCache.
     metadataIdCache.invalidate(
@@ -841,7 +842,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   @Override
   public void handleEntityNameIdMappingChange(
       String metalake, NameIdentifier nameIdentifier, Entity.EntityType type) {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(nameIdentifier, type);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(nameIdentifier, type);
     String cacheKey = JcasbinAuthorizationCacheKeys.metadataIdCacheKey(metalake, metadataObject);
     if (JcasbinAuthorizationCacheKeys.hasNestedMetadataObjects(metadataObject.type())) {
       // Prefix invalidation removes the object and all nested objects under the same name path.

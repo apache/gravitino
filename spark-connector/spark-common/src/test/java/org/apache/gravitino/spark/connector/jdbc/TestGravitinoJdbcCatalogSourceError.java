@@ -99,8 +99,13 @@ public class TestGravitinoJdbcCatalogSourceError {
       Catalog source = mock(Catalog.class);
       when(source.provider()).thenReturn("jdbc-h2");
       when(source.supportsCredentials()).thenReturn(credentials);
-      GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
-      FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+      GravitinoJdbcCatalog catalog =
+          new GravitinoJdbcCatalog() {
+            @Override
+            protected Catalog gravitinoCatalog() {
+              return source;
+            }
+          };
 
       Map<String, String> properties = new HashMap<>();
       properties.put("jdbc-url", URL);

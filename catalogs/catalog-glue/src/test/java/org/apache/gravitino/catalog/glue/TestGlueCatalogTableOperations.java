@@ -1111,6 +1111,45 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateRefusesNotNullColumnOnHiveTable() {
+    Column notNull =
+        GlueColumn.builder()
+            .withName("id")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .build();
+    assertCreateRefused(
+        "NOT NULL constraints on columns of Hive-format tables. Illegal column: id",
+        new Column[] {notNull},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesCharLengthOutsideHiveLimit() {
+    assertCreateRefused(
+        "Column c: Glue/Hive char length must be in [1, 255], got 256",
+        new Column[] {col("c", Types.FixedCharType.of(256))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesNestedNotNullOnHiveTable() {
+    assertCreateRefused(
+        "Column tags: Glue/Hive does not support NOT NULL on nested fields, got list<string, NOT NULL>",
+        new Column[] {col("tags", Types.ListType.notNull(Types.StringType.get()))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
   void testCreateUnsupportedTypeNamesColumn() {
     assertCreateRefused(
         "Column f",
@@ -1293,6 +1332,69 @@ class TestGlueCatalogTableOperations {
             () ->
                 ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"id"}, false)));
     assertTrue(e.getMessage().contains("skewed"), e.getMessage());
+  }
+
+  @Test
+  void testAlterRefusesNotNullOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"c"}, Types.StringType.get(), false),
+          TableChange.updateColumnNullability(new String[] {"id"}, false),
+          TableChange.updateColumnNullability(new String[] {"dt"}, false)
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
+      assertTrue(e.getMessage().contains("NOT NULL"), e.getMessage());
+    }
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testAlterColumnToNullableIsNoOpOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"id"}, true));
+    ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"dt"}, true));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTable(
+                    ALTER_IDENT,
+                    TableChange.updateColumnNullability(new String[] {"missing"}, true)));
+    assertTrue(e.getMessage().contains("missing"), e.getMessage());
+  }
+
+  @Test
+  void testAlterColumnToNullableKeepsOtherChangesOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(
+        ALTER_IDENT,
+        TableChange.updateColumnNullability(new String[] {"id"}, true),
+        TableChange.updateColumnComment(new String[] {"id"}, "new comment"));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    assertEquals(
+        "new comment",
+        captor.getValue().tableInput().storageDescriptor().columns().get(0).comment());
+  }
+
+  @Test
+  void testAlterRefusesVarcharLengthOutsideHiveLimit() {
+    useFakeGlueTable(nativeTable());
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"c"}, Types.VarCharType.of(65536)),
+          TableChange.updateColumnType(new String[] {"k"}, Types.VarCharType.of(0))
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
+      assertTrue(e.getMessage().contains("varchar length must be in [1, 65535]"), e.getMessage());
+    }
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
   }
 
   @Test

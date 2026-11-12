@@ -98,6 +98,9 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.PolicyHookDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -485,6 +488,53 @@ public class TestPolicyManager {
             NoSuchMetalakeException.class,
             () -> policyManager.listPolicies("non_existent_metalake"));
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
+  }
+
+  /** Invalid create/rename requests must never persist an unaddressable policy. */
+  @Test
+  public void testRejectDottedNameBeforeWrite() throws IOException {
+    PolicyDispatcher dispatcher =
+        new PolicyEventDispatcher(new EventBus(List.of()), new PolicyHookDispatcher(policyManager));
+    PolicyContent content = PolicyContents.custom(Map.of("rule", 1), SUPPORTS_OBJECT_TYPES, null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createPolicy(
+                METALAKE, "invalid.policy", Policy.BuiltInType.CUSTOM, null, true, content));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofPolicy(METALAKE, "invalid.policy"), Entity.EntityType.POLICY));
+    PolicyEntity original = createCustomPolicy(METALAKE, "valid_policy", content);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.alterPolicy(
+                METALAKE, original.name(), PolicyChange.rename("invalid.policy")));
+    Assertions.assertEquals(original, policyManager.getPolicy(METALAKE, original.name()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofPolicy(METALAKE, "invalid.policy"), Entity.EntityType.POLICY));
+  }
+
+  /** Legacy policy names can be listed and deleted without bypassing their stored identity. */
+  @Test
+  public void testLegacyDottedPolicyRecovery() throws IOException {
+    PolicyEntity legacy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("legacy.policy")
+            .withNamespace(NameIdentifierUtil.ofPolicy(METALAKE, "legacy.policy").namespace())
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(PolicyContents.custom(Map.of("rule", 1), SUPPORTS_OBJECT_TYPES, null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(legacy, false);
+    Assertions.assertEquals(legacy.name(), policyManager.getPolicy(METALAKE, legacy.name()).name());
+    Assertions.assertTrue(
+        Arrays.asList(policyManager.listPolicies(METALAKE)).contains(legacy.name()));
+    Assertions.assertTrue(policyManager.deletePolicy(METALAKE, legacy.name()));
   }
 
   @Test
