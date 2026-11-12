@@ -108,7 +108,68 @@ Return the proper MySQL image name for the init-mysql initContainer
 Return the proper Postgresql image name for the init-postgresql initContainer
 */}}
 {{- define "init-postgresql.image" -}}
-{{- if .Values.postgresql.enabled -}}
-  {{- include "gravitino.imageReference" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
+{{- include "gravitino.imageReference" (dict "imageRoot" .Values.postgresql.image "global" .Values.global) -}}
 {{- end -}}
+
+{{/*
+True when the entity store uses an external PostgreSQL JDBC URL (not in-chart Bitnami).
+*/}}
+{{- define "gravitino.entityUsesExternalPostgresql" -}}
+{{- $url := .Values.entity.jdbcUrl | default "" -}}
+{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) (hasPrefix "jdbc:postgresql:" $url) -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+True when the init-postgresql schema init container should be rendered.
+*/}}
+{{- define "gravitino.postgresqlSchemaInitEnabled" -}}
+{{- if or .Values.postgresql.enabled (eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true") -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Hostname for init-postgresql psql (-h).
+*/}}
+{{- define "gravitino.postgresqlInitHost" -}}
+{{- if .Values.postgresql.init.host -}}
+{{- .Values.postgresql.init.host -}}
+{{- else if .Values.postgresql.enabled -}}
+{{- printf "%s-postgresql" .Release.Name -}}
+{{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
+{{- fail "postgresql.init.host is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Secret name for init-postgresql POSTGRES_PASSWORD secretKeyRef.
+*/}}
+{{- define "gravitino.postgresqlInitSecretName" -}}
+{{- if .Values.postgresql.init.existingSecret -}}
+{{- .Values.postgresql.init.existingSecret -}}
+{{- else if .Values.postgresql.enabled -}}
+{{- printf "%s-postgresql" .Release.Name -}}
+{{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
+{{- fail "postgresql.init.existingSecret is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Application user for init-postgresql POSTGRES_USER.
+*/}}
+{{- define "gravitino.postgresqlInitUsername" -}}
+{{- if .Values.postgresql.enabled -}}
+{{- .Values.postgresql.auth.username -}}
+{{- else -}}
+{{- .Values.entity.jdbcUser -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Database name for init-postgresql GRAVITINO_DB.
+*/}}
+{{- define "gravitino.postgresqlInitDatabase" -}}
+{{- .Values.postgresql.auth.database | default "gravitino" -}}
 {{- end -}}

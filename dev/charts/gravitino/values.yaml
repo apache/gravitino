@@ -114,6 +114,21 @@ postgresql:
     ## The value is evaluated as a template.
     ##
     existingSecret: ""
+  init:
+    ## @param init.host PostgreSQL hostname for the init-postgresql psql client (-h).
+    ## When postgresql.enabled is true and this is empty, defaults to {{ .Release.Name }}-postgresql.
+    ## Required when the entity store uses an external PostgreSQL JDBC URL (postgresql.enabled=false
+    ## and entity.jdbcUrl starts with jdbc:postgresql:), for example CloudNativePG or RDS.
+    ##
+    host: ""
+    ## @param init.existingSecret Kubernetes Secret name for the init container POSTGRES_PASSWORD.
+    ## When postgresql.enabled is true and this is empty, defaults to {{ .Release.Name }}-postgresql.
+    ## Set this when the password Secret does not follow the Bitnami release name convention.
+    ##
+    existingSecret: ""
+    ## @param init.existingSecretPasswordKey Key in init.existingSecret for the application user password.
+    ##
+    existingSecretPasswordKey: password
 
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##

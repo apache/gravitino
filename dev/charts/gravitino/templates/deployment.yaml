@@ -125,7 +125,10 @@ spec:
             - mountPath: /scripts
               name: scripts-emptydir
       {{- end }}
-      {{- if .Values.postgresql.enabled }}
+      {{- if eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true" }}
+        {{- $pgInitHost := include "gravitino.postgresqlInitHost" . | trim }}
+        {{- $pgInitSecret := include "gravitino.postgresqlInitSecretName" . | trim }}
+        {{- $pgInitSecretKey := .Values.postgresql.init.existingSecretPasswordKey | default "password" }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -133,7 +136,7 @@ spec:
             - /bin/bash
             - -c
             - |
-              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
+              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -c "SELECT 1"; do
                 echo "Waiting for PostgreSQL to be ready..."
                 sleep 2
               done
@@ -155,29 +158,29 @@ spec:
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2 
               fi
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
             - name: POSTGRES_USER
-              value: {{ .Values.postgresql.auth.username }}
+              value: {{ include "gravitino.postgresqlInitUsername" . }}
             - name: GRAVITINO_DB
-              value: {{ .Values.postgresql.auth.database }}
+              value: {{ include "gravitino.postgresqlInitDatabase" . }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-postgresql
-                  key: password
+                  name: {{ $pgInitSecret }}
+                  key: {{ $pgInitSecretKey }}
           volumeMounts:
             - mountPath: /scripts
               name: scripts-emptydir
-        {{- end }}
+      {{- end }}
       containers:
         - name: {{ include "gravitino.name" . }}
           image: {{ include "gravitino.image" . }}
