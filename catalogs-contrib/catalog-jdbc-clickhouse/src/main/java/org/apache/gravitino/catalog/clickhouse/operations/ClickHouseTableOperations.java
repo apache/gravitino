@@ -94,6 +94,7 @@ import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.DistributedTa
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
+import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.bean.JdbcIndexBean;
@@ -700,6 +701,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       JdbcColumn column = columns[i];
       sqlBuilder.append("  %s".formatted(quoteIdentifier(column.name())));
 
+      checkDefaultValue(column.dataType(), column.defaultValue());
       appendColumnDefinition(column, sqlBuilder);
       // Add a comma for the next column, unless it's the last one
       if (i < columns.length - 1) {
@@ -1644,6 +1646,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
     // Append default value if available
     if (!Column.DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      checkDefaultValue(addColumn.getDataType(), addColumn.getDefaultValue());
       columnDefinition.append(
           "DEFAULT %s "
               .formatted(columnDefaultValueConverter.fromGravitino(addColumn.getDefaultValue())));
@@ -1735,6 +1738,7 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     JdbcColumn column = getJdbcColumnFromTable(jdbcTable, col);
     StringBuilder sqlBuilder = new StringBuilder(MODIFY_COLUMN + quoteIdentifier(col));
     JdbcColumn newColumn = withPendingDefaultValueAndNullability(column, changes);
+    checkDefaultValue(newColumn.dataType(), updateColumnDefaultValue.getNewDefaultValue());
 
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
@@ -1759,6 +1763,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
+    // The existing default is kept when the type changes, so it must also fit the new type.
+    try {
+      checkDefaultValue(newColumn.dataType(), newColumn.defaultValue());
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "The existing default value of column %s is not compatible with the new type %s: %s"
+              .formatted(col, newColumn.dataType().simpleString(), e.getMessage()),
+          e);
+    }
     return appendColumnDefinition(newColumn, sqlBuilder).toString();
   }
 
@@ -3490,6 +3503,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static boolean isQuoteDelimiter(char value) {
     return value == '\'' || value == '"' || value == '`';
+  }
+
+  private void checkDefaultValue(Type columnType, Expression defaultValue) {
+    Preconditions.checkState(
+        columnDefaultValueConverter instanceof ClickHouseColumnDefaultValueConverter,
+        "ClickHouse table operations require ClickHouseColumnDefaultValueConverter, but got %s",
+        columnDefaultValueConverter.getClass().getName());
+    ((ClickHouseColumnDefaultValueConverter) columnDefaultValueConverter)
+        .checkDefaultValue(columnType, defaultValue);
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
