@@ -60,9 +60,10 @@ public final class TermSpec {
   }
 
   /**
-   * Creates a builder for a term with the given name.
+   * Creates a builder for a term with the given name. The server removes spaces at both ends of the
+   * name and of each synonym, and keeps the case.
    *
-   * @param name The name of the term.
+   * @param name The name of the term, at most 128 characters.
    * @return The builder.
    * @throws IllegalArgumentException If the name is blank.
    */

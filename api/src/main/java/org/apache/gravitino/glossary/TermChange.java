@@ -27,6 +27,9 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * A change to a glossary term, passed to {@link GlossaryOperations#alterTerm(String,
  * TermChange...)}. All changes of one call are applied together.
+ *
+ * <p>Adding a synonym, domain, broader term or related term that the term already has, or removing
+ * one that it does not have, is not an error and changes nothing.
  */
 @Evolving
 public interface TermChange {
@@ -63,7 +66,8 @@ public interface TermChange {
   }
 
   /**
-   * Creates a change to add a synonym to the term. A synonym cannot be the name of another term.
+   * Creates a change to add a synonym to the term. A synonym cannot be the name of another term or
+   * of this term.
    *
    * @param synonym The synonym to add.
    * @return The term change.
@@ -104,7 +108,8 @@ public interface TermChange {
 
   /**
    * Creates a change to add a broader term. "A has broader term B" means "A is a kind of B". The
-   * change fails if it would create a cycle.
+   * change fails if it would create a cycle, make a chain of broader terms longer than the depth
+   * limit, or make a term an ancestor of one of its related terms.
    *
    * @param broader The name of the broader term.
    * @return The term change.
@@ -124,7 +129,8 @@ public interface TermChange {
   }
 
   /**
-   * Creates a change to add a related term. The link shows on both terms.
+   * Creates a change to add a related term. The link shows on both terms. The change fails if one
+   * term is an ancestor of the other.
    *
    * @param related The name of the related term.
    * @return The term change.

@@ -20,6 +20,7 @@ package org.apache.gravitino.glossary;
 
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 
 /**
@@ -48,17 +49,22 @@ public interface SupportsTerms {
 
   /**
    * Binds terms to the object and unbinds others, in one change. Binding a bound term, or unbinding
-   * a term that is not bound, has no effect.
+   * a term that is not bound, has no effect. If one term fails, nothing changes.
+   *
+   * <p>Each term is checked on its own. The caller needs either the admin privilege on the object
+   * and read access to the term, or the edit privilege on the term and read access to the object.
+   * Otherwise the call fails with a {@link ForbiddenException}.
    *
    * @param termsToAdd The names of the terms to bind.
    * @param termsToRemove The names of the terms to unbind.
    * @return The names of the terms bound to the object after the change.
    * @throws NoSuchTermException If a term does not exist or is not visible to the caller.
-   * @throws IllegalArgumentException If a term cannot be bound by the caller, for example a term
-   *     that is not {@link GlossaryTerm.Status#APPROVED} bound by an admin of the object.
+   * @throws IllegalArgumentException If an admin of the object, who is not an editor of the term,
+   *     binds a term that is not {@link GlossaryTerm.Status#APPROVED}.
+   * @throws ForbiddenException If the caller may not bind or unbind one of the terms.
    */
   String[] associateTerms(String[] termsToAdd, String[] termsToRemove)
-      throws NoSuchTermException, IllegalArgumentException;
+      throws NoSuchTermException, IllegalArgumentException, ForbiddenException;
 
   /**
    * Lists the terms bound to each column of a table or a view, in one call.

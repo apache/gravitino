@@ -51,7 +51,8 @@ public interface GlossaryOperations {
   GlossaryTerm[] listTermsInfo() throws NoSuchMetalakeException;
 
   /**
-   * Gets a term by its name. The name is compared without case.
+   * Gets a term by its name. The name is compared by its normalized key, so case and extra spaces
+   * do not matter.
    *
    * @param name The name of the term.
    * @return The term.
@@ -78,8 +79,9 @@ public interface GlossaryOperations {
           IllegalArgumentException;
 
   /**
-   * Alters a term. All changes are applied together, and the revision of the term increases by one.
-   * Use {@link TermChange#setStatus(GlossaryTerm.Status)} to change the status.
+   * Alters a term. All changes are applied together: if one fails, none is applied. The revision of
+   * the term increases by one. Use {@link TermChange#setStatus(GlossaryTerm.Status)} to change the
+   * status.
    *
    * @param name The name of the term.
    * @param changes The changes to apply.
@@ -90,7 +92,8 @@ public interface GlossaryOperations {
    *     source reference is set to the one of another term.
    * @throws NotFoundException If a domain to add does not exist or is not visible to the caller.
    * @throws IllegalArgumentException If a change is not valid, for example a synonym that is the
-   *     name of another term, or a broader term that would create a cycle.
+   *     name of another term, or a broader term that would create a cycle or a chain longer than
+   *     the depth limit.
    */
   GlossaryTerm alterTerm(String name, TermChange... changes)
       throws NoSuchTermException, TermAlreadyExistsException, NotFoundException,
@@ -108,18 +111,19 @@ public interface GlossaryOperations {
 
   /**
    * Looks up business words, such as the words of a question to an agent. Each word is looked up on
-   * its own and compared without case with the names and synonyms of the terms. Only {@link
+   * its own, and its normalized key is compared with the names and synonyms of the terms. Only
+   * exact matches count, so {@code customers} does not find {@code Customer}. Only {@link
    * GlossaryTerm.Status#APPROVED} terms are returned, with {@link GlossaryTerm#matchedBy()} and
    * {@link GlossaryTerm#bindings()} set. A term is returned once, even when it matches several
    * words.
    *
-   * @param words The words to look up.
+   * @param words The words to look up, at most 20.
    * @param domain The name of a domain to limit the lookup to its terms and those of its
    *     subdomains, or null to look up all terms.
    * @return The matched terms. A word that matches no term has no entry.
    * @throws NotFoundException If the domain does not exist or is not visible to the caller.
    * @throws IllegalArgumentException If no word is given, a word is blank, or there are more words
-   *     than the server allows.
+   *     than 20 words.
    */
   GlossaryTerm[] matchTerms(String[] words, @Nullable String domain)
       throws NotFoundException, IllegalArgumentException;

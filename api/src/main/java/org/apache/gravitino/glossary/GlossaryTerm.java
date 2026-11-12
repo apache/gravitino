@@ -31,9 +31,10 @@ import org.apache.gravitino.exceptions.NoSuchTermException;
  * zero or more domains, have several broader terms and any number of related terms, and be bound to
  * the metadata objects and metrics behind it.
  *
- * <p>Names and synonyms are compared after trimming, collapsing spaces and lower-casing them, so
- * {@code Churn} and {@code churn} are the same name. A name is unique in a metalake, and a synonym
- * cannot be the name of another term.
+ * <p>Names and synonyms are compared by a normalized key: spaces at both ends are removed, each run
+ * of whitespace becomes one space, and the text is lower-cased with {@code Locale.ROOT}. So {@code
+ * Churn}, {@code churn} and {@code " CHURN "} are the same name. A name is unique in a metalake,
+ * and a synonym cannot be the name of another term or of its own term.
  *
  * <p>A {@code GlossaryTerm} is a snapshot. The relation lists hold the names of the terms that are
  * visible to the caller; hidden terms are left out.
@@ -52,7 +53,8 @@ public interface GlossaryTerm extends Auditable {
   }
 
   /**
-   * Returns the name of the term, as the user typed it.
+   * Returns the name of the term. The case is kept as the user typed it; spaces at both ends are
+   * removed.
    *
    * @return The name of the term.
    */
@@ -132,8 +134,10 @@ public interface GlossaryTerm extends Auditable {
   Map<String, String> properties();
 
   /**
-   * Returns the revision of the term. Each change to the term increases it by one, so a client can
-   * see that a term changed after it read it. A revision is not an approved version.
+   * Returns the revision of the term. A new term has revision 1. Each successful alter call
+   * increases it by one, however many changes the call holds, and so does each bind or unbind call
+   * that changes the bindings of the term. Owner and tag changes do not increase it. A client can
+   * use it to see that a term changed after it read it. A revision is not an approved version.
    *
    * @return The revision of the term.
    */

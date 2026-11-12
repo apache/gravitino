@@ -128,6 +128,7 @@ public class TestMetadataObjects {
         () -> MetadataObjects.of("parent", "template_abc", MetadataObject.Type.JOB_TEMPLATE));
   }
 
+  /** Covers T1.2. */
   @Test
   public void testGlossaryTermObject() {
     MetadataObject termObject =

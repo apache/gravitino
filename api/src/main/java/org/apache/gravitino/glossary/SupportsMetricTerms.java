@@ -19,6 +19,7 @@
 package org.apache.gravitino.glossary;
 
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTermException;
 
@@ -53,7 +54,11 @@ public interface SupportsMetricTerms {
 
   /**
    * Binds terms to a metric and unbinds others, in one change. Binding a bound term, or unbinding a
-   * term that is not bound, has no effect.
+   * term that is not bound, has no effect. If one term fails, nothing changes.
+   *
+   * <p>Each term is checked on its own. The caller needs either the admin privilege on the semantic
+   * model and read access to the term, or the edit privilege on the term and read access to the
+   * semantic model. Otherwise the call fails with a {@link ForbiddenException}.
    *
    * @param metric The name of the metric.
    * @param termsToAdd The names of the terms to bind.
@@ -61,8 +66,11 @@ public interface SupportsMetricTerms {
    * @return The names of the terms bound to the metric after the change.
    * @throws NoSuchMetadataObjectException If the semantic model has no metric with this name.
    * @throws NoSuchTermException If a term does not exist or is not visible to the caller.
-   * @throws IllegalArgumentException If a term cannot be bound by the caller.
+   * @throws IllegalArgumentException If an admin of the semantic model, who is not an editor of the
+   *     term, binds a term that is not {@link GlossaryTerm.Status#APPROVED}.
+   * @throws ForbiddenException If the caller may not bind or unbind one of the terms.
    */
   String[] associateMetricTerms(String metric, String[] termsToAdd, String[] termsToRemove)
-      throws NoSuchMetadataObjectException, NoSuchTermException, IllegalArgumentException;
+      throws NoSuchMetadataObjectException, NoSuchTermException, IllegalArgumentException,
+          ForbiddenException;
 }

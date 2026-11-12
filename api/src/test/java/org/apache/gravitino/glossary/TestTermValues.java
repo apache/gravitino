@@ -25,6 +25,22 @@ import org.junit.jupiter.api.Test;
 
 public class TestTermValues {
 
+  /** Covers T1.1. */
+  @Test
+  public void testEnumNamesRoundTrip() {
+    for (GlossaryTerm.Status status : GlossaryTerm.Status.values()) {
+      Assertions.assertEquals(status, GlossaryTerm.Status.valueOf(status.name()));
+    }
+    for (TermBinding.Kind kind : TermBinding.Kind.values()) {
+      Assertions.assertEquals(kind, TermBinding.Kind.valueOf(kind.name()));
+    }
+    for (TermMatch.Field field : TermMatch.Field.values()) {
+      Assertions.assertEquals(field, TermMatch.Field.valueOf(field.name()));
+    }
+    Assertions.assertEquals(
+        MetadataObject.Type.GLOSSARY_TERM, MetadataObject.Type.valueOf("GLOSSARY_TERM"));
+  }
+
   @Test
   public void testTermLink() {
     TermLink link = TermLink.of("Wiki", "https://wiki/customer");
