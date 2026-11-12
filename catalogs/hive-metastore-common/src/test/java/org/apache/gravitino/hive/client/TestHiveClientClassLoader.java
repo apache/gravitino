@@ -19,15 +19,28 @@
 
 package org.apache.gravitino.hive.client;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.net.URLConnection;
+import java.net.URLStreamHandler;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.jar.JarEntry;
+import java.util.jar.JarOutputStream;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.spi.LoggerContext;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.ILoggerFactory;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +83,71 @@ public class TestHiveClientClassLoader {
             + "Log4jLoggerFactory's registry releases its strong reference to it (and "
             + "transitively to the classloader); otherwise the classloader can never be "
             + "garbage collected");
+  }
+
+  @Test
+  void testClosingBaseLoaderDoesNotInterruptBarrierRead(@TempDir Path tempDir) throws Exception {
+    String resource = HiveShim.class.getName().replace('.', '/') + ".class";
+    Path jar = tempDir.resolve("barrier.jar");
+    try (InputStream input = getClass().getClassLoader().getResourceAsStream(resource);
+        JarOutputStream output = new JarOutputStream(Files.newOutputStream(jar))) {
+      Assertions.assertNotNull(input);
+      output.putNextEntry(new JarEntry(resource));
+      input.transferTo(output);
+      output.closeEntry();
+    }
+
+    URL jarResource = new URL("jar:" + jar.toUri() + "!/" + resource);
+    AtomicReference<URLClassLoader> baseReference = new AtomicReference<>();
+    AtomicBoolean closeOnRead = new AtomicBoolean();
+    URL closingResource =
+        new URL(
+            null,
+            jarResource.toString(),
+            new URLStreamHandler() {
+              @Override
+              protected URLConnection openConnection(URL url) {
+                return new URLConnection(url) {
+                  @Override
+                  public void connect() {}
+
+                  @Override
+                  public InputStream getInputStream() throws IOException {
+                    URLConnection connection = jarResource.openConnection();
+                    connection.setUseCaches(getUseCaches());
+                    InputStream input = connection.getInputStream();
+                    // Catalog replacement can close the old loader while a new loader reads
+                    // a barrier class from the same jar. Close after opening, before reading.
+                    baseReference.get().close();
+                    return input;
+                  }
+                };
+              }
+            });
+    try (URLClassLoader base =
+        new URLClassLoader(new URL[] {jar.toUri().toURL()}, getClass().getClassLoader()) {
+          @Override
+          public URL getResource(String name) {
+            if (resource.equals(name)) {
+              return closeOnRead.get() ? closingResource : jarResource;
+            }
+            return super.getResource(name);
+          }
+        }) {
+      baseReference.set(base);
+      // Track the cached jar in the base loader, as URLClassLoader#getResourceAsStream does
+      // in production. Closing the base must not invalidate the new loader's independent read.
+      try (InputStream input = base.getResourceAsStream(resource)) {
+        Assertions.assertNotNull(input);
+        input.readAllBytes();
+      }
+      closeOnRead.set(true);
+      try (HiveClientClassLoader loader =
+          HiveClientClassLoader.createLoader(HiveClientClassLoader.HiveVersion.HIVE3, base)) {
+        Class<?> loaded = loader.loadClass(HiveShim.class.getName());
+        Assertions.assertSame(loader, loaded.getClassLoader());
+      }
+    }
   }
 
   /** Reflectively reads the {@code registry} field of {@code AbstractLoggerAdapter}. */
