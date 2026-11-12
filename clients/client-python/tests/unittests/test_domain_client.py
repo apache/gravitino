@@ -48,6 +48,7 @@ from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.client.metadata_object_domain_operations import (
     MetadataObjectDomainOperations,
 )
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.client.relational_table import RelationalTable
 from gravitino.constants.error import ErrorConstants
 from gravitino.dto.domain_dto import DomainDTO
@@ -603,6 +604,11 @@ class TestDomainClient(unittest.TestCase):
                 self.metalake.delete_domain,
                 lambda n: self.metalake.get_owner(
                     MetadataObjects.MetadataObjectImpl(n, MetadataObject.Type.DOMAIN)
+                ),
+                lambda n: MetadataObjectTagOperations(
+                    "metalake",
+                    MetadataObjects.MetadataObjectImpl(n, MetadataObject.Type.DOMAIN),
+                    self.client,
                 ),
                 lambda n: self.metalake.alter_domain(n, DomainChange.rename("new")),
             ):

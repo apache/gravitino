@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.utils;
 
+import com.google.common.base.Preconditions;
 import java.util.regex.Pattern;
 import org.apache.gravitino.MetadataObjects;
 
@@ -38,11 +39,12 @@ public final class NameValidationUtils {
    * @throws IllegalArgumentException If the name is reserved or illegal.
    */
   public static void validateName(String type, String name) {
+    Preconditions.checkArgument(name != null, "The %s name must not be null.", type);
     if (SYSTEM_CATALOG_RESERVED_NAME.equalsIgnoreCase(name)
         || MetadataObjects.METADATA_OBJECT_RESERVED_NAME.equals(name)) {
       throw new IllegalArgumentException("The " + type + " name '" + name + "' is reserved.");
     }
-    if (name == null || !NAME_PATTERN.matcher(name).matches()) {
+    if (!NAME_PATTERN.matcher(name).matches()) {
       throw new IllegalArgumentException("The " + type + " name '" + name + "' is illegal.");
     }
   }
@@ -51,9 +53,10 @@ public final class NameValidationUtils {
    * Validates the domain names in a member filter.
    *
    * @param names The requested domain names.
-   * @throws IllegalArgumentException If any name is reserved or illegal.
+   * @throws IllegalArgumentException If the collection is null or any name is reserved or illegal.
    */
   public static void validateDomainNames(Iterable<String> names) {
+    Preconditions.checkArgument(names != null, "Domain names must not be null.");
     names.forEach(name -> validateName("domain", name));
   }
 }

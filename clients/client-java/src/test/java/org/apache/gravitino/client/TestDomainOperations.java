@@ -386,6 +386,9 @@ public class TestDomainOperations extends TestBase {
       MetadataObject object =
           new MetadataObjects.MetadataObjectImpl(null, segment, MetadataObject.Type.DOMAIN);
       Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.getOwner(object));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> new MetadataObjectTagOperations("metalake", object, client.restClient()));
       Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(segment));
       Domain snapshot =
           new GenericDomain(

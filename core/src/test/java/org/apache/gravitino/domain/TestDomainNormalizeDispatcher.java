@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.domain;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -28,6 +29,7 @@ import java.util.function.Consumer;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.NameValidationUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
@@ -54,7 +56,7 @@ class TestDomainNormalizeDispatcher {
         "SyStEm",
         "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       })
-  void rejectsInvalidNewNames(String name) {
+  void rejectsInvalidNames(String name) {
     assertThrows(
         IllegalArgumentException.class,
         () -> dispatcher.createDomain("m", name, null, null, tag, false));
@@ -70,7 +72,33 @@ class TestDomainNormalizeDispatcher {
     assertThrows(IllegalArgumentException.class, () -> dispatcher.getDomain("m", name));
     assertThrows(IllegalArgumentException.class, () -> dispatcher.deleteDomain("m", name));
     assertThrows(IllegalArgumentException.class, () -> dispatcher.attachDomain("m", "child", name));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.alterDomain("m", name));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.publishDomain("m", name));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.unpublishDomain("m", name));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.updateBackingTag("m", name, tag));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.listSubdomainInfos("m", name));
+    assertThrows(
+        IllegalArgumentException.class, () -> dispatcher.attachDomain("m", name, "parent"));
+    assertThrows(IllegalArgumentException.class, () -> dispatcher.detachDomain("m", name));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> dispatcher.listMembers("m", name, DomainMemberFilter.builder().build()));
     verifyNoInteractions(delegate);
+  }
+
+  @Test
+  void rejectsNullNameAndNullScopeCollection() {
+    assertEquals(
+        "The domain name must not be null.",
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> NameValidationUtils.validateName("domain", null))
+            .getMessage());
+    assertEquals(
+        "Domain names must not be null.",
+        assertThrows(
+                IllegalArgumentException.class, () -> NameValidationUtils.validateDomainNames(null))
+            .getMessage());
   }
 
   @ParameterizedTest
