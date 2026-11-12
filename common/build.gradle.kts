@@ -59,30 +59,66 @@ dependencies {
   testFixturesImplementation(libs.commons.lang3)
 }
 
-fun getGitCommitId(): String {
-  var gitCommitId: String
-  try {
-    val gitPath = File(rootDir.path, ".git")
-    val gitFolder = if (gitPath.isDirectory) {
-      gitPath
-    } else {
-      val content = gitPath.readText().trim()
-      File(rootDir.path, content.substringAfter("gitdir: ").trim())
-    }
+// Ask git itself first: it handles linked worktrees, packed refs and detached HEAD.
+fun getGitCommitIdFromGit(): String? {
+  return try {
+    val process = ProcessBuilder("git", "rev-parse", "HEAD")
+      .directory(rootDir)
+      .redirectErrorStream(false)
+      .start()
+    val output = process.inputStream.bufferedReader().use { it.readText().trim() }
+    process.errorStream.close()
+    if (process.waitFor() == 0 && Regex("[0-9a-fA-F]{40}").matches(output)) output else null
+  } catch (e: Exception) {
+    null
+  }
+}
 
-    val head = File(gitFolder, "HEAD").readText().split(":")
-    val isCommit = head.size == 1
-    gitCommitId = if (isCommit) {
-      head[0].trim()
-    } else {
-      val refHead = File(gitFolder, head[1].trim())
-      refHead.readText().trim()
+// Fallback that parses the .git directory by hand, used when the git command is unavailable.
+fun getGitCommitIdFromFiles(): String {
+  val gitPath = File(rootDir.path, ".git")
+  val gitFolder = if (gitPath.isDirectory) {
+    gitPath
+  } else {
+    // Linked worktrees have a ".git" file holding an absolute (or relative) "gitdir:" path.
+    rootDir.resolve(gitPath.readText().trim().substringAfter("gitdir: ").trim())
+  }
+
+  val head = File(gitFolder, "HEAD").readText().split(":")
+  if (head.size == 1) {
+    return head[0].trim()
+  }
+  val refName = head[1].trim()
+  // Branch refs of linked worktrees live in the common git dir.
+  val commonDir = File(gitFolder, "commondir")
+  val refFolders = if (commonDir.exists()) {
+    listOf(gitFolder, gitFolder.resolve(commonDir.readText().trim()))
+  } else {
+    listOf(gitFolder)
+  }
+  for (folder in refFolders) {
+    val refFile = File(folder, refName)
+    if (refFile.exists()) {
+      return refFile.readText().trim()
     }
+    val packed = File(folder, "packed-refs")
+    if (packed.exists()) {
+      packed.readLines().firstOrNull { it.endsWith(" $refName") }?.let {
+        return it.substringBefore(" ").trim()
+      }
+    }
+  }
+  throw GradleException("Unable to resolve ref $refName")
+}
+
+fun getGitCommitId(): String {
+  getGitCommitIdFromGit()?.let { return it }
+  return try {
+    getGitCommitIdFromFiles()
   } catch (e: Exception) {
     println("WARN: Unable to get Git commit id : ${e.message}")
-    gitCommitId = ""
+    ""
   }
-  return gitCommitId
 }
 
 val propertiesFile = "src/main/resources/gravitino-build-info.properties"
@@ -129,10 +165,20 @@ fun writeProjectPropertiesFile() {
 
 tasks {
   jar {
+    // The build info (commit id, compile date) is regenerated on every run, so never skip the jar.
+    outputs.upToDateWhen { false }
+
     doFirst() {
       writeProjectPropertiesFile()
       if (!file(propertiesFile).exists()) {
         throw GradleException("Failed to generate $propertiesFile.")
+      }
+      // processResources may have copied a stale file (e.g. empty commit id) into the main
+      // resources output, which wins over the fresh one below; refresh it.
+      val processed = layout.buildDirectory.file("resources/main/gravitino-build-info.properties")
+        .get().asFile
+      if (processed.parentFile.exists()) {
+        file(propertiesFile).copyTo(processed, overwrite = true)
       }
     }
 
