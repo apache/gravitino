@@ -39,6 +39,9 @@ import org.apache.gravitino.tag.TagValue;
  * the object wins: a table that carries {@code dept=hr} under a schema that carries {@code
  * dept=finance} is a member of the domain backed by {@code dept=hr} only.
  *
+ * <p>Names have 1 to 64 ASCII letters, digits, underscores or hyphens and may not start with a
+ * hyphen. The names {@code *} and {@code system} (in any letter case) are reserved.
+ *
  * <p>A domain is either top-level or a sub-domain of exactly one top-level domain. Privileges on a
  * domain, and its ownership, also apply to its sub-domains: the metalake, the current parent and
  * the domain itself are checked together. An owner of any of them passes; otherwise a privilege

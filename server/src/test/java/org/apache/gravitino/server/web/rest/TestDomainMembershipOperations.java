@@ -117,14 +117,14 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
     DomainRelation[] relations = {
       DomainRelation.direct(),
       DomainRelation.inherited(MetadataObjects.parse("cat.schema", MetadataObject.Type.SCHEMA)),
-      DomainRelation.viaSubdomain("Tax,Trading")
+      DomainRelation.viaSubdomain("Tax_Trading")
     };
     when(dispatcher.listMembers(eq("test"), eq("Finance"), any()))
         .thenReturn(new DomainMember[] {new DomainMemberInfo(table, relations)});
     try (Response response =
         target(MEMBERS)
             .queryParam("types", "table,VIEW")
-            .queryParam("domains", "Tax,Trading", "Markets/US")
+            .queryParam("domains", "Tax_Trading", "Markets_US")
             .queryParam("nameContains", "TaBlE")
             .request()
             .get()) {
@@ -139,14 +139,14 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
           DomainRelation.Type.DIRECT, result.getMembers()[0].getRelations()[0].getRelation());
       assertNull(result.getMembers()[0].getRelations()[0].getSource());
       assertEquals("cat.schema", result.getMembers()[0].getRelations()[1].getSource().fullName());
-      assertEquals("Tax,Trading", result.getMembers()[0].getRelations()[2].getSource().name());
+      assertEquals("Tax_Trading", result.getMembers()[0].getRelations()[2].getSource().name());
     }
     ArgumentCaptor<DomainMemberFilter> filter = ArgumentCaptor.forClass(DomainMemberFilter.class);
     verify(dispatcher).listMembers(eq("test"), eq("Finance"), filter.capture());
     assertEquals(
         DomainMemberFilter.builder()
             .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
-            .withDomains("Tax,Trading", "Markets/US")
+            .withDomains("Tax_Trading", "Markets_US")
             .withNameContains("TaBlE")
             .build(),
         filter.getValue());
@@ -210,6 +210,15 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
       for (MetadataObject.Type supported : DomainMember.SUPPORTED_TYPES) {
         assertTrue(error.getMessage().contains(supported.name()));
       }
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  public void testInvalidDomainFilter() {
+    try (Response response =
+        target(MEMBERS).queryParam("domains", "Finance", "SyStEm").request().get()) {
+      assertError(response, 400, "IllegalArgumentException");
     }
     verifyNoInteractions(dispatcher);
   }
@@ -319,7 +328,7 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
               DomainRelation.direct(),
               DomainRelation.inherited(
                   MetadataObjects.parse("cat.schema", MetadataObject.Type.SCHEMA)),
-              DomainRelation.viaSubdomain("Finance.US")
+              DomainRelation.viaSubdomain("Finance_US")
             });
     when(dispatcher.listMembers(eq("test"), eq("Finance"), any()))
         .thenReturn(new DomainMember[] {member});
@@ -338,7 +347,7 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
       assertEquals("schema", relations.get(1).get("source").get("type").asText());
       assertEquals("via_subdomain", relations.get(2).get("relation").asText());
       assertEquals("domain", relations.get(2).get("source").get("type").asText());
-      assertEquals("Finance.US", relations.get(2).get("source").get("fullName").asText());
+      assertEquals("Finance_US", relations.get(2).get("source").get("fullName").asText());
     }
   }
 

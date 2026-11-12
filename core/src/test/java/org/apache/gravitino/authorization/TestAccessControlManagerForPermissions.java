@@ -461,7 +461,7 @@ public class TestAccessControlManagerForPermissions {
   void testDomainPrivilegeGrantAndRevokeStayLocal(String scope) throws IOException {
     MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
     String name = "domain_privileges_" + scope;
-    String fullName = type == MetadataObject.Type.METALAKE ? METALAKE : "Finance.v1";
+    String fullName = type == MetadataObject.Type.METALAKE ? METALAKE : "Finance_v1";
     if (type == MetadataObject.Type.DOMAIN) {
       entityStore.put(
           DomainEntity.builder()

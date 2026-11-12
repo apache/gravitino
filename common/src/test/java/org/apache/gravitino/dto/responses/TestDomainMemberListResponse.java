@@ -29,7 +29,7 @@ public class TestDomainMemberListResponse {
 
   private static final String ITEM_JSON =
       "{\"object\":{\"type\":\"table\",\"fullName\":\"cat.schema.table\"},"
-          + "\"relations\":[{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance.US\"}}]}";
+          + "\"relations\":[{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance_US\"}}]}";
 
   @Test
   public void testJsonSerialization() throws IOException {
@@ -50,7 +50,7 @@ public class TestDomainMemberListResponse {
     Assertions.assertEquals(1, response.getMembers().length);
     Assertions.assertEquals("cat.schema.table", response.getMembers()[0].getObject().fullName());
     Assertions.assertEquals(
-        "Finance.US", response.getMembers()[0].getRelations()[0].getSource().name());
+        "Finance_US", response.getMembers()[0].getRelations()[0].getSource().name());
     Assertions.assertNull(response.getMembers()[0].getRelations()[0].getSource().parent());
     assertJsonEquals(json, response);
   }

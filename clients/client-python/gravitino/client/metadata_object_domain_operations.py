@@ -25,7 +25,7 @@ from gravitino.dto.responses.domain_response import (
     DomainNamesListResponse,
 )
 from gravitino.exceptions.handlers.domain_error_handler import DOMAIN_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import encode_metadata_object_name, encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 
@@ -47,7 +47,7 @@ class MetadataObjectDomainOperations(SupportsDomains):
         self._client = rest_client
         self._path = (
             f"api/metalakes/{encode_string(metalake_name)}/objects/"
-            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}/domains"
+            f"{metadata_object.type().value}/{encode_metadata_object_name(metadata_object)}/domains"
         )
 
     def list_domains(self) -> list[str]:

@@ -25,7 +25,6 @@ from dataclasses_json import config, dataclass_json
 
 from gravitino.api.domain.domain_change import DomainChange, DomainChangeVariant
 from gravitino.rest.rest_message import RESTRequest
-from gravitino.rest.rest_utils import validate_domain_name
 from gravitino.utils.precondition import Precondition
 
 
@@ -68,7 +67,10 @@ class DomainUpdateRequest:
             Raises:
                 ValueError: If the request is invalid, this exception is thrown.
             """
-            validate_domain_name(self._new_name)
+            Precondition.check_argument(
+                isinstance(self._new_name, str) and bool(self._new_name.strip()),
+                "name must not be blank",
+            )
 
         @property
         def new_name(self) -> str:

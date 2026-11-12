@@ -95,6 +95,7 @@ import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NameValidationUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -186,10 +187,21 @@ public class GravitinoInterceptionService implements InterceptionService {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
           Optional<String> entityType = extractMetadataObjectTypeFromParameters(parameters, args);
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          // Grant and owner expressions may resolve this path before the resource method runs.
+          Object objectType =
+              pathParams.getOrDefault("p_metadataObjectType", pathParams.get("p_type"));
+          if ("domain".equalsIgnoreCase(String.valueOf(objectType))
+              && pathParams.containsKey("p_fullName")) {
+            try {
+              NameValidationUtils.validateName("domain", (String) pathParams.get("p_fullName"));
+            } catch (IllegalArgumentException e) {
+              return Utils.illegalArguments(e.getMessage(), e);
+            }
+          }
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
 
-          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationRequestContext authorizationRequestContext =
               new AuthorizationRequestContext();
 

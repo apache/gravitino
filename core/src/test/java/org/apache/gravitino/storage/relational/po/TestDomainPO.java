@@ -43,7 +43,7 @@ public class TestDomainPO {
     DomainPO joined = new DomainPO();
     var parentName = DomainPO.class.getDeclaredField("parentName");
     parentName.setAccessible(true);
-    parentName.set(joined, "derived name");
+    parentName.set(joined, "derived_name");
     var backingTagName = DomainPO.class.getDeclaredField("backingTagName");
     backingTagName.setAccessible(true);
     backingTagName.set(joined, "derived name");
@@ -53,11 +53,11 @@ public class TestDomainPO {
 
   @Test
   public void testInitializeAndConvertDomainPO() {
-    DomainEntity domain = newDomain(10L, "Finance/Trading", "comment", ImmutableMap.of("k", "v"));
+    DomainEntity domain = newDomain(10L, "Finance_Trading", "comment", ImmutableMap.of("k", "v"));
 
     DomainPO domainPO = DomainPO.initializeDomainPO(domain, 1L);
     Assertions.assertEquals(10L, domainPO.domainId());
-    Assertions.assertEquals("Finance/Trading", domainPO.domainName());
+    Assertions.assertEquals("Finance_Trading", domainPO.domainName());
     Assertions.assertEquals(1L, domainPO.metalakeId());
     Assertions.assertEquals("comment", domainPO.comment());
     Assertions.assertEquals("DRAFT", domainPO.status());
@@ -115,14 +115,14 @@ public class TestDomainPO {
         DomainPO.initializeDomainPO(newDomain(10L, "Finance", "comment", null), 1L);
 
     DomainEntity updated =
-        newDomain(10L, "Finance/Tax", "new comment", ImmutableMap.of("k", "v")).toBuilder()
+        newDomain(10L, "Finance_Tax", "new comment", ImmutableMap.of("k", "v")).toBuilder()
             .withStatus(Domain.Status.PUBLISHED)
             .build();
     DomainPO newDomainPO = DomainPO.updateDomainPO(oldDomainPO, updated);
 
     Assertions.assertEquals(10L, newDomainPO.domainId());
     Assertions.assertEquals(1L, newDomainPO.metalakeId());
-    Assertions.assertEquals("Finance/Tax", newDomainPO.domainName());
+    Assertions.assertEquals("Finance_Tax", newDomainPO.domainName());
     Assertions.assertEquals("new comment", newDomainPO.comment());
     Assertions.assertEquals("PUBLISHED", newDomainPO.status());
     Assertions.assertEquals(2L, newDomainPO.currentVersion());

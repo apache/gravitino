@@ -370,18 +370,25 @@ public class TestDomainOperations extends TestBase {
 
   /** Verifies that invalid requests are rejected before HTTP calls. */
   @Test
+  public void testServerRejectsInvalidDomainName() throws Exception {
+    buildMockResource(
+        Method.GET, ROOT + "/SyStEm", null, ErrorResponse.illegalArguments("reserved domain"), 400);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> metalake().getDomain("SyStEm"));
+    Assertions.assertTrue(error.getMessage().contains("reserved domain"));
+  }
+
+  @Test
   public void testInvalidRequests() {
     GravitinoMetalake metalake = metalake();
     for (String segment : new String[] {".", ".."}) {
+      MetadataObject object =
+          new MetadataObjects.MetadataObjectImpl(null, segment, MetadataObject.Type.DOMAIN);
+      Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.getOwner(object));
       Assertions.assertThrows(
           IllegalArgumentException.class,
-          () -> metalake.createDomain(segment, null, null, TagValue.noValue("dept"), false));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> domain().createSubdomain(segment, null, null, TagValue.noValue("dept"), false));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> metalake.alterDomain(NAME, DomainChange.rename(segment)));
+          () -> new MetadataObjectTagOperations("metalake", object, client.restClient()));
       Assertions.assertThrows(IllegalArgumentException.class, () -> metalake.deleteDomain(segment));
       Domain snapshot =
           new GenericDomain(
@@ -403,12 +410,12 @@ public class TestDomainOperations extends TestBase {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> domain().createSubdomain("child", null, null, null, true));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> domain().attachToParent(" "));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> domain().attachToParent(null));
   }
 
   private static GravitinoMetalake metalake() {
     return new GravitinoMetalake(
-        "metalake", null, Collections.emptyMap(), AUDIT, client.restClient());
+        "metalake", null, Collections.emptyMap(), AUDIT, null, client.restClient());
   }
 
   private static Domain domain() {

@@ -48,6 +48,7 @@ from gravitino.client.gravitino_client import GravitinoClient
 from gravitino.client.metadata_object_domain_operations import (
     MetadataObjectDomainOperations,
 )
+from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.client.relational_table import RelationalTable
 from gravitino.constants.error import ErrorConstants
 from gravitino.dto.domain_dto import DomainDTO
@@ -62,6 +63,7 @@ from gravitino.dto.requests.domain_set_request import (
     DomainParentSetRequest,
     DomainSetRequest,
 )
+from gravitino.dto.requests.domain_update_request import DomainUpdateRequest
 from gravitino.dto.requests.domain_updates_request import DomainUpdatesRequest
 from gravitino.dto.responses.domain_response import (
     DomainListResponse,
@@ -581,36 +583,63 @@ class TestDomainClient(unittest.TestCase):
             self.metalake.delete_domain(self.NAME)
         self.assertIsInstance(caught.exception, NonEmptyDomainException)
 
+    def test_server_rejects_invalid_domain_name(self):
+        error = {
+            "code": ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            "type": "IllegalArgumentException",
+            "message": "reserved domain",
+            "stack": None,
+        }
+        self.opener.open.side_effect = HTTPError(
+            "url", 400, "error", {}, BytesIO(json.dumps(error).encode())
+        )
+        with self.assertRaisesRegex(IllegalArgumentException, "reserved domain"):
+            self.metalake.get_domain("SyStEm")
+        self._request("GET", self.path + "/SyStEm")
+
     def test_validation_before_http(self):
         for name in (None, "", " ", ".", ".."):
             for operation in (
                 self.metalake.get_domain,
                 self.metalake.delete_domain,
-                lambda n: self.metalake.create_domain(
-                    n, None, None, TagValue("tag"), False
+                lambda n: self.metalake.get_owner(
+                    MetadataObjects.MetadataObjectImpl(n, MetadataObject.Type.DOMAIN)
                 ),
-                lambda n: self._domain().create_subdomain(
-                    n, None, None, TagValue("tag"), False
+                lambda n: MetadataObjectTagOperations(
+                    "metalake",
+                    MetadataObjects.MetadataObjectImpl(n, MetadataObject.Type.DOMAIN),
+                    self.client,
                 ),
-                lambda n: self.metalake.alter_domain(self.NAME, DomainChange.rename(n)),
                 lambda n: self.metalake.alter_domain(n, DomainChange.rename("new")),
             ):
                 with self.subTest(name=name, operation=operation):
                     with self.assertRaises(IllegalArgumentException):
                         operation(name)
+        for blank in ("", " ", "\t"):
+            with self.subTest(blank=blank):
+                for request in (
+                    DomainCreateRequest(blank, None, {}, None, BackingTagCreate("tag")),
+                    DomainCreateRequest(
+                        "child", None, {}, blank, BackingTagCreate("tag")
+                    ),
+                    DomainParentSetRequest(blank),
+                    DomainUpdateRequest.RenameDomainRequest(blank),
+                ):
+                    with self.assertRaises(IllegalArgumentException):
+                        request.validate()
         invalid_operations = (
             lambda: self.metalake.create_domain("name", None, None, None, False),
             lambda: self.metalake.create_domain(
                 "name", None, None, TagValue("tag", "v"), True
             ),
             lambda: self.metalake.create_domain(
-                " ", None, None, TagValue("tag"), False
+                None, None, None, TagValue("tag"), False
             ),
             lambda: self.metalake.create_domain(
                 "name", None, {"key": None}, TagValue("tag"), False
             ),
             lambda: self.metalake.alter_domain("name", None),
-            lambda: self.metalake.alter_domain("name", DomainChange.rename(" ")),
+            lambda: self.metalake.alter_domain("name", DomainChange.rename(None)),
             lambda: self.metalake.alter_domain(
                 "name", DomainChange.set_property(" ", "value")
             ),
@@ -620,7 +649,7 @@ class TestDomainClient(unittest.TestCase):
             lambda: self.metalake.alter_domain(
                 "name", DomainChange.remove_property(" ")
             ),
-            lambda: self._domain().attach_to_parent(" "),
+            lambda: self._domain().attach_to_parent(None),
             lambda: self._domain().create_subdomain("child", None, None, None, False),
             lambda: self._domain().list_members(None),
             lambda: MetadataObjectDomainOperations(

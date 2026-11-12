@@ -57,6 +57,7 @@ import org.apache.gravitino.catalog.TopicOperationDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.hook.DomainHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
@@ -159,7 +160,7 @@ class TestGravitinoEnvMetadataComponents {
       assertNotNull(env.secretPropertyOperationDispatcher());
       assertNotNull(env.internalTagDispatcher());
       assertNotNull(env.internalPolicyDispatcher());
-      assertInstanceOf(DomainManager.class, env.internalDomainDispatcher());
+      assertInstanceOf(DomainNormalizeDispatcher.class, env.internalDomainDispatcher());
       assertInstanceOf(StatisticManager.class, env.internalStatisticDispatcher());
       assertNotNull(env.lockManager());
       assertNotNull(env.metricsSystem());
@@ -243,18 +244,18 @@ class TestGravitinoEnvMetadataComponents {
 
       env.initializeFullComponents(config);
 
-      assertInstanceOf(DomainManager.class, env.internalDomainDispatcher());
+      assertInstanceOf(DomainNormalizeDispatcher.class, env.internalDomainDispatcher());
       assertDispatcherChain(
           env.domainDispatcher(),
           DomainEventDispatcher.class,
+          DomainNormalizeDispatcher.class,
           DomainHookDispatcher.class,
           DomainManager.class);
+      Object normalize = FieldUtils.readField(env.domainDispatcher(), "dispatcher", true);
+      Object hook = FieldUtils.readField(normalize, "dispatcher", true);
       assertSame(
-          env.internalDomainDispatcher(),
-          FieldUtils.readField(
-              FieldUtils.readField(env.domainDispatcher(), "dispatcher", true),
-              "dispatcher",
-              true));
+          FieldUtils.readField(env.internalDomainDispatcher(), "dispatcher", true),
+          FieldUtils.readField(hook, "dispatcher", true));
       assertDispatcherChain(
           env.filesetDispatcher(),
           FilesetEventDispatcher.class,

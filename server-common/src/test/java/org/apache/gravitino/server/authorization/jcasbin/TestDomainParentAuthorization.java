@@ -70,8 +70,8 @@ class TestDomainParentAuthorization {
     Set<String> allows = new HashSet<>();
     Set<String> denies = new HashSet<>();
     AtomicReference<String> parent = new AtomicReference<>("Finance");
-    when(domains.getDomain("lake", "Trading.v1"))
-        .thenAnswer(call -> domain("Trading.v1", parent.get()));
+    when(domains.getDomain("lake", "Trading_v1"))
+        .thenAnswer(call -> domain("Trading_v1", parent.get()));
     when(domains.getDomain("lake", "Finance")).thenReturn(domain("Finance", null));
     when(domains.getDomain("lake", "Markets")).thenReturn(domain("Markets", null));
     when(authorizer.isOwner(any(), anyString(), any(), any()))
@@ -85,28 +85,28 @@ class TestDomainParentAuthorization {
       environment.when(GravitinoEnv::getInstance).thenReturn(env);
       principals.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
       owners.add("Finance");
-      assertTrue(authorizer.hasSetOwnerPermission("lake", "domain", "Trading.v1", context()));
+      assertTrue(authorizer.hasSetOwnerPermission("lake", "domain", "Trading_v1", context()));
       assertTrue(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
       parent.set("Markets");
-      assertFalse(authorizer.hasSetOwnerPermission("lake", "domain", "Trading.v1", context()));
+      assertFalse(authorizer.hasSetOwnerPermission("lake", "domain", "Trading_v1", context()));
       assertFalse(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
       owners.clear();
       allows.add("Markets");
       assertTrue(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
-      denies.add("Trading.v1");
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
+      denies.add("Trading_v1");
       assertFalse(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
       owners.add("Markets");
       assertTrue(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
       owners.clear();
       denies.clear();
       parent.set(null);
       assertFalse(
-          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading.v1", context()));
+          authorizer.hasMetadataPrivilegePermission("lake", "domain", "Trading_v1", context()));
     }
   }
 
@@ -115,8 +115,8 @@ class TestDomainParentAuthorization {
     GravitinoEnv env = mock(GravitinoEnv.class);
     DomainDispatcher domains = mock(DomainDispatcher.class);
     when(env.internalDomainDispatcher()).thenReturn(domains);
-    AtomicReference<DomainEntity> current = new AtomicReference<>(domain("Trading.v1", "Finance"));
-    when(domains.getDomain("lake", "Trading.v1")).thenAnswer(call -> current.get());
+    AtomicReference<DomainEntity> current = new AtomicReference<>(domain("Trading_v1", "Finance"));
+    when(domains.getDomain("lake", "Trading_v1")).thenAnswer(call -> current.get());
     JcasbinAuthorizer authorizer = mock(JcasbinAuthorizer.class);
     doCallRealMethod().when(authorizer).canAccessDomain(any(), anyString(), any(), any());
     when(authorizer.authorize(any(), anyString(), any(), any(), any()))
@@ -132,7 +132,7 @@ class TestDomainParentAuthorization {
               NameIdentifierUtil.splitNameIdentifier(
                   "lake",
                   Entity.EntityType.DOMAIN,
-                  NameIdentifierUtil.ofDomain("lake", "Trading.v1")),
+                  NameIdentifierUtil.ofDomain("lake", "Trading_v1")),
               context(),
               principal,
               Optional.of("DOMAIN")));
@@ -142,7 +142,7 @@ class TestDomainParentAuthorization {
               NameIdentifierUtil.splitNameIdentifier(
                   "lake",
                   Entity.EntityType.DOMAIN,
-                  NameIdentifierUtil.ofDomain("lake", "Trading.v1")),
+                  NameIdentifierUtil.ofDomain("lake", "Trading_v1")),
               context(),
               principal,
               Optional.of("DOMAIN")));

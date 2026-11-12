@@ -74,7 +74,7 @@ public class TestDomainManagerWithMockStore {
 
   private EntityStore entityStore;
   private SupportsDomainOperations domainOperations;
-  private DomainManager domainManager;
+  private DomainDispatcher domainManager;
 
   @BeforeEach
   public void setUp() throws IOException {
@@ -105,7 +105,7 @@ public class TestDomainManagerWithMockStore {
 
     IdGenerator idGenerator = Mockito.mock(IdGenerator.class);
     Mockito.when(idGenerator.nextId()).thenReturn(100L);
-    domainManager = new DomainManager(idGenerator, entityStore);
+    domainManager = new DomainNormalizeDispatcher(new DomainManager(idGenerator, entityStore));
   }
 
   /** Verifies scoped caller checks run on locked state without changing the original dispatcher. */
@@ -264,8 +264,7 @@ public class TestDomainManagerWithMockStore {
     Assertions.assertEquals("Finance", domainCaptor.getValue().parent().get());
     assertIsNewDomainCheck(checkCaptor.getValue());
 
-    // The sub-domain is returned with the parent's stored name, which the check reads under the
-    // parent's lock, even when the request names it differently.
+    // The sub-domain uses the parent name read under the parent's lock.
     Mockito.doAnswer(
             invocation -> {
               DomainEntity newDomain = invocation.getArgument(0);
@@ -276,8 +275,13 @@ public class TestDomainManagerWithMockStore {
             })
         .when(domainOperations)
         .insertDomainWithBackingTag(any(), any(), any());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            domainManager.createSubdomain(
+                METALAKE, "Finance ", "Desk", null, null, BACKING_TAG, false));
     DomainEntity desk =
-        domainManager.createSubdomain(METALAKE, "Finance ", "Desk", null, null, BACKING_TAG, false);
+        domainManager.createSubdomain(METALAKE, "Finance", "Desk", null, null, BACKING_TAG, false);
     Assertions.assertEquals("Finance", desk.parent().get());
     Assertions.assertEquals(NameIdentifierUtil.ofDomain(METALAKE, "Desk"), desk.nameIdentifier());
 

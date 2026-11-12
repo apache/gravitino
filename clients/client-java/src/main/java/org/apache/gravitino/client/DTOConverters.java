@@ -441,7 +441,6 @@ class DTOConverters {
     Preconditions.checkArgument(change != null, "domain change must not be null");
     if (change instanceof DomainChange.RenameDomain) {
       String newName = ((DomainChange.RenameDomain) change).getNewName();
-      GenericDomain.validateName(newName);
       return new DomainUpdateRequest.RenameDomainRequest(newName);
 
     } else if (change instanceof DomainChange.UpdateDomainComment) {

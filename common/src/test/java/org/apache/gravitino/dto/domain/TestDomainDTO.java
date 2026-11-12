@@ -45,12 +45,12 @@ public class TestDomainDTO {
           + "\"status\":\"published\",\"parent\":\"Parent\",\"backingTag\":{\"name\":\"department\",\"value\":\"finance\"},"
           + "\"audit\":{\"creator\":\"user\",\"createTime\":\"2026-10-01T00:00:00Z\",\"lastModifier\":null,\"lastModifiedTime\":null},"
           + "\"relations\":[{\"relation\":\"direct\"},{\"relation\":\"inherited\",\"source\":{\"type\":\"schema\",\"fullName\":\"cat.schema\"}},"
-          + "{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance.US\"}}]}";
+          + "{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance_US\"}}]}";
 
   private static final String MEMBER_JSON =
       "{\"object\":{\"fullName\":\"cat.schema.table\",\"type\":\"table\"},"
           + "\"relations\":[{\"relation\":\"direct\"},{\"relation\":\"inherited\",\"source\":{\"type\":\"catalog\",\"fullName\":\"cat\"}},"
-          + "{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance.US\"}}]}";
+          + "{\"relation\":\"via_subdomain\",\"source\":{\"type\":\"domain\",\"fullName\":\"Finance_US\"}}]}";
 
   private static final AuditDTO AUDIT =
       AuditDTO.builder()
@@ -60,7 +60,7 @@ public class TestDomainDTO {
 
   @Test
   public void testDomainOptionalFieldsAndRelations() throws IOException {
-    DomainRelation[] relations = {DomainRelation.direct(), DomainRelation.viaSubdomain("Tax/US")};
+    DomainRelation[] relations = {DomainRelation.direct(), DomainRelation.viaSubdomain("Tax_US")};
     Map<String, String> properties = new HashMap<>();
     properties.put("key", "value");
     DomainDTO dto =
@@ -83,7 +83,7 @@ public class TestDomainDTO {
     Assertions.assertEquals("value", result.getProperties().get("key"));
     Assertions.assertEquals(Domain.Status.PUBLISHED, result.getStatus());
     Assertions.assertEquals(DomainRelation.Type.DIRECT, result.getRelations()[0].getRelation());
-    Assertions.assertEquals("Tax/US", result.getRelations()[1].getSource().fullName());
+    Assertions.assertEquals("Tax_US", result.getRelations()[1].getSource().fullName());
     Assertions.assertEquals(
         MetadataObject.Type.DOMAIN, result.getRelations()[1].getSource().type());
   }
@@ -151,8 +151,8 @@ public class TestDomainDTO {
   }
 
   @Test
-  public void testDottedSubdomainRelation() throws IOException {
-    DomainRelation relation = DomainRelation.viaSubdomain("Finance.US");
+  public void testSubdomainRelationRoundTrip() throws IOException {
+    DomainRelation relation = DomainRelation.viaSubdomain("Finance_US");
     DomainRelationDTO decoded =
         JsonUtils.objectMapper()
             .readValue(
@@ -161,7 +161,7 @@ public class TestDomainDTO {
     Assertions.assertEquals(DomainRelation.Type.VIA_SUBDOMAIN, decoded.getRelation());
     Assertions.assertEquals(MetadataObject.Type.DOMAIN, decoded.getSource().type());
     Assertions.assertNull(decoded.getSource().parent());
-    Assertions.assertEquals("Finance.US", decoded.getSource().name());
+    Assertions.assertEquals("Finance_US", decoded.getSource().name());
     Assertions.assertEquals(relation, DomainRelation.viaSubdomain(decoded.getSource().name()));
   }
 
@@ -180,7 +180,7 @@ public class TestDomainDTO {
               DomainRelation.direct(),
               DomainRelation.inherited(
                   MetadataObjects.parse("cat.schema", MetadataObject.Type.SCHEMA)),
-              DomainRelation.viaSubdomain("Finance.US")
+              DomainRelation.viaSubdomain("Finance_US")
             });
     assertJsonEquals(DOMAIN_JSON, dto);
   }
@@ -200,7 +200,7 @@ public class TestDomainDTO {
     Assertions.assertEquals(DomainRelation.Type.DIRECT, dto.getRelations()[0].getRelation());
     Assertions.assertNull(dto.getRelations()[0].getSource());
     Assertions.assertEquals("cat.schema", dto.getRelations()[1].getSource().fullName());
-    Assertions.assertEquals("Finance.US", dto.getRelations()[2].getSource().name());
+    Assertions.assertEquals("Finance_US", dto.getRelations()[2].getSource().name());
     Assertions.assertNull(dto.getRelations()[2].getSource().parent());
     assertJsonEquals(DOMAIN_JSON, dto);
   }
@@ -216,7 +216,7 @@ public class TestDomainDTO {
     Assertions.assertEquals("cat", member.getRelations()[1].getSource().name());
     Assertions.assertEquals(
         DomainRelation.Type.VIA_SUBDOMAIN, member.getRelations()[2].getRelation());
-    Assertions.assertEquals("Finance.US", member.getRelations()[2].getSource().name());
+    Assertions.assertEquals("Finance_US", member.getRelations()[2].getSource().name());
     assertJsonEquals(MEMBER_JSON, member);
   }
 

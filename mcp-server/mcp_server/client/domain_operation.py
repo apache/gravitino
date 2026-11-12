@@ -46,7 +46,8 @@ class DomainOperation(ABC):
         """List recorded leaf members and all applicable relations.
 
         types filters leaf object types (for example TABLE and TOPIC).
-        domains filters source domain names; name_contains is a literal substring.
+        domains filters source domain names. name_contains matches a case-insensitive
+        substring of the full metadata object name. Blank values omit this filter.
         """
 
     @abstractmethod

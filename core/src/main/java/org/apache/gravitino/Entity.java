@@ -21,6 +21,7 @@ package org.apache.gravitino;
 import java.io.Serializable;
 import java.util.Map;
 import lombok.Getter;
+import org.apache.gravitino.utils.NameValidationUtils;
 
 /** This interface defines an entity within the Apache Gravitino framework. */
 public interface Entity extends Serializable {
@@ -33,7 +34,7 @@ public interface Entity extends Serializable {
   String SYSTEM_METALAKE_RESERVED_NAME = "system";
 
   /** The system reserved catalog name. */
-  String SYSTEM_CATALOG_RESERVED_NAME = "system";
+  String SYSTEM_CATALOG_RESERVED_NAME = NameValidationUtils.SYSTEM_CATALOG_RESERVED_NAME;
 
   /** The authorization catalog name in the system metalake. */
   String AUTHORIZATION_CATALOG_NAME = "authorization";

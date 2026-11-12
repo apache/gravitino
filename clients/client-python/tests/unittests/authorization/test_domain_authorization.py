@@ -61,7 +61,7 @@ class TestDomainAuthorization(unittest.TestCase):
                     self.assertEqual(dto, PrivilegeDTO.from_json(dto.to_json()))
                     self.assertTrue(dto.can_bind_to(MetadataObject.Type.DOMAIN))
                     scope = SecurableObjects.parse(
-                        "Finance/US. East,?&+%", MetadataObject.Type.DOMAIN, [privilege]
+                        "Finance_US_East", MetadataObject.Type.DOMAIN, [privilege]
                     )
                     scope_dto = DTOConverters.to_securable_object_dto(scope)
                     restored = SecurableObjectDTO.from_json(scope_dto.to_json())
