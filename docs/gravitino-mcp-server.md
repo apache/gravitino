@@ -193,6 +193,51 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
 
+### Domains (read-only)
+
+Use `--include-tool-tags domain` to expose the five Domain tools.
+All are annotated as read-only and idempotent and issue only GET requests.
+
+| Tool | Arguments | Result |
+|------|-----------|--------|
+| `list_of_domains` | `details=true` | Domain snapshots, or names when false |
+| `get_domain_by_name` | `domain_name` | A complete domain snapshot |
+| `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
+| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains` | Recorded leaf members with all applicable relations |
+| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
+
+Results follow the existing MCP JSON-string convention; empty lists return `[]`.
+Snapshots retain the server's backing tag, status, parent, properties, audit and
+relation information. Relations can be `direct`, `inherited` (with the catalog or
+schema source), or `via_subdomain` (with the source domain). Multiple relations
+for the same member or domain remain intact. Names-only results omit relations.
+
+For example, call `list_domain_members` with:
+
+```json
+{
+  "domain_name": "sales",
+  "types": ["TABLE", "TOPIC"],
+  "domains": ["regional,sales", "online"],
+  "name_contains": "orders"
+}
+```
+
+`types` is a list of leaf object types; `domains` filters source domain names
+using repeated query parameters, preserving commas inside names.
+`name_contains` is passed as the REST `nameContains` substring filter.
+Omitted or empty type/domain lists leave those filters unset.
+Leaf lookups support tables, filesets, topics, models, views and semantic models;
+use the REST object type spelling (for example `table` or `semantic_model`).
+Paths and filter values are URL encoded. Requests use the caller's existing
+Gravitino authentication, and server authorization, validation and not-found
+errors propagate through the standard MCP error handling. Results reflect the
+caller's visibility; no client-side hierarchy expansion or relation inference
+is performed.
+
+No Domain creation, modification, deletion, publishing, parent changes or
+binding changes are exposed. Existing tools in other groups retain their behavior.
+
 ## Configuration
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
