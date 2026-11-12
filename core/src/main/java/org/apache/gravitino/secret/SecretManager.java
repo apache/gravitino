@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
@@ -323,6 +324,138 @@ public class SecretManager implements Closeable {
     deleteSecrets(urns);
   }
 
+  /**
+   * Makes the versions an alter wrote current and deletes the versions it replaced.
+   *
+   * <p>Call only after the entity alter committed. Best effort: a failure is logged and does not
+   * fail the committed alter. If a written version cannot be made current, the version that was
+   * current before it is not deleted.
+   *
+   * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
+   */
+  public void commitSecrets(PreparedSecrets prepared) {
+    Preconditions.checkArgument(prepared != null, "prepared must not be null");
+    for (PreparedSecrets.WrittenVersion written : prepared.written()) {
+      // Without a previous version the write already made the new version current.
+      if (written.previousId() == null) {
+        continue;
+      }
+      SecretUrn urn = written.version().urn();
+      try {
+        SecretProvider provider = registry.getProvider(urn.providerName());
+        provider.promoteSecretVersion(urn, written.version().id());
+        provider.deleteSecretVersion(urn, written.previousId());
+      } catch (RuntimeException e) {
+        LOG.warn(
+            "Failed to make version {} of secret {} current after the alter committed",
+            written.version().id(),
+            urn,
+            e);
+      }
+    }
+    deleteSecretVersions(prepared.released());
+  }
+
+  /**
+   * Best-effort delete of the versions an alter wrote, after the entity alter failed.
+   *
+   * <p>The versions that were current before the alter are kept, so the entity reads the values it
+   * still references.
+   *
+   * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
+   */
+  public void rollbackSecrets(PreparedSecrets prepared) {
+    Preconditions.checkArgument(prepared != null, "prepared must not be null");
+    List<PreparedSecrets.Version> versions = new ArrayList<>(prepared.written().size());
+    for (PreparedSecrets.WrittenVersion written : prepared.written()) {
+      versions.add(written.version());
+    }
+    deleteSecretVersions(versions);
+  }
+
+  /**
+   * Writes the plaintexts of an alter batch as new versions and finds the versions it releases.
+   *
+   * <p>Works from the properties before and after the whole batch, so a batch that changes one key
+   * several times is treated by its net effect. A URN that has a current version keeps it readable
+   * until {@link #commitSecrets}. If a write fails, the versions already written are deleted.
+   *
+   * @param startProperties entity properties before the alter (may be null)
+   * @param finalProperties entity properties after the alter
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param plaintexts property key → plaintext to write; each key holds a write-through URN of this
+   *     entity in {@code finalProperties}
+   * @return the written and released versions
+   */
+  PreparedSecrets prepareSecretVersions(
+      @Nullable Map<String, String> startProperties,
+      Map<String, String> finalProperties,
+      String entityType,
+      long entityId,
+      Map<String, String> plaintexts) {
+    List<PreparedSecrets.WrittenVersion> written = new ArrayList<>(plaintexts.size());
+    try {
+      for (Map.Entry<String, String> entry : plaintexts.entrySet()) {
+        SecretUrn urn = SecretUrn.parse(finalProperties.get(entry.getKey()));
+        SecretProvider provider = registry.getProvider(urn.providerName());
+        String previousId = provider.currentSecretVersion(urn);
+        String id = provider.writeSecretVersion(urn, entry.getValue());
+        written.add(
+            new PreparedSecrets.WrittenVersion(new PreparedSecrets.Version(urn, id), previousId));
+      }
+    } catch (RuntimeException e) {
+      List<PreparedSecrets.Version> versions = new ArrayList<>(written.size());
+      written.forEach(w -> versions.add(w.version()));
+      deleteSecretVersions(versions);
+      throw e;
+    }
+    return new PreparedSecrets(
+        written, releasedVersions(startProperties, finalProperties, entityType, entityId));
+  }
+
+  /** Current versions of this entity's write-through URNs that {@code finalProperties} dropped. */
+  private List<PreparedSecrets.Version> releasedVersions(
+      @Nullable Map<String, String> startProperties,
+      Map<String, String> finalProperties,
+      String entityType,
+      long entityId) {
+    if (startProperties == null || startProperties.isEmpty()) {
+      return List.of();
+    }
+    List<PreparedSecrets.Version> released = new ArrayList<>();
+    for (Map.Entry<String, String> entry : startProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (Objects.equals(value, finalProperties.get(key))
+          || !SecretPropertyUtils.isWriteThroughForEntity(key, value, entityType, entityId)) {
+        continue;
+      }
+      SecretUrn urn = SecretUrn.parse(value);
+      try {
+        String id = registry.getProvider(urn.providerName()).currentSecretVersion(urn);
+        if (id != null) {
+          released.add(new PreparedSecrets.Version(urn, id));
+        }
+      } catch (RuntimeException e) {
+        // Releasing only frees material, so a failed lookup must not block the alter.
+        LOG.warn("Failed to look up the current version of released secret {}", urn, e);
+      }
+    }
+    return released;
+  }
+
+  private void deleteSecretVersions(List<PreparedSecrets.Version> versions) {
+    for (PreparedSecrets.Version version : versions) {
+      SecretUrn urn = version.urn();
+      try {
+        registry.getProvider(urn.providerName()).deleteSecretVersion(urn, version.id());
+      } catch (Exception e) {
+        LOG.warn("Failed to delete version {} of secret {}", version.id(), urn, e);
+      }
+    }
+  }
+
   private void deleteSecrets(List<SecretUrn> secretUrns) {
     if (secretUrns.isEmpty()) {
       return;
@@ -368,15 +501,17 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Writes a write-through secret for alter setSecretBinding; updates properties with the URN.
-   * Appends written materials to {@code written} for caller rollback.
+   * Applies alter setSecretBinding to {@code properties} and records the plaintext to write.
+   *
+   * <p>Nothing is written to the provider here: {@link #prepareSecretVersions} writes the
+   * plaintexts recorded for the whole batch.
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param property property key
    * @param binding write-through secret binding
-   * @param written list that receives newly written materials for rollback
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
    * @return the URN string stored in properties
    */
   public String alterSetSecretBinding(
@@ -385,63 +520,53 @@ public class SecretManager implements Closeable {
       long entityId,
       String property,
       SecretBinding binding,
-      List<SecretMaterial> written) {
+      Map<String, String> plaintexts) {
     Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
     Preconditions.checkArgument(binding != null, "binding must not be null");
     SecretPropertyUtils.validateAlterSecretBindingPlaintext(binding.plaintext());
     Map<String, SecretBinding> bindings = ImmutableMap.of(property, binding);
-    List<SecretUrn> urns = buildSecretBindingUrns(entityType, entityId, bindings);
-    String newUrn = urns.get(0).toString();
-    String current = properties.get(property);
-    if (current != null
-        && !current.equals(newUrn)
-        && SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
-      deleteSecretsFromProperties(Map.of(property, current));
-    }
-    List<SecretMaterial> materials = List.of(new SecretMaterial(urns.get(0), binding.plaintext()));
-    writeSecrets(materials);
-    written.addAll(materials);
-    SecretPropertyUtils.putSecretUrns(properties, urns);
+    SecretPropertyUtils.putSecretUrns(
+        properties, buildSecretBindingUrns(entityType, entityId, bindings));
+    plaintexts.put(property, binding.plaintext());
     return properties.get(property);
   }
 
   /**
-   * Puts external-ref URN into properties; deletes prior write-through if owned by this entity.
+   * Applies alter setSecretReference to {@code properties}.
    *
    * @param properties mutable properties map updated as changes are applied
-   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
-   * @param entityId stable numeric entity id
    * @param property property key
    * @param reference external secret reference
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
    * @return the URN string stored in properties
    */
   public String alterSetSecretReference(
       Map<String, String> properties,
-      String entityType,
-      long entityId,
       String property,
-      SecretReference reference) {
+      SecretReference reference,
+      Map<String, String> plaintexts) {
     Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
     Preconditions.checkArgument(reference != null, "reference must not be null");
-    String current = properties.get(property);
-    if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
-      deleteSecretsFromProperties(Map.of(property, current));
-    }
     Map<String, SecretReference> refs = ImmutableMap.of(property, reference);
     List<SecretUrn> urns = buildSecretReferenceUrns(refs);
     SecretPropertyUtils.putSecretUrns(properties, urns);
+    plaintexts.remove(property);
     return properties.get(property);
   }
 
   /**
-   * Handles alter setProperty. If current value is a secret URN, rewrite via provider/writeSecrets.
-   * Otherwise puts plaintext into properties.
+   * Handles alter setProperty.
+   *
+   * <p>If the current value is a write-through URN owned by this entity, records {@code value} as
+   * the plaintext to write for it, like {@link #alterSetSecretBinding}. If it is another secret
+   * URN, rewrites that secret through its provider. Otherwise puts plaintext into properties.
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param property property key
    * @param value new property value (plaintext when rewriting a secret, or plain value)
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
    * @return value to use in SetProperty change (URN or plaintext)
    */
   public String alterSetProperty(
@@ -449,19 +574,16 @@ public class SecretManager implements Closeable {
       String entityType,
       long entityId,
       String property,
-      String value) {
+      String value,
+      Map<String, String> plaintexts) {
     SecretPropertyUtils.validateAlterSetPropertyValue(property, value);
     String current = properties.get(property);
     if (SecretPropertyUtils.isSecretProperty(property, current)) {
       SecretUrn currentUrn = SecretUrn.parse(current);
       SecretBinding binding = new SecretBinding(currentUrn.providerName(), value);
       if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
-        Map<String, SecretBinding> bindings = ImmutableMap.of(property, binding);
-        List<SecretUrn> urns = buildSecretBindingUrns(entityType, entityId, bindings);
-        List<SecretMaterial> materials = List.of(new SecretMaterial(urns.get(0), value));
-        writeSecrets(materials);
-        SecretPropertyUtils.putSecretUrns(properties, urns);
-        return properties.get(property);
+        return alterSetSecretBinding(
+            properties, entityType, entityId, property, binding, plaintexts);
       }
       List<String> segments = currentUrn.identifierSegments();
       Preconditions.checkArgument(
@@ -484,21 +606,17 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Deletes write-through secret if owned by this entity; removes key from properties.
+   * Applies alter removeProperty to {@code properties}.
    *
    * @param properties mutable properties map updated as changes are applied
-   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
-   * @param entityId stable numeric entity id
    * @param property property key to remove
+   * @param plaintexts property key → plaintext to write, updated as changes are applied
    */
   public void alterRemoveProperty(
-      Map<String, String> properties, String entityType, long entityId, String property) {
+      Map<String, String> properties, String property, Map<String, String> plaintexts) {
     Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
-    String current = properties.get(property);
-    if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
-      deleteSecretsFromProperties(Map.of(property, current));
-    }
     properties.remove(property);
+    plaintexts.remove(property);
   }
 
   /**

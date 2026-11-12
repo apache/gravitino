@@ -44,6 +44,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.secret.PreparedSecrets;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
@@ -322,7 +323,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+      Pair<FilesetChange[], PreparedSecrets> secretResult =
           SecretAlterChanges.prepareFilesetChanges(
               secretManager, currentProperties, filesetId, changes);
       writtenSecretMaterials.set(secretResult.getRight());
@@ -335,6 +336,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
               NoSuchFilesetException.class,
               IllegalArgumentException.class);
       alterCommitted = true;
+      secretManager.commitSecrets(writtenSecretMaterials.get());
       return altered;
     } finally {
       if (!alterCommitted) {

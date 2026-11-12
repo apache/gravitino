@@ -119,9 +119,9 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.secret.PreparedSecrets;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.utils.ExceptionMessages;
 import org.apache.gravitino.utils.FilesetUtil;
@@ -758,13 +758,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                     existing.properties() == null
                         ? new HashMap<>()
                         : new HashMap<>(existing.properties());
-                Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+                Pair<FilesetChange[], PreparedSecrets> secretResult =
                     SecretAlterChanges.prepareFilesetChanges(
                         secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
                 return updateFilesetEntity(ident, existing, secretResult.getLeft());
               });
       alterCommitted = true;
+      secretManager.commitSecrets(writtenSecretMaterials.get());
       return FilesetImpl.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())

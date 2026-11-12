@@ -115,6 +115,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.PreparedSecrets;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
@@ -1347,7 +1348,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         },
                         IllegalArgumentException.class);
 
-                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                Pair<CatalogChange[], PreparedSecrets> secretResult =
                     SecretAlterChanges.prepareCatalogChanges(
                         secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
@@ -1358,6 +1359,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                     .build();
               });
       alterCommitted = true;
+      secretManager.commitSecrets(writtenSecretMaterials.get());
       return updatedCatalog;
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);

@@ -616,6 +616,40 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  public void testRemovedSecretIsKeptWhenSchemaEntityUpdateFails() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_remove");
+      d.createSchema(
+          ident,
+          "comment",
+          ImmutableMap.of("k1", "v1"),
+          Map.of("k2", new SecretBinding("memory", "old")),
+          Map.of());
+      SecretUrn urn =
+          SecretUrn.parse(
+              entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+
+      // The catalog applies the remove, but the schema entity update fails and is only logged,
+      // so the entity still references the secret.
+      doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
+      try {
+        d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+      } finally {
+        reset(entityStore);
+      }
+
+      Assertions.assertEquals(
+          urn.toString(),
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+      Assertions.assertEquals("old", secrets.readSecret(urn));
+      Assertions.assertTrue(d.dropSchema(ident, false));
+    }
+  }
+
+  @Test
   public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);
