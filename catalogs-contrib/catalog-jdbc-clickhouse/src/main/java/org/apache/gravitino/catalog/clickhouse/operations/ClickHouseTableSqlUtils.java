@@ -62,6 +62,8 @@ final class ClickHouseTableSqlUtils {
       Pattern.compile("toStartOfQuarter[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern TO_START_OF_YEAR_PATTERN =
       Pattern.compile("toStartOfYear[(](.+)[)]", Pattern.CASE_INSENSITIVE);
+  private static final Pattern TYPE_CONVERSION_PATTERN =
+      Pattern.compile("(toDate|toDateTime)[(](.+)[)]", Pattern.CASE_INSENSITIVE);
   private static final Pattern FUNCTION_WRAPPER_PATTERN =
       Pattern.compile("^\\s*([A-Za-z0-9_]+)\\((.*)\\)\\s*$");
   private static final Pattern PROJECTION_SETTING_NAME_PATTERN =
@@ -353,6 +355,11 @@ final class ClickHouseTableSqlUtils {
   }
 
   static Transform[] parsePartitioning(@Nullable String partitionKey) {
+    return parsePartitioning(partitionKey, Collections.emptyMap());
+  }
+
+  static Transform[] parsePartitioning(
+      @Nullable String partitionKey, Map<String, String> columnTypeNames) {
     if (StringUtils.isBlank(partitionKey)) {
       return Transforms.EMPTY_TRANSFORM;
     }
@@ -369,7 +376,7 @@ final class ClickHouseTableSqlUtils {
       if (StringUtils.isBlank(expression)) {
         continue;
       }
-      Transform transform = parsePartitionExpression(expression);
+      Transform transform = parsePartitionExpression(expression, columnTypeNames);
       if (transform == null) {
         // A single unsupported native expression means the whole partition key cannot be
         // represented as structured transforms.
@@ -501,30 +508,32 @@ final class ClickHouseTableSqlUtils {
   }
 
   @Nullable
-  private static Transform parsePartitionExpression(String expression) {
+  private static Transform parsePartitionExpression(
+      String expression, Map<String, String> columnTypeNames) {
     String trimmedExpression = StringUtils.trim(expression);
 
     Matcher toYearMatcher = TO_YEAR_PATTERN.matcher(trimmedExpression);
     if (toYearMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toYearMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toYearMatcher.group(1), columnTypeNames);
       return identifier == null ? null : Transforms.year(identifier);
     }
 
     Matcher toYYYYMMMatcher = TO_MONTH_PATTERN.matcher(trimmedExpression);
     if (toYYYYMMMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toYYYYMMMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toYYYYMMMatcher.group(1), columnTypeNames);
       return identifier == null ? null : Transforms.month(identifier);
     }
 
     Matcher toDateMatcher = TO_DATE_PATTERN.matcher(trimmedExpression);
     if (toDateMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toDateMatcher.group(1));
+      String identifier = resolvePartitionIdentifier(toDateMatcher.group(1), columnTypeNames);
       return identifier == null ? null : Transforms.day(identifier);
     }
 
     Matcher toStartOfWeekMatcher = TO_START_OF_WEEK_PATTERN.matcher(trimmedExpression);
     if (toStartOfWeekMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfWeekMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfWeekMatcher.group(1), columnTypeNames);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfWeek", new Expression[] {NamedReference.field(identifier)});
@@ -532,7 +541,8 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfMonthMatcher = TO_START_OF_MONTH_PATTERN.matcher(trimmedExpression);
     if (toStartOfMonthMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfMonthMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfMonthMatcher.group(1), columnTypeNames);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfMonth", new Expression[] {NamedReference.field(identifier)});
@@ -540,7 +550,8 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfQuarterMatcher = TO_START_OF_QUARTER_PATTERN.matcher(trimmedExpression);
     if (toStartOfQuarterMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfQuarterMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfQuarterMatcher.group(1), columnTypeNames);
       return identifier == null
           ? null
           : Transforms.apply(
@@ -549,24 +560,25 @@ final class ClickHouseTableSqlUtils {
 
     Matcher toStartOfYearMatcher = TO_START_OF_YEAR_PATTERN.matcher(trimmedExpression);
     if (toStartOfYearMatcher.matches()) {
-      String identifier = extractPartitionIdentifier(toStartOfYearMatcher.group(1));
+      String identifier =
+          resolvePartitionIdentifier(toStartOfYearMatcher.group(1), columnTypeNames);
       return identifier == null
           ? null
           : Transforms.apply("toStartOfYear", new Expression[] {NamedReference.field(identifier)});
     }
 
-    String identifier = extractPartitionIdentifier(trimmedExpression);
+    String identifier = extractSimpleIdentifier(trimmedExpression);
     return identifier == null ? null : Transforms.identity(identifier);
   }
 
   /**
-   * Extracts a partition column name from an expression. A backtick-quoted identifier (which may
+   * Extracts a simple column name from an expression. A backtick-quoted identifier (which may
    * contain special characters such as {@code -}) is always treated as a column name. Otherwise the
    * expression must match the strict column-name pattern. Returns {@code null} for arbitrary
    * expressions such as {@code f(x)} that cannot be represented as a single column reference.
    */
   @Nullable
-  private static String extractPartitionIdentifier(String expression) {
+  private static String extractSimpleIdentifier(String expression) {
     String trimmed = StringUtils.trim(expression);
     if (StringUtils.startsWith(trimmed, "`")
         && StringUtils.endsWith(trimmed, "`")
@@ -575,6 +587,55 @@ final class ClickHouseTableSqlUtils {
       return StringUtils.isNotBlank(inner) ? inner : null;
     }
     return isStrictIdentifier(trimmed) ? trimmed : null;
+  }
+
+  /**
+   * Resolves the partition column for a granularity function. A simple column name is returned
+   * directly. Otherwise a pure type conversion (toDate/toDateTime) over a Date or DateTime column
+   * is unwrapped, which is semantically lossless for the partition granularity.
+   */
+  @Nullable
+  private static String resolvePartitionIdentifier(
+      String expression, Map<String, String> columnTypeNames) {
+    String identifier = extractSimpleIdentifier(expression);
+    if (identifier != null) {
+      return identifier;
+    }
+    return unwrapPureConversion(expression, columnTypeNames);
+  }
+
+  /**
+   * Unwraps a single pure type conversion (toDate/toDateTime) only when the conversion is lossless
+   * for the partition granularity. Only same-type conversions are unwrapped: toDate is unwrapped
+   * only for a Date column (identity), and toDateTime only for a DateTime column (identity). toDate
+   * over DateTime is not unwrapped because the effective timezone can shift the epoch boundary
+   * (e.g. Unix timestamp 0 is 1970 in UTC but 1969 in America/Los_Angeles). Other combinations are
+   * narrowing conversions that can overflow, so they are not unwrapped. Arithmetic, casts, and
+   * nested functions are not unwrapped either.
+   */
+  @Nullable
+  private static String unwrapPureConversion(
+      String expression, Map<String, String> columnTypeNames) {
+    String trimmed = StringUtils.trim(expression);
+    Matcher matcher = TYPE_CONVERSION_PATTERN.matcher(trimmed);
+    if (!matcher.matches()) {
+      return null;
+    }
+    String inner = extractSimpleIdentifier(matcher.group(2));
+    if (inner == null) {
+      return null;
+    }
+    String typeName = columnTypeNames.get(inner);
+    boolean lossless;
+    if ("toDate".equalsIgnoreCase(matcher.group(1))) {
+      // toDate is lossless only for Date (identity).
+      lossless = "Date".equalsIgnoreCase(typeName);
+    } else {
+      // toDateTime is lossless only for DateTime (identity); Date -> DateTime is narrowing because
+      // the Date range (up to 2149) exceeds the DateTime range (up to 2106).
+      lossless = "DateTime".equalsIgnoreCase(typeName);
+    }
+    return lossless ? inner : null;
   }
 
   private static String normalizePartitionKey(String partitionKey) {
