@@ -62,6 +62,7 @@ import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
@@ -142,6 +143,8 @@ public class GravitinoEnv {
   private CatalogManager catalogManager;
 
   private MetalakeManager metalakeManager;
+
+  private DomainManager domainManager;
 
   private SchemaDispatcher schemaDispatcher;
   private SchemaDispatcher internalSchemaDispatcher;
@@ -719,7 +722,7 @@ public class GravitinoEnv {
 
   /**
    * Get the internal DomainDispatcher associated with the Gravitino environment. The internal
-   * dispatcher is the domain manager itself.
+   * dispatcher validates new domain names before delegating to the domain manager.
    *
    * @return The internal DomainDispatcher instance.
    */
@@ -961,7 +964,8 @@ public class GravitinoEnv {
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
-    this.internalDomainDispatcher = new DomainManager(idGenerator, entityStore);
+    this.domainManager = new DomainManager(idGenerator, entityStore);
+    this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 
     return new MetadataOperations(
         filesetOperationDispatcher,
@@ -1213,9 +1217,9 @@ public class GravitinoEnv {
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(internalPolicyDispatcher);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
 
-    // Keep events outside lifecycle hooks so hook failures are audited as well.
+    DomainHookDispatcher domainHookDispatcher = new DomainHookDispatcher(domainManager);
     this.domainDispatcher =
-        new DomainEventDispatcher(eventBus, new DomainHookDispatcher(internalDomainDispatcher));
+        new DomainEventDispatcher(eventBus, new DomainNormalizeDispatcher(domainHookDispatcher));
   }
 
   private static final class MetadataOperations {

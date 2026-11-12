@@ -64,6 +64,7 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
 import org.apache.gravitino.dto.requests.SchemaCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
@@ -101,6 +102,8 @@ import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
 import org.apache.gravitino.server.web.rest.DomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.server.web.rest.OwnerOperations;
+import org.apache.gravitino.server.web.rest.PermissionOperations;
 import org.apache.gravitino.server.web.rest.SchemaOperations;
 import org.apache.gravitino.server.web.rest.SecretsProviderOperations;
 import org.apache.gravitino.server.web.rest.SemanticModelOperations;
@@ -595,6 +598,39 @@ public class TestGravitinoInterceptionService {
     Assertions.assertFalse(
         errorResponse.getMessage().contains("Authorization failed due to system internal error"));
     verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testInvalidDomainNameRejectedBeforeOwnerAndGrantAuthorization() throws Throwable {
+    Method owner =
+        OwnerOperations.class.getMethod(
+            "getOwnerForObject", String.class, String.class, String.class);
+    Method grant =
+        PermissionOperations.class.getMethod(
+            "grantPrivilegeToRole",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            PrivilegeGrantRequest.class);
+    for (Method method : new Method[] {owner, grant}) {
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              method.equals(owner)
+                  ? new Object[] {"metalake", "domain", "Finance "}
+                  : new Object[] {"metalake", "role", "domain", "Finance ", null});
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      try (Response response = (Response) interceptor.invoke(invocation)) {
+        assertEquals(400, response.getStatus());
+        assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            ((ErrorResponse) response.getEntity()).getCode());
+      }
+      verify(invocation, never()).proceed();
+    }
   }
 
   @Test

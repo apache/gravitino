@@ -16,10 +16,6 @@
 # under the License.
 
 import os
-import threading
-from http.client import HTTPConnection
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlsplit
 import shutil
 import tempfile
 import uuid
@@ -180,8 +176,8 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         )
         return catalog, table, hidden, view, semantic, fileset, model
 
-    def test_lifecycle_special_names_and_snapshots(self):
-        name = "Finance/US. East,?&+%"
+    def test_lifecycle_and_snapshots(self):
+        name = "Finance_US_East"
         draft = self._domain(name)
         self.assertEqual([name], self.lake.list_domains())
         self.assertEqual(name, self.lake.list_domains_info()[0].name())
@@ -195,7 +191,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
 
         renamed = self.lake.alter_domain(
             name,
-            DomainChange.rename("Renamed/US. East,?&+%"),
+            DomainChange.rename("Renamed_US_East"),
             DomainChange.update_comment("new"),
             DomainChange.set_property("key", "value"),
         )
@@ -231,10 +227,10 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         self.assertFalse(self.lake.delete_domain(name))
 
     def test_hierarchy_and_backing_tag_errors(self):
-        parent = self._domain("Parent/with. spaces")
-        other = self._domain("Other/parent. name")
+        parent = self._domain("Parent_with_spaces")
+        other = self._domain("Other_parent_name")
         child = parent.create_subdomain(
-            "Tax,EU/child", None, None, TagValue("child tag"), True
+            "Tax_EU_child", None, None, TagValue("child tag"), True
         )
         self.assertEqual([child.name()], parent.list_subdomains())
         self.assertEqual(child.name(), parent.list_subdomains_info()[0].name())
@@ -283,13 +279,13 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         catalog, table, hidden, view, semantic, fileset, model = self._catalogs()
         self.lake.create_tag("department", None, {}, ["finance", "risk"])
         finance = self.lake.create_domain(
-            "Finance/US. East,?&+%", None, {}, TagValue("department", "finance"), False
+            "Finance_US_East", None, {}, TagValue("department", "finance"), False
         )
         risk = self.lake.create_domain(
-            "Risk,EU", None, {}, TagValue("department", "risk"), False
+            "Risk_EU", None, {}, TagValue("department", "risk"), False
         )
         child = finance.create_subdomain(
-            "Trading,US/with. spaces?&+%", None, {}, TagValue("trading"), True
+            "Trading_US_with_spaces", None, {}, TagValue("trading"), True
         )
 
         # The schema grants Finance membership; the table assignment takes precedence for Risk.
@@ -351,7 +347,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [
                 m.object().full_name()
                 for m in finance.list_members(
-                    DomainMemberFilter(domains=[child.name(), "unknown,scope"])
+                    DomainMemberFilter(domains=[child.name(), "unknown_scope"])
                 )
             ],
         )
@@ -381,17 +377,17 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [], finance.list_members(DomainMemberFilter(name_contains="/ ?&+%,"))
         )
         self.assertEqual(
-            [], finance.list_members(DomainMemberFilter(domains=["unknown,scope"]))
+            [], finance.list_members(DomainMemberFilter(domains=["unknown_scope"]))
         )
 
         # Hierarchy and domain-name changes must appear without retagging any object.
-        new_parent = self._domain("new parent")
+        new_parent = self._domain("new_parent")
         child.attach_to_parent(new_parent.name())
         self.assertNotIn(new_parent.name(), view.supports_domains().list_domains())
         self.assertIn(new_parent.name(), table.supports_domains().list_domains())
-        self.lake.alter_domain(child.name(), DomainChange.rename("renamed/child"))
-        self.assertIn("renamed/child", table.supports_domains().list_domains())
-        self.lake.delete_domain("renamed/child")
+        self.lake.alter_domain(child.name(), DomainChange.rename("renamed_child"))
+        self.assertIn("renamed_child", table.supports_domains().list_domains())
+        self.lake.delete_domain("renamed_child")
         self.assertNotIn(new_parent.name(), table.supports_domains().list_domains())
         self.assertEqual("trading", self.lake.get_tag("trading").name())
         finance.update_backing_tag(None)
@@ -400,9 +396,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
     def test_authorization_visibility_inheritance_denies_and_ownership(self):
         if not self.authorization:
             self.skipTest("Requires an authorization-enabled server")
-        parent = self._domain("Parent/auth. scope")
+        parent = self._domain("Parent_auth_scope")
         child = parent.create_subdomain(
-            "Child/auth. scope", None, {}, TagValue("child"), True
+            "Child_auth_scope", None, {}, TagValue("child"), True
         )
         reader = self._client("reader")
         manager = self._client("manager")
@@ -524,9 +520,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         if not self.authorization:
             self.skipTest("Requires an authorization-enabled server")
         catalog, table, _, _, _, _, _ = self._catalogs()
-        parent = self._domain("access parent")
+        parent = self._domain("access_parent")
         child = parent.create_subdomain(
-            "access child", None, {}, TagValue("child tag"), True
+            "access_child", None, {}, TagValue("child tag"), True
         )
         parent.publish()
         catalog.as_schemas().load_schema("schema").supports_tags().assign_tags(
@@ -629,7 +625,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         first = self._domain("first").publish()
         second = self._domain("second").publish()
         child = first.create_subdomain(
-            "moving/child. name", None, {}, TagValue("moving tag"), True
+            "moving_child_name", None, {}, TagValue("moving tag"), True
         ).publish()
         manager = self._client("moving_manager")
         owner = self._client("lake_owner")
@@ -675,132 +671,6 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             self.assertEqual(child.name(), owner.get_domain(child.name()).name())
         finally:
             owner.set_owner(root, "anonymous", Owner.Type.USER)
-
-    def test_encoded_names_through_preserving_proxy(self):
-        target = urlsplit(self.uri)
-
-        class ProxyHandler(BaseHTTPRequestHandler):
-            def _forward(self):
-                # Keep the raw path and repeated query parameters, including encoded slashes.
-                connection = HTTPConnection(target.hostname, target.port, timeout=30)
-                try:
-                    body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
-                    headers = {
-                        key: self.headers[key]
-                        for key in ("Authorization", "Content-Type", "Accept")
-                        if key in self.headers
-                    }
-                    connection.request(self.command, self.path, body, headers)
-                    response = connection.getresponse()
-                    data = response.read()
-
-                    self.send_response(response.status)
-                    self.send_header(
-                        "Content-Type",
-                        response.getheader("Content-Type", "application/json"),
-                    )
-                    self.send_header("Content-Length", str(len(data)))
-                    self.end_headers()
-                    self.wfile.write(data)
-                finally:
-                    connection.close()
-
-            do_GET = _forward
-            do_POST = _forward
-            do_PATCH = _forward
-            do_DELETE = _forward
-
-            def log_message(self, format, *args):  # pylint: disable=redefined-builtin
-                pass
-
-        proxy = ThreadingHTTPServer(("127.0.0.1", 0), ProxyHandler)
-        worker = threading.Thread(target=proxy.serve_forever, daemon=True)
-        worker.start()
-        client = None
-        try:
-            # This proxy is owned by the Python suite and uses its ordinary server fixture.
-            client = GravitinoClient(
-                f"http://127.0.0.1:{proxy.server_port}",
-                self.name,
-                auth_data_provider=SimpleAuthProvider(),
-            )
-            domain = client.create_domain(
-                "Proxy/US. East,?&+%", None, {}, TagValue("proxy tag"), True
-            )
-            self.assertEqual(
-                "Proxy/US. East,?&+%", client.get_domain(domain.name()).name()
-            )
-            self.assertEqual(Domain.Status.PUBLISHED, domain.publish().status())
-            catalog, table = self._relational_table()
-            other = catalog.as_table_catalog().create_table(
-                NameIdentifier.of("schema", "other"),
-                [Column.of("id", Types.LongType.get())],
-                "",
-                {},
-            )
-            first = domain.create_subdomain(
-                "scope,one", None, {}, TagValue("proxy-first"), True
-            )
-            second = domain.create_subdomain(
-                "scope/two?&+%", None, {}, TagValue("proxy-second"), True
-            )
-            table.supports_tags().assign_tags(["proxy-first"])
-            other.supports_tags().assign_tags(["proxy-second"])
-
-            # Nonempty results detect dropped scopes, comma splitting and query decoding errors.
-            selected = domain.list_members(
-                DomainMemberFilter(
-                    domains=[first.name(), "unknown,scope"], name_contains="ORDERS"
-                )
-            )
-            self.assertEqual(
-                ["ice.schema.orders"], [m.object().full_name() for m in selected]
-            )
-            self.assertEqual(
-                {
-                    (
-                        DomainRelation.Type.VIA_SUBDOMAIN,
-                        MetadataObject.Type.DOMAIN,
-                        first.name(),
-                    )
-                },
-                self._relation_keys(selected[0].relations()),
-            )
-            self.assertEqual(
-                2,
-                len(
-                    domain.list_members(
-                        DomainMemberFilter(domains=[first.name(), second.name()])
-                    )
-                ),
-            )
-            self.assertEqual(
-                ["ice.schema.other"],
-                [
-                    m.object().full_name()
-                    for m in domain.list_members(
-                        DomainMemberFilter(domains=[second.name()])
-                    )
-                ],
-            )
-            self.assertEqual(
-                [], domain.list_members(DomainMemberFilter(domains=["unknown,scope"]))
-            )
-            self.assertEqual(
-                [],
-                domain.list_members(
-                    DomainMemberFilter(domains=[first.name()], name_contains="other")
-                ),
-            )
-            self.assertTrue(client.delete_domain(first.name()))
-            self.assertTrue(client.delete_domain(second.name()))
-            self.assertTrue(client.delete_domain(domain.name()))
-        finally:
-            if client is not None:
-                client.close()
-            proxy.shutdown()
-            proxy.server_close()
-            worker.join(timeout=10)
 
     @staticmethod
     def _relation_keys(relations):
@@ -943,10 +813,10 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         catalog, table = self._relational_table()
         parent = self._domain("Parent")
         first = parent.create_subdomain(
-            "First/child.A", None, {}, TagValue("first-tag"), True
+            "First_child_A", None, {}, TagValue("first-tag"), True
         )
         second = parent.create_subdomain(
-            "Second,child.B", None, {}, TagValue("second-tag"), True
+            "Second_child_B", None, {}, TagValue("second-tag"), True
         )
         catalog.supports_tags().assign_tags(["first-tag"])
         catalog.as_schemas().load_schema("schema").supports_tags().assign_tags(
@@ -1009,7 +879,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         second.detach_from_parent()
         self._assert_table_relations(parent, table, {first_path})
         first = self.lake.alter_domain(
-            first.name(), DomainChange.rename("Renamed/child.A")
+            first.name(), DomainChange.rename("Renamed_child_A")
         )
         first_path = (
             DomainRelation.Type.VIA_SUBDOMAIN,
@@ -1018,7 +888,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         )
         self._assert_table_relations(parent, table, {first_path})
         parent = self.lake.alter_domain(
-            parent.name(), DomainChange.rename("Renamed/parent.P")
+            parent.name(), DomainChange.rename("Renamed_parent_P")
         )
         self.assertEqual(parent.name(), self.lake.get_domain(first.name()).parent())
         self._assert_table_relations(parent, table, {first_path})

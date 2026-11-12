@@ -166,17 +166,17 @@ public class TestNameIdentifierUtil {
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
 
-    // test domain, whose name may contain "/"
-    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance/Trading");
+    // Test a domain identifier.
+    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance_Trading");
     assertEquals(NamespaceUtil.ofDomain("metalake1"), domain.namespace());
     assertEquals(
-        MetadataObjects.parse("Finance/Trading", MetadataObject.Type.DOMAIN),
+        MetadataObjects.parse("Finance_Trading", MetadataObject.Type.DOMAIN),
         NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
     assertEquals(
         domain,
         NameIdentifierUtil.buildNameIdentifier(
             Entity.EntityType.DOMAIN,
-            "Finance/Trading",
+            "Finance_Trading",
             ImmutableMap.of(Entity.EntityType.METALAKE, "metalake1")));
     assertEquals(
         NameIdentifier.of("metalake1"),
@@ -195,13 +195,13 @@ public class TestNameIdentifierUtil {
         () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
   }
 
-  /** Verifies that domain names remain atomic even when they contain dots. */
+  /** Domain names use the same identifier rules as catalogs. */
   @Test
-  public void testDottedDomainMetadataObjectName() {
-    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance.Trading.v1");
-    Assertions.assertEquals(
-        MetadataObjects.of(null, "Finance.Trading.v1", MetadataObject.Type.DOMAIN),
-        NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
+  public void testRejectDottedDomainMetadataObjectName() {
+    NameIdentifier domain = NameIdentifier.of("metalake1", "Finance.Trading");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
   }
 
   @Test

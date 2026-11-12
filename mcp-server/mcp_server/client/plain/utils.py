@@ -32,15 +32,27 @@ def encode_path_segment(segment: str) -> str:
 
 
 def extract_content_from_response(response, field: str, default="") -> str:
-    response_json = response.json()
-    _handle_gravitino_exception(response_json)
+    response_json = _response_content(response)
     return json.dumps(response_json.get(field, default))
 
 
 def extract_response(response) -> str:
-    response_json = response.json()
-    _handle_gravitino_exception(response_json)
+    response_json = _response_content(response)
     return json.dumps(response_json)
+
+
+def _response_content(response):
+    try:
+        content = response.json()
+    except ValueError:
+        response.raise_for_status()
+        raise
+
+    if isinstance(content, dict):
+        _handle_gravitino_exception(content)
+    if not response.is_success:
+        response.raise_for_status()
+    return content
 
 
 def _handle_gravitino_exception(response: dict):

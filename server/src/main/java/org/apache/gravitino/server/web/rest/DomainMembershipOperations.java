@@ -45,6 +45,7 @@ import org.apache.gravitino.server.authorization.DomainAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameValidationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -102,6 +103,7 @@ public class DomainMembershipOperations {
                       .toArray(MetadataObject.Type[]::new));
             }
             if (domains != null) {
+              NameValidationUtils.validateDomainNames(domains);
               filter.withDomains(domains.toArray(new String[0]));
             }
             DomainMemberDTO[] members =

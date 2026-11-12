@@ -40,7 +40,7 @@ public class MetadataObjectDTO implements MetadataObject {
   @JsonCreator
   private MetadataObjectDTO(
       @JsonProperty("fullName") @Nullable String fullName, @JsonProperty("type") Type type) {
-    // Read both fields together: DOMAIN names may contain dots, regardless of JSON field order.
+    // Read the type first so the raw domain name reaches validation regardless of JSON field order.
     this.type = type;
     setFullName(fullName);
   }

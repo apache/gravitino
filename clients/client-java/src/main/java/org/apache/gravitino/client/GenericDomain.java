@@ -29,7 +29,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -177,7 +176,6 @@ class GenericDomain implements Domain {
       TagValue backingTag,
       boolean createBackingTag) {
     Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
-    validateName(name);
     DomainCreateRequest request =
         new DomainCreateRequest(
             name,
@@ -293,18 +291,10 @@ class GenericDomain implements Domain {
   }
 
   static String domainPath(String metalake, String name) {
-    validateName(name);
     return "api/metalakes/"
         + RESTUtils.encodeString(metalake)
         + "/domains/"
-        + RESTUtils.encodeString(name);
-  }
-
-  static void validateName(String name) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(name), "domain name must not be blank");
-    // A proxy can normalize a dot segment and route the request to a different resource.
-    Preconditions.checkArgument(
-        !".".equals(name) && !"..".equals(name), "Unsafe domain path segment: %s", name);
+        + RESTUtils.encodeDomainPathSegment(name);
   }
 
   private static DomainRelation[] relations(DomainRelationDTO[] relations) {

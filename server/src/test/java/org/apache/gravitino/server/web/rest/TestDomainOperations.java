@@ -305,7 +305,6 @@ public class TestDomainOperations extends BaseOperationsTest {
         new String[] {
           "{}",
           "{\"name\":\"Finance\"}",
-          "{\"name\":\"Finance\",\"parent\":\" \",\"backingTag\":{\"name\":\"t\"}}",
           "{\"name\":\"Finance\",\"backingTag\":{\"name\":\"t\",\"value\":\"v\",\"create\":true}}"
         }) {
       try (Response response = send("POST", BASE, json)) {
@@ -316,7 +315,7 @@ public class TestDomainOperations extends BaseOperationsTest {
         new String[] {
           "{}",
           "{\"updates\":[null]}",
-          "{\"updates\":[{\"@type\":\"rename\",\"newName\":\" \"}]}",
+          "{\"updates\":[{\"@type\":\"rename\",\"newName\":null}]}",
           "{\"updates\":[{\"@type\":\"unknown\"}]}"
         }) {
       try (Response response = send("PUT", ITEM, json)) {
@@ -328,7 +327,7 @@ public class TestDomainOperations extends BaseOperationsTest {
         assertError(response, 400);
       }
     }
-    try (Response response = send("PUT", ITEM + "/parent", "{\"parent\":\" \"}")) {
+    try (Response response = send("PUT", ITEM + "/parent", "{\"parent\":null}")) {
       assertError(response, 400);
     }
     try (Response response =
@@ -386,16 +385,6 @@ public class TestDomainOperations extends BaseOperationsTest {
       assertEquals(409, response.getStatus());
       assertEquals("MetalakeNotInUseException", response.readEntity(ErrorResponse.class).getType());
     }
-  }
-
-  @Test
-  public void testEncodedDomainName() {
-    when(dispatcher.getDomain("test", "Finance/US")).thenReturn(domain(Domain.Status.DRAFT));
-    try (Response response =
-        target(BASE + "/{domain}").resolveTemplate("domain", "Finance/US").request().get()) {
-      assertDomain(response, Domain.Status.DRAFT);
-    }
-    verify(dispatcher).getDomain("test", "Finance/US");
   }
 
   @Test

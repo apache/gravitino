@@ -112,7 +112,7 @@ public class TestDomainManager {
   private static final String DB_DIR = JDBC_STORE_PATH + "/testdb";
 
   private static EntityStore entityStore;
-  private static DomainManager domainManager;
+  private static DomainDispatcher domainManager;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
@@ -120,7 +120,7 @@ public class TestDomainManager {
     Config config = mockConfig();
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
-    domainManager = new DomainManager(idGenerator, entityStore);
+    domainManager = new DomainNormalizeDispatcher(new DomainManager(idGenerator, entityStore));
 
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalDomainDispatcher", domainManager, true);
@@ -247,19 +247,34 @@ public class TestDomainManager {
     }
   }
 
-  /** Verifies reserved names cannot be persisted through creation or renaming. */
-  @Test
-  public void testReservedDomainNamesAreRejectedBeforeWrite() {
+  /**
+   * Verifies invalid names cannot be persisted through creation or renaming.
+   *
+   * @param name The invalid domain name.
+   */
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "*",
+        "SyStEm",
+        "-start",
+        "a.b",
+        "a/b",
+        "A ",
+        "财务",
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      })
+  public void testInvalidDomainNamesAreRejectedBeforeWrite(String name) {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
             domainManager.createDomain(
-                METALAKE, "*", null, null, TagValue.noValue("reserved-tag"), true));
+                METALAKE, name, null, null, TagValue.noValue("reserved-tag"), true));
     Assertions.assertEquals(0, domainManager.listDomains(METALAKE).length);
     domainManager.createDomain(METALAKE, "Finance", null, null, TagValue.noValue("Finance"), true);
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.rename("*")));
+        () -> domainManager.alterDomain(METALAKE, "Finance", DomainChange.rename(name)));
     Assertions.assertEquals("Finance", domainManager.getDomain(METALAKE, "Finance").name());
     Assertions.assertArrayEquals(new String[] {"Finance"}, domainManager.listDomains(METALAKE));
   }

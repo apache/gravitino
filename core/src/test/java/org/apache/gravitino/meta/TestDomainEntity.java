@@ -36,7 +36,7 @@ public class TestDomainEntity {
     DomainEntity domain =
         DomainEntity.builder()
             .withId(1L)
-            .withName("Finance/Trading")
+            .withName("Finance_Trading")
             .withNamespace(NamespaceUtil.ofDomain("metalake"))
             .withComment("comment")
             .withProperties(ImmutableMap.of("k", "v"))
@@ -50,7 +50,7 @@ public class TestDomainEntity {
 
     Assertions.assertEquals(Entity.EntityType.DOMAIN, domain.type());
     Assertions.assertEquals(1L, domain.id());
-    Assertions.assertEquals("Finance/Trading", domain.name());
+    Assertions.assertEquals("Finance_Trading", domain.name());
     Assertions.assertEquals("comment", domain.comment());
     Assertions.assertEquals(ImmutableMap.of("k", "v"), domain.properties());
     Assertions.assertEquals(Domain.Status.DRAFT, domain.status());
@@ -64,7 +64,7 @@ public class TestDomainEntity {
     Assertions.assertEquals(
         ImmutableMap.builder()
             .put(DomainEntity.ID, 1L)
-            .put(DomainEntity.NAME, "Finance/Trading")
+            .put(DomainEntity.NAME, "Finance_Trading")
             .put(DomainEntity.COMMENT, "comment")
             .put(DomainEntity.PROPERTIES, ImmutableMap.of("k", "v"))
             .put(DomainEntity.STATUS, Domain.Status.DRAFT)

@@ -87,7 +87,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
   public void testRenameAndDeleteRecordAuthorizationCacheChanges() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     DomainMetaService service = DomainMetaService.getInstance();
-    DomainEntity finance = newDomain(METALAKE_NAME, "Finance.v1", "comment");
+    DomainEntity finance = newDomain(METALAKE_NAME, "Finance_v1", "comment");
     service.insertDomain(finance, false);
     Long highWater =
         SessionUtils.doWithCommitAndFetchResult(
@@ -178,8 +178,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
         domainMetaService.listDomainsByNamespace(NamespaceUtil.ofDomain(METALAKE_NAME)).isEmpty());
 
     DomainEntity finance = newDomain(METALAKE_NAME, "Finance", "finance comment");
-    // A domain name may contain "/".
-    DomainEntity trading = newDomain(METALAKE_NAME, "Finance/Trading", null);
+    DomainEntity trading = newDomain(METALAKE_NAME, "Finance_Trading", null);
     domainMetaService.insertDomain(finance, false);
     domainMetaService.insertDomain(trading, false);
 
@@ -292,7 +291,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
     domainMetaService.insertDomain(finance, false);
     domainMetaService.updateDomain(
         finance.nameIdentifier(),
-        entity -> ((DomainEntity) entity).toBuilder().withName("Finance/Tax").build());
+        entity -> ((DomainEntity) entity).toBuilder().withName("Finance_Tax").build());
 
     // The name is free after the rename, so the overwrite finds the domain by its ID and replaces
     // the renamed row instead of adding a second domain.
@@ -304,7 +303,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
         NoSuchEntityException.class,
         () ->
             domainMetaService.getDomainByIdentifier(
-                NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance/Tax")));
+                NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance_Tax")));
     Assertions.assertEquals(
         1, domainMetaService.listDomainsByNamespace(NamespaceUtil.ofDomain(METALAKE_NAME)).size());
 
@@ -414,7 +413,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
             entity ->
                 ((DomainEntity) entity)
                     .toBuilder()
-                        .withName("Finance/Tax")
+                        .withName("Finance_Tax")
                         .withComment(null)
                         .withProperties(ImmutableMap.of("k2", "v2"))
                         .withAuditInfo(updatedAudit)
@@ -425,7 +424,7 @@ public class TestDomainMetaService extends TestJDBCBackend {
         () -> domainMetaService.getDomainByIdentifier(finance.nameIdentifier()));
     DomainEntity loaded =
         domainMetaService.getDomainByIdentifier(
-            NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance/Tax"));
+            NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance_Tax"));
     Assertions.assertEquals(updated, loaded);
     Assertions.assertEquals(finance.id(), loaded.id());
     Assertions.assertNull(loaded.comment());
