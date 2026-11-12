@@ -19,7 +19,9 @@
 
 import re
 import configparser
+import subprocess
 from datetime import datetime
+from pathlib import Path
 from gravitino.constants.root import PROJECT_ROOT
 
 from gravitino.constants.version import Version, VERSION_INI, SETUP_FILE
@@ -28,20 +30,69 @@ from gravitino.exceptions.base import GravitinoRuntimeException
 VERSION_PATTERN = r"version\s*=\s*['\"]([^'\"]+)['\"]"
 
 
-def get_git_commit_id():
-    try:
-        commit_id = ""
-        git_path = f"{PROJECT_ROOT}/.git/"
-        with open(git_path + "HEAD", "r", encoding="utf-8") as file:
-            ref = file.readline().strip()
+COMMIT_ID_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
 
-        if ref.startswith("ref:"):
-            ref_path = ref.split(" ")[1]
-            with open(git_path + ref_path, "r", encoding="utf-8") as file:
-                commit_id = file.readline().strip()
-        return commit_id
-    except (FileNotFoundError, IOError):
+
+def _read_commit_id_from_git():
+    """Ask git itself, which handles worktrees, packed refs and detached HEAD."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError):
         return ""
+    output = result.stdout.strip()
+    if result.returncode == 0 and COMMIT_ID_PATTERN.fullmatch(output):
+        return output
+    return ""
+
+
+def _read_commit_id_from_files():
+    """Fallback that parses the .git directory by hand when git is unavailable."""
+    try:
+        git_path = Path(PROJECT_ROOT) / ".git"
+        if git_path.is_file():
+            # Linked worktrees have a ".git" file holding a "gitdir:" path
+            # (absolute, or relative to the root).
+            content = git_path.read_text(encoding="utf-8").strip()
+            gitdir = content.split("gitdir:", 1)[1].strip()
+            git_dir = (Path(PROJECT_ROOT) / gitdir).resolve()
+        else:
+            git_dir = git_path
+
+        head = (git_dir / "HEAD").read_text(encoding="utf-8").strip()
+        if not head.startswith("ref:"):
+            return head
+
+        ref_name = head.split(":", 1)[1].strip()
+        # Branch refs of linked worktrees live in the common git dir.
+        search_dirs = [git_dir]
+        common_dir = git_dir / "commondir"
+        if common_dir.is_file():
+            common = common_dir.read_text(encoding="utf-8").strip()
+            search_dirs.append((git_dir / common).resolve())
+
+        for folder in search_dirs:
+            ref_file = folder / ref_name
+            if ref_file.is_file():
+                return ref_file.read_text(encoding="utf-8").strip()
+            packed = folder / "packed-refs"
+            if packed.is_file():
+                for line in packed.read_text(encoding="utf-8").splitlines():
+                    if line.endswith(" " + ref_name):
+                        return line.split(" ", 1)[0].strip()
+        return ""
+    except (OSError, IndexError):
+        return ""
+
+
+def get_git_commit_id():
+    return _read_commit_id_from_git() or _read_commit_id_from_files()
 
 
 def main():
