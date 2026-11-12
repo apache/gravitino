@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -100,9 +100,9 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
         checkDefaultsLength(replaceView.getDefaultCatalog(), replaceView.getDefaultSchema());
       }
     }
-    Capability capability = getCapability(ident, catalogManager);
-    return dispatcher.alterView(
-        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
+    ViewChange[] normalizedChanges =
+        withCapability(ident, catalogManager, capability -> applyCapabilities(capability, changes));
+    return dispatcher.alterView(normalizeCaseSensitive(ident), normalizedChanges);
   }
 
   @Override
@@ -111,13 +111,17 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.VIEW, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> applyCaseSensitive(namespace, Capability.Scope.VIEW, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier ident) {
-    Capability capabilities = getCapability(ident, catalogManager);
-    return applyCaseSensitive(ident, Capability.Scope.VIEW, capabilities);
+    return withCapability(
+        ident,
+        catalogManager,
+        capabilities -> applyCaseSensitive(ident, Capability.Scope.VIEW, capabilities));
   }
 
   private static void checkDefaultsLength(
@@ -132,7 +136,9 @@ public class ViewNormalizeDispatcher implements ViewDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, Capability.Scope.VIEW, capability);
+    return withCapability(
+        ident,
+        catalogManager,
+        capability -> applyCapabilities(ident, Capability.Scope.VIEW, capability));
   }
 }

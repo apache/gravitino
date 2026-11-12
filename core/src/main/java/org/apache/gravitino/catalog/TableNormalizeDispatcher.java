@@ -20,11 +20,12 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -80,27 +81,44 @@ public class TableNormalizeDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
-    Capability capability = getCapability(ident, catalogManager);
+    NormalizedTableDefinition normalized =
+        withCapability(
+            ident,
+            catalogManager,
+            capability ->
+                new NormalizedTableDefinition(
+                    applyCapabilities(ident, Capability.Scope.TABLE, capability),
+                    applyCapabilities(columns, capability),
+                    applyCapabilities(partitions, capability),
+                    applyCapabilities(distribution, capability),
+                    applyCapabilities(sortOrders, capability),
+                    applyCapabilities(indexes, capability)));
     return dispatcher.createTable(
-        applyCapabilities(ident, Capability.Scope.TABLE, capability),
-        applyCapabilities(columns, capability),
+        normalized.ident,
+        normalized.columns,
         comment,
         properties,
-        applyCapabilities(partitions, capability),
-        applyCapabilities(distribution, capability),
-        applyCapabilities(sortOrders, capability),
-        applyCapabilities(indexes, capability));
+        normalized.partitions,
+        normalized.distribution,
+        normalized.sortOrders,
+        normalized.indexes);
   }
 
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
-    Capability capability = getCapability(ident, catalogManager);
+    // The constraints of the name spec may be more strict than underlying catalog,
+    // and for compatibility reasons, we only apply case-sensitive capabilities to the name here.
+    Pair<NameIdentifier, TableChange[]> normalized =
+        withCapability(
+            ident,
+            catalogManager,
+            capability ->
+                Pair.of(
+                    applyCaseSensitive(ident, Capability.Scope.TABLE, capability),
+                    applyCapabilities(capability, changes)));
     return dispatcher.alterTable(
-        // The constraints of the name spec may be more strict than underlying catalog,
-        // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager),
-        applyCapabilities(capability, changes));
+        resolvePhysicalTableName(normalized.getLeft(), catalogManager), normalized.getRight());
   }
 
   @Override
@@ -124,22 +142,30 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.TABLE, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> applyCaseSensitive(namespace, Capability.Scope.TABLE, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier tableIdent) {
-    Capability capability = getCapability(tableIdent, catalogManager);
-    return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+    return withCapability(
+        tableIdent,
+        catalogManager,
+        capability -> applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability));
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
-    Capability capability = getCapability(tableIdent, catalogManager);
     Namespace namespace = tableIdent.namespace();
-    validateExistingName(
-        Capability.Scope.SCHEMA, namespace.level(namespace.length() - 1), capability);
-    validateExistingName(Capability.Scope.TABLE, tableIdent.name(), capability);
-    return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+    return withCapability(
+        tableIdent,
+        catalogManager,
+        capability -> {
+          validateExistingName(
+              Capability.Scope.SCHEMA, namespace.level(namespace.length() - 1), capability);
+          validateExistingName(Capability.Scope.TABLE, tableIdent.name(), capability);
+          return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+        });
   }
 
   private static void validateExistingName(
@@ -147,5 +173,30 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     CapabilityResult result = capability.specificationOnExistingName(scope, name);
     Preconditions.checkArgument(
         result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
+  /** The table definition after the catalog capability rules have been applied. */
+  private static final class NormalizedTableDefinition {
+    private final NameIdentifier ident;
+    private final Column[] columns;
+    private final Transform[] partitions;
+    private final Distribution distribution;
+    private final SortOrder[] sortOrders;
+    private final Index[] indexes;
+
+    private NormalizedTableDefinition(
+        NameIdentifier ident,
+        Column[] columns,
+        Transform[] partitions,
+        Distribution distribution,
+        SortOrder[] sortOrders,
+        Index[] indexes) {
+      this.ident = ident;
+      this.columns = columns;
+      this.partitions = partitions;
+      this.distribution = distribution;
+      this.sortOrders = sortOrders;
+      this.indexes = indexes;
+    }
   }
 }

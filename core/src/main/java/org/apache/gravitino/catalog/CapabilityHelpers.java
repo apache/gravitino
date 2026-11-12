@@ -27,7 +27,9 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ObjectArrays;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Function;
 import java.util.function.Supplier;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -105,10 +107,45 @@ public class CapabilityHelpers {
     }
   }
 
-  public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
+  /**
+   * Runs {@code fn} with the {@link Capability} of the catalog that owns {@code ident}, while a
+   * catalog lease is held and the catalog ClassLoader is the thread context ClassLoader.
+   *
+   * <p>A capability is loaded by the catalog ClassLoader, and its methods can load more classes
+   * from it on first use. The lease keeps that ClassLoader open until {@code fn} returns, even if
+   * the catalog is evicted from the cache meanwhile. A retired catalog is reloaded by the lease, so
+   * {@code fn} runs at most once.
+   *
+   * <p>{@code fn} must only compute values from the capability, such as normalized names or
+   * changes, and must not return or keep the capability. It must not call the backend or the entity
+   * store: those calls belong after this method returns, outside the catalog ClassLoader.
+   *
+   * @param ident any identifier inside the catalog
+   * @param catalogManager the catalog manager that loads the catalog
+   * @param fn the computation on the capability
+   * @param <R> the result type
+   * @return the result of {@code fn}
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws RuntimeException the exception thrown by {@code fn}, unchanged, or a wrapper of a
+   *     failure to load the catalog or its capability
+   */
+  public static <R> R withCapability(
+      NameIdentifier ident, CatalogManager catalogManager, Function<Capability, R> fn) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     try {
-      return catalogManager.doWithCatalog(catalogIdent, catalog -> catalog.capability());
+      return catalogManager.doWithCatalog(
+          catalogIdent,
+          catalog -> {
+            Capability capability = catalog.capability();
+            try {
+              return fn.apply(capability);
+            } catch (RuntimeException e) {
+              // Keep the caller's exception, such as an invalid name, apart from load failures.
+              throw new CapabilityCallbackException(e);
+            }
+          });
+    } catch (CapabilityCallbackException e) {
+      throw e.callbackFailure();
     } catch (NoSuchCatalogException e) {
       throw e;
     } catch (RuntimeException e) {
@@ -145,16 +182,20 @@ public class CapabilityHelpers {
       Capability.Scope scope,
       CatalogManager catalogManager,
       Supplier<EntityStore> entityStore) {
-    Capability capability = getCapability(ident, catalogManager);
     if (scope == Capability.Scope.COLUMN) {
-      NameIdentifier table =
-          resolvePhysicalTableName(
-              applyCaseSensitive(
-                  NameIdentifier.of(ident.namespace().levels()),
-                  Capability.Scope.TABLE,
-                  capability),
-              catalogManager);
-      String column = applyCaseSensitiveOnName(scope, ident.name(), capability);
+      NameIdentifier tableIdent = NameIdentifier.of(ident.namespace().levels());
+      // Only the name rules run with the capability; table resolution and the entity store run
+      // after the capability call returns.
+      Pair<NameIdentifier, String> normalized =
+          withCapability(
+              ident,
+              catalogManager,
+              capability ->
+                  Pair.of(
+                      applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability),
+                      applyCaseSensitiveOnName(scope, ident.name(), capability)));
+      NameIdentifier table = resolvePhysicalTableName(normalized.getLeft(), catalogManager);
+      String column = normalized.getRight();
       if (!column.equals(ident.name()) && hasStoredColumn(table, ident.name(), entityStore.get())) {
         column = ident.name();
       }
@@ -164,10 +205,16 @@ public class CapabilityHelpers {
 
     if (scope == Capability.Scope.SEMANTIC_MODEL) {
       return NameIdentifier.of(
-          applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+          withCapability(
+              ident,
+              catalogManager,
+              capability -> applyCaseSensitive(ident.namespace(), scope, capability)),
+          ident.name());
     }
 
-    NameIdentifier normalized = applyCaseSensitive(ident, scope, capability);
+    NameIdentifier normalized =
+        withCapability(
+            ident, catalogManager, capability -> applyCaseSensitive(ident, scope, capability));
     return scope == Capability.Scope.TABLE
         ? resolvePhysicalTableName(normalized, catalogManager)
         : normalized;
@@ -272,8 +319,8 @@ public class CapabilityHelpers {
    */
   public static NameIdentifier applyCaseSensitive(
       NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
-    Capability capability = getCapability(ident, catalogManager);
-    return applyCaseSensitive(ident, scope, capability);
+    return withCapability(
+        ident, catalogManager, capability -> applyCaseSensitive(ident, scope, capability));
   }
 
   public static Namespace applyCaseSensitive(
@@ -752,5 +799,16 @@ public class CapabilityHelpers {
         capabilities.specificationOnName(scope, name).unsupportedMessage()
             + " Illegal name: "
             + name);
+  }
+
+  /** Carries an exception thrown by a {@link #withCapability} callback through the catalog call. */
+  private static final class CapabilityCallbackException extends RuntimeException {
+    private CapabilityCallbackException(RuntimeException cause) {
+      super(cause);
+    }
+
+    private RuntimeException callbackFailure() {
+      return (RuntimeException) getCause();
+    }
   }
 }
