@@ -32,6 +32,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -43,8 +44,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -52,6 +55,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
@@ -78,6 +85,7 @@ class TestDomainMembershipResolver {
   private static final AuditInfo AUDIT =
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.EPOCH).build();
 
+  private CatalogManager previousCatalogManager;
   private EntityStore store;
   private SupportsRelationOperations relations;
   private DomainMembershipResolver resolver;
@@ -88,6 +96,13 @@ class TestDomainMembershipResolver {
 
   @BeforeEach
   void setUp() throws Exception {
+    previousCatalogManager =
+        (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    BaseCatalog<?> catalog = mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
+    when(catalog.capability()).thenReturn(Capability.DEFAULT);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
     store = mock(EntityStore.class);
     relations = mock(SupportsRelationOperations.class);
     when(store.relationOperations()).thenReturn(relations);
@@ -117,7 +132,9 @@ class TestDomainMembershipResolver {
   }
 
   @AfterEach
-  void tearDown() {
+  void tearDown() throws IllegalAccessException {
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
     metadataObjects.close();
   }
 
@@ -315,6 +332,15 @@ class TestDomainMembershipResolver {
       assertEquals(0, resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter).length);
       assertEquals(0, listDomains(METALAKE, childTable, new DomainEntity[] {finance}).length);
     }
+  }
+
+  @Test
+  void testUnknownScopesReturnEmptyWithoutEnumeratingMembers() {
+    DomainEntity finance = domain(1, "Finance", null, 10L, "finance");
+    DomainMemberFilter filter =
+        DomainMemberFilter.builder().withDomains("unknown", "Secret").build();
+    assertEquals(0, resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter).length);
+    verifyNoInteractions(relations);
   }
 
   @Test
