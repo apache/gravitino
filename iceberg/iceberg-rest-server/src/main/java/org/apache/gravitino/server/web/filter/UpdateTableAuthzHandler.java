@@ -33,7 +33,14 @@ import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInt
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
 
-/** Authorizes staged table creation against the schema before Iceberg executes the commit. */
+/**
+ * Authorizes staged table creation against the schema before Iceberg executes the commit.
+ *
+ * <p>Iceberg still validates {@code AssertTableDoesNotExist} at commit time, so this creation
+ * authorization cannot replace an existing table, including one created after authorization.
+ * Location is part of the new table's creation metadata; the executor's owner-property guard
+ * separately sets a supplied owner to the authenticated user.
+ */
 public class UpdateTableAuthzHandler implements AuthorizationHandler {
   private final boolean stagedCreate;
 
