@@ -31,6 +31,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
@@ -616,7 +617,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testRemovedSecretIsKeptWhenSchemaEntityUpdateFails() throws Exception {
+  public void testSecretAlterWhenSchemaEntityUpdateFails() throws Exception {
     reset(entityStore);
     try (SecretManager secrets = memorySecretManager()) {
       SchemaOperationDispatcher d =
@@ -637,15 +638,74 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       doThrow(new IOException()).when(entityStore).update(any(), any(), any(), any());
       try {
         d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+        Assertions.assertEquals(
+            urn.toString(),
+            entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("old", secrets.readSecret(urn));
+
+        // The catalog has applied a rotation, so its new version is made current anyway.
+        d.alterSchema(
+            ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+        Assertions.assertEquals(
+            urn.toString(),
+            entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("new", secrets.readSecret(urn));
+        reset(entityStore);
+        Assertions.assertTrue(d.dropSchema(ident, false));
       } finally {
         reset(entityStore);
+        d.dropSchema(ident, false);
       }
+    }
+  }
 
-      Assertions.assertEquals(
-          urn.toString(),
-          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
-      Assertions.assertEquals("old", secrets.readSecret(urn));
-      Assertions.assertTrue(d.dropSchema(ident, false));
+  @Test
+  void testAlterOfSchemaWithoutEntityCommitsSecrets() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_no_entity");
+      doThrow(new IOException("store unavailable"))
+          .when(entityStore)
+          .put(any(SchemaEntity.class), eq(true));
+      try {
+        GravitinoRuntimeException error =
+            Assertions.assertThrows(
+                GravitinoRuntimeException.class,
+                () ->
+                    d.createSchema(
+                        ident,
+                        "comment",
+                        ImmutableMap.of("k1", "v1"),
+                        Map.of("k2", new SecretBinding("memory", "old")),
+                        Map.of()));
+        Assertions.assertEquals("store unavailable", Throwables.getRootCause(error).getMessage());
+        reset(entityStore);
+        Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+        SecretUrn urn =
+            SecretUrn.parse(
+                catalogManager
+                    .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+                    .doWithSchemaOps(ops -> ops.loadSchema(ident))
+                    .properties()
+                    .get("k2"));
+
+        Assertions.assertEquals("old", secrets.readSecret(urn));
+        d.alterSchema(
+            ident, SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "new")));
+        Assertions.assertEquals("new", secrets.readSecret(urn));
+        d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+        // Skip if create never reached the catalog.
+        if (catalogManager
+            .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+            .doWithSchemaOps(ops -> ops.schemaExists(ident))) {
+          d.dropSchema(ident, false);
+        }
+      }
     }
   }
 

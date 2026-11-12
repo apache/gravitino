@@ -88,6 +88,10 @@ public interface SecretProvider {
    * methods; altering a write-through secret uses them. Providers that only build external
    * references can keep the defaults, which throw.
    *
+   * <p>Version ids are non-blank and are not reused for the same URN until {@link #deleteSecret}
+   * removes it, because Gravitino deletes replaced versions by id. Gravitino passes to the other
+   * version methods only ids this provider returned.
+   *
    * @param urn the write-through secret URN
    * @param plaintext the secret plaintext
    * @return the id of the new version
@@ -100,6 +104,8 @@ public interface SecretProvider {
   /**
    * Makes {@code version} the value {@link #readSecret} returns for {@code urn}.
    *
+   * <p>Write-through providers must implement this method; see {@link #writeSecretVersion}.
+   *
    * @param urn the write-through secret URN
    * @param version a version id returned by {@link #writeSecretVersion}
    * @throws IllegalArgumentException if {@code urn} has no such version
@@ -111,6 +117,8 @@ public interface SecretProvider {
 
   /**
    * Deletes one version of {@code urn} and keeps the others.
+   *
+   * <p>Write-through providers must implement this method; see {@link #writeSecretVersion}.
    *
    * <p>If {@code version} is the current version, {@code urn} has no readable value afterwards.
    * Deleting a version that does not exist does nothing.
@@ -125,6 +133,8 @@ public interface SecretProvider {
 
   /**
    * Returns the id of the version {@link #readSecret} returns for {@code urn}.
+   *
+   * <p>Write-through providers must implement this method; see {@link #writeSecretVersion}.
    *
    * @param urn the write-through secret URN
    * @return the current version id, or {@code null} if {@code urn} has no readable value

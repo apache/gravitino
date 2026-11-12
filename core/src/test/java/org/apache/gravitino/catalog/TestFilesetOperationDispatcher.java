@@ -365,6 +365,28 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+
+      // The catalog rejects the batch after the secrets are prepared, so rollback deletes the
+      // first binding of k3, which was readable as soon as it was written.
+      SecretUrn rejectedUrn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k3"));
+      IllegalArgumentException rejected =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  filesets.alterFileset(
+                      ident,
+                      FilesetChange.setSecretBinding("k3", new SecretBinding("memory", "x")),
+                      FilesetChange.updateType(Fileset.Type.EXTERNAL)));
+      Assertions.assertTrue(rejected.getMessage().contains("Unsupported fileset change"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(rejectedUrn));
+
       filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
       Assertions.assertFalse(
           catalogManager

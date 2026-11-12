@@ -2871,6 +2871,14 @@ public class TestCatalogManager {
         Assertions.assertEquals("old", secrets.readSecret(urn));
       }
 
+      // Without material the written version is current at once, so only rollback removes it.
+      secrets.getRegistry().getProvider("memory").deleteSecret(urn);
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class, () -> manager.alterCatalog(ident, rebind));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+
       Mockito.reset(store);
       manager.alterCatalog(ident, rebind);
       Assertions.assertEquals("new", secrets.readSecret(urn));

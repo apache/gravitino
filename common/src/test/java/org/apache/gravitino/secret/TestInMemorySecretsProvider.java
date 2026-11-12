@@ -123,6 +123,29 @@ public class TestInMemorySecretsProvider {
   }
 
   @Test
+  public void testWrittenVersionBecomesCurrentWhenOnlyStaleVersionsRemain() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String oldVersion = provider.currentSecretVersion(urn);
+    provider.writeSecretVersion(urn, "stale");
+    provider.deleteSecretVersion(urn, oldVersion);
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+
+    String version = provider.writeSecretVersion(urn, "new");
+    Assertions.assertEquals(version, provider.currentSecretVersion(urn));
+    Assertions.assertEquals("new", provider.readSecret(urn));
+  }
+
+  @Test
+  public void testWriteSecretVersionRequiresInitialization() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> provider.writeSecretVersion(urn, "s3cr3t"));
+  }
+
+  @Test
   public void testDeletingCurrentVersionLeavesNoReadableValue() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());

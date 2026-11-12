@@ -99,6 +99,9 @@ public class InMemorySecretsProvider implements SecretProvider {
     if (plaintext == null) {
       throw new IllegalArgumentException("plaintext must not be null");
     }
+    if (providerName == null) {
+      throw new IllegalStateException("InMemorySecretsProvider is not initialized");
+    }
     if (!urn.providerName().equals(providerName)) {
       throw new IllegalArgumentException(
           "URN " + urn + " does not belong to secret provider " + providerName);

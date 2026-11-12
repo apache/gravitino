@@ -363,15 +363,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
+          // Asked before the alter, so nothing that can throw runs between the alter and the
+          // secret commit below.
+          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           Triple<Schema, SchemaChange[], PreparedSecrets> alterResult =
-              alterSchemaUnderLock(ident, catalogIdent, changes);
+              alterSchemaUnderLock(ident, catalogIdent, isManagedSchema, changes);
           Schema alteredSchema = alterResult.getLeft();
           SchemaChange[] effectiveChanges = alterResult.getMiddle();
           // Secrets of an external alter that read a SchemaEntity, to commit after its update.
           PreparedSecrets preparedSecrets = alterResult.getRight();
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
-          boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             secretManager.commitSecrets(preparedSecrets);
             return EntityCombinedSchema.of(alteredSchema)
@@ -446,10 +448,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   }
 
   private Triple<Schema, SchemaChange[], PreparedSecrets> alterSchemaUnderLock(
-      NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
+      NameIdentifier ident,
+      NameIdentifier catalogIdent,
+      boolean isManagedSchema,
+      SchemaChange... changes)
       throws NoSuchSchemaException {
-    if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
-        && usesManagedSchemaOperations(catalogIdent)) {
+    if (isManagedSchema && usesManagedSchemaOperations(catalogIdent)) {
       return alterManagedSchemaUnderLock(ident, changes);
     }
     return alterExternalSchemaUnderLock(ident, catalogIdent, changes);

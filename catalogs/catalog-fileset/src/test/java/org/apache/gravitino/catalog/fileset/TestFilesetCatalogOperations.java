@@ -87,6 +87,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -146,6 +147,7 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -2224,6 +2226,64 @@ public class TestFilesetCatalogOperations {
       Map<String, String> props2 = fileset2.properties();
       Assertions.assertFalse(props2.containsKey("k1"));
     }
+  }
+
+  @Test
+  void testAlterFilesetSecretSwitchesOnlyAfterCommit() throws IOException {
+    String schemaName = "schema_secret_alter_" + generateTestId();
+    createSchema(schemaName, "comment", null, TEST_ROOT_PATH + "/" + schemaName);
+    createFileset("fileset", schemaName, "comment", Fileset.Type.MANAGED, null, null);
+    NameIdentifier ident = NameIdentifier.of("m1", "c1", schemaName, "fileset");
+    long filesetId = store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class).id();
+    SecretUrn urn = writeThroughUrn("fileset", filesetId, "k");
+    EntityStore failingStore = Mockito.spy(store);
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(failingStore, secretManager)) {
+      ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
+      ops.alterFileset(ident, bindSecret("k", "old"));
+      Assertions.assertEquals(
+          urn.toString(),
+          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class).properties().get("k"));
+
+      ops.alterFileset(ident, bindSecret("k", "new"));
+      Assertions.assertEquals("new", secretManager.readSecret(urn));
+
+      // The updater prepares the secrets, then the store fails to write the entity.
+      IOException failure = new IOException("fileset update failed");
+      Mockito.doAnswer(
+              invocation -> {
+                Function<FilesetEntity, FilesetEntity> updater = invocation.getArgument(3);
+                updater.apply(store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class));
+                throw failure;
+              })
+          .when(failingStore)
+          .update(
+              Mockito.eq(ident),
+              Mockito.eq(FilesetEntity.class),
+              Mockito.eq(Entity.EntityType.FILESET),
+              any());
+      FilesetChange[] failingChanges = {
+        bindSecret("k", "newer"), FilesetChange.removeProperty("k"), bindSecret("k_new", "x")
+      };
+      for (FilesetChange change : failingChanges) {
+        RuntimeException error =
+            Assertions.assertThrows(RuntimeException.class, () -> ops.alterFileset(ident, change));
+        Assertions.assertSame(failure, error.getCause());
+      }
+      Assertions.assertEquals("new", secretManager.readSecret(urn));
+      // A first binding is readable as soon as it is written, so only rollback removes it.
+      SecretUrn newUrn = writeThroughUrn("fileset", filesetId, "k_new");
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(newUrn));
+
+      Mockito.reset(failingStore);
+      ops.alterFileset(ident, FilesetChange.removeProperty("k"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secretManager.readSecret(urn));
+    }
+  }
+
+  private static FilesetChange bindSecret(String key, String plaintext) {
+    return FilesetChange.setSecretBinding(key, new SecretBinding("memory", plaintext));
   }
 
   @ParameterizedTest

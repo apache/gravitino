@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.secret;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.commons.lang3.tuple.Pair;
@@ -36,19 +39,58 @@ public class TestSecretManagerAlter {
   private static final long ID = 7L;
   private static final String KEY = "jdbc-password";
 
-  /** Fails every promote, and every version write of the property key {@code broken}. */
+  /**
+   * Fails every promote, and every version write of the property key {@code broken}. Records the
+   * version calls it receives.
+   */
   public static class FaultySecretsProvider extends InMemorySecretsProvider {
+    private final List<String> writtenVersions = new ArrayList<>();
+    private final List<String> deletedVersions = new ArrayList<>();
+    private int promotes;
+
     @Override
     public String writeSecretVersion(SecretUrn urn, String plaintext) {
       if ("broken".equals(urn.propertyKey())) {
         throw new IllegalStateException("injected write failure");
       }
-      return super.writeSecretVersion(urn, plaintext);
+      String version = super.writeSecretVersion(urn, plaintext);
+      writtenVersions.add(urn + "@" + version);
+      return version;
     }
 
     @Override
     public void promoteSecretVersion(SecretUrn urn, String version) {
+      promotes++;
       throw new IllegalStateException("injected promote failure");
+    }
+
+    @Override
+    public void deleteSecretVersion(SecretUrn urn, String version) {
+      deletedVersions.add(urn + "@" + version);
+      super.deleteSecretVersion(urn, version);
+    }
+  }
+
+  /** A write-through provider that implements only the methods that existed before versions. */
+  public static class UnversionedSecretsProvider extends InMemorySecretsProvider {
+    @Override
+    public String writeSecretVersion(SecretUrn urn, String plaintext) {
+      throw new UnsupportedOperationException("unversioned");
+    }
+
+    @Override
+    public void promoteSecretVersion(SecretUrn urn, String version) {
+      throw new UnsupportedOperationException("unversioned");
+    }
+
+    @Override
+    public void deleteSecretVersion(SecretUrn urn, String version) {
+      throw new UnsupportedOperationException("unversioned");
+    }
+
+    @Override
+    public String currentSecretVersion(SecretUrn urn) {
+      throw new UnsupportedOperationException("unversioned");
     }
   }
 
@@ -208,6 +250,28 @@ public class TestSecretManagerAlter {
 
       Assertions.assertEquals(props, rebound);
       Assertions.assertEquals("new", read(secretManager, rebound, KEY));
+
+      Assertions.assertEquals(referenced, alter(secretManager, rebound, toReference));
+      Assertions.assertNull(currentVersion(secretManager, rebound.get(KEY)));
+    }
+  }
+
+  @Test
+  void testBindThenReferenceWritesNothing() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "memory", "old"));
+      CatalogChange toReference =
+          CatalogChange.setSecretReference(
+              KEY, new SecretReference("reference", Map.of("path", "kv")));
+
+      Pair<CatalogChange[], PreparedSecrets> result =
+          prepare(secretManager, props, bind(KEY, "memory", "new"), toReference);
+      Assertions.assertTrue(result.getRight().written().isEmpty());
+      Map<String, String> referenced = applied(props, result.getLeft());
+      Assertions.assertEquals("urn:gravitino-secret:reference:kv:" + KEY, referenced.get(KEY));
+
+      secretManager.commitSecrets(result.getRight());
+      Assertions.assertNull(currentVersion(secretManager, props.get(KEY)));
     }
   }
 
@@ -249,12 +313,52 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testFailedPromoteKeepsPreviousVersion() {
+  void testFailedPromoteKeepsPreviousVersionAndCommitsTheRest() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props =
+          alter(
+              secretManager,
+              Map.of(),
+              bind(KEY, "faulty", "old"),
+              bind("k2", "memory", "old2"),
+              bind("other", "memory", "x"));
+
+      Map<String, String> committed =
+          alter(
+              secretManager,
+              props,
+              bind(KEY, "faulty", "new"),
+              bind("k2", "memory", "new2"),
+              CatalogChange.removeProperty("other"));
+      Assertions.assertEquals("old", read(secretManager, props, KEY));
+      Assertions.assertEquals("new2", read(secretManager, committed, "k2"));
+      Assertions.assertNull(currentVersion(secretManager, props.get("other")));
+    }
+  }
+
+  @Test
+  void testBindAfterOrphanedVersionIsReadable() {
     try (SecretManager secretManager = secretManager()) {
       Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "faulty", "old"));
+      // The promote fails, so the written version stays behind as a non-current version.
+      alter(secretManager, props, bind(KEY, "faulty", "new"));
+      Map<String, String> removed = alter(secretManager, props, CatalogChange.removeProperty(KEY));
+      Assertions.assertNull(currentVersion(secretManager, props.get(KEY)));
 
-      Assertions.assertDoesNotThrow(() -> alter(secretManager, props, bind(KEY, "faulty", "new")));
-      Assertions.assertEquals("old", read(secretManager, props, KEY));
+      alter(secretManager, removed, bind(KEY, "faulty", "again"));
+      Assertions.assertEquals("again", read(secretManager, props, KEY));
+    }
+  }
+
+  @Test
+  void testFirstBindingCommitsWithoutPromoteOrDelete() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "faulty", "first"));
+
+      FaultySecretsProvider faulty = faulty(secretManager);
+      Assertions.assertEquals(0, faulty.promotes);
+      Assertions.assertTrue(faulty.deletedVersions.isEmpty());
+      Assertions.assertEquals("first", read(secretManager, props, KEY));
     }
   }
 
@@ -262,6 +366,8 @@ public class TestSecretManagerAlter {
   void testFailedVersionWriteDeletesVersionsWrittenBefore() {
     try (SecretManager secretManager = secretManager()) {
       Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "faulty", "old"));
+      FaultySecretsProvider faulty = faulty(secretManager);
+      faulty.writtenVersions.clear();
 
       Assertions.assertThrows(
           IllegalStateException.class,
@@ -269,11 +375,68 @@ public class TestSecretManagerAlter {
               prepare(
                   secretManager,
                   props,
-                  bind(KEY, "faulty", "new"),
                   bind("first", "faulty", "a"),
-                  bind("broken", "faulty", "b")));
+                  bind(KEY, "faulty", "new"),
+                  bind("second", "faulty", "b"),
+                  bind("broken", "faulty", "c")));
+      Assertions.assertEquals(3, faulty.writtenVersions.size());
+      Assertions.assertEquals(
+          new HashSet<>(faulty.writtenVersions), new HashSet<>(faulty.deletedVersions));
       Assertions.assertEquals("old", read(secretManager, props, KEY));
       Assertions.assertNull(currentVersion(secretManager, writeThroughUrn("faulty", "first")));
+      Assertions.assertNull(currentVersion(secretManager, writeThroughUrn("faulty", "second")));
+    }
+  }
+
+  @Test
+  void testUnversionedProviderFailsEveryAlterOfItsSecrets() {
+    try (SecretManager secretManager = secretManager()) {
+      SecretUrn urn =
+          secretManager
+              .getRegistry()
+              .getProvider("unversioned")
+              .writeSecret("old", writeThroughAttributes(KEY));
+      Map<String, String> props = Map.of(KEY, urn.toString());
+      CatalogChange[][] batches = {
+        {bind(KEY, "unversioned", "new")},
+        {CatalogChange.setProperty(KEY, "new")},
+        {CatalogChange.removeProperty(KEY)},
+        {
+          CatalogChange.setSecretReference(
+              KEY, new SecretReference("reference", Map.of("path", "kv")))
+        },
+        {bind(KEY, "memory", "new")},
+      };
+      for (CatalogChange[] batch : batches) {
+        UnsupportedOperationException error =
+            Assertions.assertThrows(
+                UnsupportedOperationException.class, () -> prepare(secretManager, props, batch));
+        Assertions.assertTrue(error.getMessage().contains("\"unversioned\""), error.getMessage());
+        Assertions.assertTrue(error.getMessage().contains(KEY), error.getMessage());
+      }
+      Assertions.assertEquals("old", secretManager.readSecret(urn));
+      Assertions.assertNull(currentVersion(secretManager, writeThroughUrn("memory", KEY)));
+    }
+  }
+
+  @Test
+  void testUnversionedProviderLaterInBatchDeletesVersionsWrittenBefore() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "faulty", "old"));
+      FaultySecretsProvider faulty = faulty(secretManager);
+      faulty.writtenVersions.clear();
+
+      Assertions.assertThrows(
+          UnsupportedOperationException.class,
+          () ->
+              prepare(
+                  secretManager,
+                  props,
+                  bind(KEY, "faulty", "new"),
+                  bind("k2", "unversioned", "x")));
+      Assertions.assertEquals(1, faulty.writtenVersions.size());
+      Assertions.assertEquals(faulty.writtenVersions, faulty.deletedVersions);
+      Assertions.assertEquals("old", read(secretManager, props, KEY));
     }
   }
 
@@ -392,16 +555,21 @@ public class TestSecretManagerAlter {
   }
 
   private static String writeThroughUrn(String provider, String key) {
-    return SecretUrn.buildWriteThrough(
-            provider,
-            Map.of(
-                SecretConstants.ATTR_ENTITY_TYPE,
-                "catalog",
-                SecretConstants.ATTR_ENTITY_ID,
-                String.valueOf(ID),
-                SecretConstants.ATTR_PROPERTY_KEY,
-                key))
-        .toString();
+    return SecretUrn.buildWriteThrough(provider, writeThroughAttributes(key)).toString();
+  }
+
+  private static Map<String, String> writeThroughAttributes(String key) {
+    return Map.of(
+        SecretConstants.ATTR_ENTITY_TYPE,
+        "catalog",
+        SecretConstants.ATTR_ENTITY_ID,
+        String.valueOf(ID),
+        SecretConstants.ATTR_PROPERTY_KEY,
+        key);
+  }
+
+  private static FaultySecretsProvider faulty(SecretManager secretManager) {
+    return (FaultySecretsProvider) secretManager.getRegistry().getProvider("faulty");
   }
 
   private static SecretProvider provider(SecretManager secretManager) {
@@ -412,13 +580,16 @@ public class TestSecretManagerAlter {
     Config config = new Config(false) {};
     Properties properties = new Properties();
     properties.setProperty(
-        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,memory2,faulty,reference");
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS,
+        "memory,memory2,faulty,unversioned,reference");
     String prefix = SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX;
     String className = SecretProviderRegistry.CLASS_NAME;
     properties.setProperty(prefix + "memory." + className, InMemorySecretsProvider.class.getName());
     properties.setProperty(
         prefix + "memory2." + className, InMemorySecretsProvider.class.getName());
     properties.setProperty(prefix + "faulty." + className, FaultySecretsProvider.class.getName());
+    properties.setProperty(
+        prefix + "unversioned." + className, UnversionedSecretsProvider.class.getName());
     properties.setProperty(
         prefix + "reference." + className,
         TestCatalogManager.TestReferenceSecretsProvider.class.getName());

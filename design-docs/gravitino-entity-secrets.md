@@ -175,7 +175,7 @@ satisfy this rule by construction. Plaintext values never match.
 | Value matches the recognition rule | Value is a URN string → parse `provider_name` → `readSecret(urn)` |
 | Value does **not** match           | Use value as plaintext; **do not** call secrets provider          |
 
-Drop / `removeProperty` `deleteSecret` uses URN shape (§5.5.2 C).
+Drop `deleteSecret` and alter release (§5.5.3) use URN shape (§5.5.2 C).
 
 #### 5.1.1 URN shape
 
@@ -430,12 +430,12 @@ provider. The built URN **must end with the property key**. **`InMemorySecretsPr
 external-ref binds** in this design (it is write-through only); other providers may accept them
 via the same interface.
 
-**C. Drop entity / `removeProperty` — URN shape decides delete**
+**C. Drop entity / alter release — URN shape decides delete**
 
-No new drop query param (no `purgeSecrets`). The same ownership check applies when:
+No new drop query param (no `purgeSecrets`). An ownership check applies when (drop applies only part of it, see the note below the table):
 
 - dropping a catalog, schema, or fileset, or
-- alter `removeProperty` removes a secret key
+- an alter releases a write-through URN of the entity (§5.5.3)
 
 For each candidate property whose value matches the URN recognition rule (§5.1), parse the stored
 URN:
@@ -445,15 +445,23 @@ URN:
 | **Write-through shaped for this entity** — for in-memory, the identifier is exactly `<entityType>:<entityId>:<propertyKey>` where `entityType` ∈ {`catalog`,`schema`,`fileset`}, `entityId` equals this entity's id, and `propertyKey` equals the property key | Drop: best-effort `deleteSecret(urn)`. Alter: delete the current version after the alter commits (§5.5.3). Then drop / remove the property metadata |
 | **Anything else** (including external-ref URNs)                                                                                                                                                                                                                | Drop / remove property metadata only — **do not** call `deleteSecret`     |
 
+Drop currently checks only that the identifier has three segments: it deletes every such URN in
+the entity's properties without comparing the entity type, entity id and property key. Alter release applies the
+full check.
+
 Rationale: write-through secrets are **Gravitino-managed**; once the property (or entity) is gone,
 leaving material in the provider would orphan it. External refs are owned outside Gravitino.
 
 #### 5.5.3 Alter: versioned write-through secrets
 
 Secret material and the entity live in different stores, so an alter that fails after touching the
-provider must not leave the entity referencing a deleted or changed secret. The write-through URN
-stays fixed; providers that support write-through also implement four version methods:
+provider must not leave the entity referencing a deleted or changed write-through secret of its own.
+The write-through URN stays fixed; providers that support write-through also implement four version
+methods:
 `writeSecretVersion`, `promoteSecretVersion`, `deleteSecretVersion` and `currentSecretVersion`.
+If a provider of a written or released URN does not implement them, the alter fails with
+`UnsupportedOperationException`. Released URNs are checked before any version is written; versions
+already written for other keys in the batch are deleted best-effort.
 
 1. Prepare (before the entity update): apply the whole batch to a copy of the properties. For each
    key whose final value is a write-through URN of this entity with a new plaintext, record the
@@ -461,18 +469,25 @@ stays fixed; providers that support write-through also implement four version me
    the URN had none. For each write-through URN of this entity that the final properties no
    longer hold, record its current version.
 2. Commit (after the entity update): make each new version current and delete the version it
-   replaced, then delete the recorded versions of released URNs. Best effort: failures are logged.
-   If a new version cannot be made current, the previous version is kept.
+   replaced, then delete the recorded versions of released URNs. Failures are logged and do not
+   fail the alter. If making a new version current fails, the previous version is kept and the
+   new version stays in the provider; running the same change again writes and promotes another
+   version. The leftover version stays until a drop that still holds the key deletes the URN.
 3. Rollback (entity update failed): delete the new versions. The entity keeps reading the versions
    that were current before the alter.
 
-Working from the start and final properties means a batch that changes one key several times is
-handled by its net effect. Deleting by version id means a later alter that writes the same URN
+An alter releases a write-through URN of the entity when the final properties no longer hold it,
+for example after `removeProperty`, `setSecretReference`, or a binding to another provider. Working
+from the start and final properties means a batch that changes one key several times is handled by
+its net effect. Deleting by version id means a later alter that writes the same URN
 keeps its own version. On paths where the entity update is logged rather than thrown (external
 schemas), released versions are kept when the update fails.
 
 Two servers rotating one key on a shared provider can still promote in an order different from the
 order of their entity commits; the entity version check only orders the entity updates.
+
+`setProperty` on a key that holds a secret URN this entity does not own rewrites that secret
+through its provider right away, outside versions, so a failed alter does not undo it.
 
 ### 5.6 In-memory secrets provider (OSS default)
 
@@ -505,7 +520,7 @@ map[URN] = { versions: version id → Base64(plaintext), current: version id }
 | `writeSecret`          | Base64-encode plaintext. Allocate URN `urn:gravitino-secret:<provider_name>:<entityType>:<entityId>:<propertyKey>` from `SecretWriteContext`. Store Base64 as the only version of that URN and make it current. Return the URN. |
 | `readSecret`           | Look up map by URN; Base64-decode the current version; return plaintext. Missing URN or no current version → `IllegalArgumentException`.                                                                                       |
 | `deleteSecret`         | `map.remove(urn)`, all versions — best-effort; used by create rollback and entity drop for **managed** (write-through) secrets (§5.5.2 C).                                                                                       |
-| `writeSecretVersion`   | Add a version under a process-wide increasing id; make it current only when the URN has no current version.                                                                                                                      |
+| `writeSecretVersion`   | Add a version under an id that increases per provider instance; make it current only when the URN has no current version.                                                                                                                      |
 | `promoteSecretVersion` | Make an existing version current; unknown version → `IllegalArgumentException`.                                                                                                                                                  |
 | `deleteSecretVersion`  | Remove one version; deleting the current one leaves no readable value; unknown version → no-op.                                                                                                                                   |
 | `currentSecretVersion` | Current version id, or `null`.                                                                                                                                                                                                    |
@@ -561,7 +576,7 @@ Persisted example (write-through owned key):
 ```
 
 Write-through ownership is visible in the URN shape (`…:catalog:<id>:<propertyKey>`). Drop and
-alter `removeProperty` delete secret material only for that shape (§5.5.2 C).
+alter release delete secret material only for that shape (§5.5.2 C).
 
 **Affected endpoints** (entity paths unchanged; secrets behavior shared — §5.9.2–5.9.5, drop §5.5.2 C;
 plus static config list §5.9.6):
@@ -702,7 +717,7 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `provider` unknown                                                                 | **Reject**                                                                                                                                                                                                                                         |
 | `setProperty` `value` is `******`                                                  | **Reject**                                                                                                                                                                                                                                         |
 | `setProperty` `value` is `urn:gravitino-secret:...`                                | **Reject** in v1 — use `setSecretReference` or `setSecretBinding`                                                                                                                                                                                  |
-| `removeProperty` on a secret key                                                   | Remove from properties; if the **current** value is write-through-shaped for this entity (§5.5.2 C), best-effort `deleteSecret(urn)` (same rule as entity drop). External-ref / other URN shapes: remove property only — **do not** `deleteSecret` |
+| `removeProperty` on a secret key                                                   | Remove from properties; if the **current** value is write-through-shaped for this entity (§5.5.2 C), delete its current version after the alter commits (§5.5.3). External-ref / other URN shapes: remove property only — **do not** delete material |
 | Other `@type`s (`rename` / `updateComment` / …)                                    | Unchanged                                                                                                                                                                                                                                          |
 
 OpenAPI: add `SetSecretBindingRequest` / `SetSecretReferenceRequest` (and schema/fileset
@@ -897,7 +912,7 @@ No new database table is introduced for secrets-provider registration.
 | Persist                 | Server writes URN strings under the secret property keys (create/alter)             |
 | Resolve                 | Matching values → `readSecret`; others stay plaintext                               |
 | GET/list                | Matching keys are **omitted**                                                       |
-| Drop / `removeProperty` | Matching write-through-shaped URNs may `deleteSecret` (§5.5.2 C)                    |
+| Drop / alter            | Matching write-through-shaped URNs: drop calls `deleteSecret`; alter deletes released versions after commit (§5.5.2 C, §5.5.3) |
 
 ### 7.3 URN
 
@@ -975,7 +990,7 @@ Config change requires edit + **restart**.
 | Configuration | `gravitino.secret.providers` + `provider.<name>.className` (+ settings); edit + restart                                                              |
 | GET / list    | Keys whose values match the URN recognition rule **omitted**                                                                                         |
 | REST API      | Create: `secretReferences` / `secretBindings`; alter: `setSecretBinding` / `setSecretReference` (§5.9.4); list providers (§5.9.6); server builds URN |
-| Drop / alter  | No `purgeSecrets` param; material deleted on drop or `removeProperty` only when URN is write-through-shaped for this entity (§5.5.2 C); alter writes versions and switches them after commit (§5.5.3) |
+| Drop / alter  | No `purgeSecrets` param; material deleted on drop for write-through-shaped URNs, or released by an alter for this entity's write-through URNs (§5.5.2 C); alter writes versions and switches them after commit (§5.5.3) |
 | Persistence   | All-string map on catalog/schema/fileset; secret values are URN strings                                                                              |
 | Clients       | List providers API; create maps; alter `setSecretBinding` / `setSecretReference`; detail/list omits secret keys                                      |
 | Rotation      | In-memory: none (§5.8)                                                                                                                               |

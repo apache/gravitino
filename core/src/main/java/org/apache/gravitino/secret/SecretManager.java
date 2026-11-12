@@ -327,9 +327,10 @@ public class SecretManager implements Closeable {
   /**
    * Makes the versions an alter wrote current and deletes the versions it replaced.
    *
-   * <p>Call only after the entity alter committed. Best effort: a failure is logged and does not
-   * fail the committed alter. If a written version cannot be made current, the version that was
-   * current before it is not deleted.
+   * <p>Call only after the entity alter committed. Failures are logged and do not fail the
+   * committed alter. If making a written version current fails, the version that was current before
+   * it is not deleted and the written version stays in the provider; running the same change again
+   * writes and promotes a new version.
    *
    * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
    */
@@ -341,16 +342,24 @@ public class SecretManager implements Closeable {
         continue;
       }
       SecretUrn urn = written.version().urn();
+      SecretProvider provider;
       try {
-        SecretProvider provider = registry.getProvider(urn.providerName());
+        provider = registry.getProvider(urn.providerName());
         provider.promoteSecretVersion(urn, written.version().id());
-        provider.deleteSecretVersion(urn, written.previousId());
       } catch (RuntimeException e) {
-        LOG.warn(
-            "Failed to make version {} of secret {} current after the alter committed",
+        LOG.error(
+            "Failed to make version {} of secret {} current after the alter committed; the"
+                + " previous version {} is not deleted",
             written.version().id(),
             urn,
+            written.previousId(),
             e);
+        continue;
+      }
+      try {
+        provider.deleteSecretVersion(urn, written.previousId());
+      } catch (RuntimeException e) {
+        LOG.warn("Failed to delete replaced version {} of secret {}", written.previousId(), urn, e);
       }
     }
     deleteSecretVersions(prepared.released());
@@ -359,8 +368,9 @@ public class SecretManager implements Closeable {
   /**
    * Best-effort delete of the versions an alter wrote, after the entity alter failed.
    *
-   * <p>The versions that were current before the alter are kept, so the entity reads the values it
-   * still references.
+   * <p>The versions that were current before the alter are kept, so the entity's own write-through
+   * secrets keep the values it still references. A secret that {@link #alterSetProperty} rewrote
+   * right away is not restored.
    *
    * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
    */
@@ -387,6 +397,8 @@ public class SecretManager implements Closeable {
    * @param plaintexts property key → plaintext to write; each key holds a write-through URN of this
    *     entity in {@code finalProperties}
    * @return the written and released versions
+   * @throws UnsupportedOperationException if a provider of a written or released secret does not
+   *     support secret versions
    */
   PreparedSecrets prepareSecretVersions(
       @Nullable Map<String, String> startProperties,
@@ -394,13 +406,23 @@ public class SecretManager implements Closeable {
       String entityType,
       long entityId,
       Map<String, String> plaintexts) {
+    // Look up the released versions first, so an unsupported provider of a released URN fails
+    // before any version is written.
+    List<PreparedSecrets.Version> released =
+        releasedVersions(startProperties, finalProperties, entityType, entityId);
     List<PreparedSecrets.WrittenVersion> written = new ArrayList<>(plaintexts.size());
     try {
       for (Map.Entry<String, String> entry : plaintexts.entrySet()) {
         SecretUrn urn = SecretUrn.parse(finalProperties.get(entry.getKey()));
         SecretProvider provider = registry.getProvider(urn.providerName());
-        String previousId = provider.currentSecretVersion(urn);
-        String id = provider.writeSecretVersion(urn, entry.getValue());
+        String previousId;
+        String id;
+        try {
+          previousId = provider.currentSecretVersion(urn);
+          id = provider.writeSecretVersion(urn, entry.getValue());
+        } catch (UnsupportedOperationException e) {
+          throw unsupportedVersions(urn, e);
+        }
         written.add(
             new PreparedSecrets.WrittenVersion(new PreparedSecrets.Version(urn, id), previousId));
       }
@@ -410,8 +432,7 @@ public class SecretManager implements Closeable {
       deleteSecretVersions(versions);
       throw e;
     }
-    return new PreparedSecrets(
-        written, releasedVersions(startProperties, finalProperties, entityType, entityId));
+    return new PreparedSecrets(written, released);
   }
 
   /** Current versions of this entity's write-through URNs that {@code finalProperties} dropped. */
@@ -437,12 +458,24 @@ public class SecretManager implements Closeable {
         if (id != null) {
           released.add(new PreparedSecrets.Version(urn, id));
         }
+      } catch (UnsupportedOperationException e) {
+        throw unsupportedVersions(urn, e);
       } catch (RuntimeException e) {
         // Releasing only frees material, so a failed lookup must not block the alter.
         LOG.warn("Failed to look up the current version of released secret {}", urn, e);
       }
     }
     return released;
+  }
+
+  private static UnsupportedOperationException unsupportedVersions(
+      SecretUrn urn, UnsupportedOperationException cause) {
+    return new UnsupportedOperationException(
+        String.format(
+            "Secret provider \"%s\" does not support secret versions, which altering the"
+                + " write-through secret of property \"%s\" requires",
+            urn.providerName(), urn.propertyKey()),
+        cause);
   }
 
   private void deleteSecretVersions(List<PreparedSecrets.Version> versions) {
@@ -559,7 +592,8 @@ public class SecretManager implements Closeable {
    *
    * <p>If the current value is a write-through URN owned by this entity, records {@code value} as
    * the plaintext to write for it, like {@link #alterSetSecretBinding}. If it is another secret
-   * URN, rewrites that secret through its provider. Otherwise puts plaintext into properties.
+   * URN, rewrites that secret through its provider right away, outside secret versions, so a failed
+   * alter does not undo that write. Otherwise puts plaintext into properties.
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
