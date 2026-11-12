@@ -507,9 +507,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                         .build();
                 entityStore.put(entity, false);
               }
-              // A valid managed connector can sanitize its return value while preserving the
-              // identifier
-              // in storage. The same sanitized result is used for a new table and for EXIST_OK.
+              // A valid managed connector can drop the identifier from its returned table and keep
+              // it in storage. The same result is used for a new table and for EXIST_OK.
               return GenericTable.builder()
                   .withName(table.name())
                   .withColumns(new Column[0])

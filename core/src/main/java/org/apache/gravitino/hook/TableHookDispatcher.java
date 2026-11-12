@@ -100,7 +100,8 @@ public class TableHookDispatcher implements TableDispatcher {
     if (ownerManager != null) {
       Preconditions.checkState(
           table instanceof EntityCombinedTable,
-          "Table dispatcher did not return a creation outcome for %s",
+          "Table %s was created, but the table dispatcher did not report whether this request "
+              + "created it, so no owner was set. Set the owner explicitly.",
           ident);
       OptionalLong createdId = ((EntityCombinedTable) table).createdTableId();
       if (createdId.isEmpty()) {
