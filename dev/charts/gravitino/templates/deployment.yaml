@@ -129,6 +129,8 @@ spec:
         {{- $pgInitHost := include "gravitino.postgresqlInitHost" . | trim }}
         {{- $pgInitSecret := include "gravitino.postgresqlInitSecretName" . | trim }}
         {{- $pgInitSecretKey := .Values.postgresql.init.existingSecretPasswordKey | default "password" }}
+        {{- $pgInitPort := include "gravitino.postgresqlInitPort" . | trim }}
+        {{- $pgInitSslMode := include "gravitino.postgresqlInitSslMode" . | trim }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -172,6 +174,12 @@ spec:
               value: {{ include "gravitino.postgresqlInitUsername" . }}
             - name: GRAVITINO_DB
               value: {{ include "gravitino.postgresqlInitDatabase" . }}
+            - name: PGPORT
+              value: {{ $pgInitPort | quote }}
+            {{- if $pgInitSslMode }}
+            - name: PGSSLMODE
+              value: {{ $pgInitSslMode | quote }}
+            {{- end }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:

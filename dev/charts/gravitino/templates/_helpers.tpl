@@ -123,10 +123,64 @@ true
 
 {{/*
 True when the init-postgresql schema init container should be rendered.
+In-chart Bitnami PostgreSQL always runs schema init. External PostgreSQL runs
+only when postgresql.init.enabled is true (opt-in; see issue #9013 for hook Job).
 */}}
 {{- define "gravitino.postgresqlSchemaInitEnabled" -}}
-{{- if or .Values.postgresql.enabled (eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true") -}}
+{{- if .Values.postgresql.enabled -}}
 true
+{{- else if and (eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true") .Values.postgresql.init.enabled -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+Authority segment (host[:port]) from entity.jdbcUrl for PostgreSQL.
+*/}}
+{{- define "gravitino.entityJdbcAuthorityFromUrl" -}}
+{{- $url := .Values.entity.jdbcUrl | default "" -}}
+{{- if hasPrefix "jdbc:postgresql://" $url -}}
+{{- $path := trimPrefix "jdbc:postgresql://" $url -}}
+{{- (splitList "/" $path | first) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Hostname from entity.jdbcUrl authority (external PostgreSQL).
+*/}}
+{{- define "gravitino.entityJdbcHostFromUrl" -}}
+{{- $auth := include "gravitino.entityJdbcAuthorityFromUrl" . | trim -}}
+{{- if $auth -}}
+{{- if contains ":" $auth -}}
+{{- $parts := splitList ":" $auth -}}
+{{- index $parts 0 -}}
+{{- else -}}
+{{- $auth -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Port from entity.jdbcUrl authority (defaults to 5432 when omitted).
+*/}}
+{{- define "gravitino.entityJdbcPortFromUrl" -}}
+{{- $auth := include "gravitino.entityJdbcAuthorityFromUrl" . | trim -}}
+{{- if and $auth (contains ":" $auth) -}}
+{{- $parts := splitList ":" $auth -}}
+{{- index $parts 1 -}}
+{{- else -}}
+5432
+{{- end -}}
+{{- end -}}
+
+{{/*
+sslmode query parameter from entity.jdbcUrl.
+*/}}
+{{- define "gravitino.entityJdbcSslModeFromUrl" -}}
+{{- $url := .Values.entity.jdbcUrl | default "" -}}
+{{- $match := regexFind "sslmode=([^&]+)" $url -}}
+{{- if $match -}}
+{{- trimPrefix "sslmode=" $match -}}
 {{- end -}}
 {{- end -}}
 
@@ -138,8 +192,37 @@ Hostname for init-postgresql psql (-h).
 {{- .Values.postgresql.init.host -}}
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" .Release.Name -}}
-{{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
-{{- fail "postgresql.init.host is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)" -}}
+{{- else -}}
+{{- $fromUrl := include "gravitino.entityJdbcHostFromUrl" . | trim -}}
+{{- if $fromUrl -}}
+{{- $fromUrl -}}
+{{- else -}}
+{{- fail "postgresql.init.host is required (or set a parseable entity.jdbcUrl host) when postgresql.init.enabled is true for external PostgreSQL" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Port for init-postgresql (PGPORT).
+*/}}
+{{- define "gravitino.postgresqlInitPort" -}}
+{{- if .Values.postgresql.init.port -}}
+{{- .Values.postgresql.init.port | toString -}}
+{{- else if .Values.postgresql.enabled -}}
+5432
+{{- else -}}
+{{- include "gravitino.entityJdbcPortFromUrl" . | trim -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+sslmode for init-postgresql (PGSSLMODE).
+*/}}
+{{- define "gravitino.postgresqlInitSslMode" -}}
+{{- if .Values.postgresql.init.sslMode -}}
+{{- .Values.postgresql.init.sslMode -}}
+{{- else -}}
+{{- include "gravitino.entityJdbcSslModeFromUrl" . | trim -}}
 {{- end -}}
 {{- end -}}
 
@@ -154,7 +237,7 @@ Secret name for init-postgresql POSTGRES_PASSWORD secretKeyRef.
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" .Release.Name -}}
 {{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
-{{- fail "postgresql.init.existingSecret is required when the entity store uses external PostgreSQL (postgresql.enabled=false and entity.jdbcUrl starts with jdbc:postgresql:)" -}}
+{{- fail "postgresql.init.existingSecret is required when postgresql.init.enabled is true for external PostgreSQL" -}}
 {{- end -}}
 {{- end -}}
 

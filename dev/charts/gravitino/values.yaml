@@ -115,12 +115,22 @@ postgresql:
     ##
     existingSecret: ""
   init:
+    ## @param init.enabled Run init-postgresql for an external PostgreSQL entity store.
+    ## Ignored when postgresql.enabled is true (in-chart Bitnami always runs schema init).
+    ## Default false preserves prior behavior for external PostgreSQL (manual schema or #9013 Job).
+    ##
+    enabled: false
     ## @param init.host PostgreSQL hostname for the init-postgresql psql client (-h).
     ## When postgresql.enabled is true and this is empty, defaults to {{ .Release.Name }}-postgresql.
-    ## Required when the entity store uses an external PostgreSQL JDBC URL (postgresql.enabled=false
-    ## and entity.jdbcUrl starts with jdbc:postgresql:), for example CloudNativePG or RDS.
+    ## For external PostgreSQL with init.enabled=true, falls back to the host in entity.jdbcUrl when empty.
     ##
     host: ""
+    ## @param init.port TCP port for psql (PGPORT). Defaults to 5432, or the port in entity.jdbcUrl for external PostgreSQL.
+    ##
+    port: ""
+    ## @param init.sslMode libpq sslmode (PGSSLMODE), for example require. Defaults to sslmode from entity.jdbcUrl when set.
+    ##
+    sslMode: ""
     ## @param init.existingSecret Kubernetes Secret name for the init container POSTGRES_PASSWORD.
     ## When postgresql.enabled is true and this is empty, defaults to postgresql.auth.existingSecret
     ## if set, otherwise {{ .Release.Name }}-postgresql.

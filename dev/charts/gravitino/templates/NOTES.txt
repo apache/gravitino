@@ -69,13 +69,13 @@ Override postgresql.auth.password (or set postgresql.auth.existingSecret)
 before any non-trial deployment.
 {{- end }}
 
-{{- if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" }}
+{{- if and (eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true") .Values.postgresql.init.enabled }}
 
-NOTE: External PostgreSQL metadata backend detected. The init-postgresql
-container requires postgresql.init.host and postgresql.init.existingSecret
-(operator-managed Secret with the application user password). The database
-name is taken from entity.jdbcUrl. Ensure the Secret key matches
-postgresql.init.existingSecretPasswordKey (default: password).
+NOTE: External PostgreSQL schema init is enabled (postgresql.init.enabled).
+The init-postgresql container requires postgresql.init.existingSecret
+(operator-managed Secret with the application user password). Host, port, and
+sslmode default from entity.jdbcUrl when postgresql.init.host/port/sslMode are
+empty. Database name is taken from entity.jdbcUrl.
 {{- end }}
 
 To check pod status:
