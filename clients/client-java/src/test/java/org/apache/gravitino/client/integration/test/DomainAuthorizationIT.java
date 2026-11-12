@@ -65,9 +65,9 @@ public class DomainAuthorizationIT extends DomainIT {
   @Test
   void testVisibilityInheritedPermissionsAndDenyPrecedence() {
     Domain parent =
-        metalake.createDomain("Parent/auth. scope", null, null, TagValue.noValue("parent"), true);
+        metalake.createDomain("Parent_auth_scope", null, null, TagValue.noValue("parent"), true);
     Domain child =
-        parent.createSubdomain("Child/auth. scope", null, null, TagValue.noValue("child"), true);
+        parent.createSubdomain("Child_auth_scope", null, null, TagValue.noValue("child"), true);
     for (String user : List.of("reader", "manager", "outsider", "owner", "lake_manager")) {
       metalake.addUser(user);
     }
@@ -188,9 +188,9 @@ public class DomainAuthorizationIT extends DomainIT {
         .asTableCatalog()
         .createTable(NameIdentifier.of("schema", "hidden"), columns, "", Collections.emptyMap());
     Domain parent =
-        metalake.createDomain("access parent", null, null, TagValue.noValue("parent tag"), true);
+        metalake.createDomain("access_parent", null, null, TagValue.noValue("parent tag"), true);
     Domain child =
-        parent.createSubdomain("access child", null, null, TagValue.noValue("child tag"), true);
+        parent.createSubdomain("access_child", null, null, TagValue.noValue("child tag"), true);
     parent.publish();
     catalog
         .asSchemas()
@@ -283,7 +283,7 @@ public class DomainAuthorizationIT extends DomainIT {
         metalake.createDomain("second", null, null, TagValue.noValue("second tag"), true).publish();
     Domain child =
         first
-            .createSubdomain("moving/child. name", null, null, TagValue.noValue("moving tag"), true)
+            .createSubdomain("moving_child_name", null, null, TagValue.noValue("moving tag"), true)
             .publish();
     metalake.addUser("moving_manager");
     metalake.addUser("lake_owner");

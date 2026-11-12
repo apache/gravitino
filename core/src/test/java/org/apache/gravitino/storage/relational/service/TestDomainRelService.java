@@ -173,9 +173,9 @@ public class TestDomainRelService extends TestJDBCBackend {
     // The edge refers to the parent by ID, so a renamed parent is resolved by its new name.
     domainMetaService.updateDomain(
         finance.nameIdentifier(),
-        entity -> ((DomainEntity) entity).toBuilder().withName("Finance/Global").build());
+        entity -> ((DomainEntity) entity).toBuilder().withName("Finance_Global").build());
     Assertions.assertEquals(
-        "Finance/Global",
+        "Finance_Global",
         domainMetaService.getDomainByIdentifier(trading.nameIdentifier()).parent().orElse(null));
   }
 
@@ -996,7 +996,7 @@ public class TestDomainRelService extends TestJDBCBackend {
             () ->
                 domainRelService.setDomainParentAndGet(
                     finance.nameIdentifier(),
-                    NameIdentifierUtil.ofDomain(METALAKE_NAME, "Finance "),
+                    NameIdentifier.of(NamespaceUtil.ofDomain(METALAKE_NAME), "Finance "),
                     AUDIT_INFO,
                     s -> {}));
     Assertions.assertTrue(

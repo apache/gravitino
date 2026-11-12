@@ -216,7 +216,7 @@ class GenericDomain(Domain):
         if member_filter.name_contains is not None:
             params["nameContains"] = member_filter.name_contains
         if member_filter.domains:
-            # HTTPClient uses urlencode(doseq=True), preserving commas within names.
+            # Send each domain scope as a separate query parameter.
             params["domains"] = list(member_filter.domains)
         response = self._client.get(
             self._path + "/objects", params=params, error_handler=DOMAIN_ERROR_HANDLER

@@ -153,7 +153,11 @@ from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLE
 from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
-from gravitino.rest.rest_utils import domain_path, encode_string
+from gravitino.rest.rest_utils import (
+    domain_path,
+    encode_metadata_object_name,
+    encode_string,
+)
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -1385,7 +1389,7 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_OWNERS_PATH.format(
             encode_string(self.name()),
-            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+            f"{metadata_object.type().value}/{encode_metadata_object_name(metadata_object)}",
         )
         response = self.rest_client.get(url, error_handler=OWNER_ERROR_HANDLER)
         resp = OwnerResponse.from_json(response.body, infer_missing=True)
@@ -1410,7 +1414,7 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_OWNERS_PATH.format(
             encode_string(self.name()),
-            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+            f"{metadata_object.type().value}/{encode_metadata_object_name(metadata_object)}",
         )
         req = OwnerSetRequest(owner_name, owner_type)
         req.validate()
@@ -1899,7 +1903,7 @@ class GravitinoMetalake(
             encode_string(self.name()),
             encode_string(role_name),
             encode_string(securable_object.type().name.lower()),
-            encode_string(securable_object.full_name()),
+            encode_metadata_object_name(securable_object),
         )
         response = self.rest_client.put(
             url, json=req, error_handler=PERMISSION_ERROR_HANDLER
@@ -1940,7 +1944,7 @@ class GravitinoMetalake(
             encode_string(self.name()),
             encode_string(role_name),
             encode_string(securable_object.type().name.lower()),
-            encode_string(securable_object.full_name()),
+            encode_metadata_object_name(securable_object),
         )
         response = self.rest_client.put(
             url, json=req, error_handler=PERMISSION_ERROR_HANDLER

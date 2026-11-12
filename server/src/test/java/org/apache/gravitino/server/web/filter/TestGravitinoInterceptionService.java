@@ -731,6 +731,39 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testInvalidDomainNameRejectedBeforeOwnerAndGrantAuthorization() throws Throwable {
+    Method owner =
+        OwnerOperations.class.getMethod(
+            "getOwnerForObject", String.class, String.class, String.class);
+    Method grant =
+        PermissionOperations.class.getMethod(
+            "grantPrivilegeToRole",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            PrivilegeGrantRequest.class);
+    for (Method method : new Method[] {owner, grant}) {
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              method.equals(owner)
+                  ? new Object[] {"metalake", "domain", "Finance "}
+                  : new Object[] {"metalake", "role", "domain", "Finance ", null});
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      try (Response response = (Response) interceptor.invoke(invocation)) {
+        assertEquals(400, response.getStatus());
+        assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            ((ErrorResponse) response.getEntity()).getCode());
+      }
+      verify(invocation, never()).proceed();
+    }
+  }
+
+  @Test
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =

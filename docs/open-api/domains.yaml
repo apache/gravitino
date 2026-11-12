@@ -442,12 +442,7 @@ paths:
   /metalakes/{metalake}/domains/{domain}/objects:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - name: domain
-        in: path
-        required: true
-        description: Domain name. Encode slashes as %2F in this path segment.
-        schema:
-          type: string
+      - $ref: "#/components/parameters/domain"
     get:
       tags: [domain]
       summary: List recorded domain members
@@ -463,15 +458,13 @@ paths:
           description: >-
             Repeated domain names selecting the union of their scopes. Omit to select the whole
             scope. Selecting the listed domain also selects its subdomains. Unknown names are
-            ignored; if all supplied names are unknown, the result is empty. Commas are literal
-            characters in names, not separators.
+            ignored; if all supplied names are unknown, the result is empty.
           style: form
           explode: true
           schema:
             type: array
             items:
-              type: string
-              minLength: 1
+              $ref: "#/components/schemas/DomainName"
         - name: types
           in: query
           description: Comma-separated leaf types, case-insensitive. Omit to include all supported types.
@@ -598,15 +591,19 @@ components:
       name: domain
       in: path
       required: true
-      description: Domain name. Encode slashes as %2F; reverse proxies must preserve this encoding.
       schema:
-        type: string
+        $ref: "#/components/schemas/DomainName"
   schemas:
     DomainNameListResponse:
       allOf:
         - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
         - type: object
           required: [names]
+          properties:
+            names:
+              type: array
+              items:
+                $ref: "#/components/schemas/DomainName"
 
     MemberType:
       type: string
@@ -666,7 +663,7 @@ components:
       required: [name, properties, status, audit]
       properties:
         name:
-          type: string
+          $ref: "#/components/schemas/DomainName"
         comment:
           type: string
           nullable: true
@@ -678,8 +675,11 @@ components:
           type: string
           enum: [draft, published]
         parent:
-          type: string
-          nullable: true
+          oneOf:
+            - $ref: "#/components/schemas/DomainName"
+            - type: string
+              nullable: true
+              enum: [null]
           description: Parent domain name, or null for a top-level domain.
         backingTag:
           type: object
@@ -716,7 +716,7 @@ components:
                   type: schema
               - relation: via_subdomain
                 source:
-                  fullName: Finance.US
+                  fullName: Finance_US
                   type: domain
       type: object
       required: [code, members]
@@ -795,14 +795,22 @@ components:
           maxLength: 256
           description: Exact assignment value; null binds any effective assignment of the tag.
 
+    DomainName:
+      type: string
+      minLength: 1
+      maxLength: 64
+      pattern: '^(?![sS][yY][sS][tT][eE][mM]$)[A-Za-z0-9_][A-Za-z0-9_-]*$'
+      description: >-
+        Domain names follow catalog naming rules. Use ASCII letters, digits, underscores,
+        or hyphens. A hyphen may only appear after the first character. The names "*" and
+        "system" (in any letter case) are reserved.
+
     DomainCreateRequest:
       type: object
       required: [name, backingTag]
       properties:
         name:
-          type: string
-          minLength: 1
-          maxLength: 128
+          $ref: "#/components/schemas/DomainName"
         comment:
           type: string
           nullable: true
@@ -812,9 +820,11 @@ components:
           additionalProperties:
             type: string
         parent:
-          type: string
-          nullable: true
-          minLength: 1
+          oneOf:
+            - $ref: "#/components/schemas/DomainName"
+            - type: string
+              nullable: true
+              enum: [null]
           description: Optional top-level parent. A subdomain is created atomically under it.
         backingTag:
           allOf:
@@ -847,8 +857,7 @@ components:
       required: [parent]
       properties:
         parent:
-          type: string
-          minLength: 1
+          $ref: "#/components/schemas/DomainName"
 
     DomainBackingTagSetRequest:
       type: object
@@ -901,8 +910,7 @@ components:
           type: string
           enum: [rename]
         newName:
-          type: string
-          minLength: 1
+          $ref: "#/components/schemas/DomainName"
 
     UpdateDomainCommentRequest:
       type: object

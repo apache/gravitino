@@ -59,6 +59,7 @@ import org.apache.gravitino.domain.DomainChange;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainMember;
 import org.apache.gravitino.domain.DomainMemberFilter;
+import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.json.JsonUtils;
@@ -131,8 +132,8 @@ import org.junit.jupiter.api.Test;
 
 class TestDomainEventDispatcher {
   private final String metalake = "lake/with spaces";
-  private final String name = "Finance.US/a b";
-  private final String parent = "Business.EU/parent";
+  private final String name = "Finance_US-ab";
+  private final String parent = "Business_EU-parent";
   private final TagValue backingTag = TagValue.of("department", "finance");
   private final boolean createBackingTag = false;
   private final String comment = "comment";
@@ -140,7 +141,7 @@ class TestDomainEventDispatcher {
   private final DomainChange[] changes = new DomainChange[] {DomainChange.rename("renamed")};
   private final DomainMemberFilter filter =
       DomainMemberFilter.builder()
-          .withDomains("Tax,EU", "Trading/US")
+          .withDomains("Tax_EU", "Trading_US")
           .withTypes(MetadataObject.Type.TABLE)
           .withNameContains("a b&?")
           .build();
@@ -225,6 +226,22 @@ class TestDomainEventDispatcher {
         GetDomainFailureEvent.class,
         OperationType.GET_DOMAIN,
         NameIdentifierUtil.ofDomain(metalake, name));
+  }
+
+  @Test
+  void testInvalidCreateNameEmitsFailureBeforeHooks() {
+    DomainDispatcher hooks = mock(DomainDispatcher.class);
+    DomainEventDispatcher events =
+        new DomainEventDispatcher(bus, new DomainNormalizeDispatcher(hooks));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> events.createDomain(metalake, "bad.name", comment, properties, backingTag, false));
+    assertEquals(2, observed.size());
+    assertInstanceOf(CreateDomainPreEvent.class, observed.get(0));
+    assertInstanceOf(CreateDomainFailureEvent.class, observed.get(1));
+    assertEquals("bad.name", observed.get(0).identifier().name());
+    assertEquals("bad.name", observed.get(1).identifier().name());
+    verifyNoInteractions(hooks);
   }
 
   @Test

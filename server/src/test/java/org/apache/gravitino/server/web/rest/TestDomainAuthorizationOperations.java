@@ -68,6 +68,7 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.domain.DomainDispatcher;
 import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.dto.requests.DomainParentSetRequest;
 import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -119,6 +120,8 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   private final SupportsDomainOperations transactions = mock(SupportsDomainOperations.class);
   private final GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
   private final DomainManager manager = new DomainManager(mock(IdGenerator.class), store);
+  private final DomainDispatcher publicDispatcher =
+      new DomainNormalizeDispatcher(new DomainHookDispatcher(manager));
   private DomainDispatcher savedInternalDomainDispatcher;
   private Config savedConfig;
   private GravitinoAuthorizer savedAuthorizer;
@@ -153,7 +156,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
             new AbstractBinder() {
               @Override
               protected void configure() {
-                bind(new DomainHookDispatcher(manager)).to(DomainDispatcher.class);
+                bind(publicDispatcher).to(DomainDispatcher.class);
                 bindFactory(MockServletRequestFactory.class).to(HttpServletRequest.class);
               }
             });
@@ -164,7 +167,8 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
     GravitinoEnv env = GravitinoEnv.getInstance();
     savedConfig = env.config();
     savedInternalDomainDispatcher = env.internalDomainDispatcher();
-    FieldUtils.writeField(env, "internalDomainDispatcher", manager, true);
+    FieldUtils.writeField(
+        env, "internalDomainDispatcher", new DomainNormalizeDispatcher(manager), true);
     savedAuthorizer = env.gravitinoAuthorizer();
     Config config = mock(Config.class);
     when(config.get(Configs.ENABLE_AUTHORIZATION)).thenReturn(true);
@@ -305,7 +309,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
         .onPostEvent(any());
     EventBus bus = new EventBus(Collections.singletonList(listener));
     DomainOperations operations =
-        new DomainOperations(new DomainEventDispatcher(bus, new DomainHookDispatcher(manager)));
+        new DomainOperations(new DomainEventDispatcher(bus, publicDispatcher));
     HttpServletRequest request = mock(HttpServletRequest.class);
     String uri = "/api" + BASE + "/" + name + "/parent";
     when(request.getMethod()).thenReturn("PUT");
@@ -352,8 +356,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
         .onPostEvent(any());
     EventBus bus = new EventBus(Collections.singletonList(listener));
     DomainMembershipOperations operations =
-        new DomainMembershipOperations(
-            new DomainEventDispatcher(bus, new DomainHookDispatcher(manager)));
+        new DomainMembershipOperations(new DomainEventDispatcher(bus, publicDispatcher));
     HttpServletRequest request = mock(HttpServletRequest.class);
     String uri = "/api" + BASE + "/missing/objects";
     when(request.getMethod()).thenReturn("GET");
@@ -495,18 +498,34 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   }
 
   @Test
-  void reservedNamesCannotBreakDomainReads() throws Exception {
+  public void testRejectsInvalidDomainPath() {
+    try (Response response =
+        target(BASE + "/{domain}").resolveTemplate("domain", "Finance/US").request().get()) {
+      assertEquals(400, response.getStatus());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"*", "SyStEm", "bad.name", "a/b", " "})
+  void invalidNewNamesAreRejectedBeforeStorage(String name) throws Exception {
     allows.add("lake:MANAGE_DOMAIN");
     allows.add("lake:CREATE_TAG");
-    expect("POST", BASE, "{\"name\":\"*\",\"backingTag\":{\"name\":\"tag\",\"create\":true}}", 400);
-    when(store.update(any(), eq(DomainEntity.class), eq(EntityType.DOMAIN), any()))
-        .thenAnswer(
-            call -> call.<Function<DomainEntity, DomainEntity>>getArgument(3).apply(current.get()));
+    expect("GET", BASE + "/SyStEm", null, 400);
+    String backingTag = "\"backingTag\":{\"name\":\"tag\",\"create\":true}";
+    expect("POST", BASE, String.format("{\"name\":\"%s\",%s}", name, backingTag), 400);
     expect(
-        "PUT", BASE + "/Trading", "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"*\"}]}", 400);
-    assertEquals("Trading", current.get().name());
-    expect("GET", BASE, null, 200);
+        "POST",
+        BASE,
+        String.format("{\"name\":\"%s\",\"parent\":\"Finance\",%s}", name, backingTag),
+        400);
+    expect(
+        "PUT",
+        BASE + "/Trading",
+        String.format("{\"updates\":[{\"@type\":\"rename\",\"newName\":\"%s\"}]}", name),
+        400);
     verify(transactions, never()).insertDomainWithNewBackingTag(any(), any(), any());
+    verify(store, never()).update(any(), eq(DomainEntity.class), eq(EntityType.DOMAIN), any());
+    expect("GET", BASE, null, 200);
   }
 
   @Test
@@ -645,7 +664,7 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
   }
 
   private MethodInvocation deleteInvocation(String name) throws Throwable {
-    DomainOperations operations = new DomainOperations(new DomainHookDispatcher(manager));
+    DomainOperations operations = new DomainOperations(publicDispatcher);
     FieldUtils.writeField(operations, "httpRequest", mock(HttpServletRequest.class), true);
     Method method = DomainOperations.class.getMethod("deleteDomain", String.class, String.class);
     MethodInvocation invocation = mock(MethodInvocation.class);

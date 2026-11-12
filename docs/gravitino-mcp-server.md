@@ -265,14 +265,15 @@ For example, call `list_domain_members` with:
 {
   "domain_name": "sales",
   "types": ["TABLE", "TOPIC"],
-  "domains": ["regional,sales", "online"],
+  "domains": ["regional-sales", "online"],
   "name_contains": "orders"
 }
 ```
 
 `types` is a list of leaf object types; `domains` filters source domain names
-using repeated query parameters, preserving commas inside names.
-`name_contains` is passed as the REST `nameContains` substring filter.
+using repeated query parameters.
+`name_contains` matches a case-insensitive substring of the full metadata object name.
+Omitted or blank values leave this filter unset.
 Omitted or empty type/domain lists leave those filters unset.
 Leaf lookups support tables, filesets, topics, models, views and semantic models;
 use the REST object type spelling (for example `table` or `semantic_model`).

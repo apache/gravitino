@@ -38,7 +38,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.exceptions.BackingTagAlreadyBoundException;
@@ -472,7 +471,6 @@ public class DomainManager implements DomainDispatcher {
       @Nullable Map<String, String> properties,
       TagValue backingTag,
       boolean createBackingTag) {
-    MetadataObjects.of(null, name, MetadataObject.Type.DOMAIN);
     Preconditions.checkArgument(
         backingTag != null, "The backing tag of domain %s must not be null", name);
     Preconditions.checkArgument(
@@ -605,7 +603,6 @@ public class DomainManager implements DomainDispatcher {
     for (DomainChange change : changes) {
       if (change instanceof DomainChange.RenameDomain) {
         newName = ((DomainChange.RenameDomain) change).getNewName();
-        MetadataObjects.of(null, newName, MetadataObject.Type.DOMAIN);
       } else if (change instanceof DomainChange.UpdateDomainComment) {
         newComment = ((DomainChange.UpdateDomainComment) change).getNewComment();
       } else if (change instanceof DomainChange.SetProperty) {

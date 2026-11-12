@@ -185,13 +185,13 @@ class DomainApiEdgesMixin:
         with self.assertRaises(NoSuchDomainException):
             self.lake.get_domain(child.name())
 
-    def test_unicode_names_and_backing_tag_value_length_boundaries(self):
+    def test_backing_tag_value_length_boundaries(self):
         _, table = self._relational_table()
         for index, value in enumerate(("x" * 256, "😀" * 128)):
             with self.subTest(index=index):
                 tag_name = f"unicode-boundary-{index}"
                 self.lake.create_tag(tag_name, None, {})
-                name = f"财务/😀,区域{index}"
+                name = "F" * 63 + str(index)
                 binding = TagValue(tag_name, value)
                 domain = self.lake.create_domain(
                     name, "Unicode comment 中文😀", {"region": "亚洲😀"}, binding, False
@@ -205,7 +205,7 @@ class DomainApiEdgesMixin:
                 table.supports_tags().assign_tags([{"name": tag_name, "value": value}])
                 direct = {(DomainRelation.Type.DIRECT, None, None)}
                 self._assert_table_relations(domain, table, direct)
-                renamed = f"税务/😀,地区{index}"
+                renamed = f"Tax-{index}"
                 changed = self.lake.alter_domain(name, DomainChange.rename(renamed))
                 self.assertEqual(renamed, self.lake.get_domain(renamed).name())
                 self.assertEqual(binding, changed.backing_tag())
@@ -261,14 +261,18 @@ class DomainApiEdgesMixin:
         # Modifying returned collections must not change snapshots or their set membership.
         member_hash = hash(member)
         member.relations().clear()
-        self.assertEqual([DomainRelation(DomainRelation.Type.DIRECT)], member.relations())
+        self.assertEqual(
+            [DomainRelation(DomainRelation.Type.DIRECT)], member.relations()
+        )
         self.assertEqual(member_hash, hash(member))
         reverse = table.supports_domains().list_domains_info()[0]
         reverse_reloaded = table.supports_domains().list_domains_info()[0]
         self.assertEqual(reverse, reverse_reloaded)
         reverse_hash = hash(reverse)
         reverse.relations().clear()
-        self.assertEqual([DomainRelation(DomainRelation.Type.DIRECT)], reverse.relations())
+        self.assertEqual(
+            [DomainRelation(DomainRelation.Type.DIRECT)], reverse.relations()
+        )
         self.assertEqual(reverse_hash, hash(reverse))
         self.assertIn(reverse_reloaded, {reverse})
 

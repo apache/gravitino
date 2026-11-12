@@ -24,7 +24,11 @@ from gravitino.api.tag.tag_value import TagValue
 
 
 class DomainOperations(ABC):
-    """Metalake domain management. Hidden drafts are omitted or return 404."""
+    """Metalake domain management. Hidden drafts are omitted or return 404.
+
+    Names have 1 to 64 ASCII letters, digits, underscores or hyphens and cannot
+    start with a hyphen. The names "*" and "system" (in any case) are reserved.
+    """
 
     @abstractmethod
     def list_domains(self) -> list[str]:

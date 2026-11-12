@@ -646,14 +646,13 @@ public class NameIdentifierUtil {
    *
    * @param ident The metadata object identifier to check
    * @param entityType The metadata object entity type
-   * @throws IllegalNameIdentifierException If a non-domain name contains the qualified-name
-   *     separator
+   * @throws IllegalNameIdentifierException If the name contains the qualified-name separator
    */
   public static void checkMetadataObjectName(NameIdentifier ident, Entity.EntityType entityType) {
     Preconditions.checkArgument(
         ident != null && entityType != null, "The identifier and entity type must not be null");
 
-    if (entityType != Entity.EntityType.DOMAIN && ident.name().contains(".")) {
+    if (ident.name().contains(".")) {
       throw new IllegalNameIdentifierException(
           "The %s name '%s' is unsupported because '.' is reserved as the qualified-name "
               + "separator.",

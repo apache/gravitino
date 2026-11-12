@@ -26,14 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
@@ -177,9 +170,8 @@ public class DomainIT extends BaseIT {
   }
 
   @Test
-  void testDomainLifecycleAndEncodedNames() {
-    // Exercise names that must survive path and query encoding without becoming hierarchy.
-    String name = "Finance/US. East,?&+%";
+  void testDomainLifecycle() {
+    String name = "Finance_US_East";
     Domain draft = create(name);
     assertEquals(name, metalake.getDomain(name).name());
     assertEquals(Set.of(name), Set.of(metalake.listDomains()));
@@ -205,7 +197,7 @@ public class DomainIT extends BaseIT {
     // Renaming a domain preserves its backing tag but invalidates the old name until reused.
     changed =
         metalake.alterDomain(
-            name, DomainChange.removeProperty("key"), DomainChange.rename("Renamed/US. East,?&+%"));
+            name, DomainChange.removeProperty("key"), DomainChange.rename("Renamed_US_East"));
     assertTrue(changed.properties().isEmpty());
     assertEquals(
         TagValue.noValue(name.replace(".", "_") + " tag"), changed.backingTag().orElseThrow());
@@ -226,10 +218,10 @@ public class DomainIT extends BaseIT {
 
   @Test
   void testHierarchyAndBackingTagChanges() {
-    Domain parent = create("Parent/with. spaces");
-    Domain other = create("Other/parent. name");
+    Domain parent = create("Parent_with_spaces");
+    Domain other = create("Other_parent_name");
     Domain child =
-        parent.createSubdomain("Tax,EU/child", null, null, TagValue.noValue("child tag"), true);
+        parent.createSubdomain("Tax_EU_child", null, null, TagValue.noValue("child tag"), true);
     assertEquals(parent.name(), child.parent().orElseThrow());
     assertArrayEquals(new String[] {child.name()}, parent.listSubdomains());
     assertEquals(child.name(), parent.listSubdomainsInfo()[0].name());
@@ -280,7 +272,7 @@ public class DomainIT extends BaseIT {
         domain.listMembers(
                 DomainMemberFilter.builder()
                     .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
-                    .withDomains("Tax,EU", "Trading/US. East&?+%")
+                    .withDomains("Tax_EU", "Trading_US_East")
                     .withNameContains("x /?&+%,")
                     .build())
             .length);
@@ -369,12 +361,12 @@ public class DomainIT extends BaseIT {
         TagValueConstraint.ofAllowedValues("finance", "risk"));
     Domain finance =
         metalake.createDomain(
-            "Finance/US. East,?&+%", null, null, TagValue.of("department", "finance"), false);
+            "Finance_US_East", null, null, TagValue.of("department", "finance"), false);
     Domain risk =
-        metalake.createDomain("Risk,EU", null, null, TagValue.of("department", "risk"), false);
+        metalake.createDomain("Risk_EU", null, null, TagValue.of("department", "risk"), false);
     Domain child =
         finance.createSubdomain(
-            "Trading,US/with. spaces?&+%", null, null, TagValue.noValue("trading"), true);
+            "Trading_US_with_spaces", null, null, TagValue.noValue("trading"), true);
     catalog
         .asSchemas()
         .loadSchema("schema")
@@ -425,7 +417,7 @@ public class DomainIT extends BaseIT {
     assertEquals(
         1,
         finance.listMembers(
-                DomainMemberFilter.builder().withDomains(child.name(), "unknown,scope").build())
+                DomainMemberFilter.builder().withDomains(child.name(), "unknown_scope").build())
             .length);
     assertEquals(
         5,
@@ -449,92 +441,16 @@ public class DomainIT extends BaseIT {
             .length);
 
     // Membership roll-ups follow hierarchy changes without retagging the leaf object.
-    Domain other = create("new parent");
+    Domain other = create("new_parent");
     child.attachToParent(other.name());
     assertTrue(Set.of(table.supportsDomains().listDomains()).contains(other.name()));
-    metalake.alterDomain(child.name(), DomainChange.rename("renamed/child"));
-    assertTrue(Set.of(table.supportsDomains().listDomains()).contains("renamed/child"));
-    metalake.deleteDomain("renamed/child");
+    metalake.alterDomain(child.name(), DomainChange.rename("renamed_child"));
+    assertTrue(Set.of(table.supportsDomains().listDomains()).contains("renamed_child"));
+    metalake.deleteDomain("renamed_child");
     assertFalse(Set.of(table.supportsDomains().listDomains()).contains(other.name()));
     assertNotNull(metalake.getTag("trading"));
     finance.updateBackingTag(null);
     assertEquals(0, table.supportsDomains().listDomains().length);
-  }
-
-  @Test
-  void testEncodedNamesThroughPreservingProxy() throws Exception {
-    // Preserve the raw URI so this proxy does not decode %2F before forwarding to Jetty.
-    HttpServer proxy = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
-    HttpClient upstream = HttpClient.newHttpClient();
-    proxy.createContext("/", exchange -> forward(exchange, upstream));
-    proxy.start();
-    String uri = "http://127.0.0.1:" + proxy.getAddress().getPort();
-    try (GravitinoAdminClient proxyClient =
-        GravitinoAdminClient.builder(uri).withSimpleAuth("anonymous").build()) {
-      GravitinoMetalake proxied = proxyClient.loadMetalake(metalake.name());
-      String name = "Proxy/US. East,?&+%";
-      Domain domain = proxied.createDomain(name, null, null, TagValue.noValue("proxy tag"), true);
-      assertEquals(name, proxied.getDomain(name).name());
-      assertEquals(Domain.Status.PUBLISHED, domain.publish().status());
-      Catalog catalog = createRelationalCatalog();
-      Table table = createTable(catalog);
-      Table other =
-          catalog
-              .asTableCatalog()
-              .createTable(
-                  NameIdentifier.of("schema", "other"),
-                  new Column[] {Column.of("id", Types.LongType.get())},
-                  "",
-                  Collections.emptyMap());
-      Domain first =
-          domain.createSubdomain("scope,one", null, null, TagValue.noValue("proxy-first"), true);
-      Domain second =
-          domain.createSubdomain(
-              "scope/two?&+%", null, null, TagValue.noValue("proxy-second"), true);
-      table.supportsTags().associateTags(new String[] {"proxy-first"}, new String[0]);
-      other.supportsTags().associateTags(new String[] {"proxy-second"}, new String[0]);
-
-      // A dropped or incorrectly split scope parameter changes these nonempty results.
-      DomainMember[] selected =
-          domain.listMembers(
-              DomainMemberFilter.builder()
-                  .withDomains(first.name(), "unknown,scope")
-                  .withNameContains("ORDERS")
-                  .build());
-      assertEquals(1, selected.length);
-      assertEquals("ice.schema.orders", selected[0].object().fullName());
-      assertArrayEquals(
-          new DomainRelation[] {DomainRelation.viaSubdomain(first.name())},
-          selected[0].relations());
-      assertEquals(
-          2,
-          domain.listMembers(
-                  DomainMemberFilter.builder().withDomains(first.name(), second.name()).build())
-              .length);
-      assertEquals(
-          "ice.schema.other",
-          domain
-              .listMembers(DomainMemberFilter.builder().withDomains(second.name()).build())[0]
-              .object()
-              .fullName());
-      assertEquals(
-          0,
-          domain.listMembers(DomainMemberFilter.builder().withDomains("unknown,scope").build())
-              .length);
-      assertEquals(
-          0,
-          domain.listMembers(
-                  DomainMemberFilter.builder()
-                      .withDomains(first.name())
-                      .withNameContains("other")
-                      .build())
-              .length);
-      assertTrue(proxied.deleteDomain(first.name()));
-      assertTrue(proxied.deleteDomain(second.name()));
-      assertTrue(proxied.deleteDomain(name));
-    } finally {
-      proxy.stop(0);
-    }
   }
 
   @Test
@@ -650,9 +566,9 @@ public class DomainIT extends BaseIT {
     Table table = createTable(catalog);
     Domain parent = create("Parent");
     Domain first =
-        parent.createSubdomain("First/child.A", null, null, TagValue.noValue("first-tag"), true);
+        parent.createSubdomain("First_child_A", null, null, TagValue.noValue("first-tag"), true);
     Domain second =
-        parent.createSubdomain("Second,child.B", null, null, TagValue.noValue("second-tag"), true);
+        parent.createSubdomain("Second_child_B", null, null, TagValue.noValue("second-tag"), true);
     catalog.supportsTags().associateTags(new String[] {"first-tag"}, new String[0]);
     catalog
         .asSchemas()
@@ -710,9 +626,9 @@ public class DomainIT extends BaseIT {
         DomainRelation.viaSubdomain(second.name()));
     second.detachFromParent();
     assertTableRelations(parent, table, DomainRelation.viaSubdomain(first.name()));
-    first = metalake.alterDomain(first.name(), DomainChange.rename("Renamed/child.A"));
+    first = metalake.alterDomain(first.name(), DomainChange.rename("Renamed_child_A"));
     assertTableRelations(parent, table, DomainRelation.viaSubdomain(first.name()));
-    parent = metalake.alterDomain(parent.name(), DomainChange.rename("Renamed/parent.P"));
+    parent = metalake.alterDomain(parent.name(), DomainChange.rename("Renamed_parent_P"));
     assertEquals(parent.name(), metalake.getDomain(first.name()).parent().orElseThrow());
     assertTableRelations(parent, table, DomainRelation.viaSubdomain(first.name()));
 
@@ -850,13 +766,13 @@ public class DomainIT extends BaseIT {
   }
 
   @Test
-  void testUnicodeNamesAndBackingTagValueLengthBoundaries() {
+  void testBackingTagValueLengthBoundaries() {
     Table table = createTable(createRelationalCatalog());
     String[] values = {"x".repeat(256), "😀".repeat(128)};
     for (int index = 0; index < values.length; index++) {
       String tagName = "unicode-boundary-" + index;
       metalake.createTag(tagName, null, Collections.emptyMap());
-      String name = "财务/😀,区域" + index;
+      String name = "F".repeat(63) + index;
       TagValue binding = TagValue.of(tagName, values[index]);
       Domain domain =
           metalake.createDomain(
@@ -868,7 +784,7 @@ public class DomainIT extends BaseIT {
       // Boundary values must survive JSON, storage and effective-tag membership resolution.
       table.supportsTags().associateTags(new TagValue[] {binding}, new TagValue[0]);
       assertTableRelations(domain, table, DomainRelation.direct());
-      String renamed = "税务/😀,地区" + index;
+      String renamed = "Tax-" + index;
       Domain changed = metalake.alterDomain(name, DomainChange.rename(renamed));
       assertEquals(renamed, metalake.getDomain(renamed).name());
       assertEquals(binding, changed.backingTag().orElseThrow());
@@ -990,36 +906,5 @@ public class DomainIT extends BaseIT {
   private Domain create(String name) {
     return metalake.createDomain(
         name, null, null, TagValue.noValue(name.replace(".", "_") + " tag"), true);
-  }
-
-  private void forward(HttpExchange exchange, HttpClient upstream) throws IOException {
-    try {
-      // Forward the encoded path and repeated query parameters unchanged.
-      HttpRequest.Builder request =
-          HttpRequest.newBuilder(URI.create(serverUri + exchange.getRequestURI().toASCIIString()));
-      for (String header : List.of("Authorization", "Content-Type", "Accept")) {
-        String value = exchange.getRequestHeaders().getFirst(header);
-        if (value != null) {
-          request.header(header, value);
-        }
-      }
-      request.method(
-          exchange.getRequestMethod(),
-          HttpRequest.BodyPublishers.ofByteArray(exchange.getRequestBody().readAllBytes()));
-
-      HttpResponse<byte[]> response =
-          upstream.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
-      response
-          .headers()
-          .firstValue("Content-Type")
-          .ifPresent(value -> exchange.getResponseHeaders().set("Content-Type", value));
-      exchange.sendResponseHeaders(response.statusCode(), response.body().length);
-      exchange.getResponseBody().write(response.body());
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      exchange.sendResponseHeaders(502, -1);
-    } finally {
-      exchange.close();
-    }
   }
 }

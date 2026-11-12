@@ -150,7 +150,7 @@ public class TestSecurableObjects extends TestJDBCBackend {
     DomainEntity domain =
         DomainEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("Finance.v1")
+            .withName("Finance_v1")
             .withNamespace(NamespaceUtil.ofDomain(metalakeName))
             .withStatus(Domain.Status.DRAFT)
             .withProperties(ImmutableMap.of())
