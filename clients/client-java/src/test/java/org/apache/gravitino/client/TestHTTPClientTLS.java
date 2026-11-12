@@ -37,6 +37,9 @@ import org.junit.jupiter.api.Test;
 public class TestHTTPClientTLS {
   private static final String TEST_SERVLET_PATH = "/tls-test";
   private static final String TEST_CLIENT_PATH = "tls-test";
+  private static final String TEST_CLIENT_TRUSTSTORE = "test-client-truststore.p12";
+  private static final String TEST_TRUSTED_CLIENT_KEYSTORE = "test-trusted-client-keystore.p12";
+  private static final String TEST_UNTRUSTED_CLIENT_KEYSTORE = "test-untrusted-client-keystore.p12";
 
   private JettyServer jettyServer;
 
@@ -59,13 +62,11 @@ public class TestHTTPClientTLS {
             jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
 
     TLSConfigurer tlsConfigurer =
-        TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
-            .keyStore(
-                TestTlsServerUtils.testResource("test-trusted-client-keystore.p12"),
-                TEST_STORE_PASSWORD)
-            .build();
+        TLSConfigurers.withMutualTls(
+            TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE),
+            TEST_STORE_PASSWORD,
+            TestTlsServerUtils.testResource(TEST_TRUSTED_CLIENT_KEYSTORE),
+            TEST_STORE_PASSWORD);
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
       client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {});
@@ -78,11 +79,11 @@ public class TestHTTPClientTLS {
         TestTlsServerUtils.startHttpsServer(
             jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
 
+    // Creates a TLSConfigurer that only has the trust store, but no client key store, to simulate a
+    // client that does not present a certificate.
     TLSConfigurer tlsConfigurer =
-        TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
-            .build();
+        TLSConfigurers.withTrustStore(
+            TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD);
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
       RESTException exception =
@@ -101,13 +102,11 @@ public class TestHTTPClientTLS {
             jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
 
     TLSConfigurer tlsConfigurer =
-        TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
-            .keyStore(
-                TestTlsServerUtils.testResource("test-untrusted-client-keystore.p12"),
-                TEST_STORE_PASSWORD)
-            .build();
+        TLSConfigurers.withMutualTls(
+            TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE),
+            TEST_STORE_PASSWORD,
+            TestTlsServerUtils.testResource(TEST_UNTRUSTED_CLIENT_KEYSTORE),
+            TEST_STORE_PASSWORD);
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
       RESTException exception =
@@ -126,10 +125,8 @@ public class TestHTTPClientTLS {
             jettyServer, false, createTestServlet(), TEST_SERVLET_PATH);
 
     TLSConfigurer tlsConfigurer =
-        TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-client-truststore.p12"), TEST_STORE_PASSWORD)
-            .build();
+        TLSConfigurers.withTrustStore(
+            TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD);
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
       client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {});
@@ -143,13 +140,51 @@ public class TestHTTPClientTLS {
             jettyServer, false, createTestServlet(), TEST_SERVLET_PATH);
 
     TLSConfigurer tlsConfigurer =
-        TLSConfigurers.builder()
-            .trustStore(
-                TestTlsServerUtils.testResource("test-untrusted-server-truststore.p12"),
-                TEST_STORE_PASSWORD)
-            .build();
+        TLSConfigurers.withTrustStore(
+            TestTlsServerUtils.testResource("test-untrusted-server-truststore.p12"),
+            TEST_STORE_PASSWORD);
 
     try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
+      RESTException exception =
+          assertThrows(
+              RESTException.class,
+              () -> client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {}));
+
+      TestTlsServerUtils.assertHandshakeFailure(exception);
+    }
+  }
+
+  @Test
+  public void testMutualTLSWithDefaultTrustStoreRejectsUntrustedServer() throws Exception {
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, true, createTestServlet(), TEST_SERVLET_PATH);
+
+    TLSConfigurer tlsConfigurer =
+        TLSConfigurers.withKeyStore(
+            TestTlsServerUtils.testResource(TEST_TRUSTED_CLIENT_KEYSTORE), TEST_STORE_PASSWORD);
+
+    // Due to utilizing the default JVM trust store, the client will not trust either test
+    // certificate, which is self-signed so expect a handshake failure.
+    try (HTTPClient client = createHttpsClient(port, tlsConfigurer)) {
+      RESTException exception =
+          assertThrows(
+              RESTException.class,
+              () -> client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {}));
+
+      TestTlsServerUtils.assertHandshakeFailure(exception);
+    }
+  }
+
+  @Test
+  public void testHttpsWithDefaultTlsRejectsUntrustedServer() throws Exception {
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH);
+
+    try (HTTPClient client =
+        HTTPClient.builder(ImmutableMap.of()).uri("https://localhost:" + port).build()) {
+
       RESTException exception =
           assertThrows(
               RESTException.class,
@@ -186,6 +221,95 @@ public class TestHTTPClientTLS {
     assertThrows(
         IllegalArgumentException.class,
         () -> TLSConfigurers.builder().trustStore(trustStore, "wrong-password").build());
+  }
+
+  @Test
+  public void testTlsProtocolRestrictionAllowsMatchingProtocol() throws Exception {
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, "TLSv1.2", null);
+
+    TLSConfigurer allowedConfigurer =
+        TLSConfigurers.builder()
+            .trustStore(
+                TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD)
+            .protocols("TLSv1.2")
+            .build();
+
+    try (HTTPClient client = createHttpsClient(port, allowedConfigurer)) {
+      client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {});
+    }
+  }
+
+  @Test
+  public void testTlsProtocolRestrictionRejectsMismatchedProtocol() throws Exception {
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, "TLSv1.2", null);
+
+    TLSConfigurer restrictedConfigurer =
+        TLSConfigurers.builder()
+            .trustStore(
+                TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD)
+            .protocols("TLSv1.3")
+            .build();
+
+    try (HTTPClient client = createHttpsClient(port, restrictedConfigurer)) {
+      RESTException exception =
+          assertThrows(
+              RESTException.class,
+              () -> client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {}));
+
+      TestTlsServerUtils.assertHandshakeFailure(exception);
+    }
+  }
+
+  @Test
+  public void testTlsCipherSuiteRestrictionAllowsMatchingCipher() throws Exception {
+    String serverCipher = "TLS_AES_128_GCM_SHA256";
+
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, "TLSv1.3", serverCipher);
+
+    TLSConfigurer allowedConfigurer =
+        TLSConfigurers.builder()
+            .trustStore(
+                TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD)
+            .protocols("TLSv1.3")
+            .cipherSuites(serverCipher)
+            .build();
+
+    try (HTTPClient client = createHttpsClient(port, allowedConfigurer)) {
+      client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {});
+    }
+  }
+
+  @Test
+  public void testTlsCipherSuiteRestrictionRejectsMismatchedCipher() throws Exception {
+    String serverCipher = "TLS_AES_128_GCM_SHA256";
+    String clientCipher = "TLS_AES_256_GCM_SHA384";
+
+    int port =
+        TestTlsServerUtils.startHttpsServer(
+            jettyServer, false, createTestServlet(), TEST_SERVLET_PATH, "TLSv1.3", serverCipher);
+
+    TLSConfigurer restrictedConfigurer =
+        TLSConfigurers.builder()
+            .trustStore(
+                TestTlsServerUtils.testResource(TEST_CLIENT_TRUSTSTORE), TEST_STORE_PASSWORD)
+            .protocols("TLSv1.3")
+            .cipherSuites(clientCipher)
+            .build();
+
+    try (HTTPClient client = createHttpsClient(port, restrictedConfigurer)) {
+      RESTException exception =
+          assertThrows(
+              RESTException.class,
+              () -> client.head(TEST_CLIENT_PATH, ImmutableMap.of(), response -> {}));
+
+      TestTlsServerUtils.assertHandshakeFailure(exception);
+    }
   }
 
   private static HTTPClient createHttpsClient(int port, TLSConfigurer tlsConfigurer) {
