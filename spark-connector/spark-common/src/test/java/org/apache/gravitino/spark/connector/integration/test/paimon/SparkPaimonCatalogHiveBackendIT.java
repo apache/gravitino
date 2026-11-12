@@ -123,8 +123,7 @@ public abstract class SparkPaimonCatalogHiveBackendIT extends SparkPaimonCatalog
 
     // Read the format table through the Gravitino catalog.
     List<String> rows = getQueryData(String.format("SELECT * FROM %s ORDER BY id", tableName));
-    Assertions.assertEquals(
-        Arrays.asList("1,a,20260101", "2,b,20260101", "3,c,20260102"), rows);
+    Assertions.assertEquals(Arrays.asList("1,a,20260101", "2,b,20260101", "3,c,20260102"), rows);
     List<String> filtered =
         getQueryData(
             String.format("SELECT id FROM %s WHERE dt = '20260102' ORDER BY id", tableName));
