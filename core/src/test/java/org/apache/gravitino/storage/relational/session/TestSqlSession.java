@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.session;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS;
+import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_USER;
@@ -30,9 +31,12 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -44,12 +48,15 @@ import java.util.UUID;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestSqlSession {
@@ -76,6 +83,7 @@ public class TestSqlSession {
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_PASSWORD)).thenReturn("123");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER)).thenReturn("org.h2.Driver");
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
     Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_WAIT_MILLISECONDS)).thenReturn(1000L);
   }
 
@@ -128,6 +136,68 @@ public class TestSqlSession {
   }
 
   @Test
+  public void testConfiguredMaxIdleAndPoolCap() {
+    SqlSessionFactoryHelper.getInstance().close();
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(64);
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(40);
+    try {
+      SqlSessionFactoryHelper.getInstance().init(config);
+      BasicDataSource dataSource =
+          (BasicDataSource)
+              SqlSessionFactoryHelper.getInstance()
+                  .getSqlSessionFactory()
+                  .getConfiguration()
+                  .getEnvironment()
+                  .getDataSource();
+      assertEquals(40, dataSource.getMaxTotal());
+      assertEquals(40, dataSource.getMaxIdle());
+    } finally {
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    }
+  }
+
+  @Test
+  public void testMinIdleCappedByMaxIdle() {
+    SqlSessionFactoryHelper.getInstance().close();
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(3);
+    try {
+      SqlSessionFactoryHelper.getInstance().init(config);
+      BasicDataSource dataSource =
+          (BasicDataSource)
+              SqlSessionFactoryHelper.getInstance()
+                  .getSqlSessionFactory()
+                  .getConfiguration()
+                  .getEnvironment()
+                  .getDataSource();
+      assertEquals(3, dataSource.getMaxIdle());
+      assertEquals(3, dataSource.getMinIdle());
+    } finally {
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_IDLE_CONNECTIONS)).thenReturn(10);
+    }
+  }
+
+  @Test
+  public void testUnlimitedPoolStillLimitsIdleConnections() {
+    SqlSessionFactoryHelper.getInstance().close();
+    Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(-1);
+    try {
+      SqlSessionFactoryHelper.getInstance().init(config);
+      BasicDataSource dataSource =
+          (BasicDataSource)
+              SqlSessionFactoryHelper.getInstance()
+                  .getSqlSessionFactory()
+                  .getConfiguration()
+                  .getEnvironment()
+                  .getDataSource();
+      assertEquals(-1, dataSource.getMaxTotal());
+      assertEquals(10, dataSource.getMaxIdle());
+    } finally {
+      Mockito.when(config.get(ENTITY_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS)).thenReturn(100);
+    }
+  }
+
+  @Test
   public void testGetSqlSessionFactoryWithoutInit() {
     SqlSessionFactoryHelper.getInstance().close();
     assertThrows(
@@ -137,12 +207,38 @@ public class TestSqlSession {
 
   @Test
   public void testOpenAndCloseSqlSession() {
+    assertFalse(SqlSessions.hasActiveSession());
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);
+    assertTrue(SqlSessions.hasActiveSession());
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.closeSqlSession();
+    assertFalse(SqlSessions.hasActiveSession());
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
+  }
+
+  /** An unsuccessful fresh-read acquisition cannot release the caller's existing session. */
+  @Test
+  public void testFreshReadAcquisitionFailurePreservesOuterSession() {
+    SqlSession outer = SqlSessions.getSqlSession();
+    ThreadLocal<SqlSession> context = SqlSessions.getSessions();
+    IllegalStateException failure = new IllegalStateException("session acquisition failed");
+    try (MockedStatic<SqlSessions> sessions = Mockito.mockStatic(SqlSessions.class)) {
+      sessions.when(SqlSessions::getSqlSession).thenThrow(failure);
+      sessions.when(SqlSessions::closeSqlSession).thenCallRealMethod();
+      sessions.when(SqlSessions::getSessionCount).thenCallRealMethod();
+      assertSame(
+          failure,
+          assertThrows(
+              IllegalStateException.class,
+              () -> SessionUtils.getWithoutCommitFresh(CatalogMetaMapper.class, mapper -> null)));
+      assertSame(outer, context.get());
+      assertEquals(1, SqlSessions.getSessionCount());
+      sessions.verify(SqlSessions::closeSqlSession, Mockito.never());
+    } finally {
+      SqlSessions.rollbackAndCloseSqlSession();
+    }
   }
 
   @Test

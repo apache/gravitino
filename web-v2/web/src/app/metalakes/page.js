@@ -37,7 +37,7 @@ import {
 } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
-import { normalizeServiceAdmins } from '@/lib/utils/serviceAdmins'
+import { canCreateMetalake } from '@/lib/utils/metalakePermissions'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -70,17 +70,24 @@ const MetalakeList = () => {
   const [search, setSearch] = useState('')
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
-  const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = normalizeServiceAdmins(serviceAdmins)
-  const isServiceAdmin = admins.includes(authUser?.name)
+  const { isServiceAdmin, authUser, anthEnable, authType, authToken } = auth
+  const showCreateMetalake = canCreateMetalake(anthEnable, isServiceAdmin)
+  const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
   const [tableData, setTableData] = useState([])
 
   useEffect(() => {
     dispatch(resetMetalakeStore())
-    dispatch(fetchMetalakes())
   }, [dispatch])
+
+  useEffect(() => {
+    if (!isAuthReady) {
+      return
+    }
+
+    dispatch(fetchMetalakes())
+  }, [dispatch, isAuthReady])
 
   useEffect(() => {
     const filteredData = store.metalakes
@@ -339,7 +346,7 @@ const MetalakeList = () => {
         }
       }
     ],
-    [anthEnable, ownerRefreshKey]
+    [anthEnable, authUser, isServiceAdmin, ownerRefreshKey]
   )
 
   const { resizableColumns, components, tableWidth } = useAntdColumnResize(() => {
@@ -364,7 +371,7 @@ const MetalakeList = () => {
               placeholder='Search...'
               onChange={onSearchTable}
             />
-            {(isServiceAdmin || !anthEnable) && (
+            {showCreateMetalake && (
               <Button
                 data-refer='create-metalake-btn'
                 type='primary'

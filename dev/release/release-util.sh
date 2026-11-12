@@ -27,7 +27,7 @@ ASF_REPO_WEBUI="https://raw.githubusercontent.com/apache/gravitino"
 ASF_GRAVITINO_REPO="gitbox.apache.org/repos/asf/gravitino.git"
 
 function error {
-  echo "$*"
+  echo "$*" >&2
   exit 1
 }
 
@@ -105,7 +105,10 @@ function get_release_info {
       cut -d/ -f3)
   fi
 
-  export GIT_BRANCH=$(read_config "Branch" "$GIT_BRANCH" GIT_BRANCH)
+  # Assign before exporting: `export VAR=$(...)` would mask a failure in the
+  # substitution, since the exit status seen by `set -e` is export's own.
+  GIT_BRANCH=$(read_config "Branch" "$GIT_BRANCH" GIT_BRANCH)
+  export GIT_BRANCH
 
   # Find the current version for the branch.
   local VERSION=$(curl -s "$ASF_REPO_WEBUI/$GIT_BRANCH/gradle.properties" |
@@ -145,7 +148,8 @@ function get_release_info {
   fi
 
   export NEXT_VERSION
-  export RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION" RELEASE_VERSION)
+  RELEASE_VERSION=$(read_config "Release" "$RELEASE_VERSION" RELEASE_VERSION)
+  export RELEASE_VERSION
 
   # If -r was explicitly provided (non-zero), override the auto-detected NRC_COUNT
   if [ "${RC_COUNT:-0}" -gt 0 ]; then
@@ -185,16 +189,19 @@ function get_release_info {
 
   # Gather some user information.
   if [ -z "${ASF_USERNAME:-}" ]; then
-    export ASF_USERNAME=$(read_config "ASF user" "$LOGNAME" ASF_USERNAME)
+    ASF_USERNAME=$(read_config "ASF user" "$LOGNAME" ASF_USERNAME)
+    export ASF_USERNAME
   fi
 
   if [ -z "${GIT_NAME:-}" ]; then
     GIT_NAME=$(git config user.name || echo "")
-    export GIT_NAME=$(read_config "Full name" "$GIT_NAME" GIT_NAME)
+    GIT_NAME=$(read_config "Full name" "$GIT_NAME" GIT_NAME)
+    export GIT_NAME
   fi
 
   export GIT_EMAIL="$ASF_USERNAME@apache.org"
-  export GPG_KEY=$(read_config "GPG key" "$GIT_EMAIL" GPG_KEY)
+  GPG_KEY=$(read_config "GPG key" "$GIT_EMAIL" GPG_KEY)
+  export GPG_KEY
 
   cat <<EOF
 ================

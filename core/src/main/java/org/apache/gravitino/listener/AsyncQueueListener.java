@@ -20,12 +20,13 @@
 package org.apache.gravitino.listener;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import com.google.common.util.concurrent.Uninterruptibles;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
@@ -45,6 +46,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private static final Logger LOG = LoggerFactory.getLogger(AsyncQueueListener.class);
   private static final String NAME_PREFIX = "async-queue-listener-";
   private static final float HIGH_WATERMARK_RATIO = 0.9f;
+  // Queued by stop() behind the pending events. The dispatcher thread exits when it takes it.
+  private static final BaseEvent STOP_SIGNAL = new BaseEvent(null, null) {};
 
   private final List<EventListenerPlugin> eventListeners;
   private final BlockingQueue<BaseEvent> queue;
@@ -52,7 +55,8 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final int dispatcherJoinSeconds;
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
-  private final AtomicLong lastDropEventCounters = new AtomicLong(0);
+  private final Object dropEventLogLock = new Object();
+  private long lastDropEventCounters;
   private Instant lastRecordDropEventTime = Instant.EPOCH;
   private final String asyncQueueListenerName;
   private final int highWatermarkThreshold;
@@ -96,13 +100,36 @@ public class AsyncQueueListener implements EventListenerPlugin {
 
   @Override
   public void stop() {
-    Preconditions.checkState(!stopped.get(), asyncQueueListenerName + " had already stopped");
-    stopped.compareAndSet(false, true);
-    asyncProcessor.interrupt();
+    // Stop can be called more than once, e.g. by the server shutdown hook after an explicit stop.
+    if (!stopped.compareAndSet(false, true)) {
+      LOG.debug("{} had already stopped", asyncQueueListenerName);
+      return;
+    }
+    long joinMillis = TimeUnit.SECONDS.toMillis(dispatcherJoinSeconds);
+    long deadlineNanos = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(joinMillis);
+    // Give the dispatcher thread up to dispatcherJoinSeconds to drain the queued events. If it
+    // does not finish in time, interrupt it and wait up to another dispatcherJoinSeconds for it to
+    // exit, which is how long stop() waited for the thread before draining was added. So a stuck
+    // dispatcher delays stop() by at most twice dispatcherJoinSeconds.
     try {
-      asyncProcessor.join(dispatcherJoinSeconds * 1000L);
+      if (asyncProcessor.isAlive()
+          && queue.offer(STOP_SIGNAL, remainingMillis(deadlineNanos), TimeUnit.MILLISECONDS)) {
+        asyncProcessor.join(remainingMillis(deadlineNanos));
+      }
     } catch (InterruptedException e) {
-      LOG.warn("{} interrupt async processor failed.", asyncQueueListenerName, e);
+      // Skip the drain, but still stop the dispatcher thread below. The interrupt status is kept.
+      LOG.warn("{} is interrupted while draining the queued events.", asyncQueueListenerName);
+      Thread.currentThread().interrupt();
+    }
+    if (asyncProcessor.isAlive()) {
+      asyncProcessor.interrupt();
+      Uninterruptibles.joinUninterruptibly(asyncProcessor, joinMillis, TimeUnit.MILLISECONDS);
+    }
+    if (asyncProcessor.isAlive()) {
+      LOG.warn(
+          "{} event dispatcher thread is still running after it was interrupted, stop the "
+              + "listeners anyway.",
+          asyncQueueListenerName);
     }
     eventListeners.forEach(listenerPlugin -> listenerPlugin.stop());
   }
@@ -120,6 +147,9 @@ public class AsyncQueueListener implements EventListenerPlugin {
     while (!Thread.currentThread().isInterrupted()) {
       try {
         BaseEvent baseEvent = queue.take();
+        if (baseEvent == STOP_SIGNAL) {
+          break;
+        }
         if (baseEvent instanceof PreEvent) {
           this.eventListeners.forEach(listener -> listener.onPreEvent((PreEvent) baseEvent));
         } else if (baseEvent instanceof Event) {
@@ -137,29 +167,38 @@ public class AsyncQueueListener implements EventListenerPlugin {
 
     if (!queue.isEmpty()) {
       LOG.warn(
-          "{} drop {} events since dispatch thread is interrupted",
+          "{} drop {} events since dispatch thread is stopped",
           asyncQueueListenerName,
           queue.size());
     }
   }
 
+  // Never returns 0, since Thread.join(0) waits forever.
+  private static long remainingMillis(long deadlineNanos) {
+    return Math.max(1, TimeUnit.NANOSECONDS.toMillis(deadlineNanos - System.nanoTime()));
+  }
+
   private void logDropEventsIfNecessary() {
-    long currentDropEvents = dropEventCounters.incrementAndGet();
-    long lastDropEvents = lastDropEventCounters.get();
-    // dropEvents may less than zero in such conditions:
-    // 1. Thread A increment dropEventCounters
-    // 2. Thread B increment dropEventCounters and update lastDropEventCounters
-    // 3. Thread A get lastDropEventCounters
-    long dropEvents = currentDropEvents - lastDropEvents;
-    if (dropEvents > 0 && Instant.now().isAfter(lastRecordDropEventTime.plusSeconds(60))) {
-      if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
-        LOG.warn(
-            "{} drop {} events since {}",
-            asyncQueueListenerName,
-            dropEvents,
-            lastRecordDropEventTime);
-        lastRecordDropEventTime = Instant.now();
+    long dropEventsToLog = 0;
+    Instant previousRecordTime = null;
+    synchronized (dropEventLogLock) {
+      long currentDropEvents = dropEventCounters.incrementAndGet();
+      long lastDropEvents = lastDropEventCounters;
+      long dropEvents = currentDropEvents - lastDropEvents;
+      Instant now = Instant.now();
+      if (dropEvents > 0 && now.isAfter(lastRecordDropEventTime.plusSeconds(60))) {
+        lastDropEventCounters = currentDropEvents;
+        dropEventsToLog = dropEvents;
+        previousRecordTime = lastRecordDropEventTime;
+        lastRecordDropEventTime = now;
       }
+    }
+    if (dropEventsToLog > 0) {
+      LOG.warn(
+          "{} drop {} events since {}",
+          asyncQueueListenerName,
+          dropEventsToLog,
+          previousRecordTime);
     }
   }
 

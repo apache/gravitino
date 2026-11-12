@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -39,6 +40,7 @@ import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.TestInstance.Lifecycle;
@@ -59,6 +61,11 @@ public class TestCatalogEvent {
     this.dispatcher = new CatalogEventDispatcher(eventBus, catalogDispatcher);
     CatalogDispatcher catalogExceptionDispatcher = mockExceptionCatalogDispatcher();
     this.failureDispatcher = new CatalogEventDispatcher(eventBus, catalogExceptionDispatcher);
+  }
+
+  @BeforeEach
+  void clearEvents() {
+    dummyEventListener.clear();
   }
 
   @Test
@@ -356,6 +363,72 @@ public class TestCatalogEvent {
     Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
   }
 
+  @Test
+  void testTestConnectionEvent() throws Exception {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    dispatcher.testConnection(
+        identifier, catalog.type(), catalog.provider(), catalog.comment(), catalog.properties());
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(TestConnectionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testTestConnectionFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "fail");
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () ->
+            failureDispatcher.testConnection(
+                identifier,
+                catalog.type(),
+                catalog.provider(),
+                catalog.comment(),
+                catalog.properties()));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
+  @Test
+  void testTestConnectionExistingCatalogEvent() throws Exception {
+    NameIdentifier identifier = NameIdentifier.of("metalake", catalog.name());
+    dispatcher.testConnection(identifier);
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(identifier, preEvent.identifier());
+    Assertions.assertEquals(TestConnectionPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, preEvent.operationType());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+  }
+
+  @Test
+  void testTestConnectionExistingCatalogFailureEvent() {
+    NameIdentifier identifier = NameIdentifier.of("metalake", "fail");
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.testConnection(identifier));
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(identifier, event.identifier());
+    Assertions.assertEquals(TestConnectionFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.TEST_CONNECTION_CATALOG, event.operationType());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+  }
+
   private void checkCatalogInfo(CatalogInfo catalogInfo, Catalog catalog) {
     Assertions.assertEquals(catalog.name(), catalogInfo.name());
     Assertions.assertEquals(catalog.type(), catalogInfo.type());
@@ -382,7 +455,9 @@ public class TestCatalogEvent {
             any(Catalog.Type.class),
             any(String.class),
             any(String.class),
-            any(Map.class)))
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class)))
         .thenReturn(catalog);
     when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
     when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);

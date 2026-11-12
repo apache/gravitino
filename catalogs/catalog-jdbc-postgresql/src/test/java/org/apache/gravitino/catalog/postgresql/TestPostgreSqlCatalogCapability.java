@@ -28,6 +28,40 @@ public class TestPostgreSqlCatalogCapability {
   private final PostgreSqlCatalogCapability capability = new PostgreSqlCatalogCapability();
 
   @Test
+  void testNativeNamesRemainDistinctFromCreationNames() {
+    for (Capability.Scope scope :
+        new Capability.Scope[] {
+          Capability.Scope.TABLE, Capability.Scope.SCHEMA, Capability.Scope.COLUMN
+        }) {
+      Assertions.assertTrue(
+          capability.specificationOnExistingName(scope, "native\"name").supported());
+      Assertions.assertFalse(capability.specificationOnName(scope, "native\"name").supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(scope, "bad\0name").supported());
+      Assertions.assertFalse(capability.specificationOnExistingName(scope, "").supported());
+      Assertions.assertFalse(capability.specificationOnExistingName(scope, "*").supported());
+      Assertions.assertFalse(
+          capability.specificationOnExistingName(scope, "表".repeat(22)).supported());
+    }
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.SCHEMA, "pg_catalog").supported());
+    Assertions.assertFalse(
+        capability.specificationOnExistingName(Capability.Scope.TABLE, "*").supported());
+  }
+
+  @Test
+  void testNamesAreLimitedByUtf8Bytes() {
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      Assertions.assertTrue(capability.specificationOnName(scope, "表".repeat(21)).supported());
+      Assertions.assertFalse(
+          capability.specificationOnName(scope, "表".repeat(21) + "a").supported());
+      Assertions.assertTrue(
+          capability.specificationOnName(scope, "é".repeat(31) + "a").supported());
+      Assertions.assertFalse(capability.specificationOnName(scope, "é".repeat(32)).supported());
+    }
+  }
+
+  @Test
   void testValidNames() {
     // testing valid names for all scopes
     for (Capability.Scope scope : Capability.Scope.values()) {
@@ -176,6 +210,14 @@ public class TestPostgreSqlCatalogCapability {
     result = capability.specificationOnName(Capability.Scope.TABLE, exceedsMaxName);
     Assertions.assertFalse(result.supported());
     Assertions.assertTrue(result.unsupportedMessage().contains("illegal"));
+  }
+
+  @Test
+  void testByteLimitDiagnostic() {
+    CapabilityResult result =
+        capability.specificationOnName(Capability.Scope.TABLE, "表".repeat(22));
+    Assertions.assertFalse(result.supported());
+    Assertions.assertTrue(result.unsupportedMessage().contains("63 UTF-8 bytes"));
   }
 
   @Test

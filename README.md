@@ -80,8 +80,6 @@ Clone or download the [Gravitino Playground repository](https://github.com/apach
 ./bin/gravitino.sh stop
 ```
 
-Press `CTRL+C` to stop.
-
 5. (Optional) Choose UI version
 
   - By default, Gravitino uses the Web V2 UI.

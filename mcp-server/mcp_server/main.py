@@ -17,16 +17,27 @@
 
 import argparse
 import logging
+import math
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
-from mcp_server.server import GravitinoMCPServer
+from mcp_server.server import (
+    GravitinoMCPServer,
+    log_metalake_policy,
+    log_service_identity_fallback_policy,
+)
+from mcp_server.tools import SUPPORTED_TOOL_TAGS
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
 
 
 def do_main():
     args = _parse_args()
     setting = Setting(
         metalake=args.metalake,
+        gravitino_read_timeout=args.gravitino_read_timeout,
         gravitino_uri=args.gravitino_uri,
         tags=args.include_tool_tags,
         transport=args.transport,
@@ -34,8 +45,20 @@ def do_main():
         token=args.token,
         tls_cert=args.tls_cert,
         tls_key=args.tls_key,
+        oauth_token_endpoint=args.oauth_token_endpoint,
+        oauth_client_id=args.oauth_client_id,
+        oauth_client_secret=args.oauth_client_secret,
+        oauth_scope=args.oauth_scope,
+        no_service_identity_fallback=args.no_service_identity_fallback,
     )
     _init_logging(setting)
+    try:
+        setting.validate_oauth()
+    except ValueError as exc:
+        logging.error("%s", exc)
+        raise SystemExit(1) from None
+    log_metalake_policy(setting)
+    log_service_identity_fallback_policy(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
     server.run()
@@ -62,6 +85,20 @@ def _comma_separated_set(value) -> set:
     return set(item.strip() for item in value.split(",") if item.strip())
 
 
+def _positive_timeout(value):
+    try:
+        timeout = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        ) from exc
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise argparse.ArgumentTypeError(
+            "timeout must be a finite positive number"
+        )
+    return timeout
+
+
 def _parse_args():
     parser = argparse.ArgumentParser(
         description="Gravitino Mcp server",
@@ -71,8 +108,10 @@ def _parse_args():
     parser.add_argument(
         "--metalake",
         type=str,
-        required=True,
-        help="Gravitino metalake name.",
+        default="",
+        help="Default Gravitino metalake name, used by any tool call that "
+        "does not name one itself via its 'metalake' argument. Optional: a "
+        "server with no default serves whichever metalake each call names.",
     )
     parser.add_argument(
         "--gravitino-uri",
@@ -82,12 +121,20 @@ def _parse_args():
     )
 
     parser.add_argument(
+        "--gravitino-read-timeout",
+        type=_positive_timeout,
+        default=os.environ.get("GRAVITINO_READ_TIMEOUT", "60"),
+        help="Gravitino response read timeout in seconds (default: 60). "
+        "Can also be set with GRAVITINO_READ_TIMEOUT. Must be finite and positive.",
+    )
+
+    parser.add_argument(
         "--include-tool-tags",
         type=_comma_separated_set,
         default=set(),
-        help="The tool tags to include, separated by commas, support tags:[catalog, "
-        "schema, table, topic, model, fileset, tag, policy]. default: empty, "
-        "all tools will be included).",
+        help="The tool tags to include, separated by commas, support tags:"
+        f"[{', '.join(sorted(SUPPORTED_TOOL_TAGS))}]. default: empty, "
+        "all tools will be included.",
     )
 
     parser.add_argument(
@@ -112,12 +159,56 @@ def _parse_args():
         "--token",
         type=str,
         default=os.environ.get("GRAVITINO_TOKEN", ""),
-        help="Static OAuth2 Bearer token used to authenticate to Gravitino. "
-        "In stdio mode it is sent on every request; in HTTP mode it is only the "
-        "fallback when an incoming request carries no Authorization header "
+        help="Static credential used as the Authorization header when "
+        "authenticating to Gravitino. A bare token is treated as an OAuth2 Bearer "
+        "token; a value containing a valid scheme and credential, such as "
+        "'Basic <base64>', is sent as an Authorization credential. In stdio mode "
+        "it is sent on every request; in HTTP mode it is only the fallback when an "
+        "incoming request carries no Authorization header "
         "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
-        "When omitted, requests are sent without authentication.",
+        "When omitted, requests are sent without authentication. "
+        "Takes precedence over OAuth client-credentials flags.",
+    )
+
+    parser.add_argument(
+        "--oauth-token-endpoint",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_TOKEN_ENDPOINT", ""),
+        help="OAuth2 token endpoint for client-credentials (service identity). "
+        "Requires --oauth-client-id and --oauth-client-secret. "
+        "Can also be set via GRAVITINO_OAUTH_TOKEN_ENDPOINT.",
+    )
+    parser.add_argument(
+        "--oauth-client-id",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_ID", ""),
+        help="OAuth2 client id for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_ID.",
+    )
+    parser.add_argument(
+        "--oauth-client-secret",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_SECRET", ""),
+        help="OAuth2 client secret for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_SECRET.",
+    )
+    parser.add_argument(
+        "--oauth-scope",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_SCOPE", ""),
+        help="Optional OAuth2 scope for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_SCOPE.",
+    )
+
+    parser.add_argument(
+        "--no-service-identity-fallback",
+        action="store_true",
+        default=_env_truthy("GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK"),
+        help="HTTP only: reject incoming requests that omit Authorization "
+        "when OAuth client-credentials or --token is configured, instead of "
+        "using the service identity. Ignored for stdio transport. Can also "
+        "be enabled via GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK.",
     )
 
     parser.add_argument(

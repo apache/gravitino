@@ -19,13 +19,31 @@
 name: mcp-integration-test
 
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-mcp-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -35,9 +53,23 @@ jobs:
       mcp_or_authz_changes: ${{ steps.filter.outputs.mcp_or_authz_changes }}
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             mcp_or_authz_changes:
               - 'mcp-server/**'
@@ -45,38 +77,16 @@ jobs:
               - 'core/src/main/java/org/apache/gravitino/authorization/**'
               - 'server-common/src/main/java/org/apache/gravitino/server/authentication/**'
               - '.github/workflows/mcp-integration-test.yml'
+              - '.github/workflows/mcp-integration-test-action.yml'
 
   mcp-authz-integration-test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
     needs: changes
     if: needs.changes.outputs.mcp_or_authz_changes == 'true'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/setup-java-toolchains
-        with:
-          java-version: 17
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
-
-      - name: Build Gravitino distribution
-        run: ./gradlew compileDistribution -x test -PskipWeb=true
-
-      - name: Run MCP authorization integration test
-        env:
-          GRAVITINO_HOME: ${{ github.workspace }}/distribution/package
-        run: |
-          ./mcp-server/dev/run_authz_integration_test.sh
-
-      - name: Upload server logs on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: mcp-authz-it-logs
-          path: |
-            distribution/package/logs/**
-            mcp-server/gravitino-mcp-audit.log
-            mcp-server/gravitino-mcp.log
-          if-no-files-found: ignore
+    uses: ./.github/workflows/mcp-integration-test-action.yml
+    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
+      java-version: '17'

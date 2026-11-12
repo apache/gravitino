@@ -165,6 +165,7 @@ public class CatalogKafkaIT extends BaseIT {
     // test load catalog
     Catalog loadedCatalog = metalake.loadCatalog(catalogName);
     Assertions.assertEquals(createdCatalog, loadedCatalog);
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 
     // test alter catalog
     Catalog alteredCatalog =
@@ -450,6 +451,7 @@ public class CatalogKafkaIT extends BaseIT {
         Arrays.stream(topics).anyMatch(topic -> topic.name().equals(illegalName)));
 
     Assertions.assertTrue(catalog.asTopicCatalog().dropTopic(ident));
+    awaitTopicDeletedInKafka(illegalName);
     Assertions.assertFalse(catalog.asTopicCatalog().topicExists(ident));
   }
 

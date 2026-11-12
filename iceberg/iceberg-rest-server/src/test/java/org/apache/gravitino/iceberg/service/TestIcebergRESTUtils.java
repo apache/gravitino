@@ -24,6 +24,8 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -36,17 +38,26 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.SchemaParser;
+import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
+import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.types.Types;
 import org.apache.iceberg.types.Types.IntegerType;
 import org.apache.iceberg.types.Types.NestedField;
 import org.apache.iceberg.types.Types.StringType;
@@ -54,6 +65,9 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 @SuppressWarnings("deprecation")
@@ -78,6 +92,24 @@ public class TestIcebergRESTUtils {
         IcebergRESTUtils.getGravitinoNameIdentifier(metalakeName, catalogName, tableIdentifier);
     Assertions.assertEquals(
         NameIdentifier.of(metalakeName, catalogName, "ns1", "ns2", "table"), nameIdentifier);
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidNamespaces")
+  void testRejectsDotInAnyNamespaceLevel(Namespace namespace) {
+    BadRequestException error =
+        Assertions.assertThrows(
+            BadRequestException.class, () -> IcebergRESTUtils.checkNamespaceLevels(namespace));
+    Assertions.assertTrue(error.getMessage().contains("contains '.'"));
+  }
+
+  @Test
+  void testAllowsValidNamespaceLevelsWithoutDecodingAgain() {
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.checkNamespaceLevels(Namespace.empty()));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("parent", "child")));
+    Assertions.assertDoesNotThrow(
+        () -> IcebergRESTUtils.checkNamespaceLevels(Namespace.of("literal%2Ename")));
   }
 
   @Test
@@ -349,5 +381,237 @@ public class TestIcebergRESTUtils {
     Assertions.assertEquals(
         "v1/irc1/namespaces/db/tables/tbl/credentials",
         credential.config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteLoadTableCredentials() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(NestedField.required(1, "id", IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+    LoadTableResponse upstream =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "io-impl",
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    "s3.session-token",
+                    "upstream-token",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .addCredential(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadTableResponse rewritten =
+        IcebergRESTUtils.rewriteLoadTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals("s3://bucket/db/tbl", rewritten.tableMetadata().location());
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", rewritten.config().get("io-impl"));
+    Assertions.assertEquals("upstream-token", rewritten.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        rewritten.config().get("client.refresh-credentials-endpoint"));
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Credential credential = rewritten.credentials().get(0);
+    Assertions.assertEquals("s3://bucket/db/tbl/", credential.prefix());
+    Assertions.assertEquals("upstream-token", credential.config().get("s3.session-token"));
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        credential.config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testRewriteLoadTableCredentialsDropsConfigRefreshWithoutTokens() {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            new Schema(NestedField.required(1, "id", IntegerType.get())),
+            PartitionSpec.unpartitioned(),
+            SortOrder.unsorted(),
+            "s3://bucket/db/tbl",
+            Collections.emptyMap());
+    // Upstream put the refresh URL in top-level config while the session token lives only in
+    // storage-credentials. The config refresh key must be dropped, not left pointing upstream.
+    LoadTableResponse upstream =
+        LoadTableResponse.builder()
+            .withTableMetadata(metadata)
+            .addAllConfig(
+                ImmutableMap.of(
+                    "io-impl",
+                    "org.apache.iceberg.aws.s3.S3FileIO",
+                    "client.refresh-credentials-endpoint",
+                    "v1/upstream/namespaces/db/tables/tbl/credentials"))
+            .addCredential(
+                IcebergRESTUtils.toRESTCredential(
+                    "s3://bucket/db/tbl/",
+                    ImmutableMap.of(
+                        "s3.session-token",
+                        "upstream-token",
+                        "client.refresh-credentials-endpoint",
+                        "v1/upstream/namespaces/db/tables/tbl/credentials")))
+            .build();
+
+    LoadTableResponse rewritten =
+        IcebergRESTUtils.rewriteLoadTableCredentials("irc1", table, upstream);
+
+    Assertions.assertEquals(
+        "org.apache.iceberg.aws.s3.S3FileIO", rewritten.config().get("io-impl"));
+    Assertions.assertFalse(
+        rewritten.config().containsKey("client.refresh-credentials-endpoint"),
+        "Top-level config must not keep an upstream refresh endpoint when tokens are absent");
+    Assertions.assertEquals(1, rewritten.credentials().size());
+    Assertions.assertEquals(
+        "v1/irc1/namespaces/db/tables/tbl/credentials",
+        rewritten.credentials().get(0).config().get("client.refresh-credentials-endpoint"));
+  }
+
+  @Test
+  void testErrorResponseStackTraceFollowsSetting() throws Exception {
+    RuntimeException failure = new RuntimeException("failure");
+    try {
+      ErrorResponse withStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      Assertions.assertTrue(
+          IcebergObjectMapper.getInstance().writeValueAsString(withStack).contains("\"stack\""));
+
+      IcebergRESTUtils.setIncludeErrorStackTrace(false);
+      ErrorResponse withoutStack =
+          (ErrorResponse) IcebergRESTUtils.errorResponse(failure, 500).getEntity();
+      String json = IcebergObjectMapper.getInstance().writeValueAsString(withoutStack);
+      Assertions.assertFalse(json.contains("\"stack\""), json);
+      Assertions.assertEquals("failure", withoutStack.message());
+    } finally {
+      IcebergRESTUtils.setIncludeErrorStackTrace(true);
+    }
+  }
+
+  @Test
+  void testCloneFallsBackToOriginalWhenIcebergCannotSerialize() throws Exception {
+    // A partition field without its optional field-id parses, but Iceberg cannot write it again.
+    UpdateTableRequest request =
+        IcebergObjectMapper.getInstance()
+            .readValue(
+                "{\"requirements\": [], \"updates\": [{\"action\": \"add-spec\", \"spec\":"
+                    + " {\"spec-id\": 1, \"fields\": [{\"name\": \"id_bucket\", \"transform\": \"bucket[4]\","
+                    + " \"source-id\": 1}]}}]}",
+                UpdateTableRequest.class);
+    UpdateTableRequest copy =
+        Assertions.assertDoesNotThrow(
+            () -> IcebergRESTUtils.cloneIcebergRESTObject(request, UpdateTableRequest.class));
+    Assertions.assertEquals(request.updates().size(), copy.updates().size());
+  }
+
+  @Test
+  void testValidateRequestRejectsMissingOrInvalidBody() {
+    BadRequestException missing =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(null, "CreateTableRequest"));
+    Assertions.assertTrue(missing.getMessage().contains("CreateTableRequest"));
+
+    RESTRequest invalid =
+        () -> {
+          throw new IllegalArgumentException("Invalid name: null");
+        };
+    BadRequestException invalidBody =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> IcebergRESTUtils.validateRequest(invalid, "CreateTableRequest"));
+    Assertions.assertTrue(invalidBody.getMessage().contains("Invalid name: null"));
+
+    RESTRequest npe =
+        () -> {
+          throw new NullPointerException();
+        };
+    Assertions.assertThrows(
+        BadRequestException.class,
+        () -> IcebergRESTUtils.validateRequest(npe, "UpdateTableRequest"));
+
+    RESTRequest valid = () -> {};
+    Assertions.assertDoesNotThrow(() -> IcebergRESTUtils.validateRequest(valid, "X"));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "boolean",
+        "float",
+        "double",
+        "date",
+        "time",
+        "timestamp",
+        "timestamptz",
+        "uuid",
+        "fixed[16]",
+        "timestamp_ns",
+        "timestamptz_ns"
+      })
+  void testValidateRequestRejectsInvalidTruncate(String type) throws IOException {
+    for (boolean nested : new boolean[] {false, true}) {
+      for (boolean sort : new boolean[] {false, true}) {
+        CreateTableRequest request = truncateRequest(type, nested, sort);
+        BadRequestException error =
+            Assertions.assertThrows(
+                BadRequestException.class,
+                () -> IcebergRESTUtils.validateRequest(request, "CreateTableRequest"));
+        Assertions.assertTrue(error.getMessage().contains("Invalid CreateTableRequest"));
+        Assertions.assertTrue(error.getMessage().contains("Cannot truncate type: " + type));
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"int", "long", "decimal(9, 2)", "string", "binary"})
+  void testValidateRequestAcceptsValidTruncate(String type) throws IOException {
+    for (boolean nested : new boolean[] {false, true}) {
+      for (boolean sort : new boolean[] {false, true}) {
+        CreateTableRequest request = truncateRequest(type, nested, sort);
+        Assertions.assertDoesNotThrow(
+            () -> IcebergRESTUtils.validateRequest(request, "CreateTableRequest"));
+      }
+    }
+  }
+
+  private static CreateTableRequest truncateRequest(String type, boolean nested, boolean sort)
+      throws IOException {
+    NestedField field = NestedField.optional(1, "c", Types.fromPrimitiveString(type));
+    Schema schema =
+        nested
+            ? new Schema(NestedField.optional(2, "parent", Types.StructType.of(field)))
+            : new Schema(field);
+    String definition =
+        sort
+            ? "\"write-order\": {\"order-id\": 1, \"fields\": [{\"source-id\": 1,"
+                + " \"transform\": \"truncate[4]\", \"direction\": \"asc\","
+                + " \"null-order\": \"nulls-first\"}]}"
+            : "\"partition-spec\": {\"spec-id\": 0, \"fields\": [{\"source-id\": 1,"
+                + " \"field-id\": 1000, \"name\": \"p\", \"transform\": \"truncate[4]\"}]}";
+    return IcebergObjectMapper.getInstance()
+        .readValue(
+            String.format(
+                "{\"name\": \"t\", \"schema\": %s, %s}", SchemaParser.toJson(schema), definition),
+            CreateTableRequest.class);
+  }
+
+  private static List<Namespace> invalidNamespaces() {
+    return List.of(
+        Namespace.of("a.b"),
+        Namespace.of("."),
+        Namespace.of(".."),
+        Namespace.of("a.b", "child"),
+        Namespace.of("parent", "a.b"));
   }
 }

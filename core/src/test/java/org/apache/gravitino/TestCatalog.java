@@ -56,8 +56,23 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
   }
 
   @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
+  @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     return new TestCatalogOperations(config);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    int minimum = Integer.parseInt(configuration.getOrDefault("validation-min", "0"));
+    int maximum = Integer.parseInt(configuration.getOrDefault("validation-max", "2"));
+    if (minimum > maximum) {
+      throw new IllegalArgumentException("validation-min must not exceed validation-max");
+    }
   }
 
   @Override
@@ -65,6 +80,23 @@ public class TestCatalog extends BaseCatalog<TestCatalog> {
     Map<String, String> properties = entity().getProperties();
     return properties != null
         && Boolean.parseBoolean(properties.get(TestCatalogOperations.VALIDATE_ON_CREATE));
+  }
+
+  /**
+   * Mirrors the JDBC override: runs a real {@code testConnection} probe at create time instead of
+   * only eagerly initializing {@code ops()}. {@code ops()} is still invoked (so a failing {@code
+   * initialize()} still surfaces here), and the probe additionally throws when the catalog was
+   * created with {@code need-fail=true}, exercising the create-time verification/rollback path.
+   */
+  @Override
+  public void validateOnCreate() {
+    try {
+      ops().testConnection(entity().nameIdentifier());
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   @Override

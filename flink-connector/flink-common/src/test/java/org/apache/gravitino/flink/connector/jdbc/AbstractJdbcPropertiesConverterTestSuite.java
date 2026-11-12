@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -81,6 +82,24 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
     Assertions.assertEquals(flinkUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
     Assertions.assertEquals(
         defaultDatabase, properties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+  }
+
+  @Test
+  public void testToJdbcCatalogPropertiesWithBypassBaseUrl() {
+    String bypassBaseUrl = "jdbc:mysql://127.0.0.1:13306/";
+    Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+    catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", bypassBaseUrl);
+    Map<String, String> properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
+
+    // jdbc-url is not parsed for the base-url when flink.bypass.base-url is set.
+    catalogPropertiesWithBypassUrl.put(JdbcPropertiesConstants.GRAVITINO_JDBC_URL, "jdbc:invalid");
+    properties =
+        getConverter(catalogPropertiesWithBypassUrl)
+            .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+    Assertions.assertEquals(bypassBaseUrl, properties.get(JdbcPropertiesConstants.FLINK_JDBC_URL));
   }
 
   @Test
@@ -167,5 +186,27 @@ public abstract class AbstractJdbcPropertiesConverterTestSuite {
                     .toFlinkCatalogProperties(catalogPropertiesWithoutUrl));
 
     Assertions.assertTrue(ex.getMessage().contains(JdbcPropertiesConstants.GRAVITINO_JDBC_URL));
+  }
+
+  @Test
+  public void testInjectedTableOptionsDoNotBecomeGravitinoTableProperties() {
+    Map<String, String> catalogPropertiesWithDatabase = new HashMap<>(catalogProperties);
+    catalogPropertiesWithDatabase.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "db");
+    JdbcPropertiesConverter converter = getConverter(catalogPropertiesWithDatabase);
+    Map<String, String> flinkTableOptions =
+        new HashMap<>(
+            converter.toFlinkTableProperties(
+                converter.toFlinkCatalogProperties(catalogPropertiesWithDatabase),
+                ImmutableMap.of(),
+                new ObjectPath("db", "source_table")));
+    // CREATE TABLE ... LIKE copies the scan options alongside the user's own options.
+    flinkTableOptions.put("engine", "InnoDB");
+
+    Map<String, String> gravitinoProperties =
+        converter.toGravitinoTableProperties(flinkTableOptions);
+
+    Assertions.assertEquals(ImmutableMap.of("engine", "InnoDB"), gravitinoProperties);
+    Assertions.assertEquals(
+        password, flinkTableOptions.get(JdbcPropertiesConstants.FLINK_JDBC_PASSWORD));
   }
 }

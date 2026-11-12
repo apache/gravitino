@@ -1,0 +1,5 @@
+# Populated at build time by trino-connectors-dependency.sh from the staged
+# connector bands. Do not commit generated copies.
+/*/
+/LICENSE
+/NOTICE

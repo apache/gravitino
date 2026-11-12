@@ -29,10 +29,6 @@ import com.google.common.collect.Maps;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
-import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
-import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
 import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
@@ -91,7 +87,7 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "JDBC user for Iceberg JDBC backend",
                 false /* immutable */,
                 null /* defaultValue */,
-                true /* hidden */),
+                false /* hidden */),
             stringOptionalPropertyEntry(
                 GRAVITINO_JDBC_PASSWORD,
                 "JDBC password for Iceberg JDBC backend",
@@ -136,13 +132,51 @@ public class IcebergCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "HTTP socket timeout in milliseconds for the REST catalog backend",
                 false /* immutable */,
                 60000 /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_AUTH_TYPE,
+                "How the REST catalog backend authenticates to the remote catalog: user-token"
+                    + " forwards the calling user's token, service-account connects with a"
+                    + " configured credential and authorizes every request in Gravitino",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_TOKEN,
+                "Static bearer token the service account presents to the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_CREDENTIAL,
+                "OAuth2 client credential (client_id:client_secret) the service account uses"
+                    + " with the remote REST catalog",
+                false /* immutable */,
+                null /* defaultValue */,
+                true /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_OAUTH2_SERVER_URI,
+                "OAuth2 token endpoint for the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_SCOPE,
+                "OAuth2 scope requested with the service account's client credential",
+                false /* immutable */,
+                null /* defaultValue */,
+                false /* hidden */),
+            stringOptionalPropertyEntry(
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE,
+                "Who issues storage credentials for a federated REST catalog: remote passes"
+                    + " through the remote catalog's credentials, local issues them through"
+                    + " this catalog's credential providers. Service-account connections always"
+                    + " use local credentials",
+                false /* immutable */,
+                IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE /* defaultValue */,
                 false /* hidden */));
     HashMap<String, PropertyEntry<?>> result = Maps.newHashMap();
     result.putAll(Maps.uniqueIndex(propertyEntries, PropertyEntry::getName));
-    result.putAll(S3PropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES);
-    result.putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES);
     result.putAll(KerberosConfig.KERBEROS_PROPERTY_ENTRIES);
     result.putAll(AuthenticationConfig.AUTHENTICATION_PROPERTY_ENTRIES);
     PROPERTIES_METADATA = ImmutableMap.copyOf(result);

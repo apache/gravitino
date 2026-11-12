@@ -74,10 +74,13 @@ public class TestDataSourceUrlValidation {
     GravitinoRuntimeException gre =
         Assertions.assertThrows(
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
-    // validateJdbcConfig throws inside the try, so the specific reason is the wrapped cause.
+    // createDataSource re-wraps the validation failure, so assert on the cause to prove the
+    // security check fired (not some unrelated pool/driver error). The reported name is the
+    // canonical (lower-case) entry from the unsafe-parameter list.
     Assertions.assertNotNull(gre.getCause());
-    Assertions.assertTrue(
-        gre.getCause().getMessage().toLowerCase().contains("allowloadlocalinfile"));
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'allowloadlocalinfile' detected in JDBC configuration",
+        gre.getCause().getMessage());
   }
 
   @Test
@@ -94,7 +97,9 @@ public class TestDataSourceUrlValidation {
         Assertions.assertThrows(
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertNotNull(gre.getCause());
-    Assertions.assertTrue(gre.getCause().getMessage().contains("socketFactory"));
+    Assertions.assertEquals(
+        "Unsafe PostgreSQL parameter 'socketFactory' detected in JDBC configuration",
+        gre.getCause().getMessage());
   }
 
   @Test
@@ -111,8 +116,33 @@ public class TestDataSourceUrlValidation {
         Assertions.assertThrows(
             GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
     Assertions.assertNotNull(gre.getCause());
-    Assertions.assertTrue(
-        gre.getCause().getMessage().toLowerCase().contains("allowloadlocalinfile"));
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'allowloadlocalinfile' detected in JDBC configuration",
+        gre.getCause().getMessage());
+  }
+
+  @Test
+  public void testRejectMysqlUnsafeParamInConnectionProperties() {
+    // DBCP2 forwards the "connectionProperties" value straight to the JDBC driver, so an unsafe
+    // MySQL parameter smuggled here must still be rejected. (In the catalog path a user reaches
+    // this key via the "gravitino.bypass." prefix, which is stripped before the config map is
+    // handed to the validator.)
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "com.mysql.cj.jdbc.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://localhost:3306/test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+    properties.put("connectionProperties", "autoDeserialize=true");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    // createDataSource re-wraps the validation failure, so assert on the cause to prove the
+    // security check fired (not some unrelated pool/driver error).
+    Assertions.assertNotNull(gre.getCause());
+    Assertions.assertEquals(
+        "Unsafe MySQL parameter 'autoDeserialize' detected in JDBC configuration",
+        gre.getCause().getMessage());
   }
 
   @Test
@@ -138,6 +168,23 @@ public class TestDataSourceUrlValidation {
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
     properties.put(JdbcConfig.JDBC_URL.getKey(), "JDBC:H2:mem:test");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    GravitinoRuntimeException gre =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertEquals(
+        "H2 JDBC URL is not allowed in catalog configuration", gre.getMessage());
+  }
+
+  @Test
+  public void testRejectH2UrlWithMalformedPercent() {
+    // A malformed percent escape in an H2 URL must not derail the URL-decoding scan (it falls back
+    // instead of throwing), so the H2 guard still fires on the untouched "jdbc:h2" prefix.
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:h2:mem:test?applicationName=100%");
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 
@@ -391,5 +438,30 @@ public class TestDataSourceUrlValidation {
     } finally {
       dataSource.close();
     }
+  }
+
+  @Test
+  public void testMissingDriverGivesClearError() {
+    // A driver that is not on the classpath must fail fast at catalog creation with an actionable
+    // message naming the driver, not a raw ClassNotFoundException surfaced later on first use.
+    // Use a driver class that is guaranteed absent so the assertion does not depend on which
+    // vendor jars happen to be present.
+    String missingDriver = "com.example.NonExistentJdbcDriver";
+    HashMap<String, String> properties = Maps.newHashMap();
+    properties.put(JdbcConfig.JDBC_DRIVER.getKey(), missingDriver);
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:sqlite::memory:");
+    properties.put(JdbcConfig.USERNAME.getKey(), "test");
+    properties.put(JdbcConfig.PASSWORD.getKey(), "test");
+
+    IllegalArgumentException gre =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> DataSourceUtils.createDataSource(properties));
+    Assertions.assertTrue(
+        gre.getMessage().contains(missingDriver),
+        "message should name the missing driver: " + gre.getMessage());
+    Assertions.assertTrue(
+        gre.getMessage().contains("was not found"),
+        "message should state the driver was not found: " + gre.getMessage());
+    Assertions.assertInstanceOf(ClassNotFoundException.class, gre.getCause());
   }
 }

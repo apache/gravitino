@@ -27,6 +27,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -37,7 +38,10 @@ import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.service.GroupMetaService;
+import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,6 +65,7 @@ class UserGroupManager {
   }
 
   User addUser(String metalake, String name) throws UserAlreadyExistsException {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       UserEntity userEntity =
           UserEntity.builder()
@@ -88,6 +93,7 @@ class UserGroupManager {
   }
 
   boolean removeUser(String metalake, String user) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       return store.delete(AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER);
     } catch (IOException ioe) {
@@ -121,7 +127,21 @@ class UserGroupManager {
     return listUsersInternal(metalake, true /* allFields */);
   }
 
+  long countUsers(String metalake) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    return UserMetaService.getInstance().countUsersByMetalake(metalake);
+  }
+
+  PagedResult<User> listUsers(String metalake, int offset, int limit) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    PagedResult<UserEntity> result =
+        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+  }
+
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       GroupEntity groupEntity =
           GroupEntity.builder()
@@ -149,6 +169,7 @@ class UserGroupManager {
   }
 
   boolean removeGroup(String metalake, String group) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       return store.delete(AuthorizationUtils.ofGroup(metalake, group), Entity.EntityType.GROUP);
     } catch (IOException ioe) {
@@ -176,6 +197,19 @@ class UserGroupManager {
 
   Group[] listGroups(String metalake) {
     return listGroupInternal(metalake, true);
+  }
+
+  long countGroups(String metalake) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+  }
+
+  PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
+    PagedResult<GroupEntity> result =
+        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
+    return new PagedResult<>(
+        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
   }
 
   String[] listGroupNames(String metalake) {

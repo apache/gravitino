@@ -24,13 +24,16 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -78,11 +81,11 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
 
   protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -90,10 +93,10 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     doReturn(36000L).when(config).get(TREE_LOCK_CLEAN_INTERVAL);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
+        GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
     Column[] columns =
         new Column[] {
           Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())
@@ -110,13 +113,13 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
   @Test
   public void testListPartitions() {
     Partition[] partitions = partitionOperationDispatcher.listPartitions(TABLE_IDENT);
-    Assertions.assertTrue(Arrays.asList(partitions).contains(PARTITION));
+    Assertions.assertTrue(Arrays.asList(partitions).contains(DTOConverters.toDTO(PARTITION)));
   }
 
   @Test
   public void testGetPartition() {
     Partition p = partitionOperationDispatcher.getPartition(TABLE_IDENT, PARTITION.name());
-    Assertions.assertEquals(PARTITION, p);
+    Assertions.assertEquals(DTOConverters.toDTO(PARTITION), p);
   }
 
   @Test
@@ -157,6 +160,50 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(dropped);
     Assertions.assertFalse(
         partitionOperationDispatcher.partitionExists(TABLE_IDENT, testDrop.name()));
+  }
+
+  @Test
+  public void testPartitionOperationsDoNotWaitForTableTreeLock() throws Exception {
+    Partition partition =
+        Partitions.identity(
+            "p_lock",
+            new String[][] {{"col1"}},
+            new Literal[] {Literals.stringLiteral("v_lock")},
+            Maps.newHashMap());
+
+    // Partition operations never write the entity store, so they must not contend with an
+    // in-flight table operation that holds the table tree lock.
+    try (TreeLockTestSupport.HeldLock tableWrite =
+        TreeLockTestSupport.HeldLock.acquire(TABLE_IDENT, LockType.WRITE)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite, () -> partitionOperationDispatcher.addPartition(TABLE_IDENT, partition));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () -> partitionOperationDispatcher.getPartition(TABLE_IDENT, partition.name()));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite, () -> partitionOperationDispatcher.listPartitionNames(TABLE_IDENT));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () ->
+              Assertions.assertTrue(
+                  Arrays.stream(partitionOperationDispatcher.listPartitions(TABLE_IDENT))
+                      .anyMatch(p -> p.name().equals(partition.name()))));
+      // The test catalog does not support purge; reaching its exception proves that this entry
+      // point also proceeds while another thread holds the table lock.
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () ->
+              Assertions.assertThrows(
+                  UnsupportedOperationException.class,
+                  () ->
+                      partitionOperationDispatcher.purgePartition(TABLE_IDENT, partition.name())));
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          tableWrite,
+          () -> partitionOperationDispatcher.dropPartition(TABLE_IDENT, partition.name()));
+    }
+
+    Assertions.assertFalse(
+        partitionOperationDispatcher.partitionExists(TABLE_IDENT, partition.name()));
   }
 
   @Test

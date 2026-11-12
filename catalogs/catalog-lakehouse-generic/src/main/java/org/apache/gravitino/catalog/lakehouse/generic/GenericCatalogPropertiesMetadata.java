@@ -19,9 +19,11 @@
 
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.connector.PropertyEntry.booleanPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.enumPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyEntry;
 import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropertyPrefixEntry;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 
@@ -35,6 +37,13 @@ import org.apache.gravitino.connector.BaseCatalogPropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
 public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadata {
+
+  /**
+   * The name of the {@link TableLocationProvider} that provisions and unprovisions the locations of
+   * this catalog's tables. Defaults to {@link DefaultTableLocationProvider#NAME} and is immutable
+   * once the catalog is created.
+   */
+  public static final String TABLE_LOCATION_PROVIDER = "table-location-provider";
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
 
@@ -52,6 +61,24 @@ public class GenericCatalogPropertiesMetadata extends BaseCatalogPropertiesMetad
                 "The Lance storage options managed by the catalog.",
                 false /* immutable */,
                 null, /* defaultValue */
+                false /* hidden */,
+                false /* reserved */),
+            stringOptionalPropertyEntry(
+                TABLE_LOCATION_PROVIDER,
+                "The name of the table location provider that provisions and unprovisions the"
+                    + " locations of this catalog's tables. It is fixed when the catalog is"
+                    + " created, because switching it would leave the tables of a single catalog"
+                    + " spread over two different location schemes.",
+                true /* immutable */,
+                DefaultTableLocationProvider.NAME, /* defaultValue */
+                false /* hidden */),
+            booleanPropertyEntry(
+                LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                "Allow physical deletion of external and registered Lance datasets. Table"
+                    + " properties cannot enable this catalog-level policy.",
+                false /* required */,
+                false /* immutable */,
+                false /* defaultValue */,
                 false /* hidden */,
                 false /* reserved */),
             enumPropertyEntry(

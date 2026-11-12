@@ -22,6 +22,10 @@ from gravitino.api.auditable import Auditable
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.sql_representation import SQLRepresentation
+from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
+from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class View(Auditable):
@@ -66,3 +70,32 @@ class View(Auditable):
     def properties(self) -> dict[str, str]:
         """Returns the view properties."""
         return {}
+
+    def supports_semantic_models(self) -> SupportsSemanticModels:
+        """Return source-scoped Semantic Model dataset lookup operations.
+
+        Returns:
+            SupportsSemanticModels: The dataset lookup operations for this source.
+
+        Raises:
+            UnsupportedOperationException: If this implementation does not support lookup.
+        """
+        raise UnsupportedOperationException(
+            "Semantic Model dataset lookup is not supported"
+        )
+
+    def supports_tags(self) -> SupportsTags:
+        """Return tag operations if the view supports tags.
+
+        Raises:
+            UnsupportedOperationException: If the view does not support tag operations.
+
+        Returns:
+            SupportsTags: The tag operations supported by the view.
+        """
+        raise UnsupportedOperationException("View does not support tag operations.")
+
+    def support_secrets(self) -> SupportsSecrets:
+        raise UnsupportedOperationException(
+            "View does not support secret property operations."
+        )

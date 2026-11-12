@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import com.google.common.collect.Maps;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
@@ -99,25 +99,19 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     // Mirrors the correct usage pattern for a quote-aware catalog (e.g. Oracle):
     // 1. addPartition is issued with a quoted, case-sensitive name, so the catalog stores the
     //    physical partition with its case preserved: My Partition.
-    // 2. listPartitionNames()/listPartitions() surface that physical name unquoted, but
-    //    normalizeName uppercases unquoted names (MY PARTITION).
+    // 2. listPartitionNames()/listPartitions() surface that physical name unquoted (My
+    //    Partition) -- names are not re-folded by the core layer.
     // 3. Getting the partition again requires re-quoting the case-sensitive name
-    //    ("MY PARTITION"), not passing the bare listed name back in.
+    //    ("My Partition"), not passing the bare listed name back in: normalizeName cannot tell
+    //    an already-canonical name apart from raw user input.
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(metalake, catalog, "schema", "quotedTable");
     PartitionDispatcher mockDispatcher = Mockito.mock(PartitionDispatcher.class);
 
     CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.doWithCapabilityOps(Mockito.any()))
-        .thenAnswer(
-            inv -> {
-              @SuppressWarnings("unchecked")
-              org.apache.gravitino.utils.ThrowableFunction<Capability, ?> fn = inv.getArgument(0);
-              return fn.apply(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
-            });
-    Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
-        .thenReturn(mockWrapper);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(mockCatalog.capability()).thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
+    CatalogTestUtils.mockDoWithCatalog(mockCatalogManager, mockCatalog);
 
     PartitionNormalizeDispatcher dispatcher =
         new PartitionNormalizeDispatcher(mockDispatcher, mockCatalogManager);
@@ -153,11 +147,11 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
 
     String[] listedNames = dispatcher.listPartitionNames(tableIdent);
     Assertions.assertEquals(1, listedNames.length);
-    Assertions.assertEquals("MY PARTITION", listedNames[0]);
+    Assertions.assertEquals("My Partition", listedNames[0]);
 
     Partition[] listedPartitions = dispatcher.listPartitions(tableIdent);
     Assertions.assertEquals(1, listedPartitions.length);
-    Assertions.assertEquals("MY PARTITION", listedPartitions[0].name());
+    Assertions.assertEquals("My Partition", listedPartitions[0].name());
 
     // 3. Getting the partition again requires re-quoting the listed name.
     dispatcher.getPartition(tableIdent, "\"" + listedNames[0] + "\"");
@@ -165,6 +159,6 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
     ArgumentCaptor<String> gotPartitionNameCaptor = ArgumentCaptor.forClass(String.class);
     Mockito.verify(mockDispatcher)
         .getPartition(Mockito.any(NameIdentifier.class), gotPartitionNameCaptor.capture());
-    Assertions.assertEquals("MY PARTITION", gotPartitionNameCaptor.getValue());
+    Assertions.assertEquals("My Partition", gotPartitionNameCaptor.getValue());
   }
 }

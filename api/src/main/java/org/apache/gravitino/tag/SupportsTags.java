@@ -38,11 +38,37 @@ public interface SupportsTags {
   String[] listTags();
 
   /**
+   * List the visible tag names and whether authorization filtering omitted other tags.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted tags. Implementations that support authorization filtering should override this
+   * method.
+   *
+   * @return The visible tag names and authorization-filtering status.
+   */
+  default TagList<String> listTagsWithVisibility() {
+    return new TagList<>(listTags(), false);
+  }
+
+  /**
    * List all the tags with details for the specific object.
    *
    * @return The list of tags.
    */
   Tag[] listTagsInfo();
+
+  /**
+   * List the visible tags with details and whether authorization filtering omitted other tags.
+   *
+   * <p>The default implementation preserves compatibility with existing implementations but cannot
+   * detect omitted tags. Implementations that support authorization filtering should override this
+   * method.
+   *
+   * @return The visible tags and authorization-filtering status.
+   */
+  default TagList<Tag> listTagsInfoWithVisibility() {
+    return new TagList<>(listTagsInfo(), false);
+  }
 
   /**
    * Get a tag by its name for the specific object.
@@ -54,17 +80,30 @@ public interface SupportsTags {
   Tag getTag(String name) throws NoSuchTagException;
 
   /**
-   * Associate tags to the specific object. The tagsToAdd will be added to the object, and the
-   * tagsToRemove will be removed from the object. Note that: 1) Adding or removing tags that are
-   * not existed will be ignored. 2) If the same name tag is in both tagsToAdd and tagsToRemove, it
-   * will be ignored. 3) If the tag is already associated with the object, it will throw {@link
-   * TagAlreadyAssociatedException}
+   * Associate tags with no value to the specific object. The tagsToAdd will be added to the object,
+   * and the tagsToRemove will be removed from the object. Missing tags are ignored, including tags
+   * dropped or renamed while the call runs. If the same tag is in both tagsToAdd and tagsToRemove,
+   * it will be ignored. Repeated existing assignments are idempotent.
    *
-   * @param tagsToAdd The arrays of tag name to be added to the object.
-   * @param tagsToRemove The array of tag name to be removed from the object.
+   * @param tagsToAdd The array of tag names to be added to the object.
+   * @param tagsToRemove The array of tag names to be removed from the object.
    * @return The array of tag names that are associated with the object.
-   * @throws TagAlreadyAssociatedException If the tag is already associated with the object.
+   * @throws TagAlreadyAssociatedException If the association cannot be applied.
    */
   String[] associateTags(String[] tagsToAdd, String[] tagsToRemove)
       throws TagAlreadyAssociatedException;
+
+  /**
+   * Associate tag values to the specific object.
+   *
+   * @param tagsToAdd The tag values to be added to the object.
+   * @param tagsToRemove The tag values to be removed from the object.
+   * @return The array of tag names that are associated with the object.
+   * @throws TagAlreadyAssociatedException If the association cannot be applied.
+   */
+  default String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove)
+      throws TagAlreadyAssociatedException {
+    throw new UnsupportedOperationException(
+        "The associateTags(TagValue[], TagValue[]) method is not supported.");
+  }
 }

@@ -20,6 +20,8 @@
 package org.apache.gravitino.storage.relational.session;
 
 import com.google.common.annotations.VisibleForTesting;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.TransactionIsolationLevel;
@@ -103,6 +105,32 @@ public final class SqlSessions {
     return getSqlSession().getMapper(className);
   }
 
+  /**
+   * Returns whether the current thread already owns an open SQL session.
+   *
+   * @return {@code true} when an SQL session is active on the current thread
+   */
+  public static boolean hasActiveSession() {
+    return sessions.get() != null;
+  }
+
+  /**
+   * Returns the connection of the current thread's open session without changing the session count.
+   *
+   * <p>Callers must not commit, roll back, or close the connection. The session owner commits it.
+   *
+   * @return the connection bound to the current session
+   * @throws IllegalStateException if the current thread has no open session
+   * @throws SQLException if the session cannot provide its connection
+   */
+  public static Connection currentConnection() throws SQLException {
+    SqlSession sqlSession = sessions.get();
+    if (sqlSession == null) {
+      throw new IllegalStateException("No active SQL session on the current thread");
+    }
+    return sqlSession.getConnection();
+  }
+
   private static void handleSessionClose(boolean commit, boolean rollback) {
     SqlSession sqlSession = sessions.get();
     if (sqlSession == null) {
@@ -115,7 +143,11 @@ public final class SqlSessions {
         if (commit) {
           sqlSession.commit();
         } else if (rollback) {
-          sqlSession.rollback();
+          // Force the JDBC rollback. A policy lifecycle hook can write on this connection without
+          // going
+          // through a mapped statement, and MyBatis skips rollback when the session looks clean.
+          // Closing that session then turns auto-commit back on, which would commit the hook write.
+          sqlSession.rollback(true);
         }
       } finally {
         try {

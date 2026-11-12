@@ -20,7 +20,9 @@ package org.apache.gravitino.iceberg.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.base.Preconditions;
+import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -36,7 +38,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.EntityTag;
 import javax.ws.rs.core.MediaType;
@@ -47,13 +52,20 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.common.DynMethods;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.RESTRequest;
 import org.apache.iceberg.rest.RESTUtil;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.responses.BaseScanTaskResponse;
 import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
@@ -66,6 +78,17 @@ public class IcebergRESTUtils {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTUtils.class);
 
+  // Resolve scan-only methods lazily so an incompatible runtime cannot prevent unrelated REST
+  // helpers from loading. Successful lookups are cached; failed lookups retain a useful error.
+  private static final Supplier<DynMethods.UnboundMethod> SCAN_RESPONSE_SPECS =
+      Suppliers.memoize(() -> resolveScanResponseMethod(BaseScanTaskResponse.class, "specsById"));
+
+  private static final Supplier<DynMethods.UnboundMethod> SCAN_RESPONSE_WITH_SPECS =
+      Suppliers.memoize(
+          () ->
+              resolveScanResponseMethod(
+                  BaseScanTaskResponse.Builder.class, "withSpecsById", Map.class));
+
   /**
    * URL-encoded UTF-8 namespace separator ({@code 0x1F}) required by the Iceberg REST catalog spec.
    *
@@ -77,6 +100,23 @@ public class IcebergRESTUtils {
   public static final String SNAPSHOT_ALL = "all";
 
   public static final String SNAPSHOT_REFS = "refs";
+
+  /**
+   * Iceberg refresh-endpoint keys that may appear in {@link LoadTableResponse#config()}. Kept in
+   * sync with {@link CredentialPropertyUtils#buildRefreshProps}; they are not retained by {@link
+   * CredentialPropertyUtils#filterCredentialProperties}, so top-level config must drop them
+   * explicitly before IRC-local endpoints are re-applied.
+   */
+  private static final Set<String> REFRESH_CREDENTIALS_ENDPOINT_KEYS =
+      ImmutableSet.of(
+          "client.refresh-credentials-endpoint",
+          "gcs.oauth2.refresh-credentials-endpoint",
+          "adls.refresh-credentials-endpoint");
+
+  // Set once at service startup. Only Iceberg REST reads this flag, and its classes are packaged
+  // outside the main server's classpath, so each service loads its own copy.
+  private static volatile boolean includeErrorStackTrace =
+      JettyServerConfig.INCLUDE_ERROR_STACK_TRACE.getDefaultValue();
 
   /** Snapshot modes for the Iceberg loadTable endpoint. */
   public enum SnapshotMode {
@@ -95,6 +135,23 @@ public class IcebergRESTUtils {
   }
 
   private IcebergRESTUtils() {}
+
+  /**
+   * Checks that namespace levels can be represented in Gravitino metadata object names.
+   *
+   * @param namespace the decoded namespace to check
+   * @throws BadRequestException if a level contains the reserved qualified-name separator
+   */
+  public static void checkNamespaceLevels(Namespace namespace) {
+    for (String level : namespace.levels()) {
+      if (level.contains(".")) {
+        throw new BadRequestException(
+            "Invalid namespace %s: the level '%s' contains '.', which is reserved as the"
+                + " qualified-name separator",
+            namespace, level);
+      }
+    }
+  }
 
   /**
    * Builds an Iceberg REST {@link org.apache.iceberg.rest.credentials.Credential} for load-table,
@@ -234,6 +291,49 @@ public class IcebergRESTUtils {
   }
 
   /**
+   * Rewrites credentials in a federated {@link LoadTableResponse} so their {@code
+   * refresh-credentials-endpoint} entries, including any flattened into {@code config}, point at
+   * this IRC instance instead of the upstream catalog.
+   *
+   * <p>Upstream refresh endpoints are removed from top-level {@code config} before IRC-local ones
+   * are re-applied, matching {@link #rewriteCredential}. Without that step a refresh URL that lived
+   * only in {@code config} (with tokens only in {@code storage-credentials}) would leak.
+   *
+   * @param catalogName IRC catalog name used to build refresh paths
+   * @param tableIdentifier table receiving the credentials
+   * @param upstream the load-table response returned by the upstream REST catalog
+   * @return a load-table response with IRC-local refresh endpoints
+   */
+  public static LoadTableResponse rewriteLoadTableCredentials(
+      String catalogName, TableIdentifier tableIdentifier, LoadTableResponse upstream) {
+    Map<String, String> config = new HashMap<>();
+    if (upstream.config() != null) {
+      config.putAll(upstream.config());
+    }
+    // filterCredentialProperties drops refresh endpoints from its return value but putAll does not
+    // remove keys already copied from upstream.config(). Drop them first so a refresh URL that
+    // lived only in config (tokens only in storage-credentials) cannot leak to clients.
+    config.keySet().removeAll(REFRESH_CREDENTIALS_ENDPOINT_KEYS);
+    Map<String, String> filteredCredentialProperties =
+        CredentialPropertyUtils.filterCredentialProperties(config);
+    config.putAll(filteredCredentialProperties);
+    config.putAll(buildRefreshProps(catalogName, tableIdentifier, filteredCredentialProperties));
+
+    LoadTableResponse.Builder builder =
+        LoadTableResponse.builder()
+            .withTableMetadata(upstream.tableMetadata())
+            .addAllConfig(config);
+    if (upstream.credentials() != null) {
+      for (org.apache.iceberg.rest.credentials.Credential credential : upstream.credentials()) {
+        builder.addCredential(
+            rewriteCredential(
+                catalogName, tableIdentifier, credential.prefix(), credential.config()));
+      }
+    }
+    return builder.build();
+  }
+
+  /**
    * Rewrites credentials in a {@link PlanTableScanResponse} so their {@code
    * refresh-credentials-endpoint} entries point at this IRC instance instead of the upstream
    * catalog. Returns the response unchanged when no credentials are present.
@@ -265,15 +365,45 @@ public class IcebergRESTUtils {
   static PlanTableScanResponse copyWithCredentials(
       PlanTableScanResponse response,
       List<org.apache.iceberg.rest.credentials.Credential> credentials) {
-    return PlanTableScanResponse.builder()
+    return scanPlanResponseBuilder(scanResponseSpecs(response))
         .withPlanStatus(response.planStatus())
         .withPlanId(response.planId())
         .withPlanTasks(response.planTasks())
         .withFileScanTasks(response.fileScanTasks())
-        .withSpecsById(response.specsById())
         .withErrorResponse(response.errorResponse())
         .withCredentials(credentials)
         .build();
+  }
+
+  /** Creates a scan response builder with specs on both supported Iceberg runtimes. */
+  static PlanTableScanResponse.Builder scanPlanResponseBuilder(
+      @Nullable Map<Integer, PartitionSpec> specs) {
+    return SCAN_RESPONSE_WITH_SPECS.get().invoke(PlanTableScanResponse.builder(), specs);
+  }
+
+  /** Returns the full response spec map, including historical specs not referenced by tasks. */
+  @Nullable
+  static Map<Integer, PartitionSpec> scanResponseSpecs(PlanTableScanResponse response) {
+    return SCAN_RESPONSE_SPECS.get().invoke(response);
+  }
+
+  /** Resolves public methods first, then protected methods used by experimental Iceberg. */
+  static DynMethods.UnboundMethod resolveScanResponseMethod(
+      Class<?> implementation, String name, Class<?>... argumentTypes) {
+    try {
+      return DynMethods.builder(name)
+          .impl(implementation, argumentTypes)
+          .hiddenImpl(implementation, argumentTypes)
+          .buildChecked();
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      throw new IllegalStateException(
+          "Cannot access Iceberg scan response method "
+              + implementation.getName()
+              + "."
+              + name
+              + ". Use a supported Iceberg runtime with accessible scan response spec methods.",
+          e);
+    }
   }
 
   public static <T> Response ok(T t) {
@@ -282,8 +412,8 @@ public class IcebergRESTUtils {
 
   /**
    * Builds an OK response with the ETag header derived from the table metadata location. Uses the
-   * default snapshots value to ensure ETags from create/update/register are consistent with the
-   * default loadTable endpoint.
+   * default snapshots value, matching an unrestricted default load-table response. A load-table
+   * response with read restrictions has a distinct ETag based on those restrictions.
    *
    * @param loadTableResponse the table response to include in the body
    * @return a Response with ETag header set
@@ -333,6 +463,20 @@ public class IcebergRESTUtils {
    * @return the generated ETag
    */
   public static Optional<EntityTag> generateETag(String metadataLocation, String snapshots) {
+    return generateETag(metadataLocation, snapshots, Optional.empty());
+  }
+
+  /**
+   * Generates an ETag for a load-table representation, including state that may change without an
+   * Iceberg metadata commit.
+   *
+   * @param metadataLocation the metadata file location
+   * @param snapshots the snapshots query parameter value
+   * @param representationSeed optional canonical seed for response state outside table metadata
+   * @return the generated ETag
+   */
+  public static Optional<EntityTag> generateETag(
+      String metadataLocation, String snapshots, Optional<String> representationSeed) {
     if (StringUtils.isBlank(metadataLocation)) {
       return Optional.empty();
     }
@@ -340,6 +484,10 @@ public class IcebergRESTUtils {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
       digest.update(metadataLocation.getBytes(StandardCharsets.UTF_8));
       digest.update(snapshots.getBytes(StandardCharsets.UTF_8));
+      if (representationSeed.isPresent()) {
+        digest.update((byte) 0);
+        digest.update(representationSeed.get().getBytes(StandardCharsets.UTF_8));
+      }
       byte[] hash = digest.digest();
       StringBuilder hexString = new StringBuilder();
       for (byte b : hash) {
@@ -368,14 +516,69 @@ public class IcebergRESTUtils {
     return Response.status(Status.NOT_FOUND).build();
   }
 
+  /**
+   * Sets whether error responses built by {@link #errorResponse(Throwable, int)} include the
+   * exception's stack trace. Called once when the service starts.
+   *
+   * @param include whether to include stack traces
+   */
+  public static void setIncludeErrorStackTrace(boolean include) {
+    includeErrorStackTrace = include;
+  }
+
+  /**
+   * Checks that a request body was sent and passes the request's own validation, so a missing or
+   * incomplete body is answered with 400 instead of failing later with an internal error.
+   * Create-table partition and sort transforms are also checked against the source column types.
+   *
+   * @param request the deserialized request body, which is null when no body was sent
+   * @param requestType the request type named in the error message
+   * @throws BadRequestException if the body is missing or fails validation
+   */
+  public static void validateRequest(Object request, String requestType) {
+    if (request == null) {
+      throw new BadRequestException("Invalid request: a %s body is required", requestType);
+    }
+    if (request instanceof RESTRequest) {
+      try {
+        ((RESTRequest) request).validate();
+        if (request instanceof CreateTableRequest) {
+          // validate() only checks required fields. Bind transforms before the request is rebuilt
+          // to set its owner; binding failures would otherwise become 406.
+          CreateTableRequest create = (CreateTableRequest) request;
+          create.spec();
+          create.writeOrder();
+        }
+      } catch (IllegalArgumentException
+          | IllegalStateException
+          | UnsupportedOperationException
+          | NullPointerException e) {
+        throw new BadRequestException(
+            "Invalid %s: %s",
+            requestType, e.getMessage() == null ? "a required field is missing" : e.getMessage());
+      }
+    }
+  }
+
   public static Response errorResponse(Throwable ex, int httpStatus) {
-    ErrorResponse errorResponse =
+    String message = ex.getMessage();
+    if (message == null) {
+      message =
+          httpStatus >= Status.INTERNAL_SERVER_ERROR.getStatusCode()
+              ? "Internal server error"
+              : Status.fromStatusCode(httpStatus) == null
+                  ? "Request failed"
+                  : Status.fromStatusCode(httpStatus).getReasonPhrase();
+    }
+    ErrorResponse.Builder builder =
         ErrorResponse.builder()
             .responseCode(httpStatus)
             .withType(ex.getClass().getSimpleName())
-            .withMessage(ex.getMessage())
-            .withStackTrace(ex)
-            .build();
+            .withMessage(message);
+    if (includeErrorStackTrace) {
+      builder.withStackTrace(ex);
+    }
+    ErrorResponse errorResponse = builder.build();
     return Response.status(httpStatus)
         .entity(errorResponse)
         .type(MediaType.APPLICATION_JSON)
@@ -425,12 +628,33 @@ public class IcebergRESTUtils {
     return catalogName;
   }
 
+  /**
+   * Copies an Iceberg REST request or response through its JSON form, so event listeners get an
+   * object detached from the one the server works on.
+   *
+   * <p>Events are built after the operation has been applied, so a copy that fails must not turn a
+   * completed operation into an error. Some valid requests cannot be serialized again by Iceberg,
+   * for example a partition field sent without its optional {@code field-id}; for those the
+   * original object, which Iceberg does not modify, is returned instead.
+   *
+   * @param message the object to copy
+   * @param className the class of the copy
+   * @param <T> the type of the copy
+   * @return the copy, or the original object if it cannot be copied
+   */
   public static <T> T cloneIcebergRESTObject(Object message, Class<T> className) {
     ObjectMapper icebergObjectMapper = IcebergObjectMapper.getInstance();
     try {
       byte[] values = icebergObjectMapper.writeValueAsBytes(message);
       return icebergObjectMapper.readValue(values, className);
-    } catch (IOException e) {
+    } catch (IOException | RuntimeException e) {
+      if (className.isInstance(message)) {
+        LOG.warn(
+            "Cannot copy {} for an event, the event carries the original object: {}",
+            className.getSimpleName(),
+            e.getMessage());
+        return className.cast(message);
+      }
       throw new RuntimeException(e);
     }
   }

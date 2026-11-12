@@ -22,6 +22,7 @@ import static org.junit.Assert.assertThrows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -92,10 +93,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
   protected final String TIME_ZONE_UTC = "UTC";
 
-  protected SparkSession getSparkSession() {
-    return normalUserSparkSession;
-  }
-
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
@@ -160,7 +157,10 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-                Privileges.CreateTable.allow()));
+                Privileges.CreateTable.allow(),
+                // Spark JDBC needs both secret privileges to receive catalog credentials.
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
     gravitinoMetalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(securableObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
   }
@@ -183,6 +183,34 @@ public abstract class SparkAuthorizationIT extends BaseIT {
             .appName("Spark connector integration test")
             .config(sparkConf)
             .getOrCreate();
+  }
+
+  /** Verifies Spark cannot initialize a JDBC catalog with either secret privilege missing. */
+  @Test
+  @Order(0)
+  public void testCatalogRequiresBothCredentialPrivileges() {
+    GravitinoMetalake metalake = client.loadMetalake(METALAKE);
+    MetadataObject catalog =
+        MetadataObjects.of(ImmutableList.of(JDBC_CATALOG), MetadataObject.Type.CATALOG);
+    try {
+      metalake.revokePrivilegesFromRole(
+          ROLE, catalog, ImmutableSet.of(Privileges.UseSecrets.allow()));
+      assertThrows(
+          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+
+      metalake.grantPrivilegesToRole(
+          ROLE, catalog, ImmutableList.of(Privileges.UseSecrets.allow()));
+      metalake.revokePrivilegesFromRole(
+          ROLE, catalog, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
+      assertThrows(
+          ForbiddenException.class, () -> normalUserSparkSession.sql("USE " + JDBC_CATALOG));
+    } finally {
+      metalake.grantPrivilegesToRole(
+          ROLE,
+          catalog,
+          ImmutableList.of(
+              Privileges.UseSecrets.allow(), Privileges.IncludeCredentialSecrets.allow()));
+    }
   }
 
   @Test
@@ -286,7 +314,12 @@ public abstract class SparkAuthorizationIT extends BaseIT {
 
     // Create role with CREATE_TABLE but without SELECT_TABLE privilege
     SecurableObject catalogObject =
-        SecurableObjects.ofCatalog(JDBC_CATALOG, ImmutableList.of(Privileges.UseCatalog.allow()));
+        SecurableObjects.ofCatalog(
+            JDBC_CATALOG,
+            ImmutableList.of(
+                Privileges.UseCatalog.allow(),
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
     SecurableObject schemaObject =
         SecurableObjects.ofSchema(
             catalogObject,
@@ -335,7 +368,9 @@ public abstract class SparkAuthorizationIT extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
-                Privileges.CreateTable.allow()));
+                Privileges.CreateTable.allow(),
+                Privileges.UseSecrets.allow(),
+                Privileges.IncludeCredentialSecrets.allow()));
     gravitinoMetalake.createRole(testRole, new HashMap<>(), ImmutableList.of(catalogObject));
     gravitinoMetalake.grantRolesToUser(ImmutableList.of(testRole), NORMAL_USER);
 
@@ -359,9 +394,14 @@ public abstract class SparkAuthorizationIT extends BaseIT {
               ImmutableList.of(JDBC_CATALOG, JDBC_DATABASE, testTable), MetadataObject.Type.TABLE),
           ImmutableList.of(Privileges.ModifyTable.deny()));
 
-      // Assert INSERT behavior - Spark 3.5+ should throw ForbiddenException,
-      // lower versions won't because they don't support TableWritePrivilege
-      assertInsertBehaviorWithoutModifyPrivilege(testTable);
+      // INSERT must be rejected: BaseCatalog implements
+      // loadTable(Identifier, Set<TableWritePrivilege>), so Spark routes the write through the
+      // privilege-checking path.
+      assertThrows(
+          ForbiddenException.class,
+          () ->
+              normalUserSparkSession.sql(
+                  String.format("INSERT INTO %s VALUES (1, 'test')", testTable)));
     } finally {
       // Clean up
       try {
@@ -373,17 +413,6 @@ public abstract class SparkAuthorizationIT extends BaseIT {
       gravitinoMetalake.deleteRole(testRole);
       gravitinoMetalake.grantRolesToUser(ImmutableList.of(ROLE), NORMAL_USER);
     }
-  }
-
-  /**
-   * Assert the behavior when user tries to INSERT without MODIFY_TABLE privilege. Spark 3.3/3.4
-   * don't support TableWritePrivilege, so INSERT will succeed. Spark 3.5+ supports it, so INSERT
-   * should throw ForbiddenException. Subclasses can override this method to assert the expected
-   * behavior.
-   */
-  protected void assertInsertBehaviorWithoutModifyPrivilege(String tableName) {
-    // Spark 3.3/3.4 don't support TableWritePrivilege, so INSERT will succeed
-    normalUserSparkSession.sql(String.format("INSERT INTO %s VALUES (1, 'test')", tableName));
   }
 
   private void assertEqualsRows(List<Row> exceptRows, List<Row> actualRows) {

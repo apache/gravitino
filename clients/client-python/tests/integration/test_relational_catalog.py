@@ -178,7 +178,9 @@ class TestRelationalCatalog(IntegrationTestEnv):
         self.assertIsNotNone(table)
         self.assertEqual(table.name(), TestRelationalCatalog.TABLE_NAME)
         self.assertEqual(table.comment(), TestRelationalCatalog.TABLE_COMMENT)
-        self.assertEqual(table.properties(), TestRelationalCatalog.TABLE_PROPERTIES)
+        self.assert_properties_equal(
+            TestRelationalCatalog.TABLE_PROPERTIES, table.properties()
+        )
         self.assertEqual(len(table.columns()), 3)
 
         columns = table.columns()
@@ -482,3 +484,73 @@ class TestRelationalCatalog(IntegrationTestEnv):
 
         with self.assertRaises(NoSuchViewException):
             view_catalog.alter_view(ident, ViewChange.set_property("property", "value"))
+
+    def _assert_view_renamed(
+        self,
+        view_catalog,
+        altered_view,
+        old_view_ident,
+        new_view_ident,
+        new_view_name,
+    ):
+        self.assertEqual(altered_view.name(), new_view_name)
+        self.assertTrue(view_catalog.view_exists(new_view_ident))
+        self.assertFalse(view_catalog.view_exists(old_view_ident))
+
+    def test_relational_catalog_alter_view_rename(self):
+        """Test altering view name in the relational catalog."""
+        self._create_test_table()
+        self._create_test_view()
+        view_catalog = self.catalog.as_view_catalog()
+
+        new_view_name = f"{self.view_name}_renamed"
+        new_view_ident = NameIdentifier.of(
+            TestRelationalCatalog.SCHEMA_NAME, new_view_name
+        )
+
+        altered_view = view_catalog.alter_view(
+            self.view_ident, ViewChange.rename(new_view_name)
+        )
+        self._assert_view_renamed(
+            view_catalog,
+            altered_view,
+            self.view_ident,
+            new_view_ident,
+            new_view_name,
+        )
+
+    def test_relational_catalog_alter_view_replace(self):
+        """Test replacing a view definition in the relational catalog."""
+        self._create_test_table()
+        self._create_test_view()
+        view_catalog = self.catalog.as_view_catalog()
+
+        new_comment = "Updated view comment"
+        new_columns = [
+            Column.of("id", Types.LongType.get(), "Primary key"),
+        ]
+        new_representations = [
+            SQLRepresentation(
+                Dialects.HIVE,
+                f"SELECT id FROM {TestRelationalCatalog.TABLE_NAME}",
+            )
+        ]
+
+        altered_view = view_catalog.alter_view(
+            self.view_ident,
+            ViewChange.replace_view(
+                new_columns,
+                new_representations,
+                None,
+                None,
+                new_comment,
+            ),
+        )
+
+        self.assertEqual(altered_view.comment(), new_comment)
+        self.assertEqual(len(altered_view.columns()), 1)
+        self.assertEqual(altered_view.columns()[0].name(), "id")
+        self.assertEqual(
+            altered_view.sql_for(Dialects.HIVE).sql(),
+            f"SELECT id FROM {TestRelationalCatalog.TABLE_NAME}",
+        )

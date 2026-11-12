@@ -33,6 +33,7 @@ import java.util.Optional;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
@@ -84,6 +85,7 @@ class TestIcebergAsyncPurge {
   @Test
   void testAsyncDropEnqueuesJob() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
     TableMetadata metadata = mock(TableMetadata.class);
     when(metadata.metadataFileLocation()).thenReturn("s3://b/db/t/metadata/0.json");
@@ -123,11 +125,27 @@ class TestIcebergAsyncPurge {
   @Test
   void testFallbackToSyncWhenDisabled() {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(true);
 
     tableExecutor(wrapper, Optional.empty()).dropTable(context(true), TABLE, true);
 
     verify(wrapper).purgeTable(TABLE);
     verify(wrapper, never()).loadTableMetadata(any());
+  }
+
+  @Test
+  void testAsyncPurgeIsForwardedForRestCatalog() {
+    // A remote REST catalog deletes its own files, so an async purge request is forwarded to it
+    // instead of being queued for this server to delete the files.
+    CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
+    IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
+    when(wrapper.supportsAsyncPurge()).thenReturn(false);
+
+    tableExecutor(wrapper, Optional.of(cleanup)).dropTable(context(true), TABLE, true);
+
+    verify(wrapper).purgeTable(TABLE);
+    verify(wrapper, never()).loadTableMetadata(any());
+    verify(cleanup, never()).addJob(any());
   }
 
   @Test
@@ -196,11 +214,15 @@ class TestIcebergAsyncPurge {
     CatalogWrapperForREST wrapper = mock(CatalogWrapperForREST.class);
     IcebergCleanupManager cleanup = mock(IcebergCleanupManager.class);
     when(cleanup.isNameOccupied(CATALOG_ID, "db", "t")).thenReturn(false);
+    TableMetadata metadata = mock(TableMetadata.class);
+    when(metadata.schema()).thenReturn(SCHEMA);
+    when(wrapper.loadTableMetadataFromLocation("s3://b/db/t/metadata/0.json")).thenReturn(metadata);
 
     try (MockedStatic<GravitinoEnv> ignored = mockCatalogId()) {
       namespaceExecutor(wrapper, Optional.of(cleanup))
           .registerTable(context(false), DB, registerReq());
     }
+    verify(wrapper).loadTableMetadataFromLocation("s3://b/db/t/metadata/0.json");
     verify(wrapper).registerTable(any(), any(), anyBoolean());
   }
 
@@ -235,13 +257,11 @@ class TestIcebergAsyncPurge {
     MockedStatic<GravitinoEnv> envStatic = mockStatic(GravitinoEnv.class);
     GravitinoEnv env = mock(GravitinoEnv.class);
     CatalogManager catalogManager = mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper wrapper = mock(CatalogManager.CatalogWrapper.class);
     BaseCatalog<?> catalog = mock(BaseCatalog.class);
     CatalogEntity entity = mock(CatalogEntity.class);
     envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
     when(env.catalogManager()).thenReturn(catalogManager);
-    when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
-    when(wrapper.catalog()).thenReturn(catalog);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     when(catalog.entity()).thenReturn(entity);
     when(entity.id()).thenReturn(CATALOG_ID);
     return envStatic;

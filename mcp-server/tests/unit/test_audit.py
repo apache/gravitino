@@ -16,9 +16,12 @@
 # under the License.
 
 import asyncio
+import base64
+import hashlib
 import json
 import logging
 import unittest
+from unittest.mock import patch
 
 from fastmcp import Client
 
@@ -96,10 +99,10 @@ class TestAuditEmit(unittest.TestCase):
 class TestExtractPrincipal(unittest.TestCase):
     """Unit tests for audit._extract_principal()."""
 
-    def test_bearer_token_truncated_to_8_chars(self):
+    def test_bearer_token_is_fingerprinted(self):
         self.assertEqual(
             audit._extract_principal("Bearer abcdefghijklmnop"),
-            "bearer:abcdefgh",
+            "bearer:f39dac6cbaba535e",
         )
 
     def test_empty_header_returns_anonymous(self):
@@ -108,8 +111,41 @@ class TestExtractPrincipal(unittest.TestCase):
     def test_none_like_empty_returns_anonymous(self):
         self.assertEqual(audit._extract_principal(None), "anonymous")
 
-    def test_short_token_uses_full_token(self):
-        self.assertEqual(audit._extract_principal("Bearer abc"), "bearer:abc")
+    def test_short_token_is_fingerprinted(self):
+        self.assertEqual(
+            audit._extract_principal("Bearer abc"),
+            "bearer:ba7816bf8f01cfea",
+        )
+
+    def test_jwts_sharing_a_header_get_distinct_principals(self):
+        tokens = [_jwt_for(subject) for subject in ("alice", "bob", "carol")]
+        self.assertEqual(len({token.split(".")[0] for token in tokens}), 1)
+        principals = {
+            audit._extract_principal(f"Bearer {token}") for token in tokens
+        }
+        self.assertEqual(len(principals), 3)
+
+    def test_same_claims_under_another_signature_get_another_principal(self):
+        self.assertNotEqual(
+            audit._extract_principal(f"Bearer {_jwt_for('alice')}"),
+            audit._extract_principal(f"Bearer {_jwt_for('alice', b'forged')}"),
+        )
+
+    def test_jwt_principal_is_the_fingerprint_of_the_whole_token(self):
+        token = _jwt_for("alice")
+        self.assertEqual(
+            hashlib.sha256(token.encode()).hexdigest()[:16], "3056aa588a7ade5e"
+        )
+        self.assertEqual(
+            audit._extract_principal(f"Bearer {token}"),
+            "bearer:3056aa588a7ade5e",
+        )
+
+    def test_credential_that_is_not_valid_utf8_still_yields_a_principal(self):
+        self.assertEqual(
+            audit._extract_principal("Bearer \udcff\udcfe"),
+            "bearer:8db8cb0aa243f9fc",
+        )
 
     def test_basic_auth_decodes_user(self):
         """Simple auth header 'Basic base64(alice:dummy)' -> principal 'alice'."""
@@ -123,10 +159,30 @@ class TestExtractPrincipal(unittest.TestCase):
             audit._extract_principal("Basic not-valid-base64!!"), "anonymous"
         )
 
-    def test_unknown_scheme_returns_anonymous(self):
+    def test_other_scheme_falls_back_to_scheme_prefix(self):
+        """A non-Basic scheme stays attributable via '<scheme>:<sha256[:16]>'."""
         self.assertEqual(
-            audit._extract_principal("Negotiate abc123"), "anonymous"
+            audit._extract_principal("Negotiate abc123"),
+            "negotiate:6ca13d52ca70c883",
         )
+
+    def test_custom_scheme_with_multi_word_credential(self):
+        """A credential containing spaces is not treated as unparsable."""
+        self.assertEqual(
+            audit._extract_principal("Custom-Scheme key=abcdefghij, sig=xy"),
+            "custom-scheme:356588a47129863a",
+        )
+
+    def test_extra_space_between_scheme_and_credential(self):
+        """Repeated separators do not break Basic decoding."""
+        self.assertEqual(
+            audit._extract_principal("Basic   YWxpY2U6ZHVtbXk="), "alice"
+        )
+
+    def test_scheme_without_credential_returns_anonymous(self):
+        """A scheme with no credential has no identity to report."""
+        self.assertEqual(audit._extract_principal("Bearer"), "anonymous")
+        self.assertEqual(audit._extract_principal("Bearer   "), "anonymous")
 
 
 class TestAuditMiddlewareIntegration(unittest.TestCase):
@@ -168,6 +224,37 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         self.assertEqual(record["outcome"], "allow")
         self.assertEqual(record["principal"], "anonymous")
 
+    def test_record_carries_the_resolved_metalake(self):
+        """Defaulted calls must record the metalake too, not just named ones -
+        otherwise the log cannot say which tenant was touched without also
+        knowing the server's startup configuration."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+                await client.call_tool(
+                    "get_list_of_catalogs", {"metalake": "named_ml"}
+                )
+
+        asyncio.run(_run())
+
+        metalakes = [json.loads(r)["metalake"] for r in self.log_records]
+        self.assertEqual(metalakes, ["mock_metalake", "named_ml"])
+
+    def test_non_metalake_scoped_tool_records_no_metalake(self):
+        """list_metalakes spans every metalake the caller can see, so tagging
+        it with the server default would claim a tenant it never touched."""
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("list_metalakes")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["tool"], "list_metalakes")
+        self.assertNotIn("metalake", record)
+
     def test_principal_falls_back_to_startup_token(self):
         """With no request header, the audit principal uses the startup --token."""
         RESTClientFactory.set_rest_client(MockOperation)
@@ -182,7 +269,49 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         asyncio.run(_run())
 
         record = json.loads(self.log_records[0])
-        self.assertEqual(record["principal"], "bearer:abcdef12")
+        self.assertEqual(record["principal"], "bearer:da4ec3358a10c9b0")
+
+    def test_two_jwt_callers_get_separate_records_without_credentials(self):
+        tokens = [_jwt_for("alice"), _jwt_for("bob")]
+
+        async def _run():
+            async with Client(self.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        for token in tokens:
+            with patch(
+                "mcp_server.server._get_request_authorization",
+                return_value=f"Bearer {token}",
+            ):
+                asyncio.run(_run())
+
+        records = [json.loads(line) for line in self.log_records]
+        self.assertNotEqual(records[0]["principal"], records[1]["principal"])
+        forbidden = {"alice", "bob", *".".join(tokens).split(".")}
+        for line in self.log_records:
+            for material in forbidden:
+                self.assertNotIn(material, line)
+
+    def test_principal_falls_back_to_oauth_client_id(self):
+        """With no request header, OAuth client-credentials is attributable."""
+        RESTClientFactory.set_rest_client(MockOperation)
+        server = GravitinoMCPServer(
+            Setting(
+                "mock_metalake",
+                oauth_token_endpoint="https://idp/token",
+                oauth_client_id="mcp-service",
+                oauth_client_secret="s",
+            )
+        )
+
+        async def _run():
+            async with Client(server.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["principal"], "oauth:0d315e3c73d7840c")
 
     def test_failed_tool_call_emits_deny_record(self):
         """A tool call that raises an exception produces an audit record with outcome=deny."""
@@ -230,3 +359,14 @@ class _CapturingHandler(logging.Handler):
 class _FailingCatalogOperation:
     async def get_list_of_catalogs(self) -> str:
         raise GravitinoException("Error code: 1003, Error type: FORBIDDEN")
+
+
+def _jwt_for(subject: str, signature: bytes = b"signature") -> str:
+    parts = (
+        json.dumps({"alg": "RS256", "typ": "JWT"}).encode(),
+        json.dumps({"sub": subject}).encode(),
+        signature,
+    )
+    return ".".join(
+        base64.urlsafe_b64encode(part).decode().rstrip("=") for part in parts
+    )

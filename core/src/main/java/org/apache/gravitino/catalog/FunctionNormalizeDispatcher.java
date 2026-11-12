@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -95,23 +95,16 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    return withCapability(
-        NameIdentifier.of(namespace.levels()),
-        catalogManager,
-        cap -> applyCaseSensitive(namespace, Capability.Scope.FUNCTION, cap));
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return applyCaseSensitive(namespace, Capability.Scope.FUNCTION, capabilities);
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier functionIdent) {
-    return withCapability(
-        functionIdent,
-        catalogManager,
-        cap -> applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, cap));
+    return applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, catalogManager);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier functionIdent) {
-    return withCapability(
-        functionIdent,
-        catalogManager,
-        cap -> applyCapabilities(functionIdent, Capability.Scope.FUNCTION, cap));
+    Capability capability = getCapability(functionIdent, catalogManager);
+    return applyCapabilities(functionIdent, Capability.Scope.FUNCTION, capability);
   }
 }

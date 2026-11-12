@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
@@ -34,6 +35,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -90,7 +92,8 @@ public class TestClassLoaderPoolIntegration {
 
   @BeforeEach
   public void beforeEach() throws IOException {
-    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
   }
 
   @AfterEach
@@ -243,7 +246,11 @@ public class TestClassLoaderPoolIntegration {
     noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
 
     CatalogManager noSharingManager =
-        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+        new CatalogManager(
+            noSharingConfig,
+            entityStore,
+            new RandomIdGenerator(),
+            new SecretManager(noSharingConfig));
     try {
       Map<String, String> props =
           ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
@@ -292,7 +299,11 @@ public class TestClassLoaderPoolIntegration {
     noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
 
     CatalogManager noSharingManager =
-        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+        new CatalogManager(
+            noSharingConfig,
+            entityStore,
+            new RandomIdGenerator(),
+            new SecretManager(noSharingConfig));
     try {
       Map<String, String> props =
           ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
@@ -342,7 +353,18 @@ public class TestClassLoaderPoolIntegration {
 
     catalogManager.close();
 
-    // After close, the pool should be empty
+    // close() retires cached wrappers synchronously, but Caffeine's asMap() is only weakly
+    // consistent: invalidateAll may still deliver an asynchronous removal/retire for an entry
+    // the snapshot missed, which keeps the pooled ClassLoader alive until that listener runs.
+    long deadlineNs = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    while (pool.size() > 0 && System.nanoTime() < deadlineNs) {
+      try {
+        Thread.sleep(10L);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
+    }
     Assertions.assertEquals(0, pool.size());
     catalogManager = null;
   }

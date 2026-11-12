@@ -23,6 +23,10 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesM
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -43,6 +47,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.NamedReference;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -170,7 +175,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertTrue(
         StringUtils.contains(
             gravitinoRuntimeException.getMessage(),
-            "Alter table properties in ClickHouse is not supported"));
+            "Only ClickHouse table properties with the 'settings.' prefix can be altered"));
 
     // delete column
     TABLE_OPERATIONS.alterTable(
@@ -207,6 +212,155 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertFalse(
         TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), newName),
         "dropping non-existent table should return false");
+  }
+
+  @Test
+  public void testStringDefaultValueWithSpecialCharsRoundTrip() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_str_default";
+    String[] values = {"a'b", "a\\b", "a\\'b"};
+    List<JdbcColumn> columns = new ArrayList<>();
+    columns.add(
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build());
+    for (int i = 0; i < values.length; i++) {
+      columns.add(
+          JdbcColumn.builder()
+              .withName("c" + i)
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .withDefaultValue(Literals.stringLiteral(values[i]))
+              .build());
+    }
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns.toArray(new JdbcColumn[0]),
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+    JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    for (int i = 0; i < values.length; i++) {
+      String columnName = "c" + i;
+      Column column =
+          Arrays.stream(load.columns())
+              .filter(c -> c.name().equals(columnName))
+              .findFirst()
+              .orElseThrow();
+      Assertions.assertEquals(Literals.stringLiteral(values[i]), column.defaultValue());
+    }
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME.toString(),
+                tableName,
+                TableChange.addColumn(
+                    new String[] {"c_invalid"},
+                    Types.ByteType.get(),
+                    Literals.of("128", Types.ByteType.get()))));
+  }
+
+  @Test
+  public void testNumericDefaultValueTruncationOnClickHouse() throws Exception {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_num_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("dec_col")
+          .withType(Types.DecimalType.of(3, 2))
+          .withNullable(false)
+          .withDefaultValue(Literals.decimalLiteral(Decimal.of("9.995")))
+          .build(),
+      JdbcColumn.builder()
+          .withName("int_col")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.doubleLiteral(1.9))
+          .build(),
+      JdbcColumn.builder()
+          .withName("byte_col")
+          .withType(Types.ByteType.get())
+          .withNullable(false)
+          .withDefaultValue(Literals.of("-128.9", Types.ByteType.get()))
+          .build()
+    };
+
+    TABLE_OPERATIONS.create(
+        TEST_DB_NAME.toString(),
+        tableName,
+        columns,
+        null,
+        new HashMap<>(),
+        null,
+        Distributions.NONE,
+        null,
+        getSortOrders("id"));
+
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection conn =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          "INSERT INTO `%s`.`%s` (id) VALUES (1)".formatted(TEST_DB_NAME.toString(), tableName));
+      try (ResultSet rs =
+          stmt.executeQuery(
+              "SELECT toString(dec_col), int_col, byte_col FROM `%s`.`%s`"
+                  .formatted(TEST_DB_NAME.toString(), tableName))) {
+        Assertions.assertTrue(rs.next());
+        Assertions.assertEquals("9.99", rs.getString(1));
+        Assertions.assertEquals(1, rs.getInt(2));
+        Assertions.assertEquals(-128, rs.getInt(3));
+      }
+    }
+  }
+
+  @Test
+  public void testNumericDefaultValueCannotInjectDdl() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_inject_default";
+    JdbcColumn[] columns = {
+      JdbcColumn.builder()
+          .withName("id")
+          .withType(Types.IntegerType.get())
+          .withNullable(false)
+          .build(),
+      JdbcColumn.builder()
+          .withName("v")
+          .withType(Types.StringType.get())
+          .withNullable(true)
+          .withDefaultValue(Literals.of("1, x String", Types.IntegerType.get()))
+          .build()
+    };
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TABLE_OPERATIONS.create(
+                TEST_DB_NAME.toString(),
+                tableName,
+                columns,
+                null,
+                new HashMap<>(),
+                null,
+                Distributions.NONE,
+                null,
+                getSortOrders("id")));
+    Assertions.assertFalse(
+        TABLE_OPERATIONS.listTables(TEST_DB_NAME.toString()).contains(tableName));
   }
 
   @Test
@@ -492,6 +646,68 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testLoadTableWithMaterializedAndAliasColumns() throws Exception {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_default_kind";
+
+    // Create table with MATERIALIZED and ALIAS columns via raw SQL.
+    // Using DriverManager.getConnection directly because Gravitino's create() API
+    // does not support specifying MATERIALIZED/ALIAS default value kinds.
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection conn =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement stmt = conn.createStatement()) {
+      stmt.execute(
+          String.format(
+              "CREATE TABLE %s.%s ("
+                  + "  id Int64,"
+                  + "  created_date Date DEFAULT today(),"
+                  + "  computed_date Date MATERIALIZED today(),"
+                  + "  alias_date Date ALIAS today()"
+                  + ") ENGINE = MergeTree ORDER BY id",
+              TEST_DB_NAME, tableName));
+    }
+
+    // Load via table operations
+    JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Column[] columns = loaded.columns();
+
+    // Find each column and verify default values
+    Column createdDateCol = findColumn(columns, "created_date");
+    Column computedDateCol = findColumn(columns, "computed_date");
+    Column aliasDateCol = findColumn(columns, "alias_date");
+
+    // DEFAULT column: should have a default value (Literal or UnparsedExpression)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, createdDateCol.defaultValue());
+    // Verify the default value content is today()
+    UnparsedExpression createdDefault = (UnparsedExpression) createdDateCol.defaultValue();
+    Assertions.assertEquals("today()", createdDefault.unparsedExpression());
+
+    // MATERIALIZED column: should have UnparsedExpression (not DEFAULT_VALUE_NOT_SET)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, computedDateCol.defaultValue());
+    Assertions.assertTrue(computedDateCol.defaultValue() instanceof UnparsedExpression);
+    UnparsedExpression computedDefault = (UnparsedExpression) computedDateCol.defaultValue();
+    Assertions.assertEquals("today()", computedDefault.unparsedExpression());
+
+    // ALIAS column: should have UnparsedExpression (not DEFAULT_VALUE_NOT_SET)
+    Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, aliasDateCol.defaultValue());
+    Assertions.assertTrue(aliasDateCol.defaultValue() instanceof UnparsedExpression);
+    UnparsedExpression aliasDefault = (UnparsedExpression) aliasDateCol.defaultValue();
+    Assertions.assertEquals("today()", aliasDefault.unparsedExpression());
+  }
+
+  private static Column findColumn(Column[] columns, String name) {
+    for (Column col : columns) {
+      if (col.name().equals(name)) {
+        return col;
+      }
+    }
+    throw new AssertionError("Column not found: " + name);
+  }
+
+  @Test
   public void testTypeConversionAgainstCluster() {
     String tableName = RandomStringUtils.randomAlphabetic(16) + "_type_conv";
 
@@ -571,7 +787,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     columns.add(
         JdbcColumn.builder()
             .withName("c_varchar")
-            .withType(Types.VarCharType.of(5))
+            .withType(Types.StringType.get())
             .withNullable(false)
             .build());
     columns.add(
@@ -653,6 +869,43 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals(Types.ExternalType.of("IPv4"), loaded.columns()[18].dataType());
 
     Assertions.assertTrue(TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName));
+  }
+
+  @Test
+  public void testClearCommentsWithNull() {
+    String tableName = RandomStringUtils.randomAlphabetic(16) + "_clear_comment";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col_1")
+            .withType(INT)
+            .withNullable(false)
+            .withComment("col comment")
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          TEST_DB_NAME.toString(),
+          tableName,
+          new JdbcColumn[] {column},
+          "table comment",
+          new HashMap<>(),
+          null,
+          Distributions.NONE,
+          new Index[0],
+          getSortOrders("col_1"));
+
+      TABLE_OPERATIONS.alterTable(
+          TEST_DB_NAME.toString(),
+          tableName,
+          TableChange.updateColumnComment(new String[] {"col_1"}, null),
+          TableChange.updateComment(null));
+
+      JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+      Assertions.assertTrue(StringUtils.isEmpty(load.comment()), load.comment());
+      Assertions.assertTrue(
+          StringUtils.isEmpty(load.columns()[0].comment()), load.columns()[0].comment());
+    } finally {
+      TABLE_OPERATIONS.drop(TEST_DB_NAME.toString(), tableName);
+    }
   }
 
   @Test
@@ -943,7 +1196,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             Distributions.NONE,
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
-    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toDate(`c1`)"));
+    Assertions.assertTrue(dayPartitionSql.contains("PARTITION BY toYYYYMMDD(`c1`)"));
 
     String multiPartitionSql =
         ops.buildCreateSql(
@@ -956,7 +1209,7 @@ public class TestClickHouseTableOperations extends TestClickHouse {
             indexes,
             ClickHouseUtils.getSortOrders("c1"));
     Assertions.assertTrue(
-        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toDate(`c1`))"));
+        multiPartitionSql.contains("PARTITION BY tuple(toYear(`c1`), toYYYYMMDD(`c1`))"));
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -1278,6 +1531,112 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  void testDayAndNestedPartitionRoundTrip() throws Exception {
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement statement = connection.createStatement()) {
+      for (String[] expression :
+          new String[][] {
+            {"toYYYYMMDD(event_time)", "toYYYYMMDD(event_time)", "day", "DateTime"},
+            {"toDate(event_time)", "toYYYYMMDD(event_time)", "day", "Date"},
+            {"toYYYYMM(toDate(event_time))", "toYYYYMM(event_time)", "month", "Date"},
+            {"toYear(toDate(event_time))", "toYear(event_time)", "year", "Date"}
+          }) {
+        String source = RandomStringUtils.randomAlphabetic(16);
+        String target = source + "_copy";
+        try {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, source, expression[3], expression[0]));
+          JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), source);
+          Assertions.assertArrayEquals(
+              new Transform[] {
+                switch (expression[2]) {
+                  case "day" -> Transforms.day("event_time");
+                  case "month" -> Transforms.month("event_time");
+                  default -> Transforms.year("event_time");
+                }
+              },
+              loaded.partitioning());
+          TABLE_OPERATIONS.create(
+              TEST_DB_NAME.toString(),
+              target,
+              Arrays.stream(loaded.columns())
+                  .map(JdbcColumn.class::cast)
+                  .toArray(JdbcColumn[]::new),
+              null,
+              Collections.emptyMap(),
+              loaded.partitioning(),
+              Distributions.NONE,
+              Indexes.EMPTY_INDEXES,
+              getSortOrders("event_time"));
+          JdbcTable recreated = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), target);
+          Assertions.assertArrayEquals(loaded.partitioning(), recreated.partitioning());
+          Assertions.assertEquals(
+              expression[1], recreated.properties().get(TableConstants.PARTITION_KEY));
+        } finally {
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, target));
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, source));
+        }
+      }
+    }
+  }
+
+  @Test
+  void testUnsafePartitionCastsRetainNativeExpression() throws Exception {
+    String jdbcUrl = containerSuite.getClickHouseContainer().getJdbcUrl(TEST_DB_NAME);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl,
+                containerSuite.getClickHouseContainer().getUsername(),
+                containerSuite.getClickHouseContainer().getPassword());
+        Statement statement = connection.createStatement()) {
+      // DateTime -> Date can clamp the epoch boundary even though the source type is temporal.
+      try (ResultSet result =
+          statement.executeQuery(
+              "SELECT toYear(toDateTime(0, 'America/New_York')), "
+                  + "toYear(toDate(toDateTime(0, 'America/New_York')))")) {
+        Assertions.assertTrue(result.next());
+        Assertions.assertEquals(1969, result.getInt(1));
+        Assertions.assertEquals(1970, result.getInt(2));
+      }
+      for (String[] definition :
+          new String[][] {
+            {"String", "toYYYYMM(toDate(event_time))"},
+            {"UInt32", "toYear(toDate(event_time))"},
+            {"Date32", "toYear(toDate(event_time))"},
+            {"DateTime64(0)", "toYear(toDate(event_time))"},
+            {"DateTime64(3)", "toYear(toDate(event_time))"},
+            {"DateTime('Asia/Shanghai')", "toYear(toDate(event_time))"},
+            {"Date", "toYear(toDateTime(event_time))"},
+            {"DateTime", "toYear(toDate(event_time))"},
+            {"DateTime", "toDate(event_time)"},
+            {"String", "toDate(event_time)"},
+            {"UInt32", "toDate(event_time)"}
+          }) {
+        String table = RandomStringUtils.randomAlphabetic(16);
+        try {
+          statement.execute(
+              String.format(
+                  "CREATE TABLE %s.%s (event_time %s) ENGINE = MergeTree PARTITION BY %s ORDER BY event_time",
+                  TEST_DB_NAME, table, definition[0], definition[1]));
+          JdbcTable loaded = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), table);
+          Assertions.assertEquals(0, loaded.partitioning().length, definition[0]);
+          Assertions.assertEquals(
+              definition[1], loaded.properties().get(TableConstants.PARTITION_KEY));
+        } finally {
+          statement.execute(String.format("DROP TABLE IF EXISTS %s.%s", TEST_DB_NAME, table));
+        }
+      }
+    }
+  }
+
+  @Test
   void testParsePartitioningAndIndexExpressions() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 
@@ -1291,49 +1650,25 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     String[][] fields = ops.parseIndexFields("tuple(`c2`, `c3`)");
     Assertions.assertArrayEquals(new String[][] {{"c2"}, {"c3"}}, fields);
 
-    String[][] bloomFields = ops.parseIndexFields("bloom_filter(`c4`)");
-    Assertions.assertArrayEquals(new String[][] {{"c4"}}, bloomFields);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ops.parseIndexFields("bloom_filter(`c4`)"));
   }
 
   @Test
-  void testParseSortOrdersFromMultilineShowCreateSql() {
-    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
-    String showCreateSql =
-        """
-        CREATE TABLE `t1`
-        (
-          `id` Int32,
-          `event_time` DateTime
-        )
-        ENGINE = MergeTree
-        ORDER BY
-          (`id`, toDate(`event_time`))
-        SETTINGS index_granularity = 8192
-        """;
-
-    SortOrder[] sortOrders = ops.parseSortOrders(showCreateSql);
-    Assertions.assertEquals(2, sortOrders.length);
-    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
-    Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
-  }
-
-  @Test
-  void testParseSettingsFromCreateSql() {
+  void testParseSettingsFromEngineFull() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 
     // Single setting
-    String sql1 =
-        "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
-    Map<String, String> settings1 = ops.parseSettings(sql1);
+    String engineFull1 = "MergeTree ORDER BY id SETTINGS index_granularity = 4096";
+    Map<String, String> settings1 = ops.parseSettings(engineFull1);
     Assertions.assertEquals(1, settings1.size());
     Assertions.assertEquals(
         "4096", settings1.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
 
     // Multiple settings
-    String sql2 =
-        "CREATE TABLE t2 (id Int32) ENGINE = MergeTree ORDER BY id"
-            + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
-    Map<String, String> settings2 = ops.parseSettings(sql2);
+    String engineFull2 =
+        "MergeTree ORDER BY id" + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
+    Map<String, String> settings2 = ops.parseSettings(engineFull2);
     Assertions.assertEquals(2, settings2.size());
     Assertions.assertEquals(
         "4096", settings2.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
@@ -1341,15 +1676,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         "0", settings2.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
 
     // No SETTINGS clause
-    String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
-    Map<String, String> settings3 = ops.parseSettings(sql3);
+    String engineFull3 = "MergeTree ORDER BY id";
+    Map<String, String> settings3 = ops.parseSettings(engineFull3);
     Assertions.assertTrue(settings3.isEmpty());
 
-    // SETTINGS with COMMENT after
-    String sql4 =
-        "CREATE TABLE t4 (id Int32) ENGINE = MergeTree ORDER BY id"
-            + " SETTINGS index_granularity = 8192 COMMENT 'test'";
-    Map<String, String> settings4 = ops.parseSettings(sql4);
+    // Engine arguments before SETTINGS
+    String engineFull4 =
+        "ReplicatedMergeTree('/path', '{replica}') ORDER BY id"
+            + " SETTINGS index_granularity = 8192";
+    Map<String, String> settings4 = ops.parseSettings(engineFull4);
     Assertions.assertEquals(1, settings4.size());
     Assertions.assertEquals(
         "8192", settings4.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
@@ -1369,12 +1704,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
     }
 
-    SortOrder[] parseSortOrders(String createSql) {
-      return parseSortOrdersFromCreateSql(createSql);
-    }
-
-    Map<String, String> parseSettings(String createSql) {
-      return parseSettingsFromCreateSql(createSql);
+    Map<String, String> parseSettings(String engineFull) {
+      return parseSettingsFromEngineFull(engineFull);
     }
   }
 
@@ -1698,9 +2029,21 @@ public class TestClickHouseTableOperations extends TestClickHouse {
     Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(0)"));
     Assertions.assertEquals(IndexType.DATA_SKIPPING_SET, ops.getClickHouseIndexType("set(100)"));
 
+    // ngrambf_v1 and tokenbf_v1 bloom filter data skipping indexes
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_NGRAMBFV1, ops.getClickHouseIndexType("ngrambf_v1"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_TOKENBFV1, ops.getClickHouseIndexType("tokenbf_v1"));
+
     // Blank/null defaults to MINMAX
     Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(""));
     Assertions.assertEquals(IndexType.DATA_SKIPPING_MINMAX, ops.getClickHouseIndexType(null));
+
+    // Parameterized formats (C2 prefix matching)
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_NGRAMBFV1, ops.getClickHouseIndexType("ngrambf_v1(3, 512, 3, 0)"));
+    Assertions.assertEquals(
+        IndexType.DATA_SKIPPING_TOKENBFV1, ops.getClickHouseIndexType("tokenbf_v1(256, 2, 0)"));
 
     // Unsupported type
     Assertions.assertThrows(
@@ -1708,7 +2051,523 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
-  public void testAlterTableNullabilityValidationFails() {
+  public void testParseBloomFilterProperties() {
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        ClickHouseTableOperations.parseBloomFilterProperties(
+            IndexType.DATA_SKIPPING_NGRAMBFV1, "ngrambf_v1(3, 512, 3, 0)", "idx_ngram"));
+    Assertions.assertEquals(
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "1"),
+        ClickHouseTableOperations.parseBloomFilterProperties(
+            IndexType.DATA_SKIPPING_TOKENBFV1, " tokenbf_v1(256,2,1) ", "idx_token"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableOperations.parseBloomFilterProperties(
+                IndexType.DATA_SKIPPING_NGRAMBFV1, "ngrambf_v1(3,512,3)", "idx_bad"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableOperations.parseBloomFilterProperties(
+                IndexType.DATA_SKIPPING_TOKENBFV1, "tokenbf_v1(256,2,-1)", "idx_bad"));
+  }
+
+  @Test
+  public void testCreateTableWithNgrambfAndTokenbfIndexes() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // ngrambf_v1 with full parameters
+    Index[] indexes1 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size",
+                  "3",
+                  "bloom_filter_size",
+                  "512",
+                  "hash_functions",
+                  "3",
+                  "random_seed",
+                  "1")),
+        };
+
+    String sql1 =
+        ops.buildCreateSql(
+            "t_ngram",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes1,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql1.contains("INDEX `idx_ngram` `c2` TYPE ngrambf_v1(3, 512, 3, 1) GRANULARITY 1"),
+        "DDL should contain ngrambf_v1 with parameters: " + sql1);
+
+    // tokenbf_v1 with full parameters
+    Index[] indexes2 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "hash_functions", "2", "random_seed", "0")),
+        };
+
+    String sql2 =
+        ops.buildCreateSql(
+            "t_token",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes2,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql2.contains("INDEX `idx_token` `c2` TYPE tokenbf_v1(256, 2, 0) GRANULARITY 1"),
+        "DDL should contain tokenbf_v1 with parameters: " + sql2);
+
+    // ngrambf_v1 with custom GRANULARITY from properties
+    Index[] indexes3 =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram_g",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size",
+                  "4",
+                  "bloom_filter_size",
+                  "1024",
+                  "hash_functions",
+                  "3",
+                  "random_seed",
+                  "1",
+                  "granularity",
+                  "8")),
+        };
+
+    String sql3 =
+        ops.buildCreateSql(
+            "t_ngram_g",
+            cols,
+            "comment",
+            new HashMap<>(),
+            new Transform[0],
+            Distributions.NONE,
+            indexes3,
+            ClickHouseUtils.getSortOrders("c1"));
+
+    Assertions.assertTrue(
+        sql3.contains("INDEX `idx_ngram_g` `c2` TYPE ngrambf_v1(4, 1024, 3, 1) GRANULARITY 8"),
+        "DDL should contain custom GRANULARITY: " + sql3);
+  }
+
+  @Test
+  public void testNgrambfTokenbfMissingParameters() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // ngrambf_v1 without ngram_size — should throw
+    Index[] noNgramSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "512", "hash_functions", "3", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noNgramSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without bloom_filter_size — should throw
+    Index[] noBloomSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad2",
+              new String[][] {{"c2"}},
+              Map.of("hash_functions", "3", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad2",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noBloomSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // ngrambf_v1 without hash_functions — should throw
+    Index[] noHashFuncs =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad3",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "3",
+                  "bloom_filter_size", "512",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad3",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noHashFuncs,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without hash_functions — should throw
+    Index[] tokenbfNoHash =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad4",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad4",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                tokenbfNoHash,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // tokenbf_v1 without random_seed — should throw
+    Index[] noSeed =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad5",
+              new String[][] {{"c2"}},
+              Map.of("bloom_filter_size", "256", "hash_functions", "2")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad5",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                noSeed,
+                ClickHouseUtils.getSortOrders("c1")));
+  }
+
+  @Test
+  public void testNgrambfTokenbfInvalidParameterValues() {
+    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+
+    JdbcColumn[] cols =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("c1")
+              .withType(Types.LongType.get())
+              .withNullable(true)
+              .build(),
+          JdbcColumn.builder()
+              .withName("c2")
+              .withType(Types.StringType.get())
+              .withNullable(true)
+              .build(),
+        };
+
+    // Non-numeric bloom_filter_size should throw
+    Index[] nonNumericSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "abc",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Negative bloom_filter_size should throw
+    Index[] negativeSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad2",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "-1",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad2",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                negativeSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Zero bloom_filter_size should throw (>= 1 required)
+    Index[] zeroSize =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad3",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "0",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad3",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                zeroSize,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Non-numeric hash_functions should throw
+    Index[] nonNumericHash =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad4",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "3",
+                  "bloom_filter_size", "512",
+                  "hash_functions", "abc",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad4",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericHash,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Negative random_seed should throw (>= 0 required)
+    Index[] negativeSeed =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_bad5",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "bloom_filter_size", "256",
+                  "hash_functions", "3",
+                  "random_seed", "-1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad5",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                negativeSeed,
+                ClickHouseUtils.getSortOrders("c1")));
+
+    // Non-numeric ngram_size should throw (ngrambf_v1 specific)
+    Index[] nonNumericNgram =
+        new Index[] {
+          Indexes.of(
+              IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_bad6",
+              new String[][] {{"c2"}},
+              Map.of(
+                  "ngram_size", "xyz",
+                  "bloom_filter_size", "512",
+                  "hash_functions", "3",
+                  "random_seed", "1")),
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildCreateSql(
+                "t_bad6",
+                cols,
+                "comment",
+                new HashMap<>(),
+                new Transform[0],
+                Distributions.NONE,
+                nonNumericNgram,
+                ClickHouseUtils.getSortOrders("c1")));
+  }
+
+  @Test
+  public void testAlterTableAddIndexWithNgrambfAndTokenbf() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTable());
+
+    // ALTER TABLE ADD INDEX for ngrambf_v1 with full properties
+    String ngrambfSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_NGRAMBFV1,
+                  "idx_ngram",
+                  new String[][] {{"c2"}},
+                  Map.of(
+                      "ngram_size", "3",
+                      "bloom_filter_size", "512",
+                      "hash_functions", "3",
+                      "random_seed", "0"))
+            });
+    Assertions.assertTrue(
+        ngrambfSql.contains(
+            "ADD INDEX `idx_ngram` `c2` TYPE ngrambf_v1(3, 512, 3, 0) GRANULARITY 1"),
+        "DDL should contain ngrambf_v1 with parameters: " + ngrambfSql);
+
+    // ALTER TABLE ADD INDEX for tokenbf_v1 with full properties
+    String tokenbfSql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {
+              TableChange.addIndex(
+                  IndexType.DATA_SKIPPING_TOKENBFV1,
+                  "idx_token",
+                  new String[][] {{"c2"}},
+                  Map.of(
+                      "bloom_filter_size", "256",
+                      "hash_functions", "2",
+                      "random_seed", "1",
+                      "granularity", "4"))
+            });
+    Assertions.assertTrue(
+        tokenbfSql.contains("ADD INDEX `idx_token` `c2` TYPE tokenbf_v1(256, 2, 1) GRANULARITY 4"),
+        "DDL should contain tokenbf_v1 with custom GRANULARITY: " + tokenbfSql);
+  }
+
+  @Test
+  public void testAlterTableNullabilityDropsNullDefault() {
     StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
     ops.initialize(
         null,
@@ -1718,15 +2577,38 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         new HashMap<>());
     ops.setTable(buildStubTableWithNullDefault());
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            ops.buildAlterSql(
-                "db",
-                "tbl",
-                new TableChange[] {
-                  TableChange.updateColumnNullability(new String[] {"c3"}, false)
-                }));
+    String sql =
+        ops.buildAlterSql(
+            "db",
+            "tbl",
+            new TableChange[] {TableChange.updateColumnNullability(new String[] {"c3"}, false)});
+    Assertions.assertTrue(sql.replaceAll("\\s+", " ").contains("MODIFY COLUMN `c3` String"), sql);
+    Assertions.assertFalse(sql.contains("Nullable"), sql);
+    Assertions.assertFalse(sql.contains("DEFAULT"), sql);
+  }
+
+  @Test
+  public void testAlterTableNullabilityWithDefaultValueInSameRequest() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    ops.setTable(buildStubTableWithNullDefault());
+
+    TableChange setDefault =
+        TableChange.updateColumnDefaultValue(new String[] {"c3"}, Literals.stringLiteral("abc"));
+    TableChange setNotNull = TableChange.updateColumnNullability(new String[] {"c3"}, false);
+    // Every regenerated column definition carries both the new default and NOT NULL, whichever
+    // order the changes come in.
+    for (TableChange[] changes :
+        new TableChange[][] {{setDefault, setNotNull}, {setNotNull, setDefault}}) {
+      String sql = ops.buildAlterSql("db", "tbl", changes);
+      Assertions.assertFalse(sql.contains("Nullable"), sql);
+      Assertions.assertEquals(2, StringUtils.countMatches(sql, "DEFAULT 'abc'"), sql);
+    }
   }
 
   @Test
@@ -1956,6 +2838,79 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         .withComment("table_comment")
         .withTableOperation(null)
         .build();
+  }
+
+  @Test
+  public void testAlterTableDefaultValueValidation() {
+    StubClickHouseTableOperations ops = new StubClickHouseTableOperations();
+    ops.initialize(
+        null,
+        new ClickHouseExceptionConverter(),
+        new ClickHouseTypeConverter(),
+        new ClickHouseColumnDefaultValueConverter(),
+        new HashMap<>());
+    JdbcColumn c1 =
+        JdbcColumn.builder()
+            .withName("c1")
+            .withType(Types.IntegerType.get())
+            .withDefaultValue(Literals.of("300", Types.IntegerType.get()))
+            .build();
+    // A default that does not fit its type can exist when the table was created outside Gravitino.
+    JdbcColumn c2 =
+        JdbcColumn.builder()
+            .withName("c2")
+            .withType(Types.ByteType.get())
+            .withDefaultValue(Literals.of("200", Types.ByteType.get()))
+            .build();
+    ops.setTable(
+        JdbcTable.builder()
+            .withName("tbl")
+            .withColumns(new JdbcColumn[] {c1, c2})
+            .withTableOperation(null)
+            .build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"c1"}, Literals.of("2147483648", Types.IntegerType.get()))
+                }));
+
+    IllegalArgumentException typeChange =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.buildAlterSql(
+                    "db",
+                    "tbl",
+                    new TableChange[] {
+                      TableChange.updateColumnType(new String[] {"c1"}, Types.ByteType.get())
+                    }));
+    Assertions.assertTrue(
+        typeChange.getMessage().contains("existing default value of column c1"),
+        typeChange.getMessage());
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnType(new String[] {"c1"}, Types.LongType.get())
+                }));
+
+    // Changes that keep the existing default do not validate it again.
+    Assertions.assertDoesNotThrow(
+        () ->
+            ops.buildAlterSql(
+                "db",
+                "tbl",
+                new TableChange[] {
+                  TableChange.updateColumnComment(new String[] {"c2"}, "new comment")
+                }));
   }
 
   private static JdbcTable buildStubTableWithNullDefault() {

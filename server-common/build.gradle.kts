@@ -25,6 +25,10 @@ plugins {
 }
 
 dependencies {
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
+  constraints {
+    implementation(libs.xnio.api)
+  }
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
   implementation(project(":common")) {
@@ -71,4 +75,17 @@ tasks {
     environment("GRAVITINO_HOME", rootDir.path)
     environment("GRAVITINO_TEST", "true")
   }
+}
+
+val testJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("tests")
+  from(sourceSets["test"].output)
+}
+
+configurations {
+  create("testArtifacts")
+}
+
+artifacts {
+  add("testArtifacts", testJar)
 }

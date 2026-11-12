@@ -7,6 +7,9 @@ on:
 
 jobs:
   detect-cherry-pick-labels:
+    # Contributor forks run workflows for Fork CI; cherry-picks only apply to the
+    # repository the pull requests were merged into.
+    if: ${{ !github.event.repository.fork }}
     runs-on: ubuntu-latest
     name: Detect cherry-pick labels from merged PR
     outputs:

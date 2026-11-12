@@ -39,11 +39,9 @@ class TestGlueCatalogCapability {
   }
 
   @Test
-  void testColumnNotNullIsUnsupported() {
-    CapabilityResult result = capability.columnNotNull();
-    assertFalse(result.supported(), "Glue does not enforce NOT NULL constraints");
-    assertNotNull(result.unsupportedMessage());
-    assertFalse(result.unsupportedMessage().isEmpty());
+  void testColumnNotNullIsLeftToTableFormat() {
+    // Iceberg tables support NOT NULL; GlueCatalogOperations rejects it on Hive-format tables.
+    assertTrue(capability.columnNotNull().supported());
   }
 
   @Test
@@ -70,7 +68,7 @@ class TestGlueCatalogCapability {
 
   @Test
   void testCaseSensitiveOnColumnIsSupported() {
-    // Column name case folding is not documented in Glue Column API — treated as supported.
+    // Iceberg keeps the case of column names; Hive-format names are folded by the catalog itself.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
     assertTrue(result.supported());
   }

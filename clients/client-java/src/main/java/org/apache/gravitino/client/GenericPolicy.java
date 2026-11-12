@@ -20,32 +20,22 @@ package org.apache.gravitino.client;
 
 import static org.apache.gravitino.dto.util.DTOConverters.fromDTO;
 
-import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.Audit;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.policy.PolicyDTO;
-import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
-import org.apache.gravitino.rest.RESTUtils;
 
 /** Represents a generic policy. */
-class GenericPolicy implements Policy, Policy.AssociatedObjects {
+class GenericPolicy implements Policy {
 
   private final PolicyDTO policyDTO;
 
   private final PolicyContent content;
 
-  private final RESTClient restClient;
-
-  private final String metalake;
-
-  GenericPolicy(PolicyDTO policyDTO, RESTClient restClient, String metalake) {
+  GenericPolicy(PolicyDTO policyDTO) {
     this.policyDTO = policyDTO;
     this.content = fromDTO(policyDTO.content());
-    this.restClient = restClient;
-    this.metalake = metalake;
   }
 
   @Override
@@ -84,26 +74,6 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
   }
 
   @Override
-  public AssociatedObjects associatedObjects() {
-    return this;
-  }
-
-  @Override
-  public MetadataObject[] objects() {
-    MetadataObjectListResponse resp =
-        restClient.get(
-            String.format(
-                "api/metalakes/%s/policies/%s/objects",
-                RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
-            MetadataObjectListResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.policyErrorHandler());
-
-    resp.validate();
-    return resp.getMetadataObjects();
-  }
-
-  @Override
   public boolean equals(Object obj) {
     if (this == obj) {
       return true;
@@ -123,14 +93,6 @@ class GenericPolicy implements Policy, Policy.AssociatedObjects {
 
   @Override
   public String toString() {
-    return "GenericPolicy{"
-        + "policyDTO="
-        + policyDTO
-        + ", content="
-        + content
-        + ", metalake='"
-        + metalake
-        + '\''
-        + '}';
+    return "GenericPolicy{" + "policyDTO=" + policyDTO + ", content=" + content + '}';
   }
 }

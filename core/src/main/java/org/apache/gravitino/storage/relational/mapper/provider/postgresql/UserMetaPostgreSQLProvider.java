@@ -22,24 +22,34 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
-  public String softDeleteUserMetaByUserId(Long userId) {
+  public String selectUserMetaByIdForShare(Long userId) {
+    return selectUserMetaById(userId) + " FOR SHARE";
+  }
+
+  @Override
+  public String softDeleteUserMetaByUserId(Long userId, Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteUserMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -47,15 +57,13 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
-        + " (user_id, user_name, metalake_id, external_id, enabled,"
+        + " (user_id, user_name, metalake_id,"
         + " audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"
-        + " #{userMeta.externalId},"
-        + " #{userMeta.enabled},"
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
@@ -64,11 +72,14 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " ON CONFLICT(user_id) DO UPDATE SET"
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
-        + " external_id = #{userMeta.externalId},"
-        + " enabled = #{userMeta.enabled},"
         + " audit_info = #{userMeta.auditInfo},"
-        + " current_version = #{userMeta.currentVersion},"
-        + " last_version = #{userMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
@@ -76,7 +87,6 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String listExtendedUserPOsByMetalakeId(Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
@@ -101,6 +111,45 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   }
 
   @Override
+  public String listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_AGG(rot.role_name) as roleNames,"
+        + " JSON_AGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT ut.user_id FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY ut.user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + USER_TABLE_NAME
+        + " ut ON ut.user_id = paginated.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY ut.user_id"
+        + " ORDER BY ut.user_id ASC";
+  }
+
+  @Override
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
@@ -114,7 +163,8 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String touchUserUpdatedAt(@Param("userId") long userId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 }

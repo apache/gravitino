@@ -166,9 +166,9 @@ WITH (
 );
 ```
 
-| Property   | Description              | Default Value | Required | Since Version |
-|------------|--------------------------|---------------|----------|---------------|
-| `location` | S3 location for the schema | (none)      | No       | 1.3.0         |
+| Property   | Description                | Default Value | Required |
+|------------|----------------------------|---------------|----------|
+| `location` | S3 location for the schema | (none)        | No       |
 
 ### Create a Table with Properties
 
@@ -188,15 +188,19 @@ CREATE TABLE glue_test.db01.table_name
 );
 ```
 
-| Property        | Description                                                                 | Default Value | Required | Since Version |
-|-----------------|-----------------------------------------------------------------------------|---------------|----------|---------------|
-| `type`          | Table format: `HIVE` or `ICEBERG`                                           | `HIVE`        | No       | 1.3.0         |
-| `format`        | File format for Hive-format tables: `PARQUET`, `ORC`, `TEXTFILE`, etc.      | `TEXTFILE`    | No       | 1.3.0         |
-| `location`      | S3 storage location for the table                                           | (derived from catalog `warehouse`) | No | 1.3.0 |
-| `partitioned_by`| Partition columns or expressions. For Iceberg, use transform syntax such as `year(col)`. | (none) | No | 1.3.0 |
-| `bucketed_by`   | Bucket columns (Hive-format tables only)                                    | (none)        | No       | 1.3.0         |
-| `bucket_count`  | Number of buckets (required when `bucketed_by` is set)                      | (none)        | No       | 1.3.0         |
-| `sorted_by`     | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`        | (none)        | No       | 1.3.0         |
+| Property         | Description                                                                                                                         | Default Value                      | Required |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------|------------------------------------|----------|
+| `type`           | Table format: `HIVE` or `ICEBERG`. Applies to `CREATE TABLE` and `CREATE TABLE AS SELECT`.                                          | (catalog `default-table-format`)   | No       |
+| `format`         | File format for Hive-format tables: `PARQUET`, `ORC`, `TEXTFILE`, etc.                                                              | `TEXTFILE`                         | No       |
+| `location`       | S3 storage location for the table                                                                                                   | (derived from catalog `warehouse`) | No       |
+| `partitioned_by` | Partition columns or expressions. For Iceberg, use transform syntax such as `year(col)`.                                            | (none)                             | No       |
+| `bucketed_by`    | Bucket columns (Hive-format tables only)                                                                                            | (none)                             | No       |
+| `bucket_count`   | Number of buckets (required when `bucketed_by` is set)                                                                              | (none)                             | No       |
+| `sorted_by`      | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`. Sort terms over a transform, such as `day(ts)`, are not shown. | (none)                             | No       |
+
+For Hive-format tables, `sorted_by` requires `bucketed_by` and does not take `NULLS FIRST` or `NULLS LAST`. Iceberg tables need no bucketing.
+
+`SHOW CREATE TABLE` shows `type` and `format` of a Hive-format table only when its storage classes match a format Trino can name. For other tables, such as RCFile tables, set them yourself when you recreate the table.
 
 ## Examples
 
@@ -218,6 +222,10 @@ CALL gravitino.system.create_catalog(
 ```
 
 For more information about the Glue catalog, refer to [AWS Glue catalog](../aws-glue-catalog.md).
+
+:::caution
+When Trino registers a Glue catalog, it logs the configuration of the connector it creates for the catalog, and masks only the secret keys. With static `aws-access-key-id` and `aws-secret-access-key`, the access key ID appears in clear text in the Trino server log, under the logger `io.trino.bootstrap.catalog.lakehouse`. To keep it out of the log, use the default AWS credential chain (for example an IAM role) instead of static keys, or set `io.trino.bootstrap.catalog.lakehouse=WARN` in the Trino `log.properties`.
+:::
 
 ### Connect and List Catalogs
 
@@ -245,31 +253,33 @@ The `glue_test` catalog corresponds to the catalog created in Gravitino.
 
 The Glue connector extends the Hive data type mapping with additional support for Iceberg types.
 
-| Gravitino Type               | Trino Type                   | Notes                                        |
-|------------------------------|------------------------------|----------------------------------------------|
-| `boolean`                    | `BOOLEAN`                    |                                              |
-| `byte`                       | `TINYINT`                    |                                              |
-| `short`                      | `SMALLINT`                   |                                              |
-| `integer`                    | `INTEGER`                    |                                              |
-| `long`                       | `BIGINT`                     |                                              |
-| `float`                      | `REAL`                       |                                              |
-| `double`                     | `DOUBLE`                     |                                              |
-| `decimal(p, s)`              | `DECIMAL(p, s)`              |                                              |
-| `string`                     | `VARCHAR`                    |                                              |
-| `varchar(n)`                 | `VARCHAR(n)`                 |                                              |
-| `char(n)`                    | `CHAR(n)`                    |                                              |
-| `binary`                     | `VARBINARY`                  |                                              |
-| `date`                       | `DATE`                       |                                              |
-| `time(6)`                    | `TIME(6)`                    | Iceberg tables only; microsecond precision   |
-| `timestamp`                  | `TIMESTAMP(3)`               | Hive-format tables; millisecond precision    |
-| `timestamp(6)`               | `TIMESTAMP(6)`               | Iceberg tables; microsecond precision        |
-| `timestamptz(6)`             | `TIMESTAMP(6) WITH TIME ZONE`| Iceberg tables only                          |
-| `list`                       | `ARRAY`                      |                                              |
-| `map`                        | `MAP`                        |                                              |
-| `struct`                     | `ROW`                        |                                              |
+| Gravitino Type   | Trino Type                    | Notes                                                                         |
+|------------------|-------------------------------|-------------------------------------------------------------------------------|
+| `boolean`        | `BOOLEAN`                     |                                                                               |
+| `byte`           | `TINYINT`                     |                                                                               |
+| `short`          | `SMALLINT`                    |                                                                               |
+| `integer`        | `INTEGER`                     |                                                                               |
+| `long`           | `BIGINT`                      |                                                                               |
+| `float`          | `REAL`                        |                                                                               |
+| `double`         | `DOUBLE`                      |                                                                               |
+| `decimal(p, s)`  | `DECIMAL(p, s)`               |                                                                               |
+| `string`         | `VARCHAR`                     |                                                                               |
+| `varchar(n)`     | `VARCHAR(n)`                  |                                                                               |
+| `char(n)`        | `CHAR(n)`                     |                                                                               |
+| `binary`         | `VARBINARY`                   |                                                                               |
+| `date`           | `DATE`                        |                                                                               |
+| `time(6)`        | `TIME(6)`                     | Iceberg tables only; microsecond precision                                    |
+| `timestamp`      | `TIMESTAMP(3)`                | Hive-format tables; millisecond precision                                     |
+| `timestamp(6)`   | `TIMESTAMP(6)`                | Iceberg tables; microsecond precision. Hive-format tables refuse it           |
+| `timestamptz(6)` | `TIMESTAMP(6) WITH TIME ZONE` | Iceberg tables only                                                           |
+| `list`           | `ARRAY`                       |                                                                               |
+| `map`            | `MAP`                         |                                                                               |
+| `struct`         | `ROW`                         |                                                                               |
 
 :::note
 `TIME` and `TIMESTAMP WITH TIME ZONE` are available for Iceberg-format tables only. Hive-format tables use millisecond-precision `TIMESTAMP` without time zone.
+
+A column whose type Trino cannot represent, such as `interval` or `union`, is left out of the table in Trino; the other columns can be queried.
 :::
 
 ## Trino Connector Configuration

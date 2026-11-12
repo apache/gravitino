@@ -1,0 +1,220 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+---
+
+paths:
+
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/before:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/actionId"
+      - $ref: "#/components/parameters/finish"
+    post:
+      tags:
+        - maintenance
+      summary: Report TMS before-maintenance (S0) snapshot metrics
+      operationId: reportMaintenanceActionBeforeMetrics
+      description: |
+        Spark callback for an in-flight maintenance action at S0: inserts a
+        `table_snapshot_metrics` row and records `before_metrics_id` on the action keyed by
+        `actionId` (injected at submit). `tableId` and `policyId` must match the soft-slot row.
+        Optional query `finish=true` closes that soft slot (for example on snapshot drift / skip).
+        Continue / stop stays in the job. Soft-slot release without metrics uses POST .../finish.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionMetricsRequest"
+            examples:
+              MaintenanceActionMetricsRequest:
+                $ref: "#/components/examples/MaintenanceActionBeforeMetricsRequest"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/maintenance/actions/{actionId}/finish:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/actionId"
+    post:
+      tags:
+        - maintenance
+      summary: Finish TMS maintenance action soft slot without metrics
+      operationId: finishMaintenanceAction
+      description: |
+        Closes the soft slot for one bound action (`finished_at` set) without writing snapshot
+        metrics. Use when the maintenance type does not sample metrics, or when metrics were
+        already reported and only occupancy release remains. `tableId` and `policyId` must match
+        the soft-slot row addressed by `actionId`. Iceberg snapshot ids live on the metrics rows,
+        not on this request.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionFinishRequest"
+            examples:
+              MaintenanceActionFinishRequest:
+                $ref: "#/components/examples/MaintenanceActionFinishRequest"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /metalakes/{metalake}/maintenance/actions/{actionId}/metrics/after:
+    parameters:
+      - $ref: "../openapi.yaml#/components/parameters/metalake"
+      - $ref: "#/components/parameters/actionId"
+      - $ref: "#/components/parameters/finish"
+    post:
+      tags:
+        - maintenance
+      summary: Report TMS after-maintenance (S1) snapshot metrics
+      operationId: reportMaintenanceActionAfterMetrics
+      description: |
+        Spark callback for an in-flight maintenance action at S1: inserts a
+        `table_snapshot_metrics` row and records `after_metrics_id` on the action keyed by
+        `actionId`. `tableId` and `policyId` must match the soft-slot row. Optional query
+        `finish=true` closes that soft slot. Continue / stop stays in the job. Soft-slot release
+        without metrics uses POST .../finish.
+      requestBody:
+        required: true
+        content:
+          application/vnd.gravitino.v1+json:
+            schema:
+              $ref: "#/components/schemas/MaintenanceActionMetricsRequest"
+            examples:
+              MaintenanceActionMetricsRequest:
+                $ref: "#/components/examples/MaintenanceActionAfterMetricsRequest"
+      responses:
+        "200":
+          $ref: "../openapi.yaml#/components/responses/BaseResponse"
+        "400":
+          $ref: "../openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake or maintenance action does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "../openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "../openapi.yaml#/components/responses/ServerErrorResponse"
+
+components:
+
+  parameters:
+    actionId:
+      name: actionId
+      in: path
+      description: |
+        Soft-slot id from `table_maintenance_action.action_id`, injected into the Spark job as
+        `action_ids` at submit time.
+      required: true
+      schema:
+        type: integer
+        format: int64
+    finish:
+      name: finish
+      in: query
+      description: |
+        When true, close the soft slot for this action after storing metrics (sets `finished_at`).
+        Prefer POST .../finish when no metrics are written.
+      required: false
+      schema:
+        type: boolean
+        default: false
+
+  schemas:
+    MaintenanceActionMetricsRequest:
+      type: object
+      required:
+        - tableId
+        - policyId
+        - snapshotId
+        - metricsJson
+      properties:
+        tableId:
+          type: integer
+          format: int64
+          description: Table entity id that must match the soft-slot row for actionId
+        policyId:
+          type: integer
+          format: int64
+          description: Policy entity id that must match the soft-slot row for actionId
+        snapshotId:
+          type: integer
+          format: int64
+          description: Iceberg snapshot id stored on the new table_snapshot_metrics row
+        metricsJson:
+          type: string
+          description: Serialized metrics JSON for table_snapshot_metrics.metrics_value
+    MaintenanceActionFinishRequest:
+      type: object
+      required:
+        - tableId
+        - policyId
+      properties:
+        tableId:
+          type: integer
+          format: int64
+          description: Table entity id that must match the soft-slot row for actionId
+        policyId:
+          type: integer
+          format: int64
+          description: Policy entity id that must match the soft-slot row for actionId
+
+  examples:
+    MaintenanceActionBeforeMetricsRequest:
+      value: {
+        "tableId": 10,
+        "policyId": 20,
+        "snapshotId": 9001,
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9001,\"custom-data-file-mse\":1.5}"
+      }
+    MaintenanceActionAfterMetricsRequest:
+      value: {
+        "tableId": 10,
+        "policyId": 20,
+        "snapshotId": 9002,
+        "metricsJson": "{\"maintenanceType\":\"rewrite_data_files\",\"snapshotId\":9002,\"custom-data-file-mse\":0.2}"
+      }
+    MaintenanceActionFinishRequest:
+      value: {
+        "tableId": 10,
+        "policyId": 20
+      }

@@ -22,6 +22,7 @@ package org.apache.gravitino.cos.fs;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
+import org.apache.gravitino.credential.COSTokenCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.storage.COSProperties;
 import org.apache.hadoop.fs.CosNConfigKeys;
@@ -60,6 +61,23 @@ public class TestCOSFileSystemProvider {
 
     Map<String, String> conf = provider.getFileSystemCredentialConf(credentials);
 
+    Assertions.assertEquals(
+        COSCredentialsProvider.class.getCanonicalName(),
+        conf.get(CosNConfigKeys.COSN_CREDENTIALS_PROVIDER));
+  }
+
+  @Test
+  void testGetFileSystemCredentialConfWithTokenCredential() {
+    COSFileSystemProvider provider = new COSFileSystemProvider();
+    long expireMs = System.currentTimeMillis() + 60_000L;
+    Credential[] credentials =
+        new Credential[] {new COSTokenCredential("tmp-ak", "tmp-sk", "sts-token", expireMs)};
+
+    Map<String, String> conf = provider.getFileSystemCredentialConf(credentials);
+
+    // Token credentials must wire the same COSCredentialsProvider; the actual session token
+    // travels through Gravitino's GravitinoFileSystemCredentialsProvider rather than via
+    // hadoop-cos config keys.
     Assertions.assertEquals(
         COSCredentialsProvider.class.getCanonicalName(),
         conf.get(CosNConfigKeys.COSN_CREDENTIALS_PROVIDER));

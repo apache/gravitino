@@ -22,6 +22,7 @@ plugins {
 }
 
 dependencies {
+  implementation(project(":api"))
   implementation(project(":common"))
   implementation(project(":core"))
   implementation(project(":server-common"))

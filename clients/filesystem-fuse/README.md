@@ -19,6 +19,11 @@
 
 # Gvfs-fuse
 
+> **Deprecated:** Gvfs-fuse is deprecated and is no longer part of the Gradle build (it is not
+> included in `settings.gradle.kts` and cannot be built via `-PenableFuse=true`). The source is
+> kept in the repository for reference only and receives no further development or support. Use
+> the Java or Python GVFS implementations instead; see [Filesets](../../docs/filesets.md).
+
 Gvfs-fuse is the Fuse client for Gravitino fileset. It allows users to mount Gravitino filesets to their local file system via Fuse, enabling access to Gravitino fileset files as if they were part of the local file system.
 
 ## Features

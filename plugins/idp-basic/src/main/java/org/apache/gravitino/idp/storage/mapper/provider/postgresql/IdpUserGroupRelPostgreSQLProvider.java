@@ -24,6 +24,7 @@ import org.apache.gravitino.idp.storage.mapper.IdpGroupMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserGroupRelMapper;
 import org.apache.gravitino.idp.storage.mapper.IdpUserMetaMapper;
 import org.apache.gravitino.idp.storage.mapper.provider.base.IdpUserGroupRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.ibatis.annotations.Param;
 
 public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLProvider {
@@ -93,6 +94,6 @@ public class IdpUserGroupRelPostgreSQLProvider extends IdpUserGroupRelBaseSQLPro
 
   @Override
   protected String currentTimeMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+    return DatabaseTimeSQL.POSTGRESQL;
   }
 }

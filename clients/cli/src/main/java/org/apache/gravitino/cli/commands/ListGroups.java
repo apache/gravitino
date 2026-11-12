@@ -69,13 +69,13 @@ public class ListGroups extends Command {
   private Group getGroup(String name) {
     return new Group() {
       @Override
-      public String name() {
-        return name;
+      public Long id() {
+        return null;
       }
 
       @Override
-      public String externalId() {
-        return null;
+      public String name() {
+        return name;
       }
 
       @Override

@@ -22,11 +22,15 @@ import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 
 /**
  * Authorization executor for load table operations.
@@ -42,6 +46,8 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
  * Legacy clients without the `privileges` parameter will use default authorization.
  */
 public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
+  private final AuthorizationExpressionEvaluator allowCheckExistenceEvaluator;
+
   public LoadTableAuthorizationExecutor(
       Parameter[] parameters,
       Object[] args,
@@ -50,8 +56,13 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       Map<String, Object> pathParams,
       Optional<String> entityType,
       String secondaryExpression,
-      ExpressionCondition secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      String allowCheckExistenceExpression) {
     super(expression, metadataContext, pathParams, entityType);
+    this.allowCheckExistenceEvaluator =
+        StringUtils.isBlank(allowCheckExistenceExpression)
+            ? null
+            : new AuthorizationExpressionEvaluator(allowCheckExistenceExpression);
 
     if (!shouldCheckModifyTablePrivilege(secondaryExpression, secondaryExpressionCondition)) {
       return;
@@ -63,6 +74,25 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
       this.authorizationExpressionEvaluator =
           new AuthorizationExpressionEvaluator(secondaryExpression);
     }
+  }
+
+  @Override
+  public boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception {
+    if (super.execute(authorizationRequestContext)) {
+      return true;
+    }
+
+    if (allowCheckExistenceEvaluator == null
+        || !allowCheckExistenceEvaluator.evaluate(
+            metadataContext, pathParams, authorizationRequestContext, entityType)) {
+      return false;
+    }
+
+    NameIdentifier tableIdentifier = metadataContext.get(Entity.EntityType.TABLE);
+    if (tableIdentifier != null) {
+      GravitinoEnv.getInstance().internalTableDispatcher().loadTable(tableIdentifier);
+    }
+    return false;
   }
 
   private static boolean shouldCheckModifyTablePrivilege(
@@ -79,7 +109,12 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     return Arrays.stream(privileges.split(","))
         .map(String::trim)
         .filter(StringUtils::isNotBlank)
-        .map(Privilege.Name::valueOf)
-        .anyMatch(Privilege.Name.MODIFY_TABLE::equals);
+        .map(
+            privilege ->
+                RequestValidation.parse(
+                    () -> Privilege.Name.valueOf(privilege),
+                    e -> new BadRequestException(e, "Invalid privilege: %s", privilege)))
+        .toList()
+        .contains(Privilege.Name.MODIFY_TABLE);
   }
 }

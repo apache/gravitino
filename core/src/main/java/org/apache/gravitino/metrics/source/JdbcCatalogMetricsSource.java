@@ -23,14 +23,24 @@ import com.codahale.metrics.Gauge;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.gravitino.metrics.MetricNames;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JdbcCatalogMetricsSource extends CatalogMetricsSource {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JdbcCatalogMetricsSource.class);
 
   public JdbcCatalogMetricsSource(String metalakeName, String catalogName) {
     super("jdbc", metalakeName, catalogName);
   }
 
   public void registerDatasourceMetrics(DataSource dataSource) {
+    if (!(dataSource instanceof BasicDataSource)) {
+      LOG.warn(
+          "DataSource is not a BasicDataSource (actual: {}), skipping datasource metrics registration",
+          dataSource.getClass().getName());
+      return;
+    }
     BasicDataSource basicDataSource = (BasicDataSource) dataSource;
     registerGauge(
         MetricNames.DATASOURCE_ACTIVE_CONNECTIONS, (Gauge<Integer>) basicDataSource::getNumActive);

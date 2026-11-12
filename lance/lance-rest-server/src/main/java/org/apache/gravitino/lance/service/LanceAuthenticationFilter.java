@@ -28,8 +28,6 @@ import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.lance.namespace.model.ErrorResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An {@link AuthenticationFilter} subclass for the Lance REST server that:
@@ -43,7 +41,6 @@ import org.slf4j.LoggerFactory;
  */
 public class LanceAuthenticationFilter extends AuthenticationFilter {
 
-  private static final Logger LOG = LoggerFactory.getLogger(LanceAuthenticationFilter.class);
   private static final ObjectMapper MAPPER = ObjectMapperProvider.objectMapper();
 
   public LanceAuthenticationFilter() {
@@ -75,7 +72,6 @@ public class LanceAuthenticationFilter extends AuthenticationFilter {
       }
     } else {
       status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;
-      LOG.error("Authentication failure", exception);
       message = "Authentication failed";
     }
 

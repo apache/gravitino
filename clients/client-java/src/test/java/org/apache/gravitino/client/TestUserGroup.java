@@ -126,30 +126,6 @@ public class TestUserGroup extends TestBase {
   }
 
   @Test
-  public void testAddUserWithExternalId() throws Exception {
-    String username = "user";
-    String externalId = "ext-user-1";
-    String userPath = withSlash(String.format(API_METALAKES_USERS_PATH, metalakeName, ""));
-    UserAddRequest request = new UserAddRequest(username, externalId, false);
-
-    UserDTO mockUser =
-        UserDTO.builder()
-            .withName(username)
-            .withExternalId(externalId)
-            .withEnabled(false)
-            .withAudit(
-                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-    UserResponse userResponse = new UserResponse(mockUser);
-    buildMockResource(Method.POST, userPath, request, userResponse, SC_OK);
-
-    User addedUser = gravitinoClient.addUser(username, externalId, false);
-    Assertions.assertNotNull(addedUser);
-    Assertions.assertEquals(externalId, addedUser.externalId());
-    Assertions.assertFalse(addedUser.enabled());
-  }
-
-  @Test
   public void testGetUsers() throws Exception {
     String username = "user";
     String userPath = withSlash(String.format(API_METALAKES_USERS_PATH, metalakeName, username));
@@ -297,28 +273,6 @@ public class TestUserGroup extends TestBase {
   }
 
   @Test
-  public void testAddGroupWithExternalId() throws Exception {
-    String groupName = "group";
-    String externalId = "ext-group-1";
-    String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH, metalakeName, ""));
-    GroupAddRequest request = new GroupAddRequest(groupName, externalId);
-
-    GroupDTO mockGroup =
-        GroupDTO.builder()
-            .withName(groupName)
-            .withExternalId(externalId)
-            .withAudit(
-                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-    GroupResponse groupResponse = new GroupResponse(mockGroup);
-    buildMockResource(Method.POST, groupPath, request, groupResponse, SC_OK);
-
-    Group addedGroup = gravitinoClient.addGroup(groupName, externalId);
-    Assertions.assertNotNull(addedGroup);
-    Assertions.assertEquals(externalId, addedGroup.externalId());
-  }
-
-  @Test
   public void testGetGroups() throws Exception {
     String groupName = "group";
     String groupPath = withSlash(String.format(API_METALAKES_GROUPS_PATH, metalakeName, groupName));
@@ -427,6 +381,7 @@ public class TestUserGroup extends TestBase {
 
   private UserDTO mockUserDTO(String name) {
     return UserDTO.builder()
+        .withId(1L)
         .withName(name)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();
@@ -434,6 +389,7 @@ public class TestUserGroup extends TestBase {
 
   private GroupDTO mockGroupDTO(String name) {
     return GroupDTO.builder()
+        .withId(1L)
         .withName(name)
         .withAudit(AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
         .build();

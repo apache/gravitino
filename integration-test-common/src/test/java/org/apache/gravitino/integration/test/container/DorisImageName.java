@@ -33,6 +33,8 @@ package org.apache.gravitino.integration.test.container;
  */
 public enum DorisImageName {
   VERSION_1_2("apache/gravitino-ci:doris-0.1.5"),
+  /** The official all-in-one Doris 2.1.0 image. */
+  VERSION_2_1("apache/doris:doris-all-in-one-2.1.0"),
   VERSION_3_0("apache/doris:fe-3.0.6.2"),
   VERSION_4_0("apache/doris:fe-4.0.6");
 

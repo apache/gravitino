@@ -26,22 +26,26 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.dto.SchemaDTO;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
-import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyList;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagList;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic schema. */
-class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPolicies {
+class GenericSchema
+    implements Schema, SupportsTags, SupportsRoles, SupportsPolicies, SupportsSecrets {
 
   private final SchemaDTO schemaDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
@@ -52,6 +56,8 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
         new MetadataObjectRoleOperations(metalake, schemaObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(metalake, schemaObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(metalake, schemaObject, restClient);
   }
 
   @Override
@@ -67,6 +73,16 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override
@@ -95,8 +111,18 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   }
 
   @Override
+  public TagList<String> listTagsWithVisibility() {
+    return objectTagOperations.listTagsWithVisibility();
+  }
+
+  @Override
   public Tag[] listTagsInfo() {
     return objectTagOperations.listTagsInfo();
+  }
+
+  @Override
+  public TagList<Tag> listTagsInfoWithVisibility() {
+    return objectTagOperations.listTagsInfoWithVisibility();
   }
 
   @Override
@@ -110,8 +136,18 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   }
 
   @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
   public String[] listPolicies() {
     return objectPolicyOperations.listPolicies();
+  }
+
+  @Override
+  public PolicyList<String> listPoliciesWithVisibility() {
+    return objectPolicyOperations.listPoliciesWithVisibility();
   }
 
   @Override
@@ -120,14 +156,8 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   }
 
   @Override
-  public Policy getPolicy(String name) throws NoSuchPolicyException {
-    return objectPolicyOperations.getPolicy(name);
-  }
-
-  @Override
-  public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
-      throws PolicyAlreadyAssociatedException {
-    return objectPolicyOperations.associatePolicies(policiesToAdd, policiesToRemove);
+  public PolicyList<Policy> listPolicyInfosWithVisibility() {
+    return objectPolicyOperations.listPolicyInfosWithVisibility();
   }
 
   @Override

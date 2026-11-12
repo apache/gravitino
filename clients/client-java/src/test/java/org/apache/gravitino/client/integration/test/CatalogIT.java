@@ -40,6 +40,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
@@ -123,6 +124,19 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals("hive", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+
+    Assertions.assertThrows(
+        ConnectionFailedException.class,
+        () ->
+            metalake.testConnection(
+                catalogName,
+                CatalogChange.updateComment("temporary comment"),
+                CatalogChange.setProperty("metastore.uris", "thrift://127.0.0.1:1")));
+    Catalog unchangedCatalog = metalake.loadCatalog(catalogName);
+    Assertions.assertEquals("catalog comment", unchangedCatalog.comment());
+    Assertions.assertEquals(hmsUri, unchangedCatalog.properties().get("metastore.uris"));
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 
     metalake.dropCatalog(catalogName, true);
   }

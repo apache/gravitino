@@ -2,13 +2,31 @@ name: Python Client Integration Test
 
 # Controls when the workflow will run
 on:
-  push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: fork-ci-python-${{ inputs.head-sha || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -16,9 +34,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
+        id: checkout
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d
         id: filter
         with:
+          base: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.base-sha || steps.checkout.outputs.base-ref }}
+          ref: ${{ steps.checkout.outputs.synced == 'true' && steps.checkout.outputs.head-sha || github.ref }}
           filters: |
             source_changes:
               - .github/**
@@ -47,53 +79,27 @@ jobs:
   PythonIT:
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
     strategy:
       matrix:
-        # Integration test for AMD64 architecture
         architecture: [linux/amd64]
         java-version: [ 17 ]
-    env:
-      PLATFORM: ${{ matrix.architecture }}
-    steps:
-      - uses: actions/checkout@v4
+    uses: ./.github/workflows/python-integration-test-action.yml
+    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}
+      architecture: ${{ matrix.architecture }}
+      java-version: ${{ matrix.java-version }}
 
-      - uses: actions/setup-java@v4
-        with:
-          java-version: ${{ matrix.java-version }}
-          distribution: 'temurin'
-          cache: 'gradle'
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4.0.0
-
-      - name: Free up disk space
-        run: |
-          dev/ci/util_free_space.sh  
-
-      - name: Python Client Integration Test
-        id: integrationTest
-        run: |
-          ./gradlew compileDistribution -PskipWeb=true -x test
-
-          for pythonVersion in "3.10" "3.11" "3.12"
-          do
-            echo "Use Python version ${pythonVersion} to test the Python client."
-            ./gradlew -PpythonVersion=${pythonVersion} -PskipDockerTests=false -PskipWeb=true :clients:client-python:test
-            # Clean Gravitino database to clean test data
-            rm -rf ./distribution/package/data
-          done
-
-      - name: Upload integrate tests reports
-        uses: actions/upload-artifact@v7
-        if: ${{ failure() && steps.integrationTest.outcome == 'failure' }}
-        with:
-          name: integrate test reports
-          path: |
-            build/reports
-            integration-test/build/integration-test.log
-            distribution/package/logs/gravitino-server.out
-            distribution/package/logs/gravitino-server.log
-            catalogs/**/*.log
-            catalogs/**/*.tar
+  RayIcebergIT:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
+    uses: ./.github/workflows/ray-iceberg-it-action.yml
+    with:
+      base-ref: ${{ inputs.base-ref }}
+      base-sha: ${{ inputs.base-sha }}
+      head-repository: ${{ inputs.head-repository }}
+      head-sha: ${{ inputs.head-sha }}
+      sync: ${{ inputs.sync }}

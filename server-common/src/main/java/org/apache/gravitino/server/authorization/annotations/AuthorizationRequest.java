@@ -31,9 +31,12 @@ public @interface AuthorizationRequest {
   enum RequestType {
     COMMON,
     ASSOCIATE_TAG,
-    ASSOCIATE_POLICY,
     RUN_JOB,
+    LINEAGE,
     LOAD_TABLE,
-    CREATE_SCHEMA
+    /** Loads a view with authorized existence probing. */
+    LOAD_VIEW,
+    CREATE_SCHEMA,
+    TEST_CATALOG_CONNECTION
   }
 }

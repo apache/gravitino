@@ -20,20 +20,19 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 import { Button, Form, Input } from 'antd'
 
-import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
-import { clearIntervalId, setAuthUser } from '@/lib/store/auth'
+import { useAppDispatch } from '@/lib/hooks/useStore'
+import { getAuthMe, setAuthUser } from '@/lib/store/auth'
 
 function SimpleLogin() {
   const router = useRouter()
   const dispatch = useAppDispatch()
-  const store = useAppSelector(state => state.auth)
   const [form] = Form.useForm()
 
   const onFinish = async values => {
-    await dispatch(setAuthUser({ name: values.username, type: 'user' }))
+    dispatch(setAuthUser({ name: values.username, type: 'user' }))
+    await dispatch(getAuthMe())
     router.push('/metalakes')
   }
 

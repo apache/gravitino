@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
@@ -154,7 +154,11 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   @Override
   public Model alterModel(NameIdentifier ident, ModelChange... changes)
       throws NoSuchModelException, IllegalArgumentException {
-    return dispatcher.alterModel(normalizeCaseSensitive(ident), changes);
+    Capability capability = getCapability(ident, catalogManager);
+    return dispatcher.alterModel(
+        // The constraints of the name spec may be more strict than underlying catalog,
+        // and for compatibility reasons, we only apply case-sensitive capabilities here.
+        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
   }
 
   /** {@inheritDoc} */
@@ -174,19 +178,17 @@ public class ModelNormalizeDispatcher implements ModelDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    return withCapability(
-        NameIdentifier.of(namespace.levels()),
-        catalogManager,
-        cap -> applyCaseSensitive(namespace, Capability.Scope.MODEL, cap));
+    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
+    return applyCaseSensitive(namespace, Capability.Scope.MODEL, capabilities);
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier ident) {
-    return withCapability(
-        ident, catalogManager, cap -> applyCaseSensitive(ident, Capability.Scope.MODEL, cap));
+    Capability capabilities = getCapability(ident, catalogManager);
+    return applyCaseSensitive(ident, Capability.Scope.MODEL, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    return withCapability(
-        ident, catalogManager, cap -> applyCapabilities(ident, Capability.Scope.MODEL, cap));
+    Capability capability = getCapability(ident, catalogManager);
+    return applyCapabilities(ident, Capability.Scope.MODEL, capability);
   }
 }

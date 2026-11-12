@@ -23,6 +23,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -43,15 +44,19 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.ServiceUnavailableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.server.web.Utils;
@@ -144,6 +149,11 @@ public class ExceptionHandlers {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
+  public static Response handleSecretException(
+      OperationType op, String metadataObjectName, Exception e) {
+    return SecretExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
@@ -152,6 +162,20 @@ public class ExceptionHandlers {
   public static Response handleFunctionException(
       OperationType op, String function, String schema, Exception e) {
     return FunctionExceptionHandler.INSTANCE.handle(op, function, schema, e);
+  }
+
+  /**
+   * Handles an exception raised by a Semantic Model REST operation.
+   *
+   * @param op The operation type.
+   * @param semanticModel The Semantic Model name, or an empty string for a list operation.
+   * @param schema The parent schema name.
+   * @param e The exception to handle.
+   * @return The mapped REST response.
+   */
+  public static Response handleSemanticModelException(
+      OperationType op, String semanticModel, String schema, Exception e) {
+    return SemanticModelExceptionHandler.INSTANCE.handle(op, semanticModel, schema, e);
   }
 
   public static Response handleJobTemplateException(
@@ -165,30 +189,18 @@ public class ExceptionHandlers {
   }
 
   public static Response handleTestConnectionException(Exception e) {
-    ErrorResponse response;
-    if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+    return handleTestConnectionException(e, true);
+  }
 
-    } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
-
-    } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else {
-      return Utils.internalError(e.getMessage(), e);
-    }
-
-    return Response.status(Response.Status.OK)
-        .entity(response)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+  /**
+   * Handles an existing catalog connection test failure without exposing its stack trace.
+   *
+   * @param e the connection test failure
+   * @return an HTTP 403 response for forbidden operations, an HTTP 200 response for known
+   *     connection test failures, or an HTTP 500 response for unexpected errors
+   */
+  public static Response handleExistingCatalogTestConnectionException(Exception e) {
+    return handleTestConnectionException(e, false);
   }
 
   public static Response handleOwnerException(
@@ -209,6 +221,44 @@ public class ExceptionHandlers {
   public static Response handlePartitionStatsException(
       OperationType type, String name, String parent, Exception e) {
     return PartitionStatsExceptionHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
+  private static Response handleTestConnectionException(Exception e, boolean includeStack) {
+    Throwable throwable = includeStack ? e : null;
+    ErrorResponse response;
+    if (e instanceof IllegalArgumentException) {
+      response = ErrorResponse.illegalArguments(e.getMessage(), throwable);
+
+    } else if (e instanceof ServiceUnavailableException) {
+      response = ErrorResponse.serviceUnavailable(e.getMessage(), throwable);
+
+    } else if (e instanceof ConnectionFailedException) {
+      response = ErrorResponse.connectionFailed(e.getMessage(), throwable);
+
+    } else if (e instanceof UnsupportedOperationException) {
+      response = ErrorResponse.unsupportedOperation(e.getMessage(), throwable);
+
+    } else if (e instanceof NotFoundException) {
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof AlreadyExistsException) {
+      response =
+          ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof NotInUseException) {
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof ForbiddenException) {
+      return Utils.forbidden(e.getMessage(), throwable);
+
+    } else {
+      return Utils.internalError(e.getMessage(), throwable);
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(response)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -239,6 +289,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else if (e instanceof NotInUseException) {
         return Utils.notInUse(errorMsg, e);
@@ -389,11 +442,19 @@ public class ExceptionHandlers {
     @Override
     public Response handle(OperationType op, String catalog, String metalake, Exception e) {
       String formatted = StringUtil.isBlank(catalog) ? "" : " [" + catalog + "]";
-      String errorMsg = getCatalogErrorMsg(formatted, op.name(), metalake, getErrorMsg(e));
+      // Keep schema-check context even when the backend message contains "Exception: ".
+      String reason =
+          e instanceof ConnectionFailedException || e instanceof ServiceUnavailableException
+              ? e.getMessage()
+              : getErrorMsg(e);
+      String errorMsg = getCatalogErrorMsg(formatted, op.name(), metalake, reason);
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
 
       } else if (e instanceof ConnectionFailedException) {
         return Utils.connectionFailed(errorMsg, e);
@@ -730,11 +791,14 @@ public class ExceptionHandlers {
 
     @Override
     public Response handle(OperationType op, String credential, String parent, Exception e) {
-      String errorMsg = getCredentialErrorMsg(parent, getErrorMsg(e));
+      String errorMsg = getCredentialErrorMsg(credential, getErrorMsg(e));
       LOG.warn(errorMsg, e);
 
       if (e instanceof IllegalArgumentException) {
         return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
@@ -744,6 +808,39 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, credential, parent, e);
+      }
+    }
+  }
+
+  private static class SecretExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new SecretExceptionHandler();
+
+    private static String getSecretErrorMsg(String parent, String reason) {
+      return String.format("Failed to get secrets under object [%s], reason [%s]", parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String secret, String parent, Exception e) {
+      String reason = e instanceof ServiceUnavailableException ? e.getMessage() : getErrorMsg(e);
+      // metadataObjectName is passed as {@code secret}; parent is unused for this handler.
+      String errorMsg = getSecretErrorMsg(secret, reason);
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, secret, parent, e);
       }
     }
   }
@@ -775,6 +872,9 @@ public class ExceptionHandlers {
         return Utils.alreadyExists(errorMsg, e);
 
       } else if (e instanceof TagAlreadyAssociatedException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof PolicyAlreadyAssociatedException) {
         return Utils.alreadyExists(errorMsg, e);
 
       } else if (e instanceof NotInUseException) {
@@ -933,6 +1033,52 @@ public class ExceptionHandlers {
     }
   }
 
+  private static class SemanticModelExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new SemanticModelExceptionHandler();
+
+    private static String getSemanticModelErrorMsg(
+        String semanticModel, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate Semantic Model(s)%s operation [%s] under schema [%s], reason [%s]",
+          semanticModel, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String semanticModel, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(semanticModel) ? "" : " [" + semanticModel + "]";
+      String errorMsg = getSemanticModelErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof SemanticModelAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ServiceUnavailableException) {
+        return Utils.serviceUnavailable(errorMsg, e);
+
+      } else if (e instanceof ConnectionFailedException) {
+        return Utils.connectionFailed(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, semanticModel, schema, e);
+      }
+    }
+  }
+
   private static class JobTemplateExceptionHandler extends BaseExceptionHandler {
 
     private static final ExceptionHandler INSTANCE = new JobTemplateExceptionHandler();
@@ -971,6 +1117,9 @@ public class ExceptionHandlers {
       } else if (e instanceof ForbiddenException) {
         return Utils.forbidden(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, jobTemplate, parent, e);
       }
@@ -1006,6 +1155,9 @@ public class ExceptionHandlers {
       } else if (e instanceof ForbiddenException) {
         return Utils.forbidden(errorMsg, e);
 
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
       } else {
         return super.handle(op, jobTemplate, parent, e);
       }
@@ -1034,6 +1186,9 @@ public class ExceptionHandlers {
 
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof UnmodifiableStatisticException) {
+        return Utils.operationConflict(errorMsg, e);
 
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
@@ -1067,6 +1222,9 @@ public class ExceptionHandlers {
       } else if (e instanceof NotFoundException) {
         return Utils.notFound(errorMsg, e);
 
+      } else if (e instanceof UnmodifiableStatisticException) {
+        return Utils.operationConflict(errorMsg, e);
+
       } else if (e instanceof UnsupportedOperationException) {
         return Utils.unsupportedOperation(errorMsg, e);
 
@@ -1096,6 +1254,21 @@ public class ExceptionHandlers {
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
 
+      // A request the backend refuses because of the request itself (for example an invalid
+      // definition or a drop blocked by dependent objects) is a client error, not a server error.
+      if (e instanceof BadRequestException) {
+        LOG.warn(errorMsg, e);
+        return Utils.illegalArguments(IllegalArgumentException.class.getSimpleName(), errorMsg, e);
+      }
+
+      // A configured dependency that is temporarily unavailable is not an internal Gravitino error:
+      // surface it as 503 Service Unavailable so callers can tell an outage from a server bug.
+      if (e instanceof ServiceUnavailableException) {
+        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
+        LOG.warn(errorMsg, e);
+        return Utils.serviceUnavailable(errorMsg, e);
+      }
+
       // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
       // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
       // outage from a server bug.
@@ -1103,6 +1276,23 @@ public class ExceptionHandlers {
         // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
         LOG.warn(errorMsg, e);
         return Utils.connectionFailed(errorMsg, e);
+      }
+
+      if (e instanceof OptimisticLockException) {
+        LOG.warn(errorMsg, e);
+        return Utils.optimisticLockConflict(errorMsg, e);
+      }
+
+      // Classify domain-specific UnsupportedOperationException subclasses before the generic
+      // capability fallback below.
+      if (e instanceof UnmodifiableStatisticException) {
+        LOG.warn(errorMsg, e);
+        return Utils.operationConflict(errorMsg, e);
+      }
+
+      if (e instanceof UnsupportedOperationException) {
+        LOG.warn(errorMsg, e);
+        return Utils.unsupportedOperation(errorMsg, e);
       }
 
       LOG.error(errorMsg, e);
