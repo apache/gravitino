@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import org.apache.flink.configuration.Configuration;
@@ -34,6 +35,7 @@ import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
+import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
 import org.apache.gravitino.catalog.hive.HiveConstants;
 import org.apache.gravitino.flink.connector.hive.GravitinoHiveCatalogFactoryOptions;
@@ -58,12 +60,15 @@ import org.slf4j.LoggerFactory;
  *   <li>Session-scoped catalog types (e.g. {@code generic_in_memory}) are held in memory only and
  *       never reach the Gravitino server.
  *   <li>Both stores contribute to the catalog list returned by {@code SHOW CATALOGS}.
+ *   <li>Names listed in {@code gravitino.excludedCatalogs} are never resolved against Gravitino, so
+ *       a session catalog can reuse the name of an existing Gravitino catalog without changing it.
  * </ul>
  *
- * <p>Requires a running Hive Docker container for the Gravitino-managed catalog tests.
+ * <p>Requires a running Hive Docker container for the Gravitino-managed catalog tests. Concrete
+ * subclasses live in the Flink-minor modules that support the Hive catalog.
  */
 @Tag("gravitino-docker-test")
-public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
+public abstract class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(FlinkSupportsSessionCatalogIT.class);
 
@@ -88,8 +93,8 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
         "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
     configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
     configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
-    configuration.setBoolean(
-        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", true);
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", "true");
     EnvironmentSettings settings =
         EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build();
     tableEnv = TableEnvironment.create(settings);
@@ -302,6 +307,204 @@ public class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
 
     Optional<Catalog> droppedCatalog = tableEnv.getCatalog(catalogName);
     Assertions.assertFalse(droppedCatalog.isPresent(), "Catalog should be dropped");
+  }
+
+  /**
+   * Without exclusion, creating a session catalog with the name of an existing Gravitino catalog is
+   * rejected, and the Gravitino catalog is left unchanged.
+   */
+  @Test
+  public void testCreateSessionCatalogWithGravitinoCatalogNameFailsWithoutExclusion() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_conflict_hive";
+    createGravitinoHiveCatalog(catalogName);
+
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              tableEnv.executeSql(
+                  String.format(
+                      "CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName)));
+
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
+  /**
+   * With {@code gravitino.excludedCatalogs}, a session catalog can use the name of an existing
+   * Gravitino catalog. Creating, using, and dropping the session catalog never loads, modifies, or
+   * drops the Gravitino catalog, and other sessions keep seeing the Gravitino catalog.
+   */
+  @Test
+  public void testExcludedCatalogAllowsSessionCatalogWithGravitinoCatalogName() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_excluded_hive";
+    String otherCatalogName = "session_it_not_excluded_hive";
+    String sessionDatabase = "session_it_native_db";
+    createGravitinoHiveCatalog(catalogName);
+    createGravitinoHiveCatalog(otherCatalogName);
+
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment excludingEnv = createTableEnvExcluding(catalogName);
+
+      // The Gravitino catalog with the excluded name is hidden in this session only.
+      Assertions.assertFalse(Arrays.asList(excludingEnv.listCatalogs()).contains(catalogName));
+      Assertions.assertTrue(Arrays.asList(excludingEnv.listCatalogs()).contains(otherCatalogName));
+      Assertions.assertFalse(excludingEnv.getCatalog(catalogName).isPresent());
+
+      excludingEnv.executeSql(
+          String.format("CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName));
+      Optional<Catalog> sessionCatalog = excludingEnv.getCatalog(catalogName);
+      Assertions.assertTrue(sessionCatalog.isPresent());
+      Assertions.assertInstanceOf(GenericInMemoryCatalog.class, sessionCatalog.get());
+
+      excludingEnv.useCatalog(catalogName);
+      excludingEnv.executeSql("CREATE DATABASE " + sessionDatabase);
+      Assertions.assertTrue(
+          Arrays.asList(excludingEnv.listDatabases()).contains(sessionDatabase),
+          "The database must be created in the session catalog");
+      excludingEnv.useCatalog(DEFAULT_CATALOG);
+
+      // The Gravitino catalog is untouched: no schema was created there and its properties are
+      // unchanged.
+      org.apache.gravitino.Catalog gravitinoCatalog = metalake.loadCatalog(catalogName);
+      Assertions.assertFalse(gravitinoCatalog.asSchemas().schemaExists(sessionDatabase));
+      Assertions.assertEquals(propertiesBefore, gravitinoCatalog.properties());
+
+      // Other sessions keep resolving the name to the Gravitino catalog.
+      Assertions.assertTrue(Arrays.asList(tableEnv.listCatalogs()).contains(catalogName));
+      Assertions.assertFalse(
+          tableEnv.getCatalog(catalogName).get() instanceof GenericInMemoryCatalog);
+
+      // Dropping the session catalog never drops the Gravitino catalog.
+      excludingEnv.executeSql("DROP CATALOG " + catalogName);
+      Assertions.assertFalse(excludingEnv.getCatalog(catalogName).isPresent());
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertThrows(
+          Exception.class, () -> excludingEnv.executeSql("DROP CATALOG " + catalogName));
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+
+      // Catalogs that are not excluded keep their existing behavior in the same session.
+      excludingEnv.useCatalog(otherCatalogName);
+      excludingEnv.listDatabases();
+      excludingEnv.useCatalog(DEFAULT_CATALOG);
+      excludingEnv.executeSql("DROP CATALOG " + otherCatalogName);
+      Assertions.assertFalse(metalake.catalogExists(otherCatalogName));
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + otherCatalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+      Assertions.assertFalse(metalake.catalogExists(otherCatalogName));
+    }
+  }
+
+  /**
+   * A Gravitino-managed catalog type cannot be created under an excluded name, because it would be
+   * persisted to Gravitino. The existing Gravitino catalog must be left unchanged.
+   */
+  @Test
+  public void testExcludedCatalogRejectsGravitinoManagedCatalogType() {
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_excluded_managed_hive";
+    createGravitinoHiveCatalog(catalogName);
+
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment excludingEnv = createTableEnvExcluding(catalogName);
+
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class,
+              () ->
+                  excludingEnv.executeSql(
+                      String.format(
+                          "CREATE CATALOG %s WITH ("
+                              + "'type'='%s',"
+                              + "'hive-conf-dir'='%s',"
+                              + "'hive.metastore.uris'='%s'"
+                              + ")",
+                          catalogName,
+                          GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+                          hiveConfDir,
+                          hiveMetastoreUri)));
+
+      Assertions.assertTrue(
+          containsMessage(exception, "gravitino.excludedCatalogs"), collectMessages(exception));
+      // The rejected catalog must not stay registered in the session, otherwise it would expose
+      // the excluded Gravitino catalog with the same name.
+      Assertions.assertFalse(Arrays.asList(excludingEnv.listCatalogs()).contains(catalogName));
+      Assertions.assertFalse(excludingEnv.getCatalog(catalogName).isPresent());
+      Assertions.assertThrows(Exception.class, () -> excludingEnv.useCatalog(catalogName));
+      Assertions.assertTrue(metalake.catalogExists(catalogName));
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
+  private static boolean containsMessage(Throwable throwable, String expectedMessage) {
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      if (current.getMessage() != null && current.getMessage().contains(expectedMessage)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String collectMessages(Throwable throwable) {
+    StringBuilder messages = new StringBuilder();
+    for (Throwable current = throwable; current != null; current = current.getCause()) {
+      messages.append(current.getClass().getName()).append(": ").append(current.getMessage());
+      messages.append('\n');
+    }
+    return messages.toString();
+  }
+
+  private void createGravitinoHiveCatalog(String catalogName) {
+    tableEnv.executeSql(
+        String.format(
+            "CREATE CATALOG %s WITH ("
+                + "'type'='%s',"
+                + "'hive-conf-dir'='%s',"
+                + "'hive.metastore.uris'='%s'"
+                + ")",
+            catalogName,
+            GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+            hiveConfDir,
+            hiveMetastoreUri));
+    Assertions.assertTrue(metalake.catalogExists(catalogName));
+  }
+
+  /**
+   * Creates a separate Flink session that excludes the given catalog names. The session is not
+   * closed, because closing its catalog store would also close the Gravitino client shared with
+   * {@code tableEnv}.
+   */
+  private TableEnvironment createTableEnvExcluding(String... catalogNames) {
+    Configuration configuration = new Configuration();
+    configuration.setString(
+        "table.catalog-store.kind", GravitinoCatalogStoreFactoryOptions.GRAVITINO);
+    configuration.setString("table.catalog-store.gravitino.gravitino.metalake", GRAVITINO_METALAKE);
+    configuration.setString("table.catalog-store.gravitino.gravitino.uri", gravitinoUri);
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport", "true");
+    configuration.setString(
+        "table.catalog-store.gravitino.gravitino.excludedCatalogs", String.join(";", catalogNames));
+    return TableEnvironment.create(
+        EnvironmentSettings.newInstance().withConfiguration(configuration).inBatchMode().build());
   }
 
   private static void initHiveConfDir() {
