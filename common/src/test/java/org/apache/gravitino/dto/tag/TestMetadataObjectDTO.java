@@ -149,7 +149,7 @@ public class TestMetadataObjectDTO {
   }
 
   @Test
-  void testDottedDomainNameWithEitherFieldOrder() throws JsonProcessingException {
+  void testPreservesInvalidDottedDomainNameWithEitherFieldOrder() throws JsonProcessingException {
     MetadataObjectDTO expected =
         MetadataObjectDTO.builder()
             .withName("Finance.US")

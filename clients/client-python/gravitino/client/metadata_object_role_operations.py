@@ -23,7 +23,7 @@ from gravitino.dto.responses.name_list_response import NameListResponse
 from gravitino.exceptions.handlers.role_error_handler import (
     ROLE_ERROR_HANDLER,
 )
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import encode_metadata_object_name, encode_string
 from gravitino.utils.http_client import HTTPClient
 
 
@@ -47,7 +47,7 @@ class MetadataObjectRoleOperations(SupportsRoles):
             + f"/{encode_string(metalake_name)}/"
             + "objects"
             + f"/{metadata_object.type().name.lower()}"
-            + f"/{encode_string(metadata_object.full_name())}"
+            + f"/{encode_metadata_object_name(metadata_object)}"
             + "/roles"
         )
 

@@ -92,11 +92,11 @@ public class TestSupportsDomains extends TestBase {
     DomainRelation[] relations = {
       DomainRelation.direct(),
       DomainRelation.inherited(MetadataObjects.parse("cat.db", MetadataObject.Type.SCHEMA)),
-      DomainRelation.viaSubdomain("Trading/a. b")
+      DomainRelation.viaSubdomain("Trading_a_b")
     };
     DomainDTO dto =
         new DomainDTO(
-            "Finance/a. b",
+            "Finance_a_b",
             null,
             Collections.emptyMap(),
             Domain.Status.PUBLISHED,

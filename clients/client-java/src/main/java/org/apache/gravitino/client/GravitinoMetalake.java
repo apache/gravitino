@@ -1073,7 +1073,6 @@ public class GravitinoMetalake extends MetalakeDTO
       TagValue backingTag,
       boolean createBackingTag) {
     Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
-    GenericDomain.validateName(name);
     DomainCreateRequest request =
         new DomainCreateRequest(
             name,
@@ -1651,7 +1650,7 @@ public class GravitinoMetalake extends MetalakeDTO
                     "roles/%s/%s/%s/grant",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1717,7 +1716,7 @@ public class GravitinoMetalake extends MetalakeDTO
                     "roles/%s/%s/%s/revoke",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1745,7 +1744,7 @@ public class GravitinoMetalake extends MetalakeDTO
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             OwnerResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.ownerErrorHandler());
@@ -1773,7 +1772,7 @@ public class GravitinoMetalake extends MetalakeDTO
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             SetResponse.class,
             Collections.emptyMap(),

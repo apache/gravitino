@@ -196,10 +196,16 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
 
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjectUtil.toEntityIdent(
+                "metalake", MetadataObjects.parse("bad.name", MetadataObject.Type.DOMAIN)));
+
     Assertions.assertEquals(
-        NameIdentifierUtil.ofDomain("metalake", "Finance/Trading"),
+        NameIdentifierUtil.ofDomain("metalake", "Finance_Trading"),
         MetadataObjectUtil.toEntityIdent(
-            "metalake", MetadataObjects.of(null, "Finance/Trading", MetadataObject.Type.DOMAIN)));
+            "metalake", MetadataObjects.of(null, "Finance_Trading", MetadataObject.Type.DOMAIN)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog", "schema", "function"),

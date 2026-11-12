@@ -154,7 +154,7 @@ public class TestJcasbinChangePoller {
                 6L,
                 MetadataObject.Type.DOMAIN,
                 EntityChangeLogNameIdentifierCodec.encode(
-                    NameIdentifier.of("ml1", "system", "domain", "Trading.v1")))));
+                    NameIdentifier.of("ml1", "system", "domain", "Trading_v1")))));
 
     Assertions.assertEquals(
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
@@ -165,7 +165,7 @@ public class TestJcasbinChangePoller {
             lookupKey("retention", MetadataObject.Type.POLICY),
             lookupKey("job1", MetadataObject.Type.JOB),
             lookupKey("tpl1", MetadataObject.Type.JOB_TEMPLATE),
-            lookupKey("Trading.v1", MetadataObject.Type.DOMAIN)),
+            lookupKey("Trading_v1", MetadataObject.Type.DOMAIN)),
         metadataIdCache.invalidatedKeys);
   }
 

@@ -43,7 +43,7 @@ class MetadataObjectDomainOperations implements SupportsDomains {
             "api/metalakes/%s/objects/%s/%s/domains",
             RESTUtils.encodeString(metalake),
             object.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(object.fullName()));
+            RESTUtils.encodeMetadataObjectName(object));
   }
 
   /** {@inheritDoc} */

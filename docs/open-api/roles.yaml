@@ -248,7 +248,7 @@ components:
     SecurableObject:
       type: object
       example:
-        fullName: Finance.v1
+        fullName: Finance_v1
         type: DOMAIN
         privileges:
           - name: MANAGE_DOMAIN

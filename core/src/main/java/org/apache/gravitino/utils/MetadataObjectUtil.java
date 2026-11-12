@@ -140,7 +140,9 @@ public class MetadataObjectUtil {
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
       case DOMAIN:
-        return NameIdentifierUtil.ofDomain(metalakeName, metadataObject.name());
+        String domainName = metadataObject.fullName();
+        NameValidationUtils.validateName("domain", domainName);
+        return NameIdentifierUtil.ofDomain(metalakeName, domainName);
       case VIEW:
       case SEMANTIC_MODEL:
       case CATALOG:

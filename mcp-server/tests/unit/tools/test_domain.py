@@ -78,6 +78,8 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
         self.requests.append(request)
         if isinstance(self.response, Exception):
             raise self.response
+        if isinstance(self.response, bytes):
+            return httpx.Response(self.status, content=self.response)
         return httpx.Response(self.status, json=self.response)
 
     def _create_client(self, *args, **kwargs):
@@ -241,16 +243,36 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
     async def test_unfiltered_members(self):
         await self._call("list_domain_members", {"domain_name": "sales"})
         self.assertFalse(self.requests[-1].url.query)
-        await self._call(
-            "list_domain_members",
-            {
-                "domain_name": "sales",
-                "types": [],
-                "domains": [],
-                "name_contains": "",
-            },
-        )
-        self.assertEqual(self.requests[-1].url.params["nameContains"], "")
+        for blank in ("", "  ", "\t"):
+            await self._call(
+                "list_domain_members",
+                {
+                    "domain_name": "sales",
+                    "types": [],
+                    "domains": [],
+                    "name_contains": blank,
+                },
+            )
+            self.assertFalse(self.requests[-1].url.query)
+
+    async def test_missing_metalake(self):
+        for scope in (None, "", "  "):
+            operation = self._create_client(scope, "http://localhost:8090")
+            try:
+                domains = operation.as_domain_operation()
+                with self.assertRaisesRegex(ValueError, "Select a metalake"):
+                    await domains.list_of_domains()
+                with self.assertRaisesRegex(ValueError, "Select a metalake"):
+                    await domains.list_domains_for_metadata("c.s.t", "table")
+            finally:
+                await operation.close()
+        self.assertFalse(self.requests)
+
+    async def test_non_json_gateway_error(self):
+        self.status = 502
+        self.response = b"<html>Bad Gateway</html>"
+        with self.assertRaisesRegex(ToolError, "502"):
+            await self._call("list_of_domains", {})
 
     async def test_leaf_object_types(self):
         self.response = {"code": 0, "domains": [self.domain]}

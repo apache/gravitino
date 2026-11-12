@@ -22,7 +22,6 @@ from dataclasses_json import config, dataclass_json
 
 from gravitino.dto.domain_dto import DomainBackingTagDTO
 from gravitino.rest.rest_message import RESTRequest
-from gravitino.rest.rest_utils import validate_domain_name
 from gravitino.utils.precondition import Precondition
 
 
@@ -55,7 +54,10 @@ class DomainCreateRequest(RESTRequest):
     _backing_tag: BackingTagCreate = field(metadata=config(field_name="backingTag"))
 
     def validate(self) -> None:
-        validate_domain_name(self._name)
+        Precondition.check_argument(
+            isinstance(self._name, str) and bool(self._name.strip()),
+            "name must not be blank",
+        )
         Precondition.check_argument(
             self._parent is None
             or (isinstance(self._parent, str) and bool(self._parent.strip())),

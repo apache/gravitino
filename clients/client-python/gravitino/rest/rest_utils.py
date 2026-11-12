@@ -17,19 +17,27 @@
 
 import urllib.parse
 
+from gravitino.api.metadata_object import MetadataObject
 from gravitino.exceptions.base import IllegalArgumentException
 
 
-def validate_domain_name(name: str) -> None:
+def encode_domain_path_segment(name: str) -> str:
     if not isinstance(name, str) or not name.strip():
         raise IllegalArgumentException("Domain name must not be blank")
     if name in (".", ".."):
         raise IllegalArgumentException(f"Unsafe domain path segment: {name}")
 
+    return encode_string(name)
+
+
+def encode_metadata_object_name(obj: MetadataObject) -> str:
+    if obj.type() == MetadataObject.Type.DOMAIN:
+        return encode_domain_path_segment(obj.full_name())
+    return encode_string(obj.full_name())
+
 
 def domain_path(metalake: str, name: str) -> str:
-    validate_domain_name(name)
-    return f"api/metalakes/{encode_string(metalake)}/domains/{encode_string(name)}"
+    return f"api/metalakes/{encode_string(metalake)}/domains/{encode_domain_path_segment(name)}"
 
 
 def encode_string(to_encode: str):
