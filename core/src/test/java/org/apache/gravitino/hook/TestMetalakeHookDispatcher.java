@@ -22,18 +22,21 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.Collections;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.UserAlreadyExistsException;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
@@ -49,18 +52,22 @@ public class TestMetalakeHookDispatcher {
   private MetalakeDispatcher mockDispatcher;
   private OwnerDispatcher mockOwnerDispatcher;
   private AccessControlDispatcher mockAccessControlDispatcher;
+  private GravitinoAuthorizer mockAuthorizer;
   // Save the originals before each test and restore them in tearDown so we do not leak null
   // state into the GravitinoEnv singleton across tests.
   private OwnerDispatcher savedOwnerDispatcher;
   private AccessControlDispatcher savedAccessControlDispatcher;
+  private GravitinoAuthorizer savedAuthorizer;
 
   @BeforeEach
   public void setUp() throws IllegalAccessException {
     mockDispatcher = mock(MetalakeDispatcher.class);
     mockOwnerDispatcher = mock(OwnerDispatcher.class);
     mockAccessControlDispatcher = mock(AccessControlDispatcher.class);
+    mockAuthorizer = mock(GravitinoAuthorizer.class);
     savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     savedAccessControlDispatcher = GravitinoEnv.getInstance().internalAccessControlDispatcher();
+    savedAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(
@@ -68,6 +75,7 @@ public class TestMetalakeHookDispatcher {
         "internalAccessControlDispatcher",
         mockAccessControlDispatcher,
         true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", mockAuthorizer, true);
     hookDispatcher = new MetalakeHookDispatcher(mockDispatcher);
   }
 
@@ -80,6 +88,7 @@ public class TestMetalakeHookDispatcher {
         "internalAccessControlDispatcher",
         savedAccessControlDispatcher,
         true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "gravitinoAuthorizer", savedAuthorizer, true);
   }
 
   @Test
@@ -140,6 +149,41 @@ public class TestMetalakeHookDispatcher {
     Assertions.assertEquals("Add user failed", thrown.getMessage());
     verify(mockAccessControlDispatcher).addUser(any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
+  }
+
+  @Test
+  public void testDropMetalakeInvalidatesNameIdMappingsEvenWhenNothingDropped() {
+    // A concurrent drop on a peer makes this node's drop return false; it must still evict.
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    when(mockDispatcher.dropMetalake(ident, true)).thenReturn(false);
+    when(mockDispatcher.dropMetalake(ident)).thenReturn(false);
+
+    Assertions.assertFalse(hookDispatcher.dropMetalake(ident, true));
+    Assertions.assertFalse(hookDispatcher.dropMetalake(ident));
+
+    verify(mockAuthorizer, times(2))
+        .handleEntityNameIdMappingChange("test_metalake", ident, Entity.EntityType.METALAKE);
+  }
+
+  @Test
+  public void testDropMetalakeWithoutForceInvalidatesNameIdMappings() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    when(mockDispatcher.dropMetalake(ident)).thenReturn(true);
+
+    Assertions.assertTrue(hookDispatcher.dropMetalake(ident));
+
+    verify(mockAuthorizer)
+        .handleEntityNameIdMappingChange("test_metalake", ident, Entity.EntityType.METALAKE);
+  }
+
+  @Test
+  public void testDropMetalakeFailureDoesNotInvalidateNameIdMappings() {
+    NameIdentifier ident = NameIdentifier.of("test_metalake");
+    doThrow(new RuntimeException("Drop failed")).when(mockDispatcher).dropMetalake(ident, true);
+
+    Assertions.assertThrows(RuntimeException.class, () -> hookDispatcher.dropMetalake(ident, true));
+
+    verify(mockAuthorizer, never()).handleEntityNameIdMappingChange(any(), any(), any());
   }
 
   @Test

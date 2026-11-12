@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -28,12 +29,15 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -64,6 +68,150 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   private static final String METALAKE = "policy_tag_relation_metalake";
   private static final String FINANCE_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}";
   private static final String RISK_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"risk\"}";
+
+  /** Verifies selector constraints for direct storage callers and rolls back rejected updates. */
+  @TestTemplate
+  public void testSelectorValueConstraints() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    List<String[]> constraints =
+        Arrays.asList(null, new String[0], new String[] {"finance", "risk"});
+    for (int i = 0; i < constraints.size(); i++) {
+      String[] allowedValues = constraints.get(i);
+      RelationEndpoints endpoints =
+          createEndpoints(METALAKE, "domain_" + i, "retention_" + i, allowedValues);
+      RelationUpdate finance = relationUpdate(endpoints, FINANCE_SELECTOR, true);
+      if (allowedValues != null && allowedValues.length == 0) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> backend.updateEntityRelations(finance));
+        Assertions.assertTrue(error.getMessage().contains("does not allow assignment values"));
+        Assertions.assertNull(getRelation(endpoints));
+      } else {
+        backend.updateEntityRelations(finance);
+        Assertions.assertEquals(FINANCE_SELECTOR, getRelation(endpoints).getSelector());
+        backend.updateEntityRelations(relationUpdate(endpoints, FINANCE_SELECTOR, false));
+      }
+
+      backend.updateEntityRelations(relationUpdate(endpoints, null, true));
+      if (allowedValues != null && allowedValues.length > 0) {
+        PolicyEntity otherPolicy =
+            createPolicy(
+                RandomIdGenerator.INSTANCE.nextId(),
+                NamespaceUtil.ofPolicy(METALAKE),
+                "other_retention",
+                AUDIT_INFO);
+        backend.insert(otherPolicy, false);
+        for (String invalidValue : new String[] {"engineering", "Finance"}) {
+          RelationEdgeTarget invalid =
+              RelationEdgeTarget.of(
+                  otherPolicy.nameIdentifier(),
+                  Entity.EntityType.POLICY,
+                  "{\"type\":\"TAG_VALUE\",\"value\":\"" + invalidValue + "\"}");
+          RelationEdgeTarget existing =
+              RelationEdgeTarget.of(
+                  endpoints.policy.nameIdentifier(), Entity.EntityType.POLICY, null);
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  backend.updateEntityRelations(
+                      RelationUpdate.of(
+                          SupportsRelationOperations.Type.POLICY_TAG_REL,
+                          endpoints.tag.nameIdentifier(),
+                          Entity.EntityType.TAG,
+                          new RelationEdgeTarget[] {invalid},
+                          new RelationEdgeTarget[] {existing})));
+          Assertions.assertNotNull(getRelation(endpoints));
+          Assertions.assertEquals(
+              1,
+              backend
+                  .batchListEntitiesByRelation(
+                      SupportsRelationOperations.Type.POLICY_TAG_REL,
+                      Collections.singletonList(endpoints.tag.nameIdentifier()),
+                      Entity.EntityType.TAG)
+                  .size());
+        }
+      }
+    }
+  }
+
+  /** Verifies that a null JSON constraint is treated as unrestricted without a null dereference. */
+  @TestTemplate
+  public void testNullJsonAllowedValues() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false);
+        PreparedStatement statement =
+            session
+                .getConnection()
+                .prepareStatement("UPDATE tag_meta SET allowed_values = ? WHERE tag_id = ?")) {
+      statement.setString(1, "null");
+      statement.setLong(2, endpoints.tag.id());
+      Assertions.assertEquals(1, statement.executeUpdate());
+      session.commit(true);
+    }
+    backend.updateEntityRelations(relationUpdate(endpoints, FINANCE_SELECTOR, true));
+    Assertions.assertEquals(FINANCE_SELECTOR, getRelation(endpoints).getSelector());
+  }
+
+  /** Verifies validation uses the row locked for writing, including concurrent storage changes. */
+  @TestTemplate
+  public void testSelectorValidationUsesLockedTagConstraint() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
+    CountDownLatch constraintWritten = new CountDownLatch(1);
+    CountDownLatch allowCommit = new CountDownLatch(1);
+    CountDownLatch associationStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      // The public alter API cannot change constraints. Simulate a storage writer to prove that
+      // relation validation reads the committed constraint under the existing tag row lock.
+      Future<?> writer =
+          executor.submit(
+              () -> {
+                try (SqlSession session =
+                        SqlSessionFactoryHelper.getInstance()
+                            .getSqlSessionFactory()
+                            .openSession(false);
+                    PreparedStatement statement =
+                        session
+                            .getConnection()
+                            .prepareStatement(
+                                "UPDATE tag_meta SET allowed_values = ? WHERE tag_id = ?")) {
+                  statement.setString(1, "[\"risk\"]");
+                  statement.setLong(2, endpoints.tag.id());
+                  Assertions.assertEquals(1, statement.executeUpdate());
+                  constraintWritten.countDown();
+                  Assertions.assertTrue(allowCommit.await(30, TimeUnit.SECONDS));
+                  session.commit(true);
+                }
+                return null;
+              });
+      Assertions.assertTrue(constraintWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> association =
+          executor.submit(
+              () -> {
+                try {
+                  associationStarted.countDown();
+                  backend.updateEntityRelations(relationUpdate(endpoints, FINANCE_SELECTOR, true));
+                  return null;
+                } catch (Throwable failure) {
+                  return failure;
+                }
+              });
+      Assertions.assertTrue(associationStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> association.get(500, TimeUnit.MILLISECONDS));
+      allowCommit.countDown();
+      writer.get(30, TimeUnit.SECONDS);
+      Assertions.assertInstanceOf(
+          IllegalArgumentException.class, association.get(30, TimeUnit.SECONDS));
+      Assertions.assertNull(getRelation(endpoints));
+    } finally {
+      allowCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
 
   @TestTemplate
   public void testSelectorCreateConflictBidirectionalReadAndIdempotentDelete() throws IOException {
@@ -506,12 +654,19 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
 
   private RelationEndpoints createEndpoints(String metalake, String tagName, String policyName)
       throws IOException {
+    return createEndpoints(metalake, tagName, policyName, null);
+  }
+
+  private RelationEndpoints createEndpoints(
+      String metalake, String tagName, String policyName, @Nullable String[] allowedValues)
+      throws IOException {
     TagEntity tag =
         TagEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
             .withName(tagName)
             .withNamespace(NamespaceUtil.ofTag(metalake))
             .withProperties(Collections.emptyMap())
+            .withAllowedValues(allowedValues)
             .withAuditInfo(AUDIT_INFO)
             .build();
     PolicyEntity policy =

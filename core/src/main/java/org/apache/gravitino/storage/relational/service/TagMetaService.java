@@ -188,7 +188,8 @@ public class TagMetaService {
   public List<TagEntity> listTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchTagException, IOException {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
 
     List<TagPO> tagPOs = null;
@@ -249,7 +250,9 @@ public class TagMetaService {
         });
     List<TagRelationTagPO> rows = new ArrayList<>();
     String metadataObjectType =
-        NameIdentifierUtil.toMetadataObject(objectIdentifiers.get(0), objectType).type().toString();
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType)
+            .type()
+            .toString();
     for (List<Long> batch : Lists.partition(new ArrayList<>(identifiersById.keySet()), 500)) {
       rows.addAll(
           SessionUtils.getWithoutCommit(
@@ -283,7 +286,8 @@ public class TagMetaService {
   public TagEntity getTagForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
       throws NoSuchEntityException, IOException {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    MetadataObject metadataObject =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
 
     List<TagPO> tagPOs = null;
@@ -790,14 +794,17 @@ public class TagMetaService {
         tagValue.value().orElse(null));
   }
 
-  private static void validateAllowedValue(TagPO tagPO, TagValue tagValue)
-      throws JsonProcessingException {
+  static void validateAllowedValue(TagPO tagPO, TagValue tagValue) throws JsonProcessingException {
     if (tagPO.getAllowedValues() == null) {
       return;
     }
 
     String[] allowedValues =
         JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class);
+    // Treat JSON null like SQL NULL, consistent with POConverters.
+    if (allowedValues == null) {
+      return;
+    }
     if (!tagValue.value().isPresent()) {
       Preconditions.checkArgument(
           allowedValues.length == 0,

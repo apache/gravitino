@@ -74,6 +74,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rest.RESTUtils;
@@ -160,6 +161,12 @@ public class TestTagOperations extends BaseOperationsTest {
           operations.listMetadataObjectsForTag(metalake, name, null),
           operations.listPoliciesForTag(metalake, name, false),
           operations.addPolicyForTag(metalake, name, "policy", new PolicyTagAddRequest()),
+          operations.addPolicyForTag(
+              metalake,
+              name,
+              "policy",
+              new PolicyTagAddRequest(
+                  PolicyAssociationSelectorDTO.fromSelector(TagValueSelector.of("finance")))),
           operations.removePolicyFromTag(metalake, name, "policy")
         }) {
       try (Response result = response) {
@@ -340,6 +347,66 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertEquals(
           PolicyAlreadyAssociatedException.class.getSimpleName(), errorResponse.getType());
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"zzz", "A"})
+  void testAddPolicyForTagInvalidValue(String value) {
+    String message = "Tag tag1 value " + value + " is not in allowed values [a, b]";
+    doThrow(new IllegalArgumentException(message))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of(value));
+    try (Response response = addPolicyForTag(TagValueSelector.of(value))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(message));
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
+  }
+
+  @Test
+  void testAddPolicyForTagWithoutAllowedValues() {
+    doThrow(new IllegalArgumentException("Tag tag1 does not allow assignment values"))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
+    try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(
+          error.getMessage().contains("Tag tag1 does not allow assignment values"));
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"a", "b", "engineering"})
+  void testAddPolicyForTagValidSelector(String value) {
+    PolicyAssociationSelector selector = TagValueSelector.of(value);
+    try (Response response = addPolicyForTag(selector)) {
+      Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+      PolicyTagAssociationResponse association =
+          response.readEntity(PolicyTagAssociationResponse.class);
+      association.validate();
+      Assertions.assertEquals(selector, association.getSelector().toSelector());
+    }
+    Mockito.verify(tagManager).addPolicyForTag(metalake, "tag1", "policy1", selector);
+  }
+
+  @Test
+  void testAddPolicyForTagMissingTag() {
+    doThrow(new NoSuchTagException("Tag tag1 does not exist"))
+        .when(tagManager)
+        .addPolicyForTag(metalake, "tag1", "policy1", TagValueSelector.of("a"));
+    try (Response response = addPolicyForTag(TagValueSelector.of("a"))) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(NoSuchTagException.class.getSimpleName(), error.getType());
+    }
+    Mockito.verify(tagManager, Mockito.never()).getTag(Mockito.anyString(), Mockito.anyString());
   }
 
   @Test
@@ -1408,5 +1475,15 @@ public class TestTagOperations extends BaseOperationsTest {
 
   private String tagPath(String metalake) {
     return "/metalakes/" + metalake + "/tags";
+  }
+
+  private Response addPolicyForTag(PolicyAssociationSelector selector) {
+    return target(tagPath(metalake) + "/tag1/policies/policy1")
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept("application/vnd.gravitino.v1+json")
+        .post(
+            Entity.entity(
+                new PolicyTagAddRequest(PolicyAssociationSelectorDTO.fromSelector(selector)),
+                MediaType.APPLICATION_JSON_TYPE));
   }
 }

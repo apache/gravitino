@@ -35,6 +35,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.execution.datasources.jdbc.JDBCOptions;
@@ -233,6 +234,73 @@ public class TestGravitinoJdbcCatalog {
     }
   }
 
+  /** A catalog for another provider that opts in to preferTimestampNTZ. */
+  private static class OptInCatalog extends GravitinoJdbcCatalog {
+    @Override
+    protected boolean supportsPreferTimestampNtz() {
+      return true;
+    }
+
+    @Override
+    protected SparkTypeConverter getSparkTypeConverter() {
+      return new SparkJdbcTypeConverter(useTimestampNtz());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({"true, true", "false, false", "'', false"})
+  void testSubclassCanOptInToNtzOption(String option, boolean expected) throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(credentials);
+      OptInCatalog catalog =
+          new OptInCatalog() {
+            @Override
+            protected Catalog gravitinoCatalog() {
+              return source;
+            }
+          };
+
+      JDBCOptions options =
+          initialize(
+              catalog,
+              option.isEmpty() ? Map.of() : Map.of("preferTimestampNTZ", option),
+              Map.of());
+      Assertions.assertEquals(expected, options.preferTimestampNTZ());
+      Assertions.assertEquals(expected, catalog.useTimestampNtz());
+      Assertions.assertEquals(
+          expected ? DataTypes.TimestampNTZType : DataTypes.TimestampType,
+          catalog.getSparkTypeConverter().toSparkType(Types.TimestampType.withoutTimeZone()));
+    }
+  }
+
+  @Test
+  void testOptedInCatalogStillRejectsInvalidNtzValue() throws Exception {
+    try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
+      global.when(GravitinoCatalogManager::get).thenReturn(mock(GravitinoCatalogManager.class));
+      SupportsCredentials credentials = mock(SupportsCredentials.class);
+      when(credentials.getCredentials()).thenReturn(new Credential[0]);
+      Catalog source = mock(Catalog.class);
+      when(source.provider()).thenReturn("jdbc-mysql");
+      when(source.supportsCredentials()).thenReturn(credentials);
+      OptInCatalog catalog =
+          new OptInCatalog() {
+            @Override
+            protected Catalog gravitinoCatalog() {
+              return source;
+            }
+          };
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> initialize(catalog, Map.of("preferTimestampNTZ", "yes"), Map.of()));
+    }
+  }
+
   @Test
   void testNtzPropertyNeedsTheBypassPrefix() throws Exception {
     try (MockedStatic<GravitinoCatalogManager> global = mockStatic(GravitinoCatalogManager.class)) {
@@ -338,8 +406,13 @@ public class TestGravitinoJdbcCatalog {
     Catalog source = mock(Catalog.class);
     when(source.provider()).thenReturn(provider);
     when(source.supportsCredentials()).thenReturn(credentials);
-    GravitinoJdbcCatalog catalog = new GravitinoJdbcCatalog();
-    FieldUtils.writeField(catalog, "gravitinoCatalogClient", source, true);
+    GravitinoJdbcCatalog catalog =
+        new GravitinoJdbcCatalog() {
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return source;
+          }
+        };
     return catalog;
   }
 

@@ -42,9 +42,12 @@ import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
@@ -52,6 +55,7 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 
@@ -118,7 +122,8 @@ public class PolicyTagRelService {
    * @return All active policy targets for the tag after the update.
    * @throws IOException If selector audit information cannot be serialized.
    * @throws EntityAlreadyExistsException If a relation to add already exists.
-   * @throws IllegalArgumentException If the same relation is both added and removed.
+   * @throws IllegalArgumentException If a selector violates the tag's value constraint or the same
+   *     relation is both added and removed.
    */
   public List<PolicyEntity> updateRelations(
       NameIdentifier tagIdentifier,
@@ -186,6 +191,12 @@ public class PolicyTagRelService {
     long tagId = tagPO.getTagId();
     Map<String, Long> policyIds = resolvePolicyIds(metalake, targetsToAdd, targetsToRemove);
 
+    // Validate the locked row in the same transaction as the relation write. Do not carry a
+    // constraint read by REST or a dispatcher across this transaction boundary.
+    for (RelationEdgeTarget target : targetsToAdd) {
+      validateSelector(tagPO, target.relationValue().orElse(null));
+    }
+
     for (RelationEdgeTarget target : targetsToRemove) {
       long policyId = policyIds.get(target.nameIdentifier().name());
       PolicyTagRelPO existing =
@@ -215,6 +226,18 @@ public class PolicyTagRelService {
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
         .map(relation -> (PolicyEntity) relation.targetEntity())
         .collect(Collectors.toList());
+  }
+
+  private static void validateSelector(TagPO tagPO, @Nullable String selectorJson)
+      throws IOException {
+    if (selectorJson == null) {
+      return;
+    }
+    PolicyAssociationSelector selector = PolicyAssociationSelectorSerde.deserialize(selectorJson);
+    if (selector instanceof TagValueSelector) {
+      TagMetaService.validateAllowedValue(
+          tagPO, TagValue.of(tagPO.getTagName(), ((TagValueSelector) selector).value()));
+    }
   }
 
   private static List<RelationalEntity<?>> policyTargets(

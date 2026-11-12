@@ -216,13 +216,20 @@ public class TestBaseCatalogTableChanges {
 
   private static class TestCatalog extends BaseCatalog {
 
+    private final Catalog gravitinoCatalog;
+
     private TestCatalog(
         Catalog gravitinoCatalog,
         org.apache.spark.sql.connector.catalog.TableCatalog sparkCatalog) {
-      this.gravitinoCatalogClient = gravitinoCatalog;
+      this.gravitinoCatalog = gravitinoCatalog;
       this.sparkCatalog = sparkCatalog;
       this.propertiesConverter = JdbcPropertiesConverter.getNoTablePropertiesInstance();
       this.sparkTransformConverter = new SparkTransformConverter(false);
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
     }
 
     @Override

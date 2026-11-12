@@ -56,6 +56,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -85,14 +86,21 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TreeLockTestSupport;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.hook.PolicyHookDispatcher;
+import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.PolicyEventDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -123,6 +131,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mockito;
 
 public class TestPolicyManager {
@@ -150,12 +160,14 @@ public class TestPolicyManager {
   private static PolicyManager policyManager;
   private static TagManager tagManager;
   private static CatalogManager previousCatalogManager;
+  private static BaseCatalog<?> backendCatalog;
+  private static IdGenerator idGenerator;
 
   @Nullable private static IdGenerator previousIdGenerator;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
-    IdGenerator idGenerator = new RandomIdGenerator();
+    idGenerator = new RandomIdGenerator();
     previousIdGenerator = GravitinoEnv.getInstance().idGenerator();
     FieldUtils.writeField(GravitinoEnv.getInstance(), "idGenerator", idGenerator, true);
     Config config = mockConfig();
@@ -166,7 +178,7 @@ public class TestPolicyManager {
     previousCatalogManager =
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     CatalogManager catalogManager = mock(CatalogManager.class);
-    BaseCatalog<?> backendCatalog = mock(BaseCatalog.class);
+    backendCatalog = mock(BaseCatalog.class);
     CatalogTestUtils.mockDoWithCatalog(catalogManager, backendCatalog);
     when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
@@ -327,6 +339,9 @@ public class TestPolicyManager {
 
   @AfterEach
   public void cleanUp() {
+    when(backendCatalog.capability()).thenReturn(Capability.DEFAULT);
+    Mockito.doReturn(null).when(backendCatalog).ops();
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
     Arrays.stream(policyManager.listPolicies(METALAKE))
         .forEach(policyName -> policyManager.deletePolicy(METALAKE, policyName));
     Arrays.stream(tagManager.listTags(METALAKE))
@@ -473,6 +488,53 @@ public class TestPolicyManager {
             NoSuchMetalakeException.class,
             () -> policyManager.listPolicies("non_existent_metalake"));
     Assertions.assertEquals("Metalake non_existent_metalake does not exist", e.getMessage());
+  }
+
+  /** Invalid create/rename requests must never persist an unaddressable policy. */
+  @Test
+  public void testRejectDottedNameBeforeWrite() throws IOException {
+    PolicyDispatcher dispatcher =
+        new PolicyEventDispatcher(new EventBus(List.of()), new PolicyHookDispatcher(policyManager));
+    PolicyContent content = PolicyContents.custom(Map.of("rule", 1), SUPPORTS_OBJECT_TYPES, null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createPolicy(
+                METALAKE, "invalid.policy", Policy.BuiltInType.CUSTOM, null, true, content));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofPolicy(METALAKE, "invalid.policy"), Entity.EntityType.POLICY));
+    PolicyEntity original = createCustomPolicy(METALAKE, "valid_policy", content);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.alterPolicy(
+                METALAKE, original.name(), PolicyChange.rename("invalid.policy")));
+    Assertions.assertEquals(original, policyManager.getPolicy(METALAKE, original.name()));
+    Assertions.assertFalse(
+        entityStore.exists(
+            NameIdentifierUtil.ofPolicy(METALAKE, "invalid.policy"), Entity.EntityType.POLICY));
+  }
+
+  /** Legacy policy names can be listed and deleted without bypassing their stored identity. */
+  @Test
+  public void testLegacyDottedPolicyRecovery() throws IOException {
+    PolicyEntity legacy =
+        PolicyEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("legacy.policy")
+            .withNamespace(NameIdentifierUtil.ofPolicy(METALAKE, "legacy.policy").namespace())
+            .withPolicyType(Policy.BuiltInType.CUSTOM)
+            .withEnabled(true)
+            .withContent(PolicyContents.custom(Map.of("rule", 1), SUPPORTS_OBJECT_TYPES, null))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+            .build();
+    entityStore.put(legacy, false);
+    Assertions.assertEquals(legacy.name(), policyManager.getPolicy(METALAKE, legacy.name()).name());
+    Assertions.assertTrue(
+        Arrays.asList(policyManager.listPolicies(METALAKE)).contains(legacy.name()));
+    Assertions.assertTrue(policyManager.deletePolicy(METALAKE, legacy.name()));
   }
 
   @Test
@@ -866,6 +928,181 @@ public class TestPolicyManager {
         e.getMessage().contains("non_existent_catalog"), "Actual message: " + e.getMessage());
   }
 
+  @ParameterizedTest
+  @EnumSource(
+      value = Entity.EntityType.class,
+      names = {"SCHEMA", "TABLE", "COLUMN", "VIEW", "FUNCTION"})
+  void testPolicyLookupsNormalizeNames(Entity.EntityType type) {
+    NameIdentifier identifier;
+    switch (type) {
+      case SCHEMA:
+        identifier = NameIdentifier.of(METALAKE, CATALOG, SCHEMA);
+        break;
+      case COLUMN:
+        identifier = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, TABLE, COLUMN);
+        break;
+      default:
+        String name =
+            type == Entity.EntityType.VIEW
+                ? VIEW
+                : type == Entity.EntityType.FUNCTION ? FUNCTION : TABLE;
+        identifier = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, name);
+    }
+    MetadataObject canonical = NameIdentifierUtil.toMetadataObject(identifier, type);
+    MetadataObject request =
+        MetadataObjects.parse(
+            CATALOG + canonical.fullName().substring(CATALOG.length()).toUpperCase(Locale.ROOT),
+            canonical.type());
+    MetadataObject parent =
+        type == Entity.EntityType.SCHEMA
+            ? MetadataObjects.of(null, CATALOG, MetadataObject.Type.CATALOG)
+            : MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA);
+    associatePolicyThroughTag(createNormalizationPolicy("inherited_policy"), parent);
+    associatePolicyThroughTag(createNormalizationPolicy("direct_policy"), canonical);
+    useCaseInsensitiveNames();
+
+    assertPolicyResults(
+        List.of(request, canonical), Map.of("inherited_policy", true, "direct_policy", false));
+  }
+
+  @Test
+  void testPolicyLookupsPreserveQuotedNames() {
+    MetadataObject schema = MetadataObjects.of(CATALOG, SCHEMA, MetadataObject.Type.SCHEMA);
+    associatePolicyThroughTag(createNormalizationPolicy("quoted_policy"), schema);
+    Capability quoteAware =
+        new Capability() {
+          @Override
+          public String normalizeName(Scope scope, String name) {
+            return name.startsWith("\"") && name.endsWith("\"")
+                ? name.substring(1, name.length() - 1)
+                : name.toUpperCase(Locale.ROOT);
+          }
+        };
+    when(backendCatalog.capability()).thenReturn(quoteAware);
+    NameIdentifier quoted =
+        NameIdentifier.of(METALAKE, CATALOG, "\"" + SCHEMA + "\"", "\"" + TABLE + "\"");
+    when(tableDispatcher.tableExists(any()))
+        .thenAnswer(invocation -> quoted.equals(invocation.getArgument(0)));
+
+    assertPolicyResults(
+        List.of(NameIdentifierUtil.toMetadataObject(quoted, Entity.EntityType.TABLE)),
+        Map.of("quoted_policy", true));
+  }
+
+  @Test
+  void testPolicyLookupsUseCustomUppercaseNormalization() throws IOException {
+    NameIdentifier table = putNormalizationTable("UPPER_TABLE", "col");
+    MetadataObject canonical = NameIdentifierUtil.toMetadataObject(table, Entity.EntityType.TABLE);
+    try {
+      associatePolicyThroughTag(createNormalizationPolicy("uppercase_policy"), canonical);
+      when(backendCatalog.capability())
+          .thenReturn(
+              new Capability() {
+                @Override
+                public String normalizeName(Scope scope, String name) {
+                  return scope == Scope.TABLE ? name.toUpperCase(Locale.ROOT) : name;
+                }
+              });
+      MetadataObject request =
+          MetadataObjects.of(CATALOG + "." + SCHEMA, "upper_table", MetadataObject.Type.TABLE);
+
+      assertPolicyResults(List.of(request, canonical), Map.of("uppercase_policy", false));
+    } finally {
+      entityStore.delete(table, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testPolicyLookupsResolvePhysicalTableAndExactStoredColumn() throws IOException {
+    NameIdentifier table = putNormalizationTable("physical_table", "ExactColumn");
+    MetadataObject canonicalTable =
+        NameIdentifierUtil.toMetadataObject(table, Entity.EntityType.TABLE);
+    MetadataObject canonicalColumn =
+        MetadataObjects.of(canonicalTable.fullName(), "ExactColumn", MetadataObject.Type.COLUMN);
+    try {
+      associatePolicyThroughTag(createNormalizationPolicy("table_policy"), canonicalTable);
+      associatePolicyThroughTag(createNormalizationPolicy("column_policy"), canonicalColumn);
+      useCaseInsensitiveNames();
+      CatalogOperations ops =
+          mock(
+              CatalogOperations.class,
+              Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
+      Mockito.doReturn(ops).when(backendCatalog).ops();
+      when(((SupportsTableNameResolution) ops).resolveTableName(any()))
+          .thenAnswer(
+              invocation -> {
+                NameIdentifier ident = invocation.getArgument(0);
+                return ident.name().equals("table_alias") ? table : ident;
+              });
+      MetadataObject requestedTable =
+          MetadataObjects.of(
+              CATALOG + "." + SCHEMA.toUpperCase(Locale.ROOT),
+              "TABLE_ALIAS",
+              MetadataObject.Type.TABLE);
+      MetadataObject requestedColumn =
+          MetadataObjects.of(requestedTable.fullName(), "ExactColumn", MetadataObject.Type.COLUMN);
+
+      assertPolicyResults(List.of(requestedTable, canonicalTable), Map.of("table_policy", false));
+      assertPolicyResults(
+          List.of(requestedColumn, canonicalColumn),
+          Map.of("table_policy", true, "column_policy", false));
+    } finally {
+      entityStore.delete(table, Entity.EntityType.TABLE);
+    }
+  }
+
+  @Test
+  void testPolicyLookupsPreserveCaseSensitiveNamesAndResolutionFailures() {
+    MetadataObject canonical =
+        MetadataObjects.of(CATALOG + "." + SCHEMA, TABLE, MetadataObject.Type.TABLE);
+    associatePolicyThroughTag(createNormalizationPolicy("case_sensitive_policy"), canonical);
+    MetadataObject wrongCase =
+        MetadataObjects.of(
+            CATALOG + "." + SCHEMA, TABLE.toUpperCase(Locale.ROOT), MetadataObject.Type.TABLE);
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> policyManager.listPolicyInfosForMetadataObject(METALAKE, wrongCase));
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> policyManager.listPolicyInfosForMetadataObjects(METALAKE, List.of(wrongCase)));
+    assertPolicyResults(List.of(canonical), Map.of("case_sensitive_policy", false));
+
+    CatalogOperations ops =
+        mock(
+            CatalogOperations.class,
+            Mockito.withSettings().extraInterfaces(SupportsTableNameResolution.class));
+    Mockito.doReturn(ops).when(backendCatalog).ops();
+    IllegalStateException failure = new IllegalStateException("source unavailable");
+    when(((SupportsTableNameResolution) ops).resolveTableName(any())).thenThrow(failure);
+    RuntimeException single =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> policyManager.listPolicyInfosForMetadataObject(METALAKE, canonical));
+    RuntimeException batch =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> policyManager.listPolicyInfosForMetadataObjects(METALAKE, List.of(canonical)));
+    Assertions.assertSame(failure, single.getCause());
+    Assertions.assertSame(failure, batch.getCause());
+  }
+
+  @Test
+  void testDisabledPoliciesAreExcludedFromNormalizedResults() {
+    MetadataObject table =
+        MetadataObjects.of(CATALOG + "." + SCHEMA, TABLE, MetadataObject.Type.TABLE);
+    PolicyEntity policy = createNormalizationPolicy("disabled_normalized_policy");
+    associatePolicyThroughTag(policy, table);
+    policyManager.disablePolicy(METALAKE, policy.name());
+    useCaseInsensitiveNames();
+    MetadataObject request =
+        MetadataObjects.of(
+            CATALOG + "." + SCHEMA.toUpperCase(Locale.ROOT),
+            TABLE.toUpperCase(Locale.ROOT),
+            MetadataObject.Type.TABLE);
+
+    assertPolicyResults(List.of(request, table), Map.of());
+  }
+
   @Test
   public void testDisabledPoliciesAreExcludedFromMetadataObjectResults() {
     PolicyContent content =
@@ -916,6 +1153,13 @@ public class TestPolicyManager {
         policyManager.listPolicyInfosForMetadataObject(METALAKE, schemaObject));
     Assertions.assertEquals(
         0, policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject).length);
+    useCaseInsensitiveNames();
+    MetadataObject request =
+        MetadataObjects.of(
+            CATALOG + "." + SCHEMA.toUpperCase(Locale.ROOT),
+            TABLE.toUpperCase(Locale.ROOT),
+            MetadataObject.Type.TABLE);
+    assertPolicyResults(List.of(request, tableObject), Map.of());
   }
 
   @Test
@@ -988,6 +1232,70 @@ public class TestPolicyManager {
         .filter(o -> !(o instanceof PolicyEntity))
         .forEach(o -> Assertions.assertInstanceOf(PolicyAlreadyExistsException.class, o));
     Assertions.assertEquals(policyName, policyManager.getPolicy(METALAKE, policyName).name());
+  }
+
+  private static void useCaseInsensitiveNames() {
+    when(backendCatalog.capability())
+        .thenReturn(
+            new Capability() {
+              @Override
+              public CapabilityResult caseSensitiveOnName(Scope scope) {
+                return CapabilityResult.unsupported("case insensitive");
+              }
+            });
+  }
+
+  private static void assertPolicyResults(
+      List<MetadataObject> requests, Map<String, Boolean> expected) {
+    Map<MetadataObject, PolicyEntity[]> batch =
+        policyManager.listPolicyInfosForMetadataObjects(METALAKE, requests);
+    Assertions.assertEquals(requests, List.copyOf(batch.keySet()));
+    for (MetadataObject request : requests) {
+      for (PolicyEntity[] policies :
+          List.of(
+              policyManager.listPolicyInfosForMetadataObject(METALAKE, request),
+              batch.get(request))) {
+        Map<String, Boolean> actual =
+            Arrays.stream(policies)
+                .collect(
+                    Collectors.toMap(
+                        PolicyEntity::name, policy -> policy.inherited().orElseThrow()));
+        Assertions.assertEquals(expected, actual);
+      }
+    }
+  }
+
+  private PolicyEntity createNormalizationPolicy(String name) {
+    return createCustomPolicy(
+        METALAKE,
+        name,
+        PolicyContents.custom(ImmutableMap.of("rule", "value"), SUPPORTS_OBJECT_TYPES, null));
+  }
+
+  private static NameIdentifier putNormalizationTable(String tableName, String columnName)
+      throws IOException {
+    AuditInfo audit = AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(columnName)
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(audit)
+            .build();
+    NameIdentifier ident = NameIdentifier.of(METALAKE, CATALOG, SCHEMA, tableName);
+    entityStore.put(
+        TableEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName(tableName)
+            .withNamespace(ident.namespace())
+            .withColumns(Lists.newArrayList(column))
+            .withAuditInfo(audit)
+            .build(),
+        false);
+    return ident;
   }
 
   private PolicyEntity createCustomPolicy(

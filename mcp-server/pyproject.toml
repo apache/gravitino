@@ -46,6 +46,8 @@ dependencies = [
 # distributed runtime environment. Developers still get them via `uv sync` locally.
 [dependency-groups]
 dev = [
+    # Generates throwaway certificates for the TLS end-to-end tests.
+    "cryptography>=46",
     "parameterized>=0.9.0",
     "pytest>=8.4.1",
     "pylint>=2.20.0",

@@ -22,7 +22,6 @@ package org.apache.gravitino.spark.connector.jdbc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
 import java.sql.Connection;
@@ -34,11 +33,13 @@ import java.util.Map;
 import java.util.TimeZone;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.RowFactory;
@@ -51,7 +52,6 @@ import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
-import org.mockito.MockedStatic;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
@@ -86,17 +86,16 @@ public class TestGravitinoJdbcTimestampRead {
                 + "(1, '2024-01-02 03:04:05.123456', '2024-01-02 03:04:05.123456'), "
                 + "(2, NULL, NULL)");
       }
-      GravitinoCatalogManager manager = mock(GravitinoCatalogManager.class);
-      try (MockedStatic<GravitinoCatalogManager> managers =
-              mockStatic(GravitinoCatalogManager.class);
-          SparkSession spark =
-              SparkSession.builder()
-                  .master("local[1]")
-                  .appName("mysql-timestamp-options")
-                  .config("spark.ui.enabled", "false")
-                  .config("spark.sql.session.timeZone", "America/Los_Angeles")
-                  .getOrCreate()) {
-        managers.when(GravitinoCatalogManager::get).thenReturn(manager);
+      GravitinoClient client = mock(GravitinoClient.class);
+      GravitinoCatalogManager manager =
+          GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> client);
+      try (SparkSession spark =
+          SparkSession.builder()
+              .master("local[1]")
+              .appName("mysql-timestamp-options")
+              .config("spark.ui.enabled", "false")
+              .config("spark.sql.session.timeZone", "America/Los_Angeles")
+              .getOrCreate()) {
         for (String source : List.of("catalog", "bypass", "session")) {
           String name = "ntz_" + source;
           Map<String, String> properties = new HashMap<>();
@@ -108,6 +107,7 @@ public class TestGravitinoJdbcTimestampRead {
             properties.put("spark.bypass.PrEfErTiMeStAmPnTz", "true");
           }
           Catalog catalog = mock(Catalog.class);
+          when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
           when(catalog.provider()).thenReturn("jdbc-mysql");
           when(catalog.properties()).thenReturn(properties);
           when(catalog.supportsSecrets()).thenThrow(UnsupportedOperationException.class);
@@ -123,7 +123,7 @@ public class TestGravitinoJdbcTimestampRead {
                     Column.of("dt", Types.TimestampType.withoutTimeZone())
                   });
           when(tables.loadTable(any(NameIdentifier.class), anySet())).thenReturn(metadata);
-          when(manager.getGravitinoCatalogInfo(name)).thenReturn(catalog);
+          when(client.loadCatalog(name)).thenReturn(catalog);
           spark.conf().set("spark.sql.catalog." + name, GravitinoJdbcCatalog.class.getName());
           if (source.equals("catalog")) {
             spark.conf().set("spark.sql.catalog." + name + ".PrEfErTiMeStAmPnTz", "true");
@@ -166,6 +166,8 @@ public class TestGravitinoJdbcTimestampRead {
                   .head(),
               source);
         }
+      } finally {
+        manager.close();
       }
     } finally {
       TimeZone.setDefault(originalTimeZone);

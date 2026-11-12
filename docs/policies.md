@@ -342,6 +342,14 @@ A policy may be associated with multiple tags. Association listings show those d
 and their selectors, even if no object currently matches them. An object policy lookup returns each
 matching policy once.
 
+When adding a `TAG_VALUE` association, Gravitino validates its value against the tag's constraint
+in the same storage transaction as the association write. `NO_VALUE` tags reject `TAG_VALUE`;
+`ALLOWED_VALUES` tags accept only an exact, case-sensitive match. Invalid values
+return HTTP 400. `ALL_VALUES` is valid for every constraint.
+
+Tag value constraints are fixed at creation; the tag alteration API does not change them. This
+validation applies when creating associations and does not rewrite existing associations.
+
 A selector cannot be changed in place. Remove the policy-to-tag association and add it again with
 the new selector. Removing an association leaves the policy, tag, and tag assignments intact.
 Deleting a policy removes its associations.
@@ -403,6 +411,8 @@ create a missing hidden tag.
 
 Do not run old and new server versions together after internal policy tags have been created:
 old servers do not recognize the internal name prefix and can expose or modify these tags.
+Historical direct object policy associations must be converted with the offline migration tool
+before starting the new server. See [Migration Guide](./migration-guide.md#offline-policy-binding-migration).
 
 To add or remove an association, a user must own the metalake or have the required access to both
 the tag and the policy (`APPLY_TAG` and `APPLY_POLICY`, or ownership of each). Object policy
