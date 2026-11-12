@@ -52,7 +52,6 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -466,12 +465,14 @@ public class IcebergCatalogOperations
       throws NoSuchTableException, IllegalArgumentException {
     try {
       String[] levels = tableIdent.namespace().levels();
-      IcebergTableChange icebergTableChange =
+      NameIdentifier schemaTableIdent =
+          NameIdentifier.of(levels[levels.length - 1], tableIdent.name());
+      IcebergCatalogWrapperHelper helper = backend.helper();
+      LoadTableResponse loadTableResponse =
           backend
-              .helper()
-              .buildIcebergTableChanges(
-                  NameIdentifier.of(levels[levels.length - 1], tableIdent.name()), changes);
-      LoadTableResponse loadTableResponse = backend.wrapper().updateTable(icebergTableChange);
+              .wrapper()
+              .buildAndUpdateTable(
+                  catalog -> helper.buildIcebergTableChanges(catalog, schemaTableIdent, changes));
       loadTableResponse.validate();
       return IcebergTable.fromIcebergTable(loadTableResponse.tableMetadata(), tableIdent.name());
     } catch (ValidationException e) {

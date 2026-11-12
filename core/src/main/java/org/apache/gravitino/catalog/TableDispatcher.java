@@ -19,6 +19,10 @@
 
 package org.apache.gravitino.catalog;
 
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 
 /**
@@ -27,4 +31,18 @@ import org.apache.gravitino.rel.TableCatalog;
  * dispatching or handling table-related events or actions that are not covered by the standard
  * {@code TableCatalog} operations.
  */
-public interface TableDispatcher extends TableCatalog {}
+public interface TableDispatcher extends TableCatalog {
+  /**
+   * Imports an externally created table into Gravitino, or returns the already imported entity.
+   * Catalog-reported audit fields take precedence over the supplied audit. Existing nonempty
+   * creation fields are preserved; missing creation fields may be filled after a competing import.
+   * Loading also refreshes changed columns and their modification audit. This operation does not
+   * create the table in the underlying catalog.
+   *
+   * @param ident the identifier of the existing external table
+   * @param auditInfo fallback creation audit used when the catalog reports no creator
+   * @return the imported table
+   * @throws NoSuchTableException if the external table does not exist
+   */
+  Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException;
+}
