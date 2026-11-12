@@ -202,6 +202,15 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
 `VarChar(n)` is rejected when creating or adding a column because ClickHouse cannot enforce its length limit.
 Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
+In the REST API and JSON payloads, `FixedChar(n)` is written as `char(n)`, for example `"type": "char(10)"`.
+By default, ClickHouse rejects `FixedString(n)` with `n` greater than 256 unless the server setting
+`allow_suspicious_fixed_string_types` is set to `1`.
+
+Literal column default values are checked against the column type before the DDL is sent, because
+ClickHouse does not validate them when creating or altering a table. Integer defaults must be in the
+range of the type, `Decimal(p,s)` defaults must fit the precision, `Date` defaults must be between
+`1970-01-01` and `2149-06-06`, `UUID` defaults must be valid UUID strings, and `Float`/`Double`
+defaults must be numbers. Default values of other types, such as `Timestamp`, are not checked.
 
 ### Table Properties
 
