@@ -34,7 +34,13 @@ COMMIT_ID_PATTERN = re.compile(r"[0-9a-fA-F]{40}")
 
 
 def _read_commit_id_from_git():
-    """Ask git itself, which handles worktrees, packed refs and detached HEAD."""
+    """Ask git itself, which handles worktrees, packed refs and detached HEAD.
+
+    Only trusted when PROJECT_ROOT has its own .git, so a source tarball extracted
+    inside another repository does not pick up that repository's commit id.
+    """
+    if not (Path(PROJECT_ROOT) / ".git").exists():
+        return ""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -92,7 +98,8 @@ def _read_commit_id_from_files():
 
 
 def get_git_commit_id():
-    return _read_commit_id_from_git() or _read_commit_id_from_files()
+    commit_id = _read_commit_id_from_git() or _read_commit_id_from_files()
+    return commit_id if COMMIT_ID_PATTERN.fullmatch(commit_id) else ""
 
 
 def main():

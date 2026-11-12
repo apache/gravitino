@@ -19,6 +19,7 @@
 
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.concurrent.TimeUnit
 
 plugins {
   `maven-publish`
@@ -59,16 +60,26 @@ dependencies {
   testFixturesImplementation(libs.commons.lang3)
 }
 
+val gitCommitIdPattern = Regex("[0-9a-fA-F]{40}")
+
 // Ask git itself first: it handles linked worktrees, packed refs and detached HEAD.
+// Only trust git when rootDir has its own .git, so a source tarball extracted inside another
+// repository does not pick up that repository's commit id.
 fun getGitCommitIdFromGit(): String? {
+  if (!File(rootDir, ".git").exists()) {
+    return null
+  }
   return try {
     val process = ProcessBuilder("git", "rev-parse", "HEAD")
       .directory(rootDir)
-      .redirectErrorStream(false)
+      .redirectError(ProcessBuilder.Redirect.DISCARD)
       .start()
+    if (!process.waitFor(30, TimeUnit.SECONDS)) {
+      process.destroyForcibly()
+      return null
+    }
     val output = process.inputStream.bufferedReader().use { it.readText().trim() }
-    process.errorStream.close()
-    if (process.waitFor() == 0 && Regex("[0-9a-fA-F]{40}").matches(output)) output else null
+    if (process.exitValue() == 0 && gitCommitIdPattern.matches(output)) output else null
   } catch (e: Exception) {
     null
   }
@@ -114,7 +125,11 @@ fun getGitCommitIdFromFiles(): String {
 fun getGitCommitId(): String {
   getGitCommitIdFromGit()?.let { return it }
   return try {
-    getGitCommitIdFromFiles()
+    val commitId = getGitCommitIdFromFiles()
+    if (!gitCommitIdPattern.matches(commitId)) {
+      throw GradleException("Invalid Git commit id: $commitId")
+    }
+    commitId
   } catch (e: Exception) {
     println("WARN: Unable to get Git commit id : ${e.message}")
     ""
@@ -167,6 +182,9 @@ tasks {
   jar {
     // The build info (commit id, compile date) is regenerated on every run, so never skip the jar.
     outputs.upToDateWhen { false }
+    // The properties file is written in doFirst, after the cache key is computed, so a cached
+    // jar from another commit with identical sources would carry a wrong commit id.
+    outputs.cacheIf { false }
 
     doFirst() {
       writeProjectPropertiesFile()
