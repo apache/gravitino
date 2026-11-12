@@ -303,7 +303,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
-    Assertions.assertEquals("(region = \"a\\\\\"b\\\\\\\\c\")", where);
+    Assertions.assertEquals("(region = \"a\\\"b\\\\c\")", where);
     callRewrite(spark, table, where);
   }
 
@@ -352,21 +352,13 @@ public class TestBuiltinIcebergRewriteDataFiles {
     Column[] columns = new Column[] {column("ts", Types.TimestampType.withoutTimeZone())};
     Transform[] partitioning = new Transform[] {Transforms.day("ts")};
 
-    String isoWhere =
+    String where =
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-03-18")))),
             columns,
             partitioning);
-    Assertions.assertEquals("(days(ts) = DATE \"2026-03-18\")", isoWhere);
-    callRewrite(spark, table, isoWhere);
-
-    String epochWhere =
-        PartitionUtils.getWhereClauseForPartitions(
-            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "20530")))),
-            columns,
-            partitioning);
-    Assertions.assertEquals("(days(ts) = DATE \"2026-03-18\")", epochWhere);
-    callRewrite(spark, table, epochWhere);
+    Assertions.assertEquals("(days(ts) = DATE \"2026-03-18\")", where);
+    callRewrite(spark, table, where);
   }
 
   private static void assertRewriteCallForYears(SparkSession spark, boolean ansi) {
@@ -653,14 +645,14 @@ public class TestBuiltinIcebergRewriteDataFiles {
 
   private static void callRewrite(SparkSession spark, String fullTableName, String whereClause) {
     String tableArg = fullTableName.substring(SPARK_CATALOG_NAME.length() + 1);
-    // Mirror IcebergRewriteDataFilesJob.buildProcedureCall / IcebergJobUtils.escapeSqlString.
+    // Mirror IcebergRewriteDataFilesJob.buildProcedureCall / IcebergJobUtils escaping.
     String sql =
         "CALL "
             + SPARK_CATALOG_NAME
             + ".system.rewrite_data_files(table => '"
             + escapeSqlString(tableArg)
             + "', strategy => 'binpack', where => '"
-            + escapeSqlString(whereClause)
+            + escapeSparkCallStringArg(whereClause)
             + "')";
     Assertions.assertDoesNotThrow(() -> spark.sql(sql).collect());
   }
@@ -668,6 +660,11 @@ public class TestBuiltinIcebergRewriteDataFiles {
   /** Same as {@code IcebergJobUtils.escapeSqlString}: double single quotes only. */
   private static String escapeSqlString(String value) {
     return value == null ? null : value.replace("'", "''");
+  }
+
+  /** Same as {@code IcebergJobUtils.escapeSparkCallStringArg}. */
+  private static String escapeSparkCallStringArg(String value) {
+    return value == null ? null : escapeSqlString(value.replace("\\", "\\\\"));
   }
 
   private static GravitinoMetalake loadOrCreateMetalake(

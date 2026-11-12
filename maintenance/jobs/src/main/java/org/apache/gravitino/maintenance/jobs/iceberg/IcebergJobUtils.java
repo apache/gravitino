@@ -189,6 +189,25 @@ public final class IcebergJobUtils {
   }
 
   /**
+   * Escapes a value for a Spark {@code CALL} named-arg single-quoted string (e.g. {@code where =>
+   * '...'}).
+   *
+   * <p>Even with {@code spark.sql.parser.escapedStringLiterals=false}, Spark still treats {@code
+   * \\} (and {@code \"} when a single backslash remains) inside the outer single-quoted argument.
+   * Double every backslash first so one outer parse leaves inner escapes (from a double-quoted
+   * predicate literal) intact, then double single quotes.
+   *
+   * @param value the string value to escape
+   * @return escaped string safe for use in a Spark CALL string argument, or null if input is null
+   */
+  public static String escapeSparkCallStringArg(String value) {
+    if (value == null) {
+      return null;
+    }
+    return escapeSqlString(value.replace("\\", "\\\\"));
+  }
+
+  /**
    * Escape and quote a SQL identifier with backticks.
    *
    * <p>Internal backticks are doubled to prevent breaking out of the quoted identifier. The result

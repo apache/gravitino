@@ -448,8 +448,9 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   }
 
   /**
-   * End-to-end: PartitionUtils where + IcebergJobUtils.escapeSqlString (via buildProcedureCall) +
-   * real Spark rewrite_data_files. Covers a string identity value with an embedded single quote.
+   * End-to-end: PartitionUtils where + IcebergJobUtils.escapeSparkCallStringArg (via
+   * buildProcedureCall) + real Spark rewrite_data_files. Covers a string identity value with an
+   * embedded single quote.
    */
   @Test
   public void testPartitionUtilsWhereWithSingleQuoteThroughJobEscapeAndSpark() {
@@ -488,8 +489,9 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   @Test
   public void testPartitionUtilsWhereWithQuoteAndBackslashThroughJobEscapeAndSpark() {
     String partitionValue = "a\"b\\c";
-    // PartitionUtils doubles backslash escapes so outer CALL where => '...' leaves \" / \\.
-    String expectedWhere = "(region = \"a\\\\\"b\\\\\\\\c\")";
+    // PartitionUtils: one-level \" / \\ ; job builder doubles backslashes for CALL where => '...'.
+    String expectedWhere = "(region = \"a\\\"b\\\\c\")";
+    String expectedCallWhere = "(region = \"a\\\\\"b\\\\\\\\c\")";
     for (boolean ansi : new boolean[] {false, true}) {
       spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(ansi));
       String tableSuffix = "pu_qb_" + (ansi ? "ansi" : "plain");
@@ -517,7 +519,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
         String sql =
             IcebergRewriteDataFilesJob.buildProcedureCall(
                 catalogName, "db." + tableSuffix, "binpack", null, where, null);
-        assertTrue(sql.contains("where => '" + expectedWhere + "'"));
+        assertTrue(sql.contains("where => '" + expectedCallWhere + "'"));
         assertDoesNotThrow(() -> spark.sql(sql).collect());
       } finally {
         spark.sql("DROP TABLE IF EXISTS " + table);

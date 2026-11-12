@@ -327,6 +327,17 @@ public class TestIcebergExpireSnapshotsJob {
   }
 
   @Test
+  public void testEscapeSparkCallStringArg() {
+    // Doubles backslashes first, then single quotes (for CALL where => '...').
+    assertEquals(
+        "region = \"a\\\\\"b\\\\\\\\c\"",
+        IcebergJobUtils.escapeSparkCallStringArg("region = \"a\\\"b\\\\c\""));
+    assertEquals("O''Brien", IcebergJobUtils.escapeSparkCallStringArg("O'Brien"));
+    assertEquals(null, IcebergJobUtils.escapeSparkCallStringArg(null));
+    assertEquals("", IcebergJobUtils.escapeSparkCallStringArg(""));
+  }
+
+  @Test
   public void testEscapeSqlIdentifier() {
     // Test basic escaping and quoting of backticks
     assertEquals("`catalog``name`", IcebergJobUtils.escapeSqlIdentifier("catalog`name"));

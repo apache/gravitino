@@ -85,8 +85,8 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    // Doubled backslashes: survive CALL where => '...' outer unescape, then inner \" / \\.
-    Assertions.assertEquals("colA = \"a\\\\\"b\\\\\\\\c\"", where);
+    // One-level double-quoted literal escapes; CALL outer doubling is done by the job builder.
+    Assertions.assertEquals("colA = \"a\\\"b\\\\c\"", where);
   }
 
   @Test
@@ -122,7 +122,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\\\"x\\\\\\\\y\"", where);
+    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\"x\\\\y\"", where);
   }
 
   @Test
@@ -165,9 +165,10 @@ public class TestPartitionUtils {
 
   @Test
   void testTruncateAndYearPartition() {
+    // years() compares to Iceberg years-since-1970 (2024 → 54), not a calendar year.
     List<PartitionEntry> partitions =
         Arrays.asList(
-            new PartitionEntryImpl("truncate", "prefix"), new PartitionEntryImpl("year", "2024"));
+            new PartitionEntryImpl("truncate", "prefix"), new PartitionEntryImpl("year", "54"));
     Column[] columns =
         new Column[] {
           column("colC", Types.StringType.get()),
@@ -178,18 +179,18 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("truncate(5, colC) = \"prefix\" AND years(colD) = 2024", where);
+    Assertions.assertEquals("truncate(5, colC) = \"prefix\" AND years(colD) = 54", where);
   }
 
   @Test
   void testDayPartitionUsesIcebergDaysFunctionWithDateLiteral() {
-    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "19723"));
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "2024-01-01"));
     Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
     Transform[] transforms = new Transform[] {Transforms.day("event_time")};
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    // epoch day 19723 == 2024-01-01; Iceberg Spark days() returns DateType
+    // ISO only (DateTimeUtil.isoDateToDays); Iceberg Spark days() returns DateType
     Assertions.assertEquals("days(event_time) = DATE \"2024-01-01\"", where);
   }
 
@@ -347,15 +348,32 @@ public class TestPartitionUtils {
   }
 
   @Test
-  void testDayPartitionDigitStringUsesEpochDayLikeIcebergDaysToIsoDate() {
-    // Same as DateTimeUtil.daysToIsoDate(19723); compact yyyymmdd is not an ISO date.
+  void testDayPartitionRejectsEpochDayIntegerString() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "19723"));
     Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
     Transform[] transforms = new Transform[] {Transforms.day("event_time")};
 
-    String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("ISO date"));
+    Assertions.assertTrue(ex.getMessage().contains("19723"));
+  }
 
-    Assertions.assertEquals("days(event_time) = DATE \"2024-01-01\"", where);
+  @Test
+  void testDayPartitionRejectsCompactDigitDate() {
+    // Compact yyyymmdd must not be guessed as epoch-day (would become ~year 57000).
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("day", "20260101"));
+    Column[] columns = new Column[] {column("event_time", Types.TimestampType.withoutTimeZone())};
+    Transform[] transforms = new Transform[] {Transforms.day("event_time")};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("ISO date"));
+    Assertions.assertTrue(ex.getMessage().contains("20260101"));
   }
 
   @Test

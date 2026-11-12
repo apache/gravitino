@@ -82,8 +82,8 @@ public class PartitionUtils {
    *   <li>{@code years}/{@code months}/{@code hours}: compare to the stored Iceberg int (years
    *       since 1970, etc.)—not a calendar year/month
    *   <li>{@code days}: Iceberg Spark {@code days()} returns {@code DateType}, so the RHS is {@code
-   *       DATE "yyyy-MM-dd"}. Stored partition strings are converted like Iceberg {@code
-   *       DateTimeUtil} (ISO {@code yyyy-MM-dd} or epoch-day int only)
+   *       DATE "yyyy-MM-dd"}. Stored partition strings must be ISO {@code yyyy-MM-dd} (same as
+   *       Iceberg {@code DateTimeUtil.isoDateToDays})
    * </ul>
    */
   public static String getWhereClauseForPartition(
@@ -204,7 +204,9 @@ public class PartitionUtils {
   }
 
   private static String formatLiteral(Transform transform, Type type, String rawValue) {
-    // years/months/hours/bucket partition values are Iceberg ints; validate before emitting.
+    // years/months/hours/bucket: raw Iceberg ints from producers (e.g. update-stats
+    // String.valueOf(Spark partition field)). years = years since 1970 (calendar 2024 → 54),
+    // not a calendar year/month; months/hours likewise. Validate before emitting.
     if (transform instanceof Transforms.YearTransform
         || transform instanceof Transforms.MonthTransform
         || transform instanceof Transforms.HourTransform
@@ -246,54 +248,32 @@ public class PartitionUtils {
   }
 
   /**
-   * Converts a day-partition stored value to {@code yyyy-MM-dd}.
+   * Validates and normalizes a day-partition stored value to {@code yyyy-MM-dd}.
    *
-   * <p>Supported inputs match Iceberg {@code DateTimeUtil} (no iceberg-api dependency):
-   *
-   * <ul>
-   *   <li>ISO {@code yyyy-MM-dd} — same as {@code DateTimeUtil.isoDateToDays(String)}
-   *   <li>epoch-day integer string — same as {@code DateTimeUtil.daysToIsoDate(int)}
-   * </ul>
-   *
-   * <p>Both appear because callers store partition values as strings: update-stats uses {@code
-   * String.valueOf(Spark date)} (ISO), while Iceberg metadata may expose the raw epoch-day int.
-   * Compact forms like {@code 20260101} are not ISO dates; if all digits they are parsed as
-   * epoch-day (same as {@code daysToIsoDate(20260101)}), not as a calendar compact date.
+   * <p>Only ISO {@code yyyy-MM-dd} is accepted, matching Iceberg {@code
+   * DateTimeUtil.isoDateToDays(String)}. TMS update-stats stores Spark {@code DateType} partition
+   * values via {@code String.valueOf}, which is already ISO. Epoch-day ints and compact forms like
+   * {@code 20260101} are rejected rather than guessed.
    */
   private static String toIsoDateFromDayPartitionValue(String rawValue) {
     try {
-      // DateTimeUtil.isoDateToDays(String): ISO_LOCAL_DATE only.
       return LocalDate.parse(rawValue, DateTimeFormatter.ISO_LOCAL_DATE)
           .format(DateTimeFormatter.ISO_LOCAL_DATE);
-    } catch (DateTimeParseException ignored) {
-      // fall through to epoch-day
-    }
-    try {
-      // DateTimeUtil.daysToIsoDate(int).
-      return LocalDate.ofEpochDay(Integer.parseInt(rawValue))
-          .format(DateTimeFormatter.ISO_LOCAL_DATE);
-    } catch (NumberFormatException e) {
+    } catch (DateTimeParseException e) {
       throw new IllegalArgumentException(
-          "Day partition value must be an ISO date (yyyy-MM-dd) or epoch-day integer "
-              + "(Iceberg DateTimeUtil), but got: "
-              + rawValue,
-          e);
+          "Day partition value must be an ISO date (yyyy-MM-dd), but got: " + rawValue, e);
     }
   }
 
   /**
-   * Escapes a value for a double-quoted Iceberg Spark literal that is later embedded in {@code CALL
-   * ... where => '...'} via {@code IcebergJobUtils.escapeSqlString} (single-quote doubling only).
+   * Escapes a value for a double-quoted Iceberg Spark literal ({@code \} → {@code \\}, {@code "} →
+   * {@code \"}).
    *
-   * <p>Even with {@code spark.sql.parser.escapedStringLiterals=false}, Spark still treats {@code
-   * \\} (and {@code \"} when a single backslash remains) inside the outer single-quoted {@code
-   * where} argument. Build the inner double-quoted escapes ({@code \} → {@code \\}, {@code "} →
-   * {@code \"}), then double every backslash so one outer parse leaves those inner escapes intact
-   * (e.g. raw {@code a"b\c} → {@code a\\"b\\\\c} in the where text).
+   * <p>Does not apply CALL {@code where => '...'} outer escaping; the job builder doubles
+   * backslashes when embedding this clause.
    */
   private static String escapeStringLiteral(String value) {
-    // Inner: \ → \\, " → \"; then double all backslashes for outer CALL where => '...'.
-    return value.replace("\\", "\\\\\\\\").replace("\"", "\\\\\"");
+    return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
   private static String joinFieldName(String[] fieldNameParts) {

@@ -243,7 +243,9 @@ public class IcebergRewriteDataFilesJob implements BuiltInJob, IcebergMaintenanc
     }
 
     if (whereClause != null && !whereClause.isEmpty()) {
-      sql.append(", where => '").append(IcebergJobUtils.escapeSqlString(whereClause)).append("'");
+      sql.append(", where => '")
+          .append(IcebergJobUtils.escapeSparkCallStringArg(whereClause))
+          .append("'");
     }
 
     if (optionsJson != null && !optionsJson.isEmpty()) {
