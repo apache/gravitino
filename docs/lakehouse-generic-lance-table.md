@@ -148,14 +148,16 @@ Required and optional properties for tables in a Generic Lakehouse Catalog:
 |-----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|--------------|
 | `format`              | Table format: `lance`, only `lance` is fully supported.                                                                                                                                                                                                                                                                                  | (none)   | Yes          |
 | `location`            | Storage path for table metadata and data, Lance supports: S3, GCS, OSS, AZ, File, Memory and file-object-store.                                                                                                                                                                                                                          | (none)   | Conditional* |
-| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge table will delete both. For a non-external table, dropping will drop both.                                                                                 | false    | No           |
+| `external`            | Whether the data directory is an external location. If it's `true`, dropping a table will only remove metadata in Gravitino and will not delete the data directory, and purge is rejected unless the catalog enables `lance.allow-external-table-purge`. For a non-external table, dropping will drop both.                                                                                 | false    | No           |
 | `lance.creation-mode` | Create mode: for create table, it can be `CREATE`, `EXIST_OK` or `OVERWRITE`. and it should be `CREATE` or `OVERWRITE` for registering tables                                                                                                                                                                                            | `CREATE` | No           |
-| `lance.register`      | Whether it is a register table operation. If it's `true`, This API will not create data directory actually and it's the user's responsibility to create and manage the data directory. `false` it will actually create a table.                                                                                                          | false    | No           |
+| `lance.register`      | Whether it is a register table operation. If `true`, register an existing, readable Lance dataset without creating data. A missing dataset or plain directory is rejected. Registered tables are external. If `false`, create a dataset.                                                                                                 | false    | No           |
 | `lance.storage.xxxx`  | Any additional storage-specific properties required by Lance format (e.g., S3 credentials, HDFS configs). Replace `xxxx` with actual property names. For example, we can use `lance.storage.aws_access_key_id` to set S3 aws_access_key_id when using a S3 location, for detail, refer to https://lancedb.com/docs/storage/integrations/ | (none)   | No           |
 
 - `CREATE`: Create a new table, fail if the table already exists.
 - `EXIST_OK`: Create a new table if it does not exist, otherwise do nothing.
-- `OVERWRITE`: Create a new table, overwrite if the table already exists, it will delete the existing data directory first if the table is not a registered table and then create a new one.
+- `OVERWRITE`: For creation (`lance.register=false`), purge the existing table and its dataset before creating a replacement. An existing external table requires the catalog to enable `lance.allow-external-table-purge`; otherwise the original metadata and data are retained. For registration (`lance.register=true`), validate the replacement dataset first and replace only external-table metadata, retaining the old dataset. Registration overwrite of a managed table is rejected; explicitly dropping or purging a managed table deletes its data.
+
+Registration validation checks dataset existence and readability, not an operator-defined storage scope or authorization to purge external data.
 
 ### Format boundary
 
@@ -300,7 +302,10 @@ tableCatalog.createTable(
 Register existing Lance tables without moving or copying data. A table with `lance.register=true`
 is always external, including when the request omits `external` or sets it to `false`. Dropping it
 through the Gravitino table API removes only the metadata. Explicit `purgeTable` and Lance REST
-`drop` still delete both the metadata and the dataset; use Lance REST `deregister` to preserve data.
+`drop` are rejected by default, preserving metadata and data. A catalog administrator may set
+`lance.allow-external-table-purge=true` to allow both to be deleted. This setting is read only from
+catalog properties; a table property cannot enable it. Use Lance REST `deregister` to remove
+metadata while preserving data. The opt-in does not validate location ownership.
 
 Existing registrations with a missing or false stored `external` flag receive the same protection
 when dropped or deregistered. Their stored properties are not automatically migrated.
@@ -350,7 +355,7 @@ tableCatalog.createTable(
 
 :::tip Registration vs Creation
 - **Registration** (`lance.register: true`):
-  - Links to existing Lance dataset or a path placeholder
+  - Requires an existing, readable Lance dataset; missing datasets and plain directories are rejected
   - Schema automatically detected from Lance metadata
   - Useful for importing existing datasets
 
@@ -467,4 +472,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```
 
-If you need to override storage on a single table, `lance.storage.*` table properties are still supported.
+A table can add `lance.storage.*` table properties for keys that the catalog does not set. If the
+catalog sets a key, the catalog value is used, and the table value is ignored. This prevents a table
+creator from sending the catalog credentials to another endpoint. Put tables that need a different
+endpoint or credentials in a separate catalog.

@@ -61,6 +61,7 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
+import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.utils.Executable;
@@ -107,6 +108,25 @@ public class RelationalEntityStore
   @VisibleForTesting
   public EntityCache getCache() {
     return cache;
+  }
+
+  /**
+   * Wraps a relational backend for offline migration without caches or background workers.
+   *
+   * <p>The caller initializes the SQL session factory and owns transaction boundaries. Closing the
+   * returned store also closes the backend. All servers sharing the database must be stopped.
+   *
+   * @param backend The backend using the caller's SQL session factory.
+   * @param config The configuration for the uncached store.
+   * @return A store that participates in the current thread's SQL transaction.
+   */
+  public static RelationalEntityStore forOfflineMigration(
+      RelationalBackend backend, Config config) {
+    RelationalEntityStore store = new RelationalEntityStore();
+    store.backend = backend;
+    store.cache = new NoOpsCache(config);
+    EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    return store;
   }
 
   @Override
@@ -205,6 +225,17 @@ public class RelationalEntityStore
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
+  }
+
+  @Override
+  public List<NameIdentifier> listSemanticModelMetrics(Namespace namespace) throws IOException {
+    return backend.listSemanticModelMetrics(namespace);
+  }
+
+  @Override
+  public List<SemanticModelMetric> listSemanticModelMetricInfos(Namespace namespace)
+      throws IOException {
+    return backend.listSemanticModelMetricInfos(namespace);
   }
 
   @Override

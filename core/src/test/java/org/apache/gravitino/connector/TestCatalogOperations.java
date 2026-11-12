@@ -132,6 +132,8 @@ public class TestCatalogOperations
 
   private final Map<String, String> config;
 
+  private boolean reportNoColumnsOnCreate;
+
   public static final String FAIL_CREATE = "fail-create";
 
   public static final String FAIL_TEST = "need-fail";
@@ -171,6 +173,16 @@ public class TestCatalogOperations
     return tables.keySet().stream()
         .filter(testTable -> testTable.namespace().equals(namespace))
         .toArray(NameIdentifier[]::new);
+  }
+
+  /** Makes {@link #createTable} return a table without a column list, as a broken source would. */
+  public void setReportNoColumnsOnCreate(boolean reportNoColumnsOnCreate) {
+    this.reportNoColumnsOnCreate = reportNoColumnsOnCreate;
+  }
+
+  /** Replaces a table, e.g. with one whose source reports no column list. */
+  public void replaceTable(NameIdentifier ident, TestTable table) {
+    tables.put(ident, table);
   }
 
   @Override
@@ -236,7 +248,7 @@ public class TestCatalogOperations
         .withComment(comment)
         .withProperties(new HashMap<>(properties))
         .withAuditInfo(auditInfo)
-        .withColumns(sortedColumns)
+        .withColumns(reportNoColumnsOnCreate ? null : sortedColumns)
         .withDistribution(distribution)
         .withSortOrders(sortOrders)
         .withPartitioning(partitions)
@@ -1454,6 +1466,9 @@ public class TestCatalogOperations
   }
 
   private Column[] updateColumns(Column[] columns, TableChange.ColumnChange[] columnChanges) {
+    if (columns == null) {
+      return null;
+    }
     Map<String, Column> columnMap =
         Arrays.stream(columns).collect(Collectors.toMap(Column::name, Function.identity()));
 

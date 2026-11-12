@@ -85,6 +85,7 @@ import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
+import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
@@ -582,6 +583,14 @@ public class HiveCatalogOperations
 
   private void validateDistributionAndSort(Distribution distribution, SortOrder[] sortOrder) {
     if (distribution != Distributions.NONE) {
+      // NONE can also arrive as a DTO rather than the singleton used by the Java API.
+      boolean unbucketed =
+          distribution.strategy() == Strategy.NONE
+              && distribution.number() == 0
+              && distribution.expressions().length == 0;
+      Preconditions.checkArgument(
+          distribution.strategy() == Strategy.HASH || unbucketed,
+          "Hive only supports HASH distribution, or NONE with zero buckets and no expressions");
       boolean allNameReference =
           Arrays.stream(distribution.expressions())
               .allMatch(t -> t instanceof NamedReference.FieldReference);
@@ -726,6 +735,11 @@ public class HiveCatalogOperations
           TableChange.RemoveProperty removeProperty = (TableChange.RemoveProperty) change;
           updatedProperties.remove(removeProperty.getProperty());
         } else if (change instanceof TableChange.ColumnChange) {
+          if (!currentTable.originalStorageColumns().isEmpty()) {
+            throw new IllegalArgumentException(
+                "Cannot alter columns of a SerDe-derived table through Gravitino. "
+                    + "Update the schema through the table SerDe or its external schema definition.");
+          }
           applyColumnChange(updatedColumns, (TableChange.ColumnChange) change);
         } else {
           throw new IllegalArgumentException(
@@ -824,7 +838,9 @@ public class HiveCatalogOperations
     if (comment != null) {
       builder.withComment(comment);
     }
-    return builder.build();
+    HiveTable altered = builder.build();
+    altered.setOriginalStorageColumns(original.originalStorageColumns());
+    return altered;
   }
 
   private void applyColumnChange(List<Column> columns, TableChange.ColumnChange change) {

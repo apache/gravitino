@@ -47,10 +47,28 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
     return "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = "
-        + now
+        + newerRetiredAtExpression(now)
         + ", updated_at = "
         + now
         + " WHERE metadata_object_id = #{metadataObjectId} AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0";
+  }
+
+  /**
+   * Returns a deleted_at that is newer than every retired owner row of the same object. The
+   * PostgreSQL clock is the transaction start time, so owner changes that start in one millisecond
+   * would otherwise repeat a retired row and break the unique key. Owner writes on one object are
+   * serialized by its row lock, so reading the maximum here cannot race another owner change.
+   */
+  private String newerRetiredAtExpression(String now) {
+    return "GREATEST("
+        + now
+        + ", (SELECT COALESCE(MAX(retired.deleted_at), 0) + 1 FROM "
+        + OWNER_TABLE_NAME
+        + " retired WHERE retired.metadata_object_id = "
+        + OWNER_TABLE_NAME
+        + ".metadata_object_id AND retired.metadata_object_type = "
+        + OWNER_TABLE_NAME
+        + ".metadata_object_type))";
   }
 
   @Override
@@ -207,7 +225,7 @@ public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
         + "UPDATE "
         + OWNER_TABLE_NAME
         + " SET deleted_at = "
-        + now
+        + newerRetiredAtExpression(now)
         + ", updated_at = "
         + now
         + " WHERE deleted_at = 0 AND ("

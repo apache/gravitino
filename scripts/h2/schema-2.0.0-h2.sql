@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_name` VARCHAR(300) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` CLOB NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS `fileset_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'fileset info version',
     `fileset_comment` VARCHAR(256) DEFAULT '' COMMENT 'fileset comment',
     `properties` CLOB DEFAULT NULL COMMENT 'fileset properties',
-    `storage_location_name` VARCHAR(128) NOT NULL DEFAULT 'default' COMMENT 'fileset storage location name',
+    `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default' COMMENT 'fileset storage location name',
     `storage_location` CLOB DEFAULT NULL COMMENT 'fileset storage location',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'fileset deleted at',
     PRIMARY KEY (id),
@@ -248,7 +248,8 @@ CREATE TABLE IF NOT EXISTS `group_role_rel` (
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'relation deleted at',
     PRIMARY KEY (`id`),
     CONSTRAINT `uk_gi_ri_del` UNIQUE (`group_id`, `role_id`, `deleted_at`),
-    KEY `idx_gid` (`group_id`)
+    KEY `idx_gid` (`group_id`),
+    KEY `group_role_rel_idx_role_id` (`role_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `idp_user_meta` (
@@ -369,7 +370,7 @@ CREATE TABLE IF NOT EXISTS `model_version_info` (
     `version` INT UNSIGNED NOT NULL COMMENT 'model version',
     `model_version_comment` CLOB DEFAULT NULL COMMENT 'model version comment',
     `model_version_properties` CLOB DEFAULT NULL COMMENT 'model version properties',
-    `model_version_uri_name` VARCHAR(128) NOT NULL COMMENT 'model version uri name',
+    `model_version_uri_name` VARCHAR(256) NOT NULL COMMENT 'model version uri name',
     `model_version_uri` CLOB NOT NULL COMMENT 'model storage uri',
     `audit_info` CLOB NOT NULL COMMENT 'model version audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model version deleted at',
@@ -752,31 +753,45 @@ CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_execution_time_idx` ON `sched
 CREATE INDEX IF NOT EXISTS `scheduled_commit_tasks_last_heartbeat_idx` ON `scheduled_commit_tasks`(`last_heartbeat`);
 
 CREATE TABLE IF NOT EXISTS `table_maintenance_action` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `action_id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'maintenance action id',
     `job_id` BIGINT COMMENT 'job run id, maps to job_run_meta.job_run_id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
-    `before_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id before maintenance, null until sampled',
-    `after_snapshot_id` BIGINT COMMENT 'Iceberg snapshot id after maintenance, null while pending',
-    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    `before_metrics_id` BIGINT COMMENT 'table_snapshot_metrics.metrics_id for S0 sample',
+    `after_metrics_id` BIGINT COMMENT 'table_snapshot_metrics.metrics_id for S1 sample',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`)
+    `finished_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'finish millis, 0 = soft in-flight slot (one per table/policy)',
+    PRIMARY KEY (`action_id`)
 ) COMMENT='table maintenance action metadata';
 CREATE INDEX IF NOT EXISTS `idx_tma_job_id` ON `table_maintenance_action`(`job_id`);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_tma_table_policy_finished` ON `table_maintenance_action`(`table_id`, `policy_id`, `finished_at`);
-CREATE INDEX IF NOT EXISTS `idx_tma_before_sid` ON `table_maintenance_action`(`table_id`, `before_snapshot_id`);
-CREATE INDEX IF NOT EXISTS `idx_tma_after_sid` ON `table_maintenance_action`(`table_id`, `after_snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_before_metrics` ON `table_maintenance_action`(`before_metrics_id`);
+CREATE INDEX IF NOT EXISTS `idx_tma_after_metrics` ON `table_maintenance_action`(`after_metrics_id`);
 CREATE INDEX IF NOT EXISTS `idx_tma_created_at` ON `table_maintenance_action`(`created_at`);
 
 CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
-    `id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'auto increment id',
+    `metrics_id` BIGINT AUTO_INCREMENT NOT NULL COMMENT 'metrics row id',
     `table_id` BIGINT NOT NULL COMMENT 'table id from table_meta',
     `policy_id` BIGINT NOT NULL COMMENT 'policy id from policy_meta',
     `snapshot_id` BIGINT NOT NULL COMMENT 'Iceberg snapshot id',
     `metrics_value` CLOB NOT NULL COMMENT 'metrics value as JSON',
     `created_at` BIGINT NOT NULL COMMENT 'creation timestamp in milliseconds',
-    PRIMARY KEY (`id`)
+    PRIMARY KEY (`metrics_id`)
 ) COMMENT='table snapshot metrics metadata';
-CREATE UNIQUE INDEX IF NOT EXISTS `uk_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
+CREATE INDEX IF NOT EXISTS `idx_tsm_tid_pid_sid` ON `table_snapshot_metrics`(`table_id`, `policy_id`, `snapshot_id`);
 CREATE INDEX IF NOT EXISTS `idx_tsm_created_at` ON `table_snapshot_metrics`(`created_at`);
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`)
+) COMMENT='current semantic model dataset source associations';
+CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);

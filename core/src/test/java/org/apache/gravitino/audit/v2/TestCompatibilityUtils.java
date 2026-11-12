@@ -204,6 +204,12 @@ public class TestCompatibilityUtils {
       {OperationType.DROP_SEMANTIC_MODEL, Operation.DROP_SEMANTIC_MODEL},
       {OperationType.LOAD_SEMANTIC_MODEL, Operation.LOAD_SEMANTIC_MODEL},
       {OperationType.LIST_SEMANTIC_MODEL, Operation.LIST_SEMANTIC_MODEL},
+      {
+        OperationType.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
+        Operation.LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE
+      },
+      {OperationType.LIST_SEMANTIC_MODEL_METRIC, Operation.LIST_SEMANTIC_MODEL_METRIC},
+      {OperationType.LIST_SEMANTIC_MODEL_METRIC_INFOS, Operation.LIST_SEMANTIC_MODEL_METRIC_INFOS},
       {OperationType.IMPORT_SEMANTIC_MODEL, Operation.IMPORT_SEMANTIC_MODEL},
       {OperationType.EXPORT_SEMANTIC_MODEL, Operation.EXPORT_SEMANTIC_MODEL},
       {OperationType.REGISTER_FUNCTION, Operation.REGISTER_FUNCTION},

@@ -132,6 +132,9 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
             };
     Set<String> primaryKeyColumns = new HashSet<>(Arrays.asList(primaryKeys));
     Distribution distribution = toDistribution(properties, schema, bucketTransform);
+    Map<String, String> tableProperties =
+        propertiesConverter.toGravitinoTableProperties(properties);
+    SparkTypeConverter typeConverter = getSparkTypeConverter(tableProperties);
     Column[] columns =
         Arrays.stream(schema.fields())
             .map(
@@ -139,16 +142,14 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
                     primaryKeyColumns.contains(field.name())
                         ? new StructField(field.name(), field.dataType(), false, field.metadata())
                         : field)
-            .map(this::createGravitinoColumn)
+            .map(field -> createGravitinoColumn(field, typeConverter))
             .toArray(Column[]::new);
-    Map<String, String> tableProperties =
-        propertiesConverter.toGravitinoTableProperties(properties);
     tableProperties.remove(PaimonConstants.PRIMARY_KEY);
     tableProperties.remove(PaimonConstants.BUCKET_NUM);
     tableProperties.remove(PaimonConstants.BUCKET_KEY);
     String comment = tableProperties.remove(ConnectorConstants.COMMENT);
 
-    return gravitinoCatalogClient
+    return gravitinoCatalog()
         .asTableCatalog()
         .createTable(
             NameIdentifier.of(getDatabase(ident), ident.name()),
@@ -169,7 +170,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     CredentialPropertyUtils.applyPaimonCredentials(
-        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+        CredentialPropertyUtils.getCredentials(gravitinoCatalog()), all);
     paimonCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return paimonCatalog;
   }
@@ -205,7 +206,7 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
   @Override
   public boolean dropTable(Identifier ident) {
     sparkCatalog.invalidateTable(ident);
-    return gravitinoCatalogClient
+    return gravitinoCatalog()
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
   }

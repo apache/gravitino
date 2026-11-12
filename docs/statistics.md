@@ -33,8 +33,8 @@ you choose.
 A reserved statistic is one Gravitino defines, such as `row_count`. The set can grow in future
 releases, so reserved names are not available for your own use.
 
-A custom statistic is yours, and its name must begin with `custom.` to keep it clear of anything
-Gravitino may reserve later. The prefix is the only naming rule.
+A custom statistic is yours, and its name must begin with `custom-` to keep it clear of anything
+Gravitino may reserve later. Statistic names must not exceed 128 characters, including the prefix.
 
 ### Modifiable and Not
 
