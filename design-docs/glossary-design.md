@@ -402,13 +402,16 @@ Both can write bindings. The server checks each term in the request separately:
 
 ### Status and versions
 
+The following status table and immediate-update rules describe Step 1. Step 2 publication and
+pending-content rules are specified separately below.
+
 | Status               | Who can see it                                                   | Who can delete it    |
 | -------------------- | ---------------------------------------------------------------- | -------------------- |
 | `DRAFT`              | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`; not MCP | `MANAGE_DEFINITIONS` |
 | `APPROVED` (default) | `VIEW_DEFINITION`; MCP also requires this privilege              | `MANAGE_DEFINITIONS` |
 | `DEPRECATED`         | `VIEW_DEFINITION`; not MCP                                       | `MANAGE_DEFINITIONS` |
 
-- **Status is an ordinary field.** It is set in the create request (default `APPROVED`) or with
+- **Status is an ordinary field in Step 1.** It is set in the create request (default `APPROVED`) or with
   `setStatus` in the update request. Anyone who can edit the term can set it: the owner with
   `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`. There are no transition rules and no separate
   status endpoint.
@@ -455,6 +458,18 @@ Both can write bindings. The server checks each term in the request separately:
   relations, domains, and both binding paths. The default handler applies the change at once. In
   Step 2, a review handler keeps the proposed change apart from the live tables until it is
   approved.
+- **Step 2 publication**: new terms default to `DRAFT`; a create request specifying another
+  initial status is rejected. A create request or ordinary update,
+  including `setStatus(APPROVED)`, cannot publish a term without review. This applies to CREATE,
+  MANAGE and the metalake owner; publication requires an explicit approval decision on a
+  submitted proposal by another principal. A request that tries to publish directly is rejected,
+  rather than silently treated as approved. No initial-status setting may bypass this rule.
+- **Step 2 live and pending content**: an edit to an approved term creates proposed content;
+  its existing approved version and bindings remain live for ordinary readers and agents until
+  approval. Pending content is visible only to the current owner with effective CREATE, or to
+  an authorized MANAGE reviewer. Being a former owner or the submitter does not independently
+  grant continued read access. Proposal status is separate from the
+  live term's status. Rejection leaves the approved version unchanged; approval replaces it.
 - Dropping a term soft-deletes its synonyms, relations, domain links, bindings and version rows, in
   the same transaction. Dropping a metalake soft-deletes all its glossary rows in
   `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
@@ -476,7 +491,10 @@ In Step 1, the three privileges are granted on the metalake:
 - `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, and `CREATE_DEFINITION` includes
   `VIEW_DEFINITION`. The names are general, so other business-definition objects can use them too.
 - **Owner versus any term**: `CREATE_DEFINITION` lets a user write and maintain their own terms.
-  `MANAGE_DEFINITIONS` lets an admin read, edit and delete any term. Ownership means the current
+  `MANAGE_DEFINITIONS` lets an admin read, edit, bind, set the status of and delete any term,
+  including other users' drafts. It is not limited to list and delete. Ordinary VIEW callers
+  can also list terms, subject to visibility; MANAGE additionally exposes all statuses in its
+  authorized scope. Ownership means the current
   owner, including group members, not necessarily the original creator. Changing status is an
   ordinary edit in Step 1; CREATE and MANAGE have no separate approval capability. Step 2 adds
   submission and review, including reviewer authorization and no self-approval.
@@ -494,7 +512,8 @@ In Step 1, the three privileges are granted on the metalake:
   VIEW, so denying VIEW blocks both reads and writes, even for a term owner. Creating requires
   effective CREATE; editing uses effective MANAGE or the owner-with-effective-CREATE path;
   deleting requires effective MANAGE. A deny on MANAGE removes the all-term path, but leaves
-  effective CREATE usable on own terms. The metalake owner always passes.
+  effective CREATE usable on own terms. The metalake owner always passes these privilege checks;
+  Step 2 workflow conditions still apply.
 - **Bindings** are written on the object, by the object admin (`APPROVED` terms only) or by the
   term editor. See Bindings.
 - **Owner** (a user or a group), set through `/owners/glossary_term/{term}`. When a group owns a
@@ -509,6 +528,40 @@ In Step 1, the three privileges are granted on the metalake:
   grants and ownership, not glossary content. Owner-transfer and role-grant APIs retain their
   existing authorization; MANAGE does not grant `MANAGE_GRANTS`. In Step 2, a `TermScopeResolver`
   adds the domains of a term, and their parents, as more levels of the glossary checks.
+
+**Step 2: MANAGE retains administration and adds review**
+
+The three privilege names and their implications are retained. CREATE remains the contributor
+capability; MANAGE remains the administrator capability and additionally authorizes approval
+and rejection. MANAGE does not become an approval-only privilege.
+
+| Privilege            | Step 1                                                                | Step 2                                                                                           |
+| -------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `VIEW_DEFINITION`    | Read visible published terms; no draft access                         | Read authorized APPROVED/DEPRECATED live terms; no draft or proposal access                      |
+| `CREATE_DEFINITION`  | Create and maintain own terms; changes take effect immediately        | Create drafts, maintain own content and submit changes; cannot approve                           |
+| `MANAGE_DEFINITIONS` | Read all statuses, create, edit, bind, set status and delete any term | Retain management, inspect pending changes, and approve or reject another principal's submission |
+
+- **Scope**: Step 1 grants are metalake-wide. In Step 2, all-term administration and review
+  mean all terms in the caller's effective authorized scope. A domain grant does not confer
+  metalake-wide rights; S2.3 defines domain inheritance and deny handling. Glossary MANAGE still
+  grants neither access to bound assets nor permission to administer role grants.
+- **No workflow bypass**: ordinary edits, binding changes and requested deletion follow the
+  Step 2 review workflow, even when submitted by MANAGE. Required cleanup after endpoint deletion
+  remains the exception described in Cleanup revisions. Ownership, domain ownership and metalake
+  ownership do not waive the workflow or the no-self-approval rule.
+- **No self-approval**: the approval endpoint checks effective MANAGE for the proposal's scope
+  and rejects approval by the authenticated principal that submitted it. Owner/group membership
+  or an additional role does not turn that principal into a different reviewer. A MANAGE user's
+  own submission needs another authorized MANAGE reviewer; an installation with only one such
+  user cannot approve that user's submissions. Editing submitted content requires a new
+  submission with its own recorded submitter and content revision; approval refers to that
+  submitted revision, not mutable content attributed to an earlier submitter.
+- **PRD alignment**: the enterprise prototype separates `MODIFY_GLOSSARY` and
+  `APPROVE_GLOSSARY`; neither implies the other. This design deliberately combines all-term
+  administration and review in MANAGE while keeping own-term contribution in CREATE. It does
+  not offer an independent all-term editor without approval rights, or an approval-only role.
+  Those roles would require a later privilege split rather than being claimed as supported by
+  these three privileges.
 
 ### Locking
 
@@ -932,6 +985,10 @@ tag. The second case cannot be blocked without changing how tags work.
 3. **Default read access**: everyone should be able to read terms by default. But Gravitino has no
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
+4. **Two-step governance (decided)**: Step 1 defaults to APPROVED with immediate changes and no
+   review. Step 2 defaults to DRAFT and adds approval/rejection to MANAGE's existing administration
+   rights, with no self-approval or direct-publication bypass. Combining administration and review
+   is a deliberate simplification of the PRD's independent modify and approve privileges.
 
 ## Testing
 
@@ -1611,18 +1668,38 @@ These are tracked here until separate GitHub issues are filed and linked. The lo
 are not issue numbers, and no follow-up issues have been created by this document update.
 
 - [ ] **S2.1. Review and no self-approval**: proposed-change storage, the review handler for
-      `TermChangeHandler`, reviewer authorization and rejection of a submitter reviewing their
-      own change, including content, relations, membership and both binding paths.
+      `TermChangeHandler`, explicit submit/approve/reject APIs, scoped MANAGE reviewer
+      authorization and rejection of self-approval, including content, status, relations,
+      membership, both binding paths and requested deletion. Ordinary MANAGE writes cannot
+      bypass review; its own submissions need another authorized MANAGE reviewer.
 - [ ] **S2.2. Version snapshots and history**: snapshots in `glossary_term_version_info`, the
       history and diff APIs, and atomic commit with the approved live change.
 - [ ] **S2.3. Domain grants**: grants on domains, inherited by subdomains, with deny handling
       and revalidation when membership changes.
-- [ ] **S2.4. Initial-status setting**: the audited metalake setting for the default status.
+- [ ] **S2.4. Creation defaults and upgrade behavior**: default new terms to DRAFT and reject
+      direct publication through create/update, including for MANAGE. No initial-status setting
+      bypasses review. Preserve existing term IDs and statuses when enabling Step 2; an existing
+      Step 1 APPROVED term is not relabeled as human-reviewed or given a fabricated decision.
 - [ ] **S2.5. Web UI**: term pages, hierarchy, binding drawers, review queue and history.
 - [ ] **S2.6. CSV import/export**: define the CSV schema and validation,
       permission-filtered exports, repeat-import identity using `sourceRef`, batch failure
       semantics, and imports through the same review and no-self-approval checks as other
       writes. This remains planned work, outside Step 1; public APIs alone do not deliver CSV.
+
+**Step 2 acceptance requirements** (implemented with S2.1, S2.2, S2.3 and S2.4, not Step 1):
+
+- CREATE creates a draft and submits its own changes; it cannot read another owner's draft,
+  decide a proposal or publish by passing APPROVED in create/update.
+- MANAGE can inspect drafts and pending changes in its authorized scope, and approve/reject a
+  different principal's submission. MANAGE outside that scope cannot inspect or decide it.
+- Two MANAGE users submit separate changes. Neither can approve its own submission, including
+  through another role or group ownership; each can approve the other's authorized submission.
+  Repeat the self-approval and direct-publication rejection as the metalake owner.
+- Submit a content or binding change to an approved term. Ordinary reads and MCP continue to
+  return the previous approved state, never pending content. Rejection preserves that state;
+  approval exposes the new state. A requested deletion remains pending until approval.
+- Enabling Step 2 preserves existing IDs/statuses and records no invented reviewer decisions;
+  newly created terms default to DRAFT, regardless of the caller's management privileges.
 
 ## Implementation Steps
 
@@ -1630,22 +1707,22 @@ The glossary is built in two steps. Step 1 is this design. Step 2 adds review, h
 on domains on top of it. Both steps use the same term IDs, relations and storage, so Step 2 needs
 no data migration.
 
-| Area                 | Step 1 (this design)                                                                                                      | Step 2                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Term model           | Terms with definitions, synonyms, owner, links, properties and source reference                                           | Same terms                                                                                 |
-| Relations            | Several broader terms, related terms, cycle check, cleanup                                                                | Relation changes are reviewed                                                              |
-| Domain membership    | Explicit relations (Option A); zero or more domains, optional on create; filters and cleanup                              | Same membership source; changes are reviewed and domains become the scope of grants        |
-| Tags                 | Ordinary tags on terms through the existing tag APIs                                                                      | Same                                                                                       |
-| Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths               | Binding changes are reviewed, on both paths                                                |
-| Privileges           | Metalake grants; CREATE maintains own terms; MANAGE reads, edits and deletes any term; private drafts, deny and filtering | Same privileges, also granted on domains and inherited by subdomains                       |
-| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision                           | Default `DRAFT`, or `APPROVED` by an audited metalake setting; status changes are reviewed |
-| Changes              | Take effect at once; `TermChangeHandler` is the write hook                                                                | Always reviewed; proposed changes are kept apart; nobody approves their own change         |
-| Versions and history | Revision number and audit only                                                                                            | A snapshot of each approved change, readable history and diffs                             |
-| APIs and clients     | REST, Java and Python clients, OpenAPI                                                                                    | Proposal, decision and history APIs                                                        |
-| CSV import/export    | Not delivered; APIs and source references support future importers                                                        | Planned as S2.6, with permissions and review                                               |
-| Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                                     | Same lookup, on the approved state                                                         |
-| Audit and events     | Create, edit, status, relation, membership, binding and delete                                                            | Submit, approve, reject, and changes of the metalake setting                               |
-| UI                   | None; the REST calls behind each page are listed in Web UI support                                                        | Term pages, hierarchy, binding drawers, review queue and history                           |
+| Area                 | Step 1 (this design)                                                                                                      | Step 2                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Term model           | Terms with definitions, synonyms, owner, links, properties and source reference                                           | Same terms                                                                               |
+| Relations            | Several broader terms, related terms, cycle check, cleanup                                                                | Relation changes are reviewed                                                            |
+| Domain membership    | Explicit relations (Option A); zero or more domains, optional on create; filters and cleanup                              | Same membership source; changes are reviewed and domains become the scope of grants      |
+| Tags                 | Ordinary tags on terms through the existing tag APIs                                                                      | Same                                                                                     |
+| Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths               | Binding changes are reviewed, on both paths                                              |
+| Privileges           | Metalake grants; CREATE maintains own terms; MANAGE reads, edits and deletes any term; private drafts, deny and filtering | MANAGE retains scoped administration and adds approval/rejection; grants also on domains |
+| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision                           | Default `DRAFT`; explicit approval required, including for MANAGE submissions            |
+| Changes              | Take effect at once; `TermChangeHandler` is the write hook                                                                | Always reviewed; proposed changes are kept apart; nobody approves their own change       |
+| Versions and history | Revision number and audit only                                                                                            | A snapshot of each approved change, readable history and diffs                           |
+| APIs and clients     | REST, Java and Python clients, OpenAPI                                                                                    | Proposal, decision and history APIs                                                      |
+| CSV import/export    | Not delivered; APIs and source references support future importers                                                        | Planned as S2.6, with permissions and review                                             |
+| Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                                     | Same lookup on the current approved state while proposed changes await review            |
+| Audit and events     | Create, edit, status, relation, membership, binding and delete                                                            | Submit, approve, reject, and changes of the metalake setting                             |
+| UI                   | None; the REST calls behind each page are listed in Web UI support                                                        | Term pages, hierarchy, binding drawers, review queue and history                         |
 
 ### Storage for Step 2
 
@@ -1654,7 +1731,8 @@ no data migration.
 - Step 2 keeps term IDs, relation keys and existing data. It adds storage for proposed changes.
 - The write hook covers content, status, relations, membership and both binding paths. So Step 2
   can review every change.
-- On approval, Step 2 checks privileges, the revision the change was based on, and the objects it
+- On approval, Step 2 checks effective MANAGE in scope, rejects the submitting principal, checks
+  the revision the change was based on, and the objects it
   refers to again. Then it writes the live change, the snapshot and the decision in one
   transaction. If the snapshot fails, the live change is rolled back.
 - `APPROVED` in Step 1 means "agents can use it", not "a reviewer accepted it". Step 2 history
