@@ -140,6 +140,20 @@ blob columns stored as `External(arrow_field_json_str)` keep that form instead o
 `External("lance.blob.legacy")`.
 :::
 
+### Ownership with `EXIST_OK`
+
+You can use `lance.creation-mode=EXIST_OK` with the Gravitino table API and with Lance REST.
+
+- If the table already exists, Gravitino returns it and keeps its owner. This is also true when
+  the table has no owner.
+- If another request is still creating the table, the `EXIST_OK` request does not set the owner.
+  The creator sets it.
+- If the request creates a new table, the caller becomes the owner when authorization is enabled.
+
+Gravitino creates the table and sets the owner in two separate steps. If the table is created but
+setting the owner fails, a repeated `EXIST_OK` request does not fix the owner. Fix the cause, then
+set the owner explicitly.
+
 ### Table Properties
 
 Required and optional properties for tables in a Generic Lakehouse Catalog:

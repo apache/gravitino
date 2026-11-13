@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -864,7 +865,34 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      // ManagedTableOperations persists the server-issued ID on insertion and preserves the old
+      // ID when returning an existing table. Inspect the unmasked snapshot: the public properties
+      // omit this reserved identifier. Do not infer creation from the presence of an owner.
+      StringIdentifier persistedId = StringIdentifier.fromProperties(table.properties());
+      EntityCombinedTable result =
+          EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      long persistedTableId;
+      if (persistedId != null) {
+        persistedTableId = persistedId.id();
+      } else {
+        // Custom managed connectors may omit reserved properties from their returned Table. Read
+        // the stored identity in that case; absence or a replacement cannot prove this request
+        // created the object. Never require an extra connector read after external creation.
+        try {
+          persistedTableId = store.get(ident, TABLE, TableEntity.class).id();
+        } catch (NoSuchEntityException e) {
+          return result;
+        } catch (IOException e) {
+          throw new GravitinoRuntimeException(
+              e,
+              "Table %s was returned by the catalog, but its stored creation identity could not be read. "
+                  + "Check the entity store before retrying or assigning ownership.",
+              ident);
+        }
+      }
+      return persistedTableId == catalogResult.id
+          ? result.withCreatedTableId(catalogResult.id)
+          : result;
     }
 
     AuditInfo audit =
@@ -905,6 +933,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
+        .withCreatedTableId(tableEntity.id())
         .withHiddenProperties(catalogResult.hiddenProperties);
   }
 
