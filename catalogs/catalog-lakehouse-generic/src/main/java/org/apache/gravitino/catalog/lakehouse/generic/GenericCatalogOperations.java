@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
+import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -25,10 +26,12 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -169,10 +172,56 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     return schemaOps.listSchemas(namespace);
   }
 
+  /**
+   * Creates a schema, asking the {@link TableLocationProvider} for its location first when the
+   * provider implements {@link SupportsSchemaLocations}.
+   *
+   * <p>A schema that already exists is rejected before the provider is consulted, so that a
+   * provider is never asked to allocate for a name that is taken. A provider that throws fails the
+   * creation, and a non-null location it returns is stored as the schema's {@code location}.
+   *
+   * @param ident the identifier of the schema to create
+   * @param comment the comment of the schema
+   * @param properties the properties of the schema
+   * @return the created schema
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws SchemaAlreadyExistsException if the schema already exists
+   */
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return schemaOps.createSchema(ident, comment, properties);
+    TableLocationProvider provider = tableLocationProvider;
+    if (!(provider instanceof SupportsSchemaLocations)) {
+      return schemaOps.createSchema(ident, comment, properties);
+    }
+
+    try {
+      if (store.exists(ident, SCHEMA)) {
+        throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to check if schema " + ident + " exists", e);
+    }
+
+    String location =
+        ((SupportsSchemaLocations) provider)
+            .provisionSchemaLocation(
+                SchemaLocationContext.builder()
+                    .withSchemaIdentifier(ident)
+                    .withSchemaProperties(properties)
+                    .withCatalogProperties(catalogProperties)
+                    .build());
+    Map<String, String> schemaProperties = properties;
+    if (location != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(location),
+          "Table location provider '%s' returned a blank location for schema %s",
+          provider.name(),
+          ident);
+      schemaProperties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
+      schemaProperties.put(Schema.PROPERTY_LOCATION, location);
+    }
+    return schemaOps.createSchema(ident, comment, schemaProperties);
   }
 
   @Override
@@ -196,6 +245,12 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * retried. A {@link TableLocationProvider} failing to unprovision a location does not abort it,
    * because the table it belongs to is already gone.
    *
+   * <p>When the provider implements {@link SupportsSchemaLocations}, it is asked to unprovision the
+   * schema location after the cascaded tables are dropped and before the schema itself is removed,
+   * together with the tables the cascade dropped without deleting their data. A provider failing to
+   * unprovision fails the drop and leaves the schema in place, so the call can be retried. For any
+   * other provider an empty schema is dropped without being read.
+   *
    * @param ident the identifier of the schema to drop
    * @param cascade whether to drop the tables contained in the schema
    * @return true if the schema was dropped, false if it did not exist
@@ -218,18 +273,30 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
           "Schema %s is not empty, cannot drop it without cascade", ident);
     }
 
+    TableLocationProvider provider = tableLocationProvider;
+    boolean schemaHooks = provider instanceof SupportsSchemaLocations;
+    Schema schema = schemaHooks || tableIdents.length > 0 ? loadSchema(ident) : null;
+
     // Drop all tables under the schema first if cascade is true. This goes through the same path
     // as the catalog level dropTable, so that the location of each table is unprovisioned and its
     // cached format invalidated. The schema is resolved once for the whole cascade rather than
     // once per table: every table here has the same parent, and the provider may not ask for it at
     // all.
-    if (tableIdents.length > 0) {
-      Schema cascadedSchema = loadSchema(ident);
-      for (NameIdentifier tableIdent : tableIdents) {
-        dropOrPurgeTable(tableIdent, false /* purge */, cascadedSchema);
-      }
+    List<NameIdentifier> tablesWithRetainedData = Lists.newArrayList();
+    for (NameIdentifier tableIdent : tableIdents) {
+      dropOrPurgeTable(tableIdent, false /* purge */, schema, tablesWithRetainedData);
     }
 
+    if (schemaHooks) {
+      ((SupportsSchemaLocations) provider)
+          .unprovisionSchemaLocation(
+              SchemaLocationContext.builder()
+                  .withSchemaIdentifier(ident)
+                  .withSchemaProperties(schema.properties())
+                  .withCatalogProperties(catalogProperties)
+                  .withTablesWithRetainedData(tablesWithRetainedData)
+                  .build());
+    }
     return schemaOps.dropSchema(ident, cascade);
   }
 
@@ -355,7 +422,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    */
   private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge) {
     return dropOrPurgeTable(
-        ident, purge, loadSchema(NameIdentifier.of(ident.namespace().levels())));
+        ident, purge, loadSchema(NameIdentifier.of(ident.namespace().levels())), null);
   }
 
   /**
@@ -370,9 +437,15 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * @param ident the identifier of the table to drop
    * @param purge whether to purge the table instead of dropping it
    * @param schema the table's parent schema
+   * @param tablesWithRetainedData if not null, receives the identifier of the table when it is
+   *     dropped without its data being deleted
    * @return true if the table was dropped, false if it did not exist
    */
-  private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge, Schema schema) {
+  private boolean dropOrPurgeTable(
+      NameIdentifier ident,
+      boolean purge,
+      Schema schema,
+      @Nullable List<NameIdentifier> tablesWithRetainedData) {
     Map<String, String> tableProperties;
     try {
       tableProperties = store.get(ident, TABLE, TableEntity.class).properties();
@@ -464,6 +537,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
           ident,
           context.tableProperties().get(Table.PROPERTY_LOCATION),
           tableLocationProvider.name());
+      if (tablesWithRetainedData != null) {
+        tablesWithRetainedData.add(ident);
+      }
     }
 
     return dropped;
