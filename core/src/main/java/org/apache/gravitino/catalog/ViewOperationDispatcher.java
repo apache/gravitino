@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -56,6 +57,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -137,21 +139,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    LOG.info("Loading view: {}", ident);
+    return loadAndImportView(ident, AuditInfo.EMPTY);
+  }
 
-    EntityCombinedView entityCombinedView =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-
-    if (!entityCombinedView.imported()) {
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      entityCombinedView =
-          TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
-    }
-
-    return entityCombinedView;
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportView(ident, auditInfo);
   }
 
   /**
@@ -182,6 +177,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     Preconditions.checkArgument(
         representations != null && representations.length >= 1,
         "representations must not be null or empty");
+    if (columns != null) {
+      WritableDataTypeValidator.validateColumns(columns, "columns");
+    }
 
     // Load the schema to make sure the schema exists.
     SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
@@ -219,6 +217,12 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
+    for (int i = 0; i < changes.length; i++) {
+      if (changes[i] instanceof ViewChange.ReplaceView) {
+        WritableDataTypeValidator.validateColumns(
+            ((ViewChange.ReplaceView) changes[i]).getColumns(), "updates[" + i + "].columns");
+      }
+    }
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
     boolean isRenameView =
         Arrays.stream(changes).anyMatch(change -> change instanceof ViewChange.RenameView);
@@ -342,6 +346,8 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
               store.delete(ident, VIEW);
             } catch (NoSuchEntityException e) {
               LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (Exception e) {
               throw new RuntimeException(e);
             }
@@ -525,7 +531,51 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         .withImported(viewEntity != null);
   }
 
-  private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+  private View loadAndImportView(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
+    LOG.info("Loading view: {}", ident);
+
+    EntityCombinedView entityCombinedView =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+
+    if (!entityCombinedView.imported()) {
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      entityCombinedView =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+    }
+
+    ViewEntity entity =
+        fillMissingCreationAudit(
+            entityCombinedView.viewEntity(),
+            ViewEntity.class,
+            entityCombinedView.viewFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                ViewEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(current.columns())
+                    .withRepresentations(current.representations())
+                    .withDefaultCatalog(current.defaultCatalog())
+                    .withDefaultSchema(current.defaultSchema())
+                    .withProperties(current.properties())
+                    .withAuditInfo(audit)
+                    .build());
+    return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), entity)
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
+        .withImported(
+            entityCombinedView.imported()
+                && (entityCombinedView.viewEntity() == null || entity != null));
+  }
+
+  private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -558,6 +608,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withLastModifier(catalogView.auditInfo().lastModifier())
             .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
             .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     ViewEntity viewEntity =
         ViewEntity.builder()
             .withId(uid)
@@ -581,17 +634,16 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
       throw new UnsupportedOperationException(
           "View managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
               + "To resolve: Remove all catalogs managing this view, then recreate one catalog to ensure single-catalog management.");
+    } catch (OptimisticLockException e) {
+      // A conflict with a concurrent writer, such as a lock wait timeout; the load can be retried.
+      throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", ident, e);
       throw new RuntimeException("Failed to import the view entity to the store", e);
     }
 
     return EntityCombinedView.of(catalogView, viewEntity)
-        .withHiddenProperties(
-            getMaskAndOmitKeys(
-                getCatalogIdentifier(ident),
-                HasPropertyMetadata::tablePropertiesMetadata,
-                catalogView.properties()))
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
         .withImported(true);
   }
 

@@ -39,7 +39,6 @@ import javax.servlet.DispatcherType;
 import javax.servlet.Filter;
 import javax.servlet.Servlet;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
 import org.eclipse.jetty.server.ConnectionFactory;
@@ -51,6 +50,7 @@ import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.eclipse.jetty.server.handler.HandlerCollection;
+import org.eclipse.jetty.server.handler.StatisticsHandler;
 import org.eclipse.jetty.servlet.DefaultServlet;
 import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletContextHandler;
@@ -73,11 +73,11 @@ public class JettyServer {
   private static final String HTTP_PROTOCOL = "http/1.1";
 
   /**
-   * The pathSpecs {@link #initialize} registers directly on the shared servlet context when a
-   * {@link MetricsSystem} is available, outside of whatever pathspec the caller itself filters.
-   * Callers that need request-context tracking or audit coverage on these paths (see GH-12760) must
-   * apply their own filters to them explicitly, using this constant rather than re-declaring the
-   * literal path strings, so the two can never drift apart.
+   * The pathSpecs {@link #addMetricsServlets} registers directly on the shared servlet context,
+   * outside of whatever pathspec the caller itself filters. Callers that need request-context
+   * tracking or audit coverage on these paths (see GH-12760) must apply their own filters to them
+   * explicitly, using this constant rather than re-declaring the literal path strings, so the two
+   * can never drift apart.
    */
   public static final ImmutableList<String> METRICS_PATH_SPECS =
       ImmutableList.of("/metrics", "/prometheus/metrics");
@@ -182,21 +182,13 @@ public class JettyServer {
     // Install before authentication, custom filters, and servlet mappings on every service.
     addFilter(new OutOfMemoryErrorFilter(), "/*");
 
-    MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
-    // Metrics System could be null in UT.
-    if (metricsSystem != null) {
-      MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
-      servletContextHandler.setAttribute(
-          "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
-      servletContextHandler.addServlet(MetricsServlet.class, METRICS_PATH_SPECS.get(0));
-
-      servletContextHandler.addServlet(
-          new ServletHolder(metricsSystem.getPrometheusServlet()), METRICS_PATH_SPECS.get(1));
-    }
-
     HandlerCollection handlers = new HandlerCollection();
     handlers.addHandler(servletContextHandler);
-    server.setHandler(handlers);
+    // Without a StatisticsHandler, stopping the server closes the connections of in-flight
+    // requests at once. With it, stop waits up to the stop timeout for them to finish.
+    StatisticsHandler statisticsHandler = new StatisticsHandler();
+    statisticsHandler.setHandler(handlers);
+    server.setHandler(statisticsHandler);
   }
 
   public synchronized void start() throws RuntimeException {
@@ -269,6 +261,24 @@ public class JettyServer {
   public void addFilter(Filter filter, String pathSpec) {
     servletContextHandler.addFilter(
         new FilterHolder(filter), pathSpec, EnumSet.allOf(DispatcherType.class));
+  }
+
+  /**
+   * Adds Dropwizard and Prometheus metrics endpoints to this server.
+   *
+   * <p>Metrics endpoints are opt-in because some {@code JettyServer} instances listen on ports
+   * exposed directly to external query engines. Call this only for a listener intended for metrics
+   * scraping.
+   *
+   * @param metricsSystem the metrics system exported by the endpoints
+   */
+  public void addMetricsServlets(MetricsSystem metricsSystem) {
+    MetricRegistry metricRegistry = metricsSystem.getMetricRegistry();
+    servletContextHandler.setAttribute(
+        "com.codahale.metrics.servlets.MetricsServlet.registry", metricRegistry);
+    servletContextHandler.addServlet(MetricsServlet.class, METRICS_PATH_SPECS.get(0));
+    servletContextHandler.addServlet(
+        new ServletHolder(metricsSystem.getPrometheusServlet()), METRICS_PATH_SPECS.get(1));
   }
 
   public boolean isWebUiEnabled() {

@@ -23,9 +23,15 @@ import com.google.common.annotations.VisibleForTesting;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
+import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
+import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.gravitino.Catalog;
@@ -42,15 +48,19 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
  */
 public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
+  private static final String NO_DEFAULT_DATABASE = "__gravitino_no_default_database__";
+
   private final CatalogFactory.Context context;
+  @Nullable private final String configuredDefaultDatabase;
   private AbstractCatalog jdbcCatalog;
   // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
-  // visible to toFlinkTable() and to the inner JdbcCatalogFactory context.
+  // visible to toFlinkTable(). The inner JdbcCatalogFactory context gets a filtered copy taken
+  // after the injection.
   private final Map<String, String> mutableOptions;
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
-      String defaultDatabase,
+      @Nullable String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     this(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter, null);
@@ -58,7 +68,7 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
   protected GravitinoJdbcCatalog(
       CatalogFactory.Context context,
-      String defaultDatabase,
+      @Nullable String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       AbstractCatalog jdbcCatalog) {
@@ -73,7 +83,7 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
   private GravitinoJdbcCatalog(
       CatalogFactory.Context context,
-      String defaultDatabase,
+      @Nullable String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter,
       AbstractCatalog jdbcCatalog,
@@ -81,10 +91,11 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
     super(
         context.getName(),
         mutableOptions,
-        defaultDatabase,
+        defaultDatabase == null ? NO_DEFAULT_DATABASE : defaultDatabase,
         schemaAndTablePropertiesConverter,
         partitionConverter);
     this.context = context;
+    this.configuredDefaultDatabase = defaultDatabase;
     this.jdbcCatalog = jdbcCatalog;
     this.mutableOptions = mutableOptions;
   }
@@ -101,6 +112,25 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
       // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
       // In this case credentials are already present in the user-provided options.
     }
+    if (configuredDefaultDatabase == null) {
+      return;
+    }
+    // The inner Flink JDBC catalog connects to its 'default-database' and rejects unknown options,
+    // so pass it the connection database instead when the converter tracks one separately.
+    Map<String, String> innerCatalogOptions = new HashMap<>(mutableOptions);
+    String connectionDatabase =
+        innerCatalogOptions.remove(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE);
+    if (connectionDatabase != null) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE, connectionDatabase);
+    }
+    // Flink JDBC 4.x takes "jdbc:dialect://host:port/" as a URL that already names a database and
+    // connects to it as is, so drop the trailing slash to have 'default-database' appended.
+    String baseUrl = innerCatalogOptions.get(JdbcPropertiesConstants.FLINK_JDBC_URL);
+    if (baseUrl != null && baseUrl.indexOf('?') < 0) {
+      innerCatalogOptions.put(
+          JdbcPropertiesConstants.FLINK_JDBC_URL, StringUtils.stripEnd(baseUrl.trim(), "/"));
+    }
     CatalogFactory.Context contextWithCredentials =
         new CatalogFactory.Context() {
           @Override
@@ -110,7 +140,7 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
           @Override
           public Map<String, String> getOptions() {
-            return mutableOptions;
+            return innerCatalogOptions;
           }
 
           @Override
@@ -127,6 +157,20 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
     super.open();
   }
 
+  /** Closes the native JDBC catalog when one was created for a configured default database. */
+  @Override
+  public void close() throws CatalogException {
+    if (jdbcCatalog != null) {
+      super.close();
+    }
+  }
+
+  @Override
+  @Nullable
+  public String getDefaultDatabase() {
+    return configuredDefaultDatabase;
+  }
+
   /**
    * Creates the inner Flink JDBC catalog from the given context. Subclasses for different Flink
    * versions implement this because {@code JdbcCatalogFactory}'s package moved (and, starting with
@@ -139,7 +183,31 @@ public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   protected AbstractCatalog realCatalog() {
+    if (jdbcCatalog == null) {
+      throw new CatalogException(
+          "No default database is configured for catalog '"
+              + getName()
+              + "'. Select a database before using operations that require a default database.");
+    }
     return jdbcCatalog;
+  }
+
+  @Override
+  public CatalogTableStatistics getTableStatistics(ObjectPath tablePath)
+      throws TableNotExistException, CatalogException {
+    if (configuredDefaultDatabase == null) {
+      return CatalogTableStatistics.UNKNOWN;
+    }
+    return super.getTableStatistics(tablePath);
+  }
+
+  @Override
+  public CatalogColumnStatistics getTableColumnStatistics(ObjectPath tablePath)
+      throws TableNotExistException, CatalogException {
+    if (configuredDefaultDatabase == null) {
+      return CatalogColumnStatistics.UNKNOWN;
+    }
+    return super.getTableColumnStatistics(tablePath);
   }
 
   @Override

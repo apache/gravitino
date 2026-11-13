@@ -75,6 +75,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
@@ -1063,6 +1064,11 @@ public abstract class BaseGVFSOperations implements Closeable {
           "Catalog {} does not support credential recovery via getCredentials: {}",
           catalog.name(),
           e.toString());
+    } catch (ForbiddenException e) {
+      // Catalog-wide credentials are optional; fileset path authorization is separate.
+      LOG.debug(
+          "Catalog credentials for {} are not permitted; using fileset credential vending",
+          catalog.name());
     } catch (RESTException e) {
       LOG.warn(
           "Failed to load static credentials for catalog {} via getCredentials; continuing without"

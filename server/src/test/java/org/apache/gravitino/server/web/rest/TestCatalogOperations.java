@@ -572,6 +572,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  void testRenameCatalogToExistingName() {
+    CatalogAlreadyExistsException exception =
+        new CatalogAlreadyExistsException("Catalog existing already exists");
+    doThrow(exception).when(manager).alterCatalog(any(), any());
+    CatalogUpdatesRequest request =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(new CatalogUpdateRequest.RenameCatalogRequest("existing")));
+    try (Response response =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ALREADY_EXISTS_CODE, error.getCode());
+      Assertions.assertEquals(CatalogAlreadyExistsException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(exception.getMessage()));
+    }
+  }
+
+  @Test
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 
@@ -712,6 +733,27 @@ public class TestCatalogOperations extends BaseOperationsTest {
               + "]",
           error.getMessage());
     }
+  }
+
+  @Test
+  void testSetCatalogRequiresExplicitState() {
+    for (String json : new String[] {"{}", "{\"inUse\":null}"}) {
+      try (Response response =
+          target("/metalakes/metalake1/catalogs/catalog1")
+              .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .method("PATCH", Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
+        Assertions.assertEquals(400, response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(
+            "Failed to operate catalog(s) [catalog1] operation [SET] under metalake [metalake1], "
+                + "reason [inUse field is required and must not be null]",
+            error.getMessage());
+      }
+    }
+    Mockito.verify(manager, Mockito.never()).enableCatalog(any());
+    Mockito.verify(manager, Mockito.never()).disableCatalog(any());
   }
 
   @Test

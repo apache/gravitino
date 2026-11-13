@@ -28,9 +28,10 @@ import java.util.Map;
  * <ul>
  *   <li>Every secret-URN property value, resolved via the secret manager (including keys that may
  *       also be delivered via {@link org.apache.gravitino.credential.SupportsCredentials}).
- *   <li>Stored plaintext for every property declared {@code hidden} in entity metadata (no
- *       sensitive-name keyword gate), so shortening the server sensitive-key keyword list cannot
- *       leave a masked property without a recovery path.
+ *   <li>Stored plaintext for every property declared {@code hidden} but not {@code reserved} in
+ *       entity metadata (no sensitive-name keyword gate), so shortening the server sensitive-key
+ *       keyword list cannot leave a masked property without a recovery path. Reserved+hidden
+ *       internal keys such as {@code gravitino.identifier} are never returned.
  *   <li>Stored plaintext for undeclared keys whose names look sensitive (contain {@code secret},
  *       {@code password}, {@code token}, {@code credential}, {@code access}, or {@code account},
  *       case-insensitive), so mistyped / undeclared credential properties remain usable after API

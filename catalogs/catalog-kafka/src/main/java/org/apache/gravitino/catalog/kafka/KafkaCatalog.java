@@ -43,6 +43,11 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
   }
 
   @Override
+  public boolean supportsPathBasedCredentials() {
+    return false;
+  }
+
+  @Override
   protected CatalogOperations newOps(Map<String, String> config) {
     KafkaCatalogOperations ops = new KafkaCatalogOperations();
     return ops;

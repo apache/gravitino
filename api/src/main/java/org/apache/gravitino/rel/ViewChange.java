@@ -75,6 +75,13 @@ public interface ViewChange {
    * and defaults are discarded. Callers that only intend to change a subset of the body should read
    * the current values first and pass them back unchanged.
    *
+   * <p>All supplied column types and literal types in defaults, including nested types and types
+   * copied unchanged from the current view, must be recognized Gravitino types or explicit {@code
+   * ExternalType} values with nonblank catalog strings. {@code UnparsedType} is not accepted, even
+   * when only the comment or another part of the body changes. Operations that do not resubmit
+   * types, such as renaming a view or updating its properties, remain supported for existing views
+   * with unresolved types.
+   *
    * @param columns The new output columns of the view.
    * @param representations The new representations of the view. At least one representation is
    *     expected.

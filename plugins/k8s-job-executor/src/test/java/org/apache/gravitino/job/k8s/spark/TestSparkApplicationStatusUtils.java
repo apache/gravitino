@@ -91,6 +91,30 @@ public class TestSparkApplicationStatusUtils {
   }
 
   @Test
+  public void testUnreadableStatus() {
+    // A status without any state this version can read, for example of a newer operator, keeps
+    // the job unfinished after the no-status timeout.
+    GenericKubernetesResource app = app();
+    app.setAdditionalProperty("status", ImmutableMap.of("phase", "Running"));
+    Assertions.assertTrue(SparkApplicationStatusUtils.hasStatus(app));
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasState(app));
+    Assertions.assertEquals(
+        JobHandle.Status.QUEUED,
+        SparkApplicationStatusUtils.executionInfoOf(
+                app, null, CREATED_AT.plusMillis(NO_STATUS_TIMEOUT_MS + 1), NO_STATUS_TIMEOUT_MS)
+            .status());
+
+    // An empty status is no status.
+    app.setAdditionalProperty("status", ImmutableMap.of());
+    Assertions.assertFalse(SparkApplicationStatusUtils.hasStatus(app));
+    Assertions.assertEquals(
+        JobHandle.Status.FAILED,
+        SparkApplicationStatusUtils.executionInfoOf(
+                app, null, CREATED_AT.plusMillis(NO_STATUS_TIMEOUT_MS + 1), NO_STATUS_TIMEOUT_MS)
+            .status());
+  }
+
+  @Test
   public void testTimes() {
     JobExecutionInfo queued = executionInfoOf(app("Submitted", "DriverRequested"));
     Assertions.assertNull(queued.startedAt());
@@ -296,12 +320,40 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(timeOf(1), cancelled.startedAt());
     Assertions.assertEquals(deletedAt, cancelled.finishedAt());
 
-    // The application stopped before the deletion.
+    // The application stopped by itself after it was marked, but before the deletion.
     GenericKubernetesResource stopped = app("Submitted", "DriverReady", "Failed");
     cancel(stopped);
+    stopped.getMetadata().setDeletionTimestamp(timeOf(3).toString());
     JobExecutionInfo info = executionInfoOf(stopped);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, info.status());
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
     Assertions.assertEquals(timeOf(2), info.finishedAt());
+
+    // An outcome recorded in the second of the deletion counts as after it.
+    GenericKubernetesResource sameSecond = app("Submitted", "DriverReady", "Failed");
+    cancel(sameSecond);
+    sameSecond.getMetadata().setDeletionTimestamp(CREATED_AT.plusSeconds(2).toString());
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, executionInfoOf(sameSecond).status());
+  }
+
+  @Test
+  public void testCancelMarkWithoutDeletion() {
+    // A cancellation that failed after marking the job, for example because its response was
+    // lost, leaves the mark. The job keeps running and keeps the outcome it reaches.
+    GenericKubernetesResource succeeded = app("Submitted", "DriverReady", "Succeeded");
+    cancel(succeeded);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(succeeded).status());
+
+    GenericKubernetesResource failed = app("Submitted", "DriverReady", "Failed");
+    cancel(failed);
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(failed).status());
+
+    GenericKubernetesResource running = app("Submitted", "DriverReady", "RunningHealthy");
+    cancel(running);
+    Assertions.assertEquals(JobHandle.Status.STARTED, executionInfoOf(running).status());
+
+    // Deleted by its TTL after it succeeded, it still succeeded.
+    succeeded.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(succeeded).status());
   }
 
   @Test
@@ -420,16 +472,39 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(JobHandle.Status.FAILED, failed.status());
     Assertions.assertEquals(timeOf(2), failed.finishedAt());
 
+    // Stopped before it was cancelled, it isn't cancelled.
     cancel(app);
-    JobExecutionInfo cancelled = executionInfoOf(app);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelled.status());
-    Assertions.assertEquals(timeOf(2), cancelled.finishedAt());
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(app).status());
+    Assertions.assertEquals(timeOf(2), executionInfoOf(app).finishedAt());
 
     GenericKubernetesResource stopped =
         app("Submitted", "DriverReady", "Succeeded", "TerminatedWithoutReleaseResources");
     cancel(stopped);
-    Assertions.assertEquals(JobHandle.Status.CANCELLED, executionInfoOf(stopped).status());
+    stopped.getMetadata().setDeletionTimestamp(NOW.toString());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, executionInfoOf(stopped).status());
     Assertions.assertEquals(timeOf(2), executionInfoOf(stopped).finishedAt());
+  }
+
+  @Test
+  public void testStoppedStateWithoutTime() {
+    GenericKubernetesResource app = app("Submitted", "DriverReady", "ResourceReleased");
+    history(app)
+        .put(
+            "2",
+            ImmutableMap.of(
+                "currentStateSummary", "ResourceReleased", "lastTransitionTime", "soon"));
+    status(app).put("currentState", history(app).get("2"));
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+
+    // Deleted after it stopped at an unknown time, it finished when it was deleted at the latest.
+    JobExecutionInfo info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, info.status());
+    Assertions.assertEquals(NOW, info.finishedAt());
+
+    // Nor is it cancelled.
+    cancel(app);
+    Assertions.assertEquals(JobHandle.Status.FAILED, executionInfoOf(app).status());
   }
 
   @Test
@@ -577,6 +652,33 @@ public class TestSparkApplicationStatusUtils {
   }
 
   @Test
+  public void testIsDriverRunning() {
+    GenericKubernetesResource app = app("Submitted", "DriverRequested", "DriverStartTimedOut");
+    Pod running = driverPod("spark-kubernetes-driver", "2026-09-30T00:00:10Z", null);
+    Pod terminated =
+        driverPod("spark-kubernetes-driver", "2026-09-30T00:00:10Z", "2026-09-30T00:00:20Z");
+
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, running));
+    Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, terminated));
+    // Nothing tells the driver has terminated: a pending pod, or one without a status.
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, podInPhase("Pending")));
+    Assertions.assertTrue(SparkApplicationStatusUtils.isDriverRunning(app, new Pod()));
+
+    // A terminated pod runs nothing, even if its container status still says running, for example
+    // after its node was lost.
+    for (String phase : new String[] {"Succeeded", "Failed"}) {
+      running.getStatus().setPhase(phase);
+      Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, running), phase);
+      Assertions.assertFalse(
+          SparkApplicationStatusUtils.isDriverRunning(app, podInPhase(phase)), phase);
+    }
+
+    // A sidecar keeps the pod running after the driver exited.
+    terminated.getStatus().setPhase("Running");
+    Assertions.assertFalse(SparkApplicationStatusUtils.isDriverRunning(app, terminated));
+  }
+
+  @Test
   public void testHasState() {
     Assertions.assertFalse(SparkApplicationStatusUtils.hasState(app()));
     Assertions.assertTrue(SparkApplicationStatusUtils.hasState(app("Submitted")));
@@ -615,6 +717,14 @@ public class TestSparkApplicationStatusUtils {
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
     Assertions.assertEquals(timeOf(1), info.startedAt());
     Assertions.assertNull(info.finishedAt());
+
+    // Marked and deleted, it had still stopped before, as its outcome time is unknown. It finished
+    // when it was deleted at the latest.
+    cancel(app);
+    app.getMetadata().setDeletionTimestamp(NOW.toString());
+    info = executionInfoOf(app);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, info.status());
+    Assertions.assertEquals(NOW, info.finishedAt());
 
     // Without a creation time, an application without status never times out.
     GenericKubernetesResource noCreationTime = app();
@@ -758,6 +868,10 @@ public class TestSparkApplicationStatusUtils {
         .endContainerStatus()
         .endStatus()
         .build();
+  }
+
+  private static Pod podInPhase(String phase) {
+    return new PodBuilder().withNewStatus().withPhase(phase).endStatus().build();
   }
 
   private static void cancel(GenericKubernetesResource app) {

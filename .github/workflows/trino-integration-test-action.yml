@@ -3,6 +3,26 @@ name: Trino Integration Test Action
 on:
   workflow_call:
     inputs:
+      base-ref:
+        type: string
+        required: false
+        default: ''
+      base-sha:
+        type: string
+        required: false
+        default: ''
+      head-repository:
+        type: string
+        required: false
+        default: ''
+      head-sha:
+        type: string
+        required: false
+        default: ''
+      sync:
+        type: string
+        required: false
+        default: ''
       architecture:
         required: true
         description: 'Architecture of the platform'
@@ -21,6 +41,15 @@ jobs:
       PLATFORM: ${{ inputs.architecture }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/checkout-and-sync
+        with:
+          base-ref: ${{ inputs.base-ref }}
+          base-sha: ${{ inputs.base-sha }}
+          head-repository: ${{ inputs.head-repository }}
+          head-sha: ${{ inputs.head-sha }}
+          sync: ${{ inputs.sync }}
 
       - uses: ./.github/actions/setup-java-toolchains
         with:
@@ -46,6 +75,8 @@ jobs:
             -x :flink-connector:flink-runtime-1.20:build \
             -x :flink-connector:flink-2.1:build \
             -x :flink-connector:flink-runtime-2.1:build \
+            -x :flink-connector:flink-2.2:build \
+            -x :flink-connector:flink-runtime-2.2:build \
             -x :spark-connector:spark-3.5:build -x :spark-connector:spark-4.0:build \
             -x :spark-connector:spark-runtime-3.5:build -x :spark-connector:spark-runtime-4.0:build \
             -x :mcp-server:build -x :lineage:build \

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.utils;
 
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -67,13 +68,16 @@ import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.PolicyExecutionSpec;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortDirection;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
@@ -106,11 +110,40 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPOConverters {
   private static final LocalDateTime FIX_DATE_TIME = LocalDateTime.of(2024, 2, 6, 0, 0, 0);
 
   private static final Instant FIX_INSTANT = FIX_DATE_TIME.toInstant(ZoneOffset.UTC);
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRoleAssignmentAuditUsesGrant(boolean group) throws JsonProcessingException {
+    AuditInfo created =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    AuditInfo initial = roleAssignmentAudit(group, created);
+    assertEquals(created, initial);
+
+    for (int grant = 1; grant <= 2; grant++) {
+      Instant grantedAt = FIX_INSTANT.plusSeconds(grant);
+      AuditInfo principalAudit =
+          AuditInfo.builder()
+              .withCreator(created.creator())
+              .withCreateTime(created.createTime())
+              .withLastModifier("granter" + grant)
+              .withLastModifiedTime(grantedAt)
+              .build();
+      AuditInfo assignment = roleAssignmentAudit(group, principalAudit);
+      assertEquals("granter" + grant, assignment.creator());
+      assertEquals(grantedAt, assignment.createTime());
+      assertNotEquals(principalAudit.creator(), assignment.creator());
+      assertNotEquals(principalAudit.createTime(), assignment.createTime());
+      assertEquals("creator", principalAudit.creator());
+      assertEquals(FIX_INSTANT, principalAudit.createTime());
+    }
+  }
 
   @Test
   public void testFromMetalakePO() throws JsonProcessingException {
@@ -246,6 +279,38 @@ public class TestPOConverters {
 
     ColumnEntity convertedColumn1 = POConverters.fromColumnPO(columnPO1);
     assertEquals(expectedColumn1.comment(), convertedColumn1.comment());
+  }
+
+  @Test
+  public void testFromColumnPOWithLegacyNullDefault() throws JsonProcessingException {
+    Type legacyType = Types.UnparsedType.of("future_type");
+    ColumnPO columnPO =
+        createColumnPO(
+            1L,
+            "legacy",
+            0,
+            1L,
+            1L,
+            1L,
+            1L,
+            legacyType,
+            null,
+            true,
+            false,
+            Literals.of(null, legacyType),
+            ColumnPO.ColumnOpType.CREATE);
+
+    Literal<?> storedDefault =
+        (Literal<?>)
+            JsonUtils.anyFieldMapper().readValue(columnPO.getDefaultValue(), Expression.class);
+    assertEquals(legacyType, storedDefault.dataType());
+    assertNull(storedDefault.value());
+
+    // Loading existing metadata must preserve the converter's null normalization without applying
+    // the validation that rejects this declared type on new writes.
+    ColumnEntity convertedColumn = POConverters.fromColumnPO(columnPO);
+    assertEquals(legacyType, convertedColumn.dataType());
+    assertEquals(Literals.NULL, convertedColumn.defaultValue());
   }
 
   @Test
@@ -1033,6 +1098,171 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testFromPolicyPOIcebergCompactionWithExecutionPeers() throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergDataCompaction(
+            IcebergDataCompactionContent.DEFAULT_MIN_DATA_FILE_MSE,
+            IcebergDataCompactionContent.DEFAULT_MIN_DELETE_FILE_NUMBER,
+            IcebergDataCompactionContent.DEFAULT_DATA_FILE_MSE_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_DELETE_FILE_NUMBER_WEIGHT,
+            IcebergDataCompactionContent.DEFAULT_MAX_PARTITION_NUM,
+            IcebergDataCompactionContent.DEFAULT_REWRITE_STRATEGY,
+            IcebergDataCompactionContent.DEFAULT_SORT_ORDER,
+            ImmutableMap.of("target-file-size-bytes", "134217728"),
+            "0 0 2 * * ?",
+            true,
+            3_600_000L,
+            ImmutableMap.of("spark.executor.memory", "4g"),
+            ImmutableMap.of("metalake", "ml"));
+
+    // Persistence must keep peer keys flat (not nested under executionSpec).
+    String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertTrue(storedJson.contains("\"commitTrigger\""));
+    assertTrue(storedJson.contains("\"minIntervalMs\""));
+    assertTrue(storedJson.contains("\"jobOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
+    assertFalse(storedJson.contains("\"executionSpec\""));
+
+    PolicyVersionPO policyVersionPO =
+        createPolicyVersionPO(1L, 1L, 1L, "compaction with peers", true, content);
+    PolicyPO policyPO =
+        createPolicyPO(1L, "iceberg-compaction", "system_iceberg_compaction", 1L, policyVersionPO);
+
+    PolicyEntity convertedPolicy =
+        POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy("test_metalake"));
+
+    assertEquals(Policy.BuiltInType.ICEBERG_COMPACTION, convertedPolicy.policyType());
+    assertEquals(content, convertedPolicy.content());
+
+    IcebergDataCompactionContent loaded = (IcebergDataCompactionContent) convertedPolicy.content();
+    PolicyExecutionSpec peers = loaded.executionSpec();
+    assertEquals("0 0 2 * * ?", peers.timeTrigger());
+    assertEquals(Boolean.TRUE, peers.commitTrigger());
+    assertEquals(3_600_000L, peers.minIntervalMs());
+    assertEquals("4g", peers.jobOptions().get("spark.executor.memory"));
+    assertEquals("ml", peers.updaterOptions().get("metalake"));
+    assertEquals("134217728", loaded.rewriteOptions().get("target-file-size-bytes"));
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergOrphanFileRemovalWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergOrphanFileRemoval(
+            7L,
+            "s3://bucket/table/data",
+            true,
+            "0 0 3 * * ?",
+            null,
+            1_800_000L,
+            ImmutableMap.of("spark.executor.cores", "2"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                2L,
+                "orphan-cleanup",
+                "system_iceberg_orphan_file_removal",
+                1L,
+                createPolicyVersionPO(2L, 1L, 1L, "orphan peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_ORPHAN_FILE_REMOVAL, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergRewriteManifestsWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergRewriteManifests(
+            null,
+            null,
+            null,
+            null,
+            null,
+            "0 30 1 * * ?",
+            true,
+            900_000L,
+            ImmutableMap.of("spark.executor.memory", "2g"),
+            ImmutableMap.of("queue", "tms"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                3L,
+                "rewrite-manifests",
+                "system_iceberg_rewrite_manifests",
+                1L,
+                createPolicyVersionPO(3L, 1L, 1L, "rewrite peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_REWRITE_MANIFESTS, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergSnapshotExpiration() throws JsonProcessingException {
+    PolicyContent content = PolicyContents.icebergSnapshotExpiration(14L, 5L, true);
+    String stored = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(stored.contains("\"olderThanDays\":14"));
+    assertTrue(stored.contains("\"retainLast\":5"));
+    assertTrue(stored.contains("\"streamResults\":true"));
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                5L,
+                "snapshot-expiration",
+                "system_iceberg_snapshot_expiration",
+                1L,
+                createPolicyVersionPO(5L, 1L, 1L, "expire", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  @Test
+  public void testFromPolicyPOIcebergSnapshotExpirationWithExecutionPeers()
+      throws JsonProcessingException {
+    PolicyContent content =
+        PolicyContents.icebergSnapshotExpiration(
+            14L,
+            5L,
+            true,
+            "0 0 4 * * ?",
+            false,
+            2_700_000L,
+            ImmutableMap.of("spark.driver.memory", "1g"),
+            ImmutableMap.of("metalake", "ml"));
+    assertFlatExecutionPeersPersisted(content);
+
+    PolicyEntity converted =
+        POConverters.fromPolicyPO(
+            createPolicyPO(
+                4L,
+                "snapshot-expiration",
+                "system_iceberg_snapshot_expiration",
+                1L,
+                createPolicyVersionPO(4L, 1L, 1L, "snapshot peers", true, content)),
+            NamespaceUtil.ofPolicy("test_metalake"));
+    assertEquals(Policy.BuiltInType.ICEBERG_SNAPSHOT_EXPIRATION, converted.policyType());
+    assertEquals(content, converted.content());
+  }
+
+  private static void assertFlatExecutionPeersPersisted(PolicyContent content)
+      throws JsonProcessingException {
+    String storedJson = JsonUtils.anyFieldMapper().writeValueAsString(content);
+    assertTrue(storedJson.contains("\"timeTrigger\""));
+    assertTrue(storedJson.contains("\"minIntervalMs\""));
+    assertTrue(storedJson.contains("\"jobOptions\""));
+    assertTrue(storedJson.contains("\"updaterOptions\""));
+    assertFalse(storedJson.contains("\"executionSpec\""));
+  }
+
+  @Test
   public void testFromTagPO() throws JsonProcessingException {
     TagPO tagPO = createTagPO(1L, "test", 1L, "this is test");
     Namespace tagNS =
@@ -1538,6 +1768,38 @@ public class TestPOConverters {
     Assertions.assertEquals("test", entity.name());
     Assertions.assertEquals("test", entity.value().value());
     Assertions.assertEquals(Namespace.fromString(parentTableIdent.toString()), entity.namespace());
+  }
+
+  private AuditInfo roleAssignmentAudit(boolean group, AuditInfo audit)
+      throws JsonProcessingException {
+    Namespace namespace = Namespace.of("metalake", "system", group ? "groups" : "users");
+    String serialized;
+    if (group) {
+      GroupEntity principal =
+          GroupEntity.builder()
+              .withId(1L)
+              .withName("group")
+              .withNamespace(namespace)
+              .withAuditInfo(audit)
+              .build();
+      serialized =
+          POConverters.initializeGroupRoleRelsPOWithVersion(principal, List.of(2L))
+              .get(0)
+              .getAuditInfo();
+    } else {
+      UserEntity principal =
+          UserEntity.builder()
+              .withId(1L)
+              .withName("user")
+              .withNamespace(namespace)
+              .withAuditInfo(audit)
+              .build();
+      serialized =
+          POConverters.initializeUserRoleRelsPOWithVersion(principal, List.of(2L))
+              .get(0)
+              .getAuditInfo();
+    }
+    return JsonUtils.anyFieldMapper().readValue(serialized, AuditInfo.class);
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

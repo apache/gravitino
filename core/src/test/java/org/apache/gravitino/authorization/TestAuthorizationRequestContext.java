@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -546,5 +547,75 @@ public class TestAuthorizationRequestContext {
     assertThrows(UnsupportedOperationException.class, () -> context.getBoundRoleIds().add(4L));
     assertThrows(NullPointerException.class, () -> context.setBoundRoleIds(null));
     assertEquals(7L, context.getRolePolicyGeneration());
+  }
+
+  /** Successful auth-subject prefetch is reused without executing another loader. */
+  @Test
+  public void testAuthSubjectPrefetchCachesUser() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Optional<UserUpdatedAt> user = Optional.of(new UserUpdatedAt(1L, 2L));
+    AtomicInteger queries = new AtomicInteger();
+    assertSame(
+        user,
+        context.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              queries.incrementAndGet();
+              return user;
+            }));
+    assertSame(
+        user,
+        context.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              throw new AssertionError("Successful prefetch must not be repeated");
+            }));
+    assertEquals(1, queries.get());
+  }
+
+  /** A missing user is a completed prefetch result, not a reason to repeat the query. */
+  @Test
+  public void testAuthSubjectPrefetchCachesMissingUser() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    AtomicInteger queries = new AtomicInteger();
+    for (int i = 0; i < 2; i++) {
+      assertEquals(
+          Optional.empty(),
+          context.computeAuthSubjectPrefetchIfAbsent(
+              () -> {
+                queries.incrementAndGet();
+                return Optional.empty();
+              }));
+    }
+    assertEquals(1, queries.get());
+  }
+
+  /** Failed prefetch stays failed in this request, while a fresh request can recover. */
+  @Test
+  public void testAuthSubjectPrefetchFailureIsRequestScoped() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    RuntimeException failure = new RuntimeException("database unavailable");
+    AtomicInteger queries = new AtomicInteger();
+    for (int i = 0; i < 2; i++) {
+      assertSame(
+          failure,
+          assertThrows(
+              RuntimeException.class,
+              () ->
+                  context.computeAuthSubjectPrefetchIfAbsent(
+                      () -> {
+                        queries.incrementAndGet();
+                        throw failure;
+                      })));
+    }
+    assertEquals(1, queries.get());
+    AuthorizationRequestContext nextRequest = new AuthorizationRequestContext();
+    Optional<UserUpdatedAt> recovered = Optional.of(new UserUpdatedAt(1L, 2L));
+    assertSame(
+        recovered,
+        nextRequest.computeAuthSubjectPrefetchIfAbsent(
+            () -> {
+              queries.incrementAndGet();
+              return recovered;
+            }));
+    assertEquals(2, queries.get());
   }
 }

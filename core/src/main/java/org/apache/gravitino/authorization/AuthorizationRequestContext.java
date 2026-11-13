@@ -32,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
@@ -102,6 +103,12 @@ public class AuthorizationRequestContext {
    * {@code batchGetRoleUpdatedAt} round trip.
    */
   private volatile Map<Long, RoleUpdatedAt> prefetchedRoleVersions;
+
+  /** Completed auth-subject prefetch result, including a missing user, for this request only. */
+  @Nullable private volatile Optional<UserUpdatedAt> authSubjectPrefetchResult;
+
+  /** Failed prefetch attempts are shared by all workers of this request. */
+  @Nullable private volatile RuntimeException authSubjectPrefetchFailure;
 
   private volatile String originalAuthorizationExpression;
 
@@ -198,6 +205,46 @@ public class AuthorizationRequestContext {
   }
 
   /**
+   * Runs auth-subject prefetch at most once for this request, sharing its result or failure.
+   *
+   * <p>The loader may populate the request's user, group and role-version caches before returning
+   * the user identity, or {@link Optional#empty()} when the user is absent. Waiting workers reuse
+   * the same outcome. A runtime failure is retained for the request so later checks cannot repeat
+   * the failed query; a fresh request can try again. Fatal {@link Error}s are not cached.
+   *
+   * @param loader the non-null prefetch operation, which must return a non-null optional
+   * @return the prefetched user identity, or empty when the user is absent
+   * @throws RuntimeException if the loader failed, including on subsequent calls in this request
+   */
+  public Optional<UserUpdatedAt> computeAuthSubjectPrefetchIfAbsent(
+      Supplier<Optional<UserUpdatedAt>> loader) {
+    Objects.requireNonNull(loader, "Prefetch loader must not be null");
+    RuntimeException failure = authSubjectPrefetchFailure;
+    if (failure != null) {
+      throw failure;
+    }
+    Optional<UserUpdatedAt> result = authSubjectPrefetchResult;
+    if (result != null) {
+      return result;
+    }
+    synchronized (this) {
+      if (authSubjectPrefetchFailure != null) {
+        throw authSubjectPrefetchFailure;
+      }
+      if (authSubjectPrefetchResult == null) {
+        try {
+          authSubjectPrefetchResult =
+              Objects.requireNonNull(loader.get(), "Prefetch loader must not return null");
+        } catch (RuntimeException e) {
+          authSubjectPrefetchFailure = e;
+          throw e;
+        }
+      }
+      return authSubjectPrefetchResult;
+    }
+  }
+
+  /**
    * Per-request {@link UserUpdatedAt} dedup. Loader may return {@link Optional#empty()} to cache
    * the "user not found" outcome and avoid repeated DB lookups within a single request.
    */
@@ -237,10 +284,13 @@ public class AuthorizationRequestContext {
   }
 
   /**
-   * Normalizes a raw name while remembering capability failures for its catalog in this request.
+   * Normalizes a raw name while remembering normalization failures for its catalog in this request.
    *
    * <p>Catalog lookups are serialized so concurrent objects cannot retry a failed initialization.
-   * Missing catalogs are not memoized; a fresh request can retry any capability failure.
+   * Any failure except not found is remembered for the whole catalog, including one that only
+   * concerns a single object, such as a physical table-name or stored-column read. Later objects in
+   * the same catalog then fail in this request, which denies them. Missing catalogs are not
+   * memoized; a fresh request retries every failure.
    *
    * @param key the raw metadata object's cache key
    * @param catalogIdentifier the containing catalog, including its metalake

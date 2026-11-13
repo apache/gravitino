@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.dispatcher;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
@@ -30,10 +31,13 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
@@ -69,7 +73,13 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   @Override
   public LoadTableResponse createTable(
       IcebergRequestContext context, Namespace namespace, CreateTableRequest createTableRequest) {
-    LoadTableResponse response = dispatcher.createTable(context, namespace, createTableRequest);
+    // Hold the namespace's tree lock in read mode, as dropNamespace holds it in write mode, so a
+    // create and a drop of the same namespace on this server do not both succeed.
+    LoadTableResponse response =
+        TreeLockUtils.doWithTreeLock(
+            NameIdentifier.of(metalake, context.catalogName(), namespace.level(0)),
+            LockType.READ,
+            () -> dispatcher.createTable(context, namespace, createTableRequest));
     // Skip import and ownership for staged creates (credential vending).
     // The table will be imported when the staged table is committed via updateTable.
     if (!createTableRequest.stageCreate()) {
@@ -84,16 +94,27 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context,
       TableIdentifier tableIdentifier,
       UpdateTableRequest updateTableRequest) {
-    LoadTableResponse response =
-        dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     // Import the table and set ownership only when committing a staged table create.
     // A staged create commit is identified by the AssertTableDoesNotExist requirement,
     // which is set by UpdateRequirements.forCreateTable().
     boolean isStagedCreateCommit =
         updateTableRequest.requirements().stream()
             .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance);
+    LoadTableResponse response =
+        isStagedCreateCommit
+            ? TreeLockUtils.doWithTreeLock(
+                NameIdentifier.of(
+                    metalake, context.catalogName(), tableIdentifier.namespace().level(0)),
+                LockType.READ,
+                () -> dispatcher.updateTable(context, tableIdentifier, updateTableRequest))
+            : dispatcher.updateTable(context, tableIdentifier, updateTableRequest);
     if (isStagedCreateCommit) {
       importTableAndSetOwner(context, tableIdentifier.namespace(), tableIdentifier.name());
+    } else if (changesSchema(updateTableRequest)) {
+      // Bring the stored columns up to date now, while the request runs as the committing user, so
+      // the change is recorded as theirs. Left to the next load, it is recorded as whoever loads
+      // the table first, or as anonymous when that is a background listener.
+      importTableEntity(context.catalogName(), tableIdentifier.namespace(), tableIdentifier.name());
     }
     return response;
   }
@@ -222,12 +243,24 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
     return dispatcher.getTableMetadataLocation(context, tableIdentifier);
   }
 
+  @VisibleForTesting
+  static boolean changesSchema(UpdateTableRequest updateTableRequest) {
+    return updateTableRequest.updates().stream()
+        .anyMatch(
+            update ->
+                update instanceof MetadataUpdate.AddSchema
+                    || update instanceof MetadataUpdate.SetCurrentSchema);
+  }
+
   private void importTableAndSetOwner(
       IcebergRequestContext context, Namespace namespace, String tableName) {
-    // Import is intentionally NOT wrapped in try-catch: if it fails the table exists in Iceberg
-    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
-    // entity is registered. Surface the failure so the caller can react.
-    importTableEntity(context.catalogName(), namespace, tableName);
+    // Validate request metadata before the backend operation. An unexpected import failure must
+    // propagate without deleting a table that another client may already have updated or recreated.
+    importTableEntity(
+        context.catalogName(),
+        namespace,
+        tableName,
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),
@@ -238,14 +271,20 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   }
 
   private void importTableEntity(String catalogName, Namespace namespace, String tableName) {
+    importTableEntity(catalogName, namespace, tableName, AuditInfo.EMPTY);
+  }
+
+  private void importTableEntity(
+      String catalogName, Namespace namespace, String tableName, AuditInfo auditInfo) {
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
     if (tableDispatcher != null) {
-      tableDispatcher.loadTable(
+      tableDispatcher.importTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
               catalogName,
               TableIdentifier.of(namespace, tableName),
-              HierarchicalSchemaUtil.schemaSeparator()));
+              HierarchicalSchemaUtil.schemaSeparator()),
+          auditInfo);
     }
   }
 

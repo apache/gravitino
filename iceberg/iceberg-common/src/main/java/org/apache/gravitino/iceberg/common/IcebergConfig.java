@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -44,6 +46,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT = 9001;
   public static final int DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT = 9433;
+
+  /** Whether to expose metrics endpoints when the Iceberg REST service runs standalone. */
+  public static final ConfigEntry<Boolean> METRICS_ENABLED =
+      new ConfigBuilder("metrics.enabled")
+          .doc(
+              "Whether to expose /metrics and /prometheus/metrics in standalone mode. "
+                  + "This setting is ignored when running as an auxiliary service.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
 
   public static final ConfigEntry<String> CATALOG_BACKEND =
       new ConfigBuilder(IcebergConstants.CATALOG_BACKEND)
@@ -230,6 +242,53 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .booleanConf()
           .createWithDefault(true);
 
+  /**
+   * How a REST catalog backend authenticates to the remote catalog. {@code user-token} forwards the
+   * calling user's access token; {@code service-account} connects with the configured service
+   * account credential and makes Gravitino authorize every request locally.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_AUTH_TYPE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_AUTH_TYPE)
+          .doc(
+              "How the REST catalog backend authenticates to the remote catalog. `user-token`"
+                  + " forwards the calling user's access token, and the remote catalog authorizes"
+                  + " the user. `service-account` connects with the credential in"
+                  + " `rest-backend-token` or `rest-backend-credential`, and Gravitino authorizes"
+                  + " every request before proxying it.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN.equals(value)
+                      || IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(value),
+              "The value must be `user-token` or `service-account`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_AUTH_TYPE_USER_TOKEN);
+
+  /**
+   * Who issues storage credentials for tables of a federated REST catalog. {@code remote} passes
+   * through what the remote catalog vends; {@code local} issues credentials through this catalog's
+   * credential providers, scoped to the table and to the caller's privilege. Service-account
+   * connections always use local credentials.
+   */
+  public static final ConfigEntry<String> REST_BACKEND_STORAGE_CREDENTIAL_SOURCE =
+      new ConfigBuilder(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE)
+          .doc(
+              "Who issues storage credentials for tables of a federated REST catalog. `remote`"
+                  + " passes through the credentials the remote catalog vends. `local` does not"
+                  + " request credentials from the remote catalog and issues them through this"
+                  + " catalog's `credential-providers`, scoped to the table location and to the"
+                  + " caller's privilege on the table. Service-account connections always use local"
+                  + " credentials.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE.equals(value)
+                      || IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                          value),
+              "The value must be `local` or `remote`")
+          .createWithDefault(IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_REMOTE);
+
   /** HTTP connection timeout in milliseconds for the REST catalog backend. */
   public static final ConfigEntry<Integer> REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS =
       new ConfigBuilder(IcebergConstants.REST_CATALOG_BACKEND_CLIENT_CONNECTION_TIMEOUT_MS)
@@ -397,6 +456,53 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(720);
 
+  /**
+   * Master switch for {@code Idempotency-Key} support. Disabled by default: when off the header is
+   * ignored and no key lifetime is advertised in {@code GET /v1/config}, which per the Iceberg REST
+   * spec tells clients the server does not support idempotency.
+   */
+  public static final ConfigEntry<Boolean> ICEBERG_IDEMPOTENCY_ENABLED =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_ENABLED)
+          .doc("Whether to honor the Idempotency-Key header on Iceberg REST mutation endpoints")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  /** Client reuse window for an idempotency key, as an ISO-8601 duration. */
+  public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_KEY_LIFETIME =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_KEY_LIFETIME)
+          .doc(
+              "The client reuse window for an Idempotency-Key, an ISO-8601 duration such as PT30M. "
+                  + "Advertised to clients as `idempotency-key-lifetime` in the config response")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              IcebergConfig::isPositiveDuration, "The value must be a positive ISO-8601 duration")
+          .createWithDefault("PT30M");
+
+  /** Storage backend holding idempotency records. */
+  public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_STORE_TYPE =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE)
+          .doc(
+              "The store holding Iceberg idempotency records, either the `in-memory` short name or "
+                  + "the fully-qualified class name of an `IdempotencyStore` implementation")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault("in-memory");
+
+  /** Capacity of the in-memory idempotency store. */
+  public static final ConfigEntry<Integer> ICEBERG_IDEMPOTENCY_MAX_ENTRIES =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_MAX_ENTRIES)
+          .doc(
+              "The maximum number of idempotency records retained by the in-memory store, records "
+                  + "beyond it are evicted before their reuse window elapses. Eviction can include "
+                  + "in-flight reservations, allowing retries to execute the mutation concurrently")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10000);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
@@ -422,6 +528,16 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
     return transformedConfig;
   }
 
+  /**
+   * Returns whether a REST catalog backend connects to the remote catalog as a service account.
+   *
+   * @return {@code true} if {@code rest-backend-auth-type} is {@code service-account}
+   */
+  public boolean isRestBackendServiceAccount() {
+    return IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT.equals(
+        get(REST_BACKEND_AUTH_TYPE));
+  }
+
   @Override
   public Map<String, String> getOverwriteDefaultConfig() {
     return ImmutableMap.of(
@@ -429,5 +545,14 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT),
         ConfigConstants.WEBSERVER_HTTPS_PORT,
         String.valueOf(DEFAULT_ICEBERG_REST_SERVICE_HTTPS_PORT));
+  }
+
+  private static boolean isPositiveDuration(String value) {
+    try {
+      Duration duration = Duration.parse(value);
+      return !duration.isNegative() && !duration.isZero();
+    } catch (DateTimeParseException e) {
+      return false;
+    }
   }
 }

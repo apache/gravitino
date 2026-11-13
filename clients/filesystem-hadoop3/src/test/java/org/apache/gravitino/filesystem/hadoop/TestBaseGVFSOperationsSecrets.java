@@ -20,7 +20,13 @@ package org.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,6 +42,7 @@ import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
@@ -46,6 +53,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
+import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
 import org.apache.hadoop.security.Credentials;
@@ -259,6 +267,40 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
+  void testCatalogCredentialDenialDoesNotBlockFilesetCredentials() throws Exception {
+    SupportsCredentials catalogCredentials = mock(SupportsCredentials.class);
+    when(catalogCredentials.getCredentials()).thenThrow(new ForbiddenException("catalog denied"));
+    Catalog catalog =
+        mockCatalogWithCredentials(
+            Map.of("s3-endpoint", "http://s3.example.com"), catalogCredentials);
+    Fileset fileset = catalog.asFilesetCatalog().loadFileset(NameIdentifier.of("schema", "fs"));
+    when(fileset.storageLocations()).thenReturn(Map.of("default", "s3a://bucket/data"));
+    SupportsCredentials scopedCredentials = mock(SupportsCredentials.class);
+    when(fileset.supportsCredentials()).thenReturn(scopedCredentials);
+    when(scopedCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {
+              new S3TokenCredential("SCOPED", "scoped-secret", "token", Long.MAX_VALUE)
+            });
+    TestOps ops = spy(opsFor(catalog));
+    NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
+    doReturn(fileset).when(ops).getFileset(ident);
+    doReturn(true).when(ops).enableCredentialVending();
+    FileSystem filesystem = mock(FileSystem.class);
+    doReturn(filesystem).when(ops).getActualFileSystemByPath(any(Path.class), anyMap());
+
+    assertSame(filesystem, ops.getActualFileSystemByLocationName(ident, "default"));
+    verify(scopedCredentials).getCredentials();
+
+    ForbiddenException denied = new ForbiddenException("fileset denied");
+    when(scopedCredentials.getCredentials()).thenThrow(denied);
+    RuntimeException failure =
+        assertThrows(
+            RuntimeException.class, () -> ops.getActualFileSystemByLocationName(ident, "default"));
+    assertSame(denied, failure.getCause());
+  }
+
+  @Test
   public void testRestFailureDoesNotCacheEmptyStaticCredentials() throws Exception {
     SupportsCredentials credentials = mock(SupportsCredentials.class);
     when(credentials.getCredentials())
@@ -304,6 +346,8 @@ public class TestBaseGVFSOperationsSecrets {
 
   private static TestOps opsFor(Catalog catalog) {
     Configuration conf = new Configuration();
+    conf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_AUTO_CREATE_LOCATION, false);
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
@@ -394,7 +438,7 @@ public class TestBaseGVFSOperationsSecrets {
     }
   }
 
-  private static final class TestOps extends BaseGVFSOperations {
+  private static class TestOps extends BaseGVFSOperations {
     private final GravitinoClient client;
 
     private TestOps(Configuration configuration, GravitinoClient client) {

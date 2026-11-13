@@ -18,7 +18,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 
-from gravitino.exceptions.base import NotFoundException, RESTException
+from gravitino.exceptions.base import (
+    ForbiddenException,
+    NotFoundException,
+    RESTException,
+)
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
 from gravitino.name_identifier import NameIdentifier
@@ -276,6 +280,7 @@ class TestGVFSMergeSecrets(unittest.TestCase):
 
     def test_get_credentials_failures_do_not_abort_merge(self):
         for exc in (
+            ForbiddenException("catalog credentials denied"),
             NotFoundException("credentials endpoint missing"),
             URLError("connection refused"),
         ):
@@ -296,6 +301,52 @@ class TestGVFSMergeSecrets(unittest.TestCase):
                 merged = self._merge_with_catalog(operations, catalog)
                 self.assertEqual(merged["s3-endpoint"], "http://s3.example.com")
                 self.assertNotIn("s3-access-key-id", merged)
+
+    def test_catalog_denial_preserves_fileset_credential_authorization(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090", metalake_name="ml", options={}
+        )
+        catalog = MagicMock()
+        catalog.properties.return_value = {"s3-endpoint": "http://s3.example.com"}
+        catalog.get_secrets.return_value = {}
+        catalog.support_credentials.return_value.get_credentials.side_effect = (
+            ForbiddenException("catalog denied")
+        )
+        schema = catalog.as_schemas.return_value.load_schema.return_value
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        fileset = catalog.as_fileset_catalog.return_value.load_fileset.return_value
+        fileset.properties.return_value = {}
+        fileset.get_secrets.return_value = {}
+        fileset.storage_locations.return_value = {"default": "s3://bucket/data"}
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        scoped_credentials = [MagicMock()]
+        filesystem = MagicMock()
+        ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+        with (
+            patch.object(operations, "_get_gravitino_client", return_value=client),
+            patch.object(operations, "_get_fileset", return_value=fileset),
+            patch.object(operations, "_get_user_defined_configs", return_value={}),
+            patch.object(
+                operations,
+                "_get_credentials_with_cache",
+                return_value=scoped_credentials,
+            ) as vend,
+            patch.object(
+                operations, "_get_filesystem", return_value=filesystem
+            ) as create,
+        ):
+            self.assertIs(
+                filesystem,
+                operations._get_actual_filesystem_by_location_name(ident, "default"),
+            )
+            vend.assert_called_once_with(ident, fileset, "default")
+            self.assertIs(create.call_args.args[0], scoped_credentials)
+            vend.side_effect = ForbiddenException("fileset denied")
+            with self.assertRaises(ForbiddenException):
+                operations._get_actual_filesystem_by_location_name(ident, "default")
+            create.assert_called_once()
 
     def test_skips_expiring_credentials(self):
         operations = DefaultGVFSOperations(
