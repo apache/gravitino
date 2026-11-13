@@ -91,6 +91,23 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testReregisteredCatalogImportsTopicWithoutOverwritingHistory() throws IOException {
+    TopicEntity topic = createTopic("topic_reregistered", "original");
+    backend.insert(topic, false);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(topic, false));
+
+    backend.delete(NameIdentifier.of(metalakeName, catalogName), Entity.EntityType.CATALOG, true);
+    createAndInsertCatalog(metalakeName, catalogName);
+    createAndInsertSchema(metalakeName, catalogName, schemaName);
+    TopicEntity replacement = copyTopic(topic, topic.name(), "new registration");
+    backend.insert(replacement, false);
+    Assertions.assertEquals(
+        "new registration",
+        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(replacement, false));
+  }
+
+  @TestTemplate
   public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
     SchemaPO observedSchemaPO =
         SessionUtils.getWithoutCommit(

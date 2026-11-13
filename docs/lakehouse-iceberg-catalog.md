@@ -57,6 +57,27 @@ If you are using the Gravitino with Trino, you can pass the Trino Iceberg connec
 
 If you are using the Gravitino with Spark, you can pass the Spark Iceberg connector configuration using prefix `spark.bypass.`. For example, using `spark.bypass.io-impl` to pass the `io-impl` to the Spark Iceberg connector in Spark runtime.
 
+#### Identifier Case Behavior
+
+For `catalog-backend=hive`, schema, table, and view identifiers are case-insensitive; you can use any casing.
+
+For `catalog-backend=rest`, always use the same identifier casing that was used when the object was first registered. Loading the same object with different casing is rejected.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Iceberg namespaces, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
 
 #### JDBC Backend
 

@@ -496,6 +496,22 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Schema loadedSchema = Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
     Assertions.assertEquals(schemaIdent.name(), loadedSchema.name());
     Assertions.assertEquals("comment", loadedSchema.comment());
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
+  }
+
+  @Test
+  void testImportSchemaAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_soft_deleted_identifier");
+    dispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    entityStore.delete(schemaIdent, SCHEMA);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> dispatcher.loadSchema(schemaIdent));
+    Assertions.assertEquals(
+        schemaEntity.id(), entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class).id());
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
   @Test
@@ -534,7 +550,13 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     UnsupportedOperationException exception =
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Schema managed by multiple catalogs"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "does not automatically reconcile conflicting external schema registrations"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
 
   @Test

@@ -55,6 +55,26 @@ Users can use the following properties to configure the security of the catalog 
 
 Property name with this prefix passed down to the underlying backend client for use. Such as `gravitino.bypass.hive.metastore.kerberos.principal=XXXX`、`gravitino.bypass.hadoop.security.authentication=kerberos`、`gravitino.bypass.hive.metastore.sasl.enabled=ture` And so on.
 
+#### Identifier Case Behavior
+
+Schema and table identifiers are case-insensitive; you can use any casing. Column identifiers remain
+case-sensitive.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Hudi schemas, tables, or physical data in the Hive Metastore.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
 
 ### Catalog Operations
 

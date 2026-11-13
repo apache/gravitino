@@ -18,6 +18,25 @@
 --
 
 
+-- Preserve retired registrations while keeping each external ID unique among active rows.
+ALTER TABLE schema_meta
+    DROP CONSTRAINT IF EXISTS schema_meta_pkey,
+    ADD CONSTRAINT schema_meta_pkey PRIMARY KEY (schema_id, deleted_at);
+
+ALTER TABLE table_meta
+    DROP CONSTRAINT IF EXISTS table_meta_pkey,
+    ADD CONSTRAINT table_meta_pkey PRIMARY KEY (table_id, deleted_at);
+
+ALTER TABLE topic_meta
+    DROP CONSTRAINT IF EXISTS topic_meta_pkey,
+    ADD CONSTRAINT topic_meta_pkey PRIMARY KEY (topic_id, deleted_at);
+
+ALTER TABLE view_meta
+    DROP CONSTRAINT IF EXISTS view_meta_pkey,
+    ADD CONSTRAINT view_meta_pkey PRIMARY KEY (view_id, deleted_at);
+
+
+
 
 
 
@@ -365,6 +384,121 @@ COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name 
 COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
 COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
 COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';
+
+-- Clear governance attached to retired external registrations before their IDs can be reused.
+-- A retry must preserve relationships attached to a new active registration of the same ID.
+UPDATE owner_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
+    updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE role_meta_securable_object r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE tag_relation_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE statistic_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
 
 CREATE TABLE IF NOT EXISTS domain_meta (
     domain_id BIGINT NOT NULL,

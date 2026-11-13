@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -48,7 +50,11 @@ class TestTableMetaPostgreSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = new TableMetaPostgreSQLProvider().softDeleteTableMetasByTableId(null, null);
+    String sql =
+        new TableMetaPostgreSQLProvider()
+            .softDeleteTableMetasByTableId(null, null, null, null, null);
+    assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    assertTrue(sql.contains("AND table_name = #{tableName}"));
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

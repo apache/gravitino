@@ -671,17 +671,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 LockType.WRITE,
                 () -> importSchemaFromCatalog(ident, importAudit));
       } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this schema. Reload from the
-        // entity store to verify the entity stored by the winning node is consistent.
+        // A create-only import can conflict with a concurrent import or an identity registered
+        // under another catalog. Reload to verify the winning registration's identity.
         LOG.info(
-            "Schema {} was concurrently imported by another node; reloading from store.", ident);
+            "Schema {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
-          throw new UnsupportedOperationException(
-              "Schema managed by multiple catalogs. This may cause unexpected issues such as "
-                  + "privilege conflicts. To resolve: Remove all catalogs managing this schema, "
-                  + "then recreate one catalog to ensure single-catalog management.");
+          throw retainedExternalIdentifierConflictException(ident, SCHEMA);
         }
         schema = reloaded;
       }

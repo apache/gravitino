@@ -22,11 +22,22 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveCatalogCapability {
+
+  @Test
+  public void testHiveEntityNamesAreCaseInsensitive() {
+    HiveCatalogCapability capability = new HiveCatalogCapability(() -> HiveVersion.HIVE2);
+
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+  }
 
   @Test
   public void testColumnConstraintsOnHive2() {

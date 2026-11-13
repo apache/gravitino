@@ -154,7 +154,7 @@ public class SchemaMetaService {
    * Registers a schema without replacing another active identity at the same name.
    *
    * @param schemaEntity the schema to register
-   * @param overwrite whether to update or revive the same schema ID; active cross-catalog IDs and
+   * @param overwrite whether to update the same active schema ID; active cross-catalog IDs and
    *     different active IDs at the same name are rejected even when true
    * @throws EntityAlreadyExistsException if the name or identity conflicts with a registration
    * @throws IOException if the store operation fails
@@ -525,9 +525,9 @@ public class SchemaMetaService {
     // must still revalidate identity because the first check is only a fail-fast optimization.
     SchemaPO registeredId = mapper.selectSchemaMetaById(incoming.getSchemaId());
     rejectForeignSchemaIdentity(identifier, incoming, registeredId);
-    // Lock even a retired ID before reviving it. Otherwise two catalogs could both revive the
-    // same marker and the slower upsert would move the winner's newly live registration.
-    registeredId = mapper.selectSchemaMetaByIdIncludingDeletedForUpdate(incoming.getSchemaId());
+    // Revalidate the active identity under its row lock. A retired identity is imported with a
+    // plain insert, so the composite primary key arbitrates concurrent registrations.
+    registeredId = mapper.selectSchemaMetaByIdForUpdate(incoming.getSchemaId());
     rejectForeignSchemaIdentity(identifier, incoming, registeredId);
     SchemaPO stored =
         ops.listPOs(mapper, identifier.namespace(), List.of(identifier.name())).stream()

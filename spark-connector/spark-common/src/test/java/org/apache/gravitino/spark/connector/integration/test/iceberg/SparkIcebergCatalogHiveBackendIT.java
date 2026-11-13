@@ -29,7 +29,6 @@ import org.junit.jupiter.api.Tag;
 /** This class use Apache Iceberg HiveCatalog for backend catalog. */
 @Tag("gravitino-docker-test")
 public abstract class SparkIcebergCatalogHiveBackendIT extends SparkIcebergCatalogIT {
-
   @Override
   protected Map<String, String> getExtraSparkConfigs() {
     // This class deliberately exercises the legacy Hive backend without a discoverable Iceberg

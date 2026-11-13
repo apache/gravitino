@@ -37,6 +37,7 @@ import org.apache.gravitino.catalog.lakehouse.paimon.ops.PaimonCatalogOps;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.credential.AzureAccountKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.DlfSecretKeyCredential;
@@ -129,6 +130,8 @@ public class TestPaimonCatalog {
     conf.put(PaimonCatalogPropertiesMetadata.WAREHOUSE, tempDir);
     PaimonCatalog paimonCatalog =
         new PaimonCatalog().withCatalogConf(conf).withCatalogEntity(entity);
+    Assertions.assertTrue(
+        paimonCatalog.newCapability().caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
     CatalogOperations catalogOperations = paimonCatalog.ops();
     Assertions.assertInstanceOf(PaimonCatalogOperations.class, catalogOperations);
 
