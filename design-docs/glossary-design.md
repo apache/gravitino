@@ -98,13 +98,13 @@ also lists design requirements assigned to Step 2, including CSV import/export. 
 | Definition grants on domains | Metalake grants only | S2.3: domain grants and inherited authorization |
 | Version snapshots and history | Revision and audit only; no snapshots | S2.2: approved snapshots, history and diffs |
 | Independent review and no self-approval | No review; default APPROVED and immediate edits | S2.1: proposed changes, reviewer authorization and no self-approval |
-| CSV import/export | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6 / Enterprise G16: a separate CSV design and implementation task |
+| CSV import/export | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6: a separate CSV design and implementation task |
 
 Until the remaining design requirements are accepted or explicitly split into linked follow-up
 issues, #14238 remains open. The PR description should use `Related to #14238`, rather than
 `Fixes #14238`. The S2 task IDs below track the deferred scope locally; they are not GitHub issue
 numbers. Filing the follow-up issues and linking them from #14238 is still a separate step.
-CSV remains planned, with its owner and scope in S2.6 and the OSS/Enterprise responsibility split.
+CSV remains planned, with its scope tracked in S2.6.
 
 ## Usage Scenario
 
@@ -1596,7 +1596,7 @@ are not issue numbers, and no follow-up issues have been created by this documen
       and revalidation when membership changes.
 - [ ] **S2.4. Initial-status setting**: the audited metalake setting for the default status.
 - [ ] **S2.5. Web UI**: term pages, hierarchy, binding drawers, review queue and history.
-- [ ] **S2.6. CSV import/export** (Enterprise G16): define the CSV schema and validation,
+- [ ] **S2.6. CSV import/export**: define the CSV schema and validation,
       permission-filtered exports, repeat-import identity using `sourceRef`, batch failure
       semantics, and imports through the same review and no-self-approval checks as other
       writes. This remains planned work, outside Step 1; public APIs alone do not deliver CSV.
@@ -1619,7 +1619,7 @@ no data migration.
 | Changes              | Take effect at once; `TermChangeHandler` is the write hook                                            | Always reviewed; proposed changes are kept apart; nobody approves their own change         |
 | Versions and history | Revision number and audit only                                                                        | A snapshot of each approved change, readable history and diffs                             |
 | APIs and clients     | REST, Java and Python clients, OpenAPI                                                                | Proposal, decision and history APIs                                                        |
-| CSV import/export    | Not delivered; APIs and source references support future importers                                  | Planned as S2.6 / Enterprise G16, with permissions and review                               |
+| CSV import/export    | Not delivered; APIs and source references support future importers                                  | Planned as S2.6, with permissions and review                               |
 | Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                 | Same lookup, on the approved state                                                         |
 | Audit and events     | Create, edit, status, relation, membership, binding and delete                                        | Submit, approve, reject, and changes of the metalake setting                               |
 | UI                   | None; the REST calls behind each page are listed in Web UI support                                    | Term pages, hierarchy, binding drawers, review queue and history                           |
