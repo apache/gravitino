@@ -328,8 +328,9 @@ public class SecretManager implements Closeable {
    * Makes the versions an alter wrote current and deletes the versions it replaced.
    *
    * <p>Call only after the entity alter committed. Failures are logged and do not fail the
-   * committed alter. If making a written version current fails, the version that was current before
-   * it is not deleted and the written version stays in the provider; running the same change again
+   * committed alter. If making a written version current fails and the provider then reports it as
+   * current, the previous version is deleted; otherwise the written version is deleted. If the
+   * current version cannot be looked up, both versions are kept. Running the same change again
    * writes and promotes a new version.
    *
    * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
@@ -342,18 +343,19 @@ public class SecretManager implements Closeable {
         continue;
       }
       SecretUrn urn = written.version().urn();
-      SecretProvider provider;
+      SecretProvider provider = null;
       try {
         provider = registry.getProvider(urn.providerName());
         provider.promoteSecretVersion(urn, written.version().id());
       } catch (RuntimeException e) {
         LOG.error(
-            "Failed to make version {} of secret {} current after the alter committed; the"
-                + " previous version {} is not deleted",
+            "Failed to make version {} of secret {} current after the alter committed",
             written.version().id(),
             urn,
-            written.previousId(),
             e);
+        if (provider != null) {
+          deleteUnusedVersionAfterFailedPromote(provider, written);
+        }
         continue;
       }
       try {
@@ -363,6 +365,42 @@ public class SecretManager implements Closeable {
       }
     }
     deleteSecretVersions(prepared.released());
+  }
+
+  /**
+   * Deletes the version a failed promote left unused. The promote may have taken effect before it
+   * failed, so the version that is current now is kept; if the current version cannot be looked up,
+   * both versions are kept.
+   */
+  private static void deleteUnusedVersionAfterFailedPromote(
+      SecretProvider provider, PreparedSecrets.WrittenVersion written) {
+    SecretUrn urn = written.version().urn();
+    String writtenId = written.version().id();
+    String current;
+    try {
+      current = provider.currentSecretVersion(urn);
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Could not look up the current version of secret {} after a failed promote; keeping"
+              + " versions {} and {}",
+          urn,
+          written.previousId(),
+          writtenId,
+          e);
+      return;
+    }
+    String unused;
+    if (writtenId.equals(current)) {
+      LOG.info("Version {} of secret {} is current although its promote failed", writtenId, urn);
+      unused = written.previousId();
+    } else {
+      unused = writtenId;
+    }
+    try {
+      provider.deleteSecretVersion(urn, unused);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to delete unused version {} of secret {}", unused, urn, e);
+    }
   }
 
   /**

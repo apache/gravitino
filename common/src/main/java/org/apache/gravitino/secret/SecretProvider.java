@@ -106,6 +106,13 @@ public interface SecretProvider {
    *
    * <p>Write-through providers must implement this method; see {@link #writeSecretVersion}.
    *
+   * <p>If this method throws, the promote must not take effect afterwards, and {@link
+   * #currentSecretVersion} must already report whether it did: after a failed promote Gravitino
+   * deletes the previous version if {@code version} is current and {@code version} otherwise, and
+   * deletes neither if {@code currentSecretVersion} throws. Settle an unknown outcome before
+   * throwing, for example with a conditional update, and read the current version with
+   * read-after-write consistency.
+   *
    * @param urn the write-through secret URN
    * @param version a version id returned by {@link #writeSecretVersion}
    * @throws IllegalArgumentException if {@code urn} has no such version

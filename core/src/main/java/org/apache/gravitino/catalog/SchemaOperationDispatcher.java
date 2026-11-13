@@ -434,7 +434,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .build()),
                   "UPDATE",
                   schemaId);
-          // A null result is logged, and the entity may still reference the released secrets.
+          // operateOnEntity logs and returns null when the update fails or the updated entity's id
+          // does not match. The new versions are made current either way; if it returns null, the
+          // released ones are kept because the entity may still reference them.
           secretManager.commitSecrets(
               updatedSchemaEntity == null ? preparedSecrets.withoutReleased() : preparedSecrets);
 

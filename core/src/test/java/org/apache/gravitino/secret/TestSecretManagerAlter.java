@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
@@ -40,13 +41,17 @@ public class TestSecretManagerAlter {
   private static final String KEY = "jdbc-password";
 
   /**
-   * Fails every promote, and every version write of the property key {@code broken}. Records the
-   * version calls it receives.
+   * Records the versions it writes and deletes and counts promotes, fails every promote, and fails
+   * version writes of the property key {@code broken}. For the key {@code applied} the promote
+   * takes effect before failing; for {@code raced} another version is made current before it fails;
+   * for {@code unknown} every lookup of the current version fails from the first promote until
+   * {@code lookupFails} is cleared.
    */
   public static class FaultySecretsProvider extends InMemorySecretsProvider {
     private final List<String> writtenVersions = new ArrayList<>();
     private final List<String> deletedVersions = new ArrayList<>();
     private int promotes;
+    private boolean lookupFails;
 
     @Override
     public String writeSecretVersion(SecretUrn urn, String plaintext) {
@@ -61,7 +66,28 @@ public class TestSecretManagerAlter {
     @Override
     public void promoteSecretVersion(SecretUrn urn, String version) {
       promotes++;
+      // For the key "applied" the promote takes effect before it fails, like a timed-out call.
+      if ("applied".equals(urn.propertyKey())) {
+        super.promoteSecretVersion(urn, version);
+      }
+      // For the key "raced" another writer makes its own version current first.
+      if ("raced".equals(urn.propertyKey())) {
+        super.promoteSecretVersion(urn, super.writeSecretVersion(urn, "other"));
+      }
+      // For the key "unknown" the current version cannot be looked up after the failed promote.
+      if ("unknown".equals(urn.propertyKey())) {
+        lookupFails = true;
+      }
       throw new IllegalStateException("injected promote failure");
+    }
+
+    @Override
+    @Nullable
+    public String currentSecretVersion(SecretUrn urn) {
+      if (lookupFails && "unknown".equals(urn.propertyKey())) {
+        throw new IllegalStateException("injected lookup failure");
+      }
+      return super.currentSecretVersion(urn);
     }
 
     @Override
@@ -337,16 +363,68 @@ public class TestSecretManagerAlter {
   }
 
   @Test
-  void testBindAfterOrphanedVersionIsReadable() {
+  void testFailedPromoteDeletesTheUnpromotedVersion() {
     try (SecretManager secretManager = secretManager()) {
       Map<String, String> props = alter(secretManager, Map.of(), bind(KEY, "faulty", "old"));
-      // The promote fails, so the written version stays behind as a non-current version.
-      alter(secretManager, props, bind(KEY, "faulty", "new"));
-      Map<String, String> removed = alter(secretManager, props, CatalogChange.removeProperty(KEY));
-      Assertions.assertNull(currentVersion(secretManager, props.get(KEY)));
+      FaultySecretsProvider faulty = faulty(secretManager);
+      faulty.writtenVersions.clear();
 
-      alter(secretManager, removed, bind(KEY, "faulty", "again"));
-      Assertions.assertEquals("again", read(secretManager, props, KEY));
+      alter(secretManager, props, bind(KEY, "faulty", "new"));
+      Assertions.assertEquals(1, faulty.promotes);
+      Assertions.assertEquals("old", read(secretManager, props, KEY));
+      Assertions.assertEquals(faulty.writtenVersions, faulty.deletedVersions);
+    }
+  }
+
+  @Test
+  void testFailedPromoteKeepsBothVersionsWhenCurrentIsUnknown() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind("unknown", "faulty", "old"));
+      String old = props.get("unknown") + "@" + currentVersion(secretManager, props.get("unknown"));
+      FaultySecretsProvider faulty = faulty(secretManager);
+
+      alter(secretManager, props, bind("unknown", "faulty", "new"));
+      Assertions.assertEquals(1, faulty.promotes);
+      Assertions.assertTrue(faulty.deletedVersions.isEmpty());
+      Assertions.assertEquals("old", read(secretManager, props, "unknown"));
+
+      // Clear the lookup failure so the remove releases the old version. That leaves the URN with
+      // the new version and no current one; binding the key again must still make the rebound
+      // value readable.
+      faulty.lookupFails = false;
+      Map<String, String> removed =
+          alter(secretManager, props, CatalogChange.removeProperty("unknown"));
+      Assertions.assertEquals(List.of(old), faulty.deletedVersions);
+      Assertions.assertNull(currentVersion(secretManager, props.get("unknown")));
+      alter(secretManager, removed, bind("unknown", "faulty", "again"));
+      Assertions.assertEquals("again", read(secretManager, props, "unknown"));
+    }
+  }
+
+  @Test
+  void testFailedPromoteKeepsAVersionAnotherWriterMadeCurrent() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind("raced", "faulty", "old"));
+      FaultySecretsProvider faulty = faulty(secretManager);
+      faulty.writtenVersions.clear();
+
+      alter(secretManager, props, bind("raced", "faulty", "new"));
+      Assertions.assertEquals(faulty.writtenVersions, faulty.deletedVersions);
+      Assertions.assertEquals("other", read(secretManager, props, "raced"));
+    }
+  }
+
+  @Test
+  void testPromoteThatTookEffectBeforeFailingDeletesThePreviousVersion() {
+    try (SecretManager secretManager = secretManager()) {
+      Map<String, String> props = alter(secretManager, Map.of(), bind("applied", "faulty", "old"));
+      String previous =
+          props.get("applied") + "@" + currentVersion(secretManager, props.get("applied"));
+      FaultySecretsProvider faulty = faulty(secretManager);
+
+      alter(secretManager, props, bind("applied", "faulty", "new"));
+      Assertions.assertEquals("new", read(secretManager, props, "applied"));
+      Assertions.assertEquals(List.of(previous), faulty.deletedVersions);
     }
   }
 

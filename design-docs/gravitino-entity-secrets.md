@@ -459,6 +459,9 @@ provider must not leave the entity referencing a deleted or changed write-throug
 The write-through URN stays fixed; providers that support write-through also implement four version
 methods:
 `writeSecretVersion`, `promoteSecretVersion`, `deleteSecretVersion` and `currentSecretVersion`.
+A `promoteSecretVersion` that throws must not take effect afterwards, and `currentSecretVersion`
+must already report whether it did: a provider settles an unknown outcome before throwing, for
+example with a conditional update, and reads with read-after-write consistency.
 If a provider of a written or released URN does not implement them, the alter fails with
 `UnsupportedOperationException`. Released URNs are checked before any version is written; versions
 already written for other keys in the batch are deleted best-effort.
@@ -470,9 +473,11 @@ already written for other keys in the batch are deleted best-effort.
    longer hold, record its current version.
 2. Commit (after the entity update): make each new version current and delete the version it
    replaced, then delete the recorded versions of released URNs. Failures are logged and do not
-   fail the alter. If making a new version current fails, the previous version is kept and the
-   new version stays in the provider; running the same change again writes and promotes another
-   version. The leftover version stays until a drop that still holds the key deletes the URN.
+   fail the alter. If making a new version current fails and the provider then reports it as
+   current (the promote took effect before failing), the previous version is deleted; otherwise the
+   new version is deleted. If the current version cannot be looked up, or that delete fails, the
+   leftover version stays until a drop that still holds the key deletes the URN. Running the same
+   change again writes and promotes another version.
 3. Rollback (entity update failed): delete the new versions. The entity keeps reading the versions
    that were current before the alter.
 
@@ -521,7 +526,7 @@ map[URN] = { versions: version id → Base64(plaintext), current: version id }
 | `readSecret`           | Look up map by URN; Base64-decode the current version; return plaintext. Missing URN or no current version → `IllegalArgumentException`.                                                                                       |
 | `deleteSecret`         | `map.remove(urn)`, all versions — best-effort; used by create rollback and entity drop for **managed** (write-through) secrets (§5.5.2 C).                                                                                       |
 | `writeSecretVersion`   | Add a version under an id that increases per provider instance; make it current only when the URN has no current version.                                                                                                                      |
-| `promoteSecretVersion` | Make an existing version current; unknown version → `IllegalArgumentException`.                                                                                                                                                  |
+| `promoteSecretVersion` | Make an existing version current; unknown version → `IllegalArgumentException` without changing state (synchronous, so a promote that throws never takes effect).                                                                                                                                                  |
 | `deleteSecretVersion`  | Remove one version; deleting the current one leaves no readable value; unknown version → no-op.                                                                                                                                   |
 | `currentSecretVersion` | Current version id, or `null`.                                                                                                                                                                                                    |
 
