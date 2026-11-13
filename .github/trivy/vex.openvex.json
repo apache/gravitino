@@ -1,0 +1,8 @@
+{
+  "@context": "https://openvex.dev/ns/v0.2.0",
+  "@id": "https://github.com/apache/gravitino/blob/main/.github/trivy/vex.openvex.json",
+  "author": "Apache Gravitino Community",
+  "timestamp": "2026-11-09T00:00:00Z",
+  "version": 1,
+  "statements": []
+}
