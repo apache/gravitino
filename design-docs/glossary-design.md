@@ -92,13 +92,13 @@ This is a design PR. T1–T19 describe future implementation work, not runtime f
 delivered by merging this document. [Issue #14238](https://github.com/apache/gravitino/issues/14238)
 also lists design requirements assigned to Step 2, including CSV import/export. The scope is:
 
-| Requirement in #14238 | Step 1 design | Later work and tracking |
-| -------------------- | ------------- | ----------------------- |
-| Terms, explicit domain membership, hierarchy, asset/metric bindings, REST, clients and exact MCP lookup | Covered by this document and T1–T19; membership uses selected Option A | Step 2 extends the same identities and live store |
-| Definition grants on domains | Metalake grants only | S2.3: domain grants and inherited authorization |
-| Version snapshots and history | Revision and audit only; no snapshots | S2.2: approved snapshots, history and diffs |
-| Independent review and no self-approval | No review; default APPROVED and immediate edits | S2.1: proposed changes, reviewer authorization and no self-approval |
-| CSV import/export | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6: a separate CSV design and implementation task |
+| Requirement in #14238                                                                                   | Step 1 design                                                                | Later work and tracking                                             |
+| ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Terms, explicit domain membership, hierarchy, asset/metric bindings, REST, clients and exact MCP lookup | Covered by this document and T1–T19; membership uses selected Option A       | Step 2 extends the same identities and live store                   |
+| Definition grants on domains                                                                            | Metalake grants only                                                         | S2.3: domain grants and inherited authorization                     |
+| Version snapshots and history                                                                           | Revision and audit only; no snapshots                                        | S2.2: approved snapshots, history and diffs                         |
+| Independent review and no self-approval                                                                 | No review; default APPROVED and immediate edits                              | S2.1: proposed changes, reviewer authorization and no self-approval |
+| CSV import/export                                                                                       | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6: a separate CSV design and implementation task                 |
 
 Until the remaining design requirements are accepted or explicitly split into linked follow-up
 issues, #14238 remains open. The PR description should use `Related to #14238`, rather than
@@ -387,11 +387,11 @@ Both can write bindings. The server checks each term in the request separately:
 
 ### Status and versions
 
-| Status | Who can see it | Who can delete it |
-| ------ | -------------- | ----------------- |
-| `DRAFT` | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`; not MCP | `MANAGE_DEFINITIONS` |
-| `APPROVED` (default) | `VIEW_DEFINITION`; MCP also requires this privilege | `MANAGE_DEFINITIONS` |
-| `DEPRECATED` | `VIEW_DEFINITION`; not MCP | `MANAGE_DEFINITIONS` |
+| Status               | Who can see it                                                   | Who can delete it    |
+| -------------------- | ---------------------------------------------------------------- | -------------------- |
+| `DRAFT`              | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`; not MCP | `MANAGE_DEFINITIONS` |
+| `APPROVED` (default) | `VIEW_DEFINITION`; MCP also requires this privilege              | `MANAGE_DEFINITIONS` |
+| `DEPRECATED`         | `VIEW_DEFINITION`; not MCP                                       | `MANAGE_DEFINITIONS` |
 
 - **Status is an ordinary field.** It is set in the create request (default `APPROVED`) or with
   `setStatus` in the update request. Anyone who can edit the term can set it: the owner with
@@ -456,7 +456,7 @@ In Step 1, the three privileges are granted on the metalake:
 | See other users' `DRAFT` terms                            |                   |                     | ✓                    |
 | Edit, bind and set the status of own terms, in any status |                   | ✓                   | ✓                    |
 | Edit, bind and set the status of any term                 |                   |                     | ✓                    |
-| Delete any term, in any status                           |                   |                     | ✓                    |
+| Delete any term, in any status                            |                   |                     | ✓                    |
 
 - `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, and `CREATE_DEFINITION` includes
   `VIEW_DEFINITION`. The names are general, so other business-definition objects can use them too.
@@ -513,15 +513,15 @@ updates in one transaction, and hold the locks until commit or rollback. If a re
 the plan needs an earlier lock or an additional term row that would break ID order, roll back
 and rebuild the plan before writing.
 
-| Operation | Locks | Conflict it prevents |
-| --------- | ----- | -------------------- |
-| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared) | name/synonym conflict; invalid relations; endpoint drop |
-| Rename or change synonyms | metalake (shared) -> hierarchy lock -> term (exclusive) | name/synonym conflict; concurrent edits |
-| Edit other content, status or domains | metalake (shared) -> term (exclusive) -> added domains (shared) | concurrent edits; endpoint drop |
-| Add or remove a relation | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> added domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters |
-| Bind / unbind | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order) | object drop; concurrent term edits |
-| Delete a term | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order) | new links; lost cleanup revisions |
-| Object, column or metric cleanup | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order) | new bindings; lost cleanup revisions |
+| Operation                                       | Locks                                                                                                               | Conflict it prevents                                    |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared)                   | name/synonym conflict; invalid relations; endpoint drop |
+| Rename or change synonyms                       | metalake (shared) -> hierarchy lock -> term (exclusive)                                                             | name/synonym conflict; concurrent edits                 |
+| Edit other content, status or domains           | metalake (shared) -> term (exclusive) -> added domains (shared)                                                     | concurrent edits; endpoint drop                         |
+| Add or remove a relation                        | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> added domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters         |
+| Bind / unbind                                   | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order)                                            | object drop; concurrent term edits                      |
+| Delete a term                                   | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order)                   | new links; lost cleanup revisions                       |
+| Object, column or metric cleanup                | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order) | new bindings; lost cleanup revisions                    |
 
 For an alter that combines rows of this table, use the union of locks in the global order. For
 example, rename plus `addBroader` plus `addDomain` takes the metalake fence, hierarchy lock, the
@@ -557,21 +557,21 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 - `DropResponse` on delete;
 - bindings are written on the object.
 
-| Operation              | Endpoint                                                                 | Request -> response                                                      |
-| ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=&bindings=`     | -> `NameListResponse` / `TermListResponse`                               |
-| Create                 | `POST /terms`                                                            | `TermCreateRequest` -> `TermResponse`                                    |
-| Get                    | `GET /terms/{term}?status=`                                              | -> `TermResponse`                                                        |
-| Alter                  | `PUT /terms/{term}`                                                      | `TermUpdatesRequest` -> `TermResponse`                                   |
-| Drop                   | `DELETE /terms/{term}`                                                   | -> `DropResponse`                                                        |
-| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`        | -> `TermTreeResponse`                                                    |
-| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=`                         | -> `TermBindingListResponse`                                             |
-| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`        | -> `NameListResponse` / `ObjectTermsResponse`                            |
-| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                  | `TermsAssociateRequest{termsToAdd, termsToRemove}` -> `NameListResponse` |
-| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=&status=` | -> `NameListResponse` / `TermListResponse`                        |
-| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`         | `TermsAssociateRequest` -> `NameListResponse`                            |
-| Owner                  | existing `/owners/glossary_term/{term}`                                  |                                                                          |
-| Tags                   | existing `/objects/glossary_term/{term}/tags`                            |                                                                          |
+| Operation              | Endpoint                                                                         | Request -> response                                                      |
+| ---------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=&bindings=`             | -> `NameListResponse` / `TermListResponse`                               |
+| Create                 | `POST /terms`                                                                    | `TermCreateRequest` -> `TermResponse`                                    |
+| Get                    | `GET /terms/{term}?status=`                                                      | -> `TermResponse`                                                        |
+| Alter                  | `PUT /terms/{term}`                                                              | `TermUpdatesRequest` -> `TermResponse`                                   |
+| Drop                   | `DELETE /terms/{term}`                                                           | -> `DropResponse`                                                        |
+| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`                | -> `TermTreeResponse`                                                    |
+| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=`                                 | -> `TermBindingListResponse`                                             |
+| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
+| Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                          | `TermsAssociateRequest{termsToAdd, termsToRemove}` -> `NameListResponse` |
+| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=&status=` | -> `NameListResponse` / `TermListResponse`                               |
+| Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                 | `TermsAssociateRequest` -> `NameListResponse`                            |
+| Owner                  | existing `/owners/glossary_term/{term}`                                          |                                                                          |
+| Tags                   | existing `/objects/glossary_term/{term}/tags`                                    |                                                                          |
 
 ```
 TermCreateRequest     { name, definition, synonyms, status?, domains, broader, related, links,
@@ -659,23 +659,23 @@ The table shows the REST calls behind each part of the glossary page, and of the
 show terms. A term comes with its name, domains, status, version, owner, relations and links. So
 the term page does not need a call per field.
 
-| Page                         | Part                                                                    | Calls                                                                                                     |
-| ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Page                         | Part                                                                            | Calls                                                                                                     |
+| ---------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No visible domain) | `GET /terms?details=true` and `GET /domains?details=true`; the tree is built from `domains` and `broader` |
-| Glossary                     | Search terms                                                            | `GET /terms?nameContains=`                                                                                |
-| Glossary, term               | Header, Definition, Details, Related terms                              | `GET /terms/{term}`; the source label is the `sourceRef` system, or "Gravitino" if empty                  |
-| Glossary, term               | Implemented by, Used by                                                 | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                          |
-| Glossary, term               | Set status (immediate in Step 1; no approval decision)                   | `PUT /terms/{term}` with `setStatus`                                                                      |
-| Glossary, term               | Delete term (the dialog counts relations and asset links)               | `DELETE /terms/{term}`; the counts come from the term and its bindings                                    |
-| Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation     | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers use `/domains` and `/terms`         |
-| Glossary, Add term           | Owner other than the creator                                            | `POST /terms`, then `PUT /owners/glossary_term/{term}` (allowed, because the creator is the owner)        |
-| Explore, table               | Terms N, Update terms drawer, column chips and the term filter          | `GET /objects/table/{fullName}/terms?details=true&children=true`; `POST .../terms` per change             |
-| Explore, view                | Terms N, Update terms drawer and the term filter; no view-column chips | `GET /objects/view/{fullName}/terms?details=true`; `POST .../terms` per change                             |
-| Explore, Update terms drawer | Term picker (approved, grouped by domain)                               | `GET /terms?details=true&status=APPROVED&nameContains=`                                                   |
-| Semantic model               | Glossary terms of each metric                                           | `GET /objects/semantic_model/{fullName}/terms?details=true&children=true`                                 |
-| Metric editor                | Terms (approved only)                                                   | the picker call above; `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                   |
-| Domain, Definitions tab      | Terms of the domain and its subdomains, name search                     | `GET /terms?details=true&domain=&nameContains=`                                                           |
-| Define, Overview             | Terms by domain, terms by status                                        | counted from `GET /terms?details=true`                                                                    |
+| Glossary                     | Search terms                                                                    | `GET /terms?nameContains=`                                                                                |
+| Glossary, term               | Header, Definition, Details, Related terms                                      | `GET /terms/{term}`; the source label is the `sourceRef` system, or "Gravitino" if empty                  |
+| Glossary, term               | Implemented by, Used by                                                         | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                          |
+| Glossary, term               | Set status (immediate in Step 1; no approval decision)                          | `PUT /terms/{term}` with `setStatus`                                                                      |
+| Glossary, term               | Delete term (the dialog counts relations and asset links)                       | `DELETE /terms/{term}`; the counts come from the term and its bindings                                    |
+| Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation             | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers use `/domains` and `/terms`         |
+| Glossary, Add term           | Owner other than the creator                                                    | `POST /terms`, then `PUT /owners/glossary_term/{term}` (allowed, because the creator is the owner)        |
+| Explore, table               | Terms N, Update terms drawer, column chips and the term filter                  | `GET /objects/table/{fullName}/terms?details=true&children=true`; `POST .../terms` per change             |
+| Explore, view                | Terms N, Update terms drawer and the term filter; no view-column chips          | `GET /objects/view/{fullName}/terms?details=true`; `POST .../terms` per change                            |
+| Explore, Update terms drawer | Term picker (approved, grouped by domain)                                       | `GET /terms?details=true&status=APPROVED&nameContains=`                                                   |
+| Semantic model               | Glossary terms of each metric                                                   | `GET /objects/semantic_model/{fullName}/terms?details=true&children=true`                                 |
+| Metric editor                | Terms (approved only)                                                           | the picker call above; `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                   |
+| Domain, Definitions tab      | Terms of the domain and its subdomains, name search                             | `GET /terms?details=true&domain=&nameContains=`                                                           |
+| Define, Overview             | Terms by domain, terms by status                                                | counted from `GET /terms?details=true`                                                                    |
 
 This design does not cover the parts below. They need another source, or the page hides them:
 
@@ -693,13 +693,13 @@ This design does not cover the parts below. They need another source, or the pag
 The `mcp-server/` gets a read-only `glossary` tool tag, added to `SUPPORTED_TOOL_TAGS`. All glossary
 tools use `GravitinoContext.rest_client()` and its existing identity selection:
 
-| Mode | Identity used for the Gravitino request |
-| ---- | -------------------------------------- |
-| HTTP with a non-empty `Authorization` header | Forward that header verbatim, ahead of any configured service credential. Authentication failure does not trigger service fallback. |
-| HTTP without a header, with a service identity and fallback enabled | Use the configured static `--token`, or OAuth client-credentials when no token is set. |
-| HTTP without a header, with a service identity and `--no-service-identity-fallback` | Reject the tool call with `ServiceIdentityFallbackDisabled` before issuing a Gravitino request. |
-| HTTP without a header and without a service identity | Send no authorization credential; Gravitino applies its anonymous/unauthenticated behavior. |
-| stdio | Use the configured service identity, or send no credential if none is configured. The HTTP-only fallback flag does not apply. |
+| Mode                                                                                | Identity used for the Gravitino request                                                                                             |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| HTTP with a non-empty `Authorization` header                                        | Forward that header verbatim, ahead of any configured service credential. Authentication failure does not trigger service fallback. |
+| HTTP without a header, with a service identity and fallback enabled                 | Use the configured static `--token`, or OAuth client-credentials when no token is set.                                              |
+| HTTP without a header, with a service identity and `--no-service-identity-fallback` | Reject the tool call with `ServiceIdentityFallbackDisabled` before issuing a Gravitino request.                                     |
+| HTTP without a header and without a service identity                                | Send no authorization credential; Gravitino applies its anonymous/unauthenticated behavior.                                         |
+| stdio                                                                               | Use the configured service identity, or send no credential if none is configured. The HTTP-only fallback flag does not apply.       |
 
 Authorization applies to that effective principal, with an additional APPROVED-only restriction
 for glossary tools. User credentials therefore limit results to the user's authorized approved
@@ -831,13 +831,13 @@ User question
 4. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
    the normal privileges.
 
-| Tool                      | REST calls                                                              | Use                                                              |
-| ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`          | Map the words of a question to terms and their data              |
-| `get_term`                | `GET /terms/{term}?status=APPROVED`                                     | Definition, synonyms, authorized domains and approved relations |
-| `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`) | Browse the terms of a domain                                     |
-| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy?status=APPROVED`                           | Find approved wider or narrower terms                           |
-| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED`                             | All authorized bindings of an approved term                     |
+| Tool                      | REST calls                                                                                                                | Use                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`                                                            | Map the words of a question to terms and their data              |
+| `get_term`                | `GET /terms/{term}?status=APPROVED`                                                                                       | Definition, synonyms, authorized domains and approved relations  |
+| `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`)                                                   | Browse the terms of a domain                                     |
+| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy?status=APPROVED`                                                                             | Find approved wider or narrower terms                            |
+| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED`                                                                               | All authorized bindings of an approved term                      |
 | `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&status=APPROVED`; add `children=true` only for table or semantic model | Explain an authorized object, its table columns or model metrics |
 
 Every tool passes `status=APPROVED` to the server. The server applies the read contract in REST
@@ -1607,22 +1607,22 @@ The glossary is built in two steps. Step 1 is this design. Step 2 adds review, h
 on domains on top of it. Both steps use the same term IDs, relations and storage, so Step 2 needs
 no data migration.
 
-| Area                 | Step 1 (this design)                                                                                  | Step 2                                                                                     |
-| -------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Term model           | Terms with definitions, synonyms, owner, links, properties and source reference                       | Same terms                                                                                 |
-| Relations            | Several broader terms, related terms, cycle check, cleanup                                            | Relation changes are reviewed                                                              |
-| Domain membership    | Explicit relations (Option A); zero or more domains, optional on create; filters and cleanup         | Same membership source; changes are reviewed and domains become the scope of grants         |
-| Tags                 | Ordinary tags on terms through the existing tag APIs                                                  | Same                                                                                       |
-| Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths | Binding changes are reviewed, on both paths                                            |
+| Area                 | Step 1 (this design)                                                                                                      | Step 2                                                                                     |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Term model           | Terms with definitions, synonyms, owner, links, properties and source reference                                           | Same terms                                                                                 |
+| Relations            | Several broader terms, related terms, cycle check, cleanup                                                                | Relation changes are reviewed                                                              |
+| Domain membership    | Explicit relations (Option A); zero or more domains, optional on create; filters and cleanup                              | Same membership source; changes are reviewed and domains become the scope of grants        |
+| Tags                 | Ordinary tags on terms through the existing tag APIs                                                                      | Same                                                                                       |
+| Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths               | Binding changes are reviewed, on both paths                                                |
 | Privileges           | Metalake grants; CREATE maintains own terms; MANAGE reads, edits and deletes any term; private drafts, deny and filtering | Same privileges, also granted on domains and inherited by subdomains                       |
-| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision      | Default `DRAFT`, or `APPROVED` by an audited metalake setting; status changes are reviewed |
-| Changes              | Take effect at once; `TermChangeHandler` is the write hook                                            | Always reviewed; proposed changes are kept apart; nobody approves their own change         |
-| Versions and history | Revision number and audit only                                                                        | A snapshot of each approved change, readable history and diffs                             |
-| APIs and clients     | REST, Java and Python clients, OpenAPI                                                                | Proposal, decision and history APIs                                                        |
-| CSV import/export    | Not delivered; APIs and source references support future importers                                  | Planned as S2.6, with permissions and review                               |
-| Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                 | Same lookup, on the approved state                                                         |
-| Audit and events     | Create, edit, status, relation, membership, binding and delete                                        | Submit, approve, reject, and changes of the metalake setting                               |
-| UI                   | None; the REST calls behind each page are listed in Web UI support                                    | Term pages, hierarchy, binding drawers, review queue and history                           |
+| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision                           | Default `DRAFT`, or `APPROVED` by an audited metalake setting; status changes are reviewed |
+| Changes              | Take effect at once; `TermChangeHandler` is the write hook                                                                | Always reviewed; proposed changes are kept apart; nobody approves their own change         |
+| Versions and history | Revision number and audit only                                                                                            | A snapshot of each approved change, readable history and diffs                             |
+| APIs and clients     | REST, Java and Python clients, OpenAPI                                                                                    | Proposal, decision and history APIs                                                        |
+| CSV import/export    | Not delivered; APIs and source references support future importers                                                        | Planned as S2.6, with permissions and review                                               |
+| Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                                     | Same lookup, on the approved state                                                         |
+| Audit and events     | Create, edit, status, relation, membership, binding and delete                                                            | Submit, approve, reject, and changes of the metalake setting                               |
+| UI                   | None; the REST calls behind each page are listed in Web UI support                                                        | Term pages, hierarchy, binding drawers, review queue and history                           |
 
 ### Storage for Step 2
 
