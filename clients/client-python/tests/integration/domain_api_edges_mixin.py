@@ -79,7 +79,7 @@ class DomainApiEdgesMixin:
                 )
             snapshot = reader.get_domain(child.name())
             # Read permission remains effective despite an explicit management deny.
-            self.assertEqual([], snapshot.list_members(DomainMemberFilter()))
+            self.assertEqual([], snapshot.list_members(DomainMemberFilter(expand=True)))
             self.assertEqual([], snapshot.list_subdomains())
             self.assertEqual([], snapshot.list_subdomains_info())
             writes = {
@@ -245,7 +245,9 @@ class DomainApiEdgesMixin:
         self.assertEqual({"key": "value"}, loaded.properties())
 
         table.supports_tags().assign_tags(["value-contract-tag"])
-        member_filter = DomainMemberFilter(types=[MetadataObject.Type.TABLE])
+        member_filter = DomainMemberFilter(
+            expand=True, types=[MetadataObject.Type.TABLE]
+        )
         member = loaded.list_members(member_filter)[0]
         reloaded = loaded.list_members(member_filter)[0]
         metadata_object = MetadataObjects.parse(
@@ -300,7 +302,7 @@ class DomainApiEdgesMixin:
             "backing_tag": lambda: removed.update_backing_tag(None),
             "subdomains": removed.list_subdomains,
             "subdomains_info": removed.list_subdomains_info,
-            "members": lambda: removed.list_members(DomainMemberFilter()),
+            "members": lambda: removed.list_members(DomainMemberFilter(expand=True)),
             "create_subdomain": lambda: removed.create_subdomain(
                 "orphan", None, {}, TagValue("orphan-tag"), True
             ),

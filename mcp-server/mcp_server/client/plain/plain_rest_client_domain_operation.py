@@ -66,6 +66,7 @@ class PlainRESTClientDomainOperation(DomainOperation):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        expand: bool = False,
     ) -> str:
         params = []
         if types:
@@ -74,6 +75,8 @@ class PlainRESTClientDomainOperation(DomainOperation):
             params.extend(("domains", domain) for domain in domains)
         if name_contains and name_contains.strip():
             params.append(("nameContains", name_contains))
+        if expand:
+            params.append(("expand", "true"))
 
         response = await self._rest_client.get(
             f"{self._metalake_path}/domains/{encode_path_segment(domain_name)}/objects",

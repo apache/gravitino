@@ -370,7 +370,8 @@ public class TestDomainAuthorizationOperations extends BaseOperationsTest {
             mock(HttpServletResponse.class),
             (req, response) -> {
               try (Response result =
-                  operations.listMembers("lake", "missing", null, null, Collections.emptyList())) {
+                  operations.listMembers(
+                      "lake", "missing", null, null, Collections.emptyList(), false)) {
                 assertEquals(404, result.getStatus());
                 ((HttpServletResponse) response).setStatus(result.getStatus());
               }

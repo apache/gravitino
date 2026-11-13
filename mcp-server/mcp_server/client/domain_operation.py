@@ -42,10 +42,18 @@ class DomainOperation(ABC):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        expand: bool = False,
     ) -> str:
-        """List recorded leaf members and all applicable relations.
+        """List domain members and all applicable relations.
 
-        types filters leaf object types (for example TABLE and TOPIC).
+        By default, lists objects that carry the domain's backing tag themselves,
+        including catalogs and schemas; a CATALOG or SCHEMA member includes all
+        objects under it and is listed once. expand=true instead expands catalogs
+        and schemas into the recorded leaf objects under them, with INHERITED
+        relations; use it to enumerate every table, view, fileset, topic, model or
+        semantic model in a domain.
+        types filters object types (for example TABLE, TOPIC, CATALOG or SCHEMA;
+        CATALOG and SCHEMA are not allowed with expand=true).
         domains filters source domain names. name_contains matches a case-insensitive
         substring of the full metadata object name. Blank values omit this filter.
         """

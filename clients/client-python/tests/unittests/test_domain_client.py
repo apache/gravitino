@@ -31,6 +31,7 @@ from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.domain import (
     Domain,
     DomainChange,
+    DomainMember,
     DomainMemberFilter,
     DomainRelation,
     SupportsDomains,
@@ -451,6 +452,57 @@ class TestDomainClient(unittest.TestCase):
             query={"domains": ["Tax"]},
         )
 
+    def test_direct_and_expanded_members(self):
+        self._respond(
+            {
+                "code": 0,
+                "members": [
+                    {
+                        "object": {"fullName": "cat", "type": "catalog"},
+                        "relations": [{"relation": "direct"}],
+                    },
+                    {
+                        "object": {"fullName": "cat.db", "type": "schema"},
+                        "relations": [
+                            {
+                                "relation": "via_subdomain",
+                                "source": {"fullName": "Tax", "type": "domain"},
+                            }
+                        ],
+                    },
+                ],
+            }
+        )
+        member_filter = DomainMemberFilter(
+            types=(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA)
+        )
+        self.assertFalse(member_filter.expand)
+        members = self._domain().list_members(member_filter)
+        self._request(
+            "GET",
+            self.path + "/" + encode_string(self.NAME) + "/objects",
+            query={"types": ["CATALOG,SCHEMA"]},
+        )
+        self.assertEqual(
+            [MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA],
+            [m.object().type() for m in members],
+        )
+        self.assertTrue(
+            all(m.object().type() in DomainMember.CONTAINER_TYPES for m in members)
+        )
+        self.assertEqual(DomainRelation.Type.DIRECT, members[0].relations()[0].type())
+        self.assertEqual("Tax", members[1].relations()[0].source().name())
+
+        self._respond({"code": 0, "members": []})
+        expanded = DomainMemberFilter(types=(MetadataObject.Type.TABLE,), expand=True)
+        self.assertNotEqual(DomainMemberFilter(types=expanded.types), expanded)
+        self._domain().list_members(expanded)
+        self._request(
+            "GET",
+            self.path + "/" + encode_string(self.NAME) + "/objects",
+            query={"types": ["TABLE"], "expand": ["true"]},
+        )
+
     def test_domain_identifier_parent(self):
         for parent in ("Finance", ""):
             with self.subTest(parent=parent), self.assertRaises(
@@ -684,7 +736,13 @@ class TestDomainClient(unittest.TestCase):
         for kwargs in (
             {"types": None},
             {"types": [None]},
-            {"types": [MetadataObject.Type.CATALOG]},
+            {"types": [MetadataObject.Type.FUNCTION]},
+            {"types": [MetadataObject.Type.COLUMN]},
+            {"types": [MetadataObject.Type.CATALOG], "expand": True},
+            {
+                "types": [MetadataObject.Type.TABLE, MetadataObject.Type.SCHEMA],
+                "expand": True,
+            },
             {"domains": None},
             {"domains": [None]},
             {"domains": [" "]},

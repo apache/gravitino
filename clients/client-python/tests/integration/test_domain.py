@@ -302,7 +302,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         # The same table has both inherited and subdomain relations, with no precedence.
         members = {
             m.object().full_name(): m
-            for m in finance.list_members(DomainMemberFilter())
+            for m in finance.list_members(DomainMemberFilter(expand=True))
         }
         self.assertEqual(
             {
@@ -330,7 +330,36 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         )
         self.assertEqual(
             ["ice.schema.hidden"],
-            [m.object().full_name() for m in risk.list_members(DomainMemberFilter())],
+            [
+                m.object().full_name()
+                for m in risk.list_members(DomainMemberFilter(expand=True))
+            ],
+        )
+
+        # By default the tagged objects are listed, and the schema is listed once.
+        direct = {
+            m.object().full_name(): m
+            for m in finance.list_members(DomainMemberFilter())
+        }
+        self.assertEqual(
+            {
+                "ice.schema",
+                "ice.schema.orders",
+                "files.schema.data",
+                "models.schema.model",
+            },
+            set(direct),
+        )
+        self.assertEqual(
+            MetadataObject.Type.SCHEMA, direct["ice.schema"].object().type()
+        )
+        self.assertEqual(
+            [DomainRelation.Type.DIRECT],
+            [r.type() for r in direct["ice.schema"].relations()],
+        )
+        self.assertEqual(
+            [DomainRelation.Type.VIA_SUBDOMAIN],
+            [r.type() for r in direct["ice.schema.orders"].relations()],
         )
 
         # Reverse lookup must expose the same domain on every supported leaf resource.
@@ -347,7 +376,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [
                 m.object().full_name()
                 for m in finance.list_members(
-                    DomainMemberFilter(domains=[child.name(), "unknown_scope"])
+                    DomainMemberFilter(
+                        expand=True, domains=[child.name(), "unknown_scope"]
+                    )
                 )
             ],
         )
@@ -355,7 +386,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             5,
             len(
                 finance.list_members(
-                    DomainMemberFilter(domains=[finance.name(), child.name()])
+                    DomainMemberFilter(
+                        expand=True, domains=[finance.name(), child.name()]
+                    )
                 )
             ),
         )
@@ -365,19 +398,31 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
                 m.object().type()
                 for m in finance.list_members(
                     DomainMemberFilter(
-                        types=[MetadataObject.Type.VIEW, MetadataObject.Type.MODEL]
+                        expand=True,
+                        types=[MetadataObject.Type.VIEW, MetadataObject.Type.MODEL],
                     )
                 )
             },
         )
         self.assertEqual(
-            2, len(finance.list_members(DomainMemberFilter(name_contains="ORDERS")))
+            2,
+            len(
+                finance.list_members(
+                    DomainMemberFilter(expand=True, name_contains="ORDERS")
+                )
+            ),
         )
         self.assertEqual(
-            [], finance.list_members(DomainMemberFilter(name_contains="/ ?&+%,"))
+            [],
+            finance.list_members(
+                DomainMemberFilter(expand=True, name_contains="/ ?&+%,")
+            ),
         )
         self.assertEqual(
-            [], finance.list_members(DomainMemberFilter(domains=["unknown_scope"]))
+            [],
+            finance.list_members(
+                DomainMemberFilter(expand=True, domains=["unknown_scope"])
+            ),
         )
 
         # Hierarchy and domain-name changes must appear without retagging any object.
@@ -553,7 +598,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             ],
         )
 
-        visible = reader.get_domain(parent.name()).list_members(DomainMemberFilter())
+        visible = reader.get_domain(parent.name()).list_members(
+            DomainMemberFilter(expand=True)
+        )
         self.assertEqual(
             ["ice.schema.orders"], [m.object().full_name() for m in visible]
         )
@@ -570,13 +617,15 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         self.assertEqual(
             [],
             reader.get_domain(parent.name()).list_members(
-                DomainMemberFilter(domains=[child.name()])
+                DomainMemberFilter(expand=True, domains=[child.name()])
             ),
         )
 
         # A hidden child contributes no roll-up relation until it is published.
         child.publish()
-        visible = reader.get_domain(parent.name()).list_members(DomainMemberFilter())
+        visible = reader.get_domain(parent.name()).list_members(
+            DomainMemberFilter(expand=True)
+        )
         self.assertEqual(
             {DomainRelation.Type.INHERITED, DomainRelation.Type.VIA_SUBDOMAIN},
             {r.type() for r in visible[0].relations()},
@@ -594,7 +643,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [self._scope(child.name(), [Privileges.deny("USE_DOMAIN")])],
         )
         parent_only = reader.get_domain(parent.name()).list_members(
-            DomainMemberFilter()
+            DomainMemberFilter(expand=True)
         )
         self.assertEqual(1, len(parent_only))
         self.assertEqual(
@@ -614,7 +663,10 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             ],
         )
         self.assertEqual(
-            [], reader.get_domain(parent.name()).list_members(DomainMemberFilter())
+            [],
+            reader.get_domain(parent.name()).list_members(
+                DomainMemberFilter(expand=True)
+            ),
         )
         with self.assertRaises(ForbiddenException):
             lookup.list_domains()
@@ -686,7 +738,9 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
     def _assert_table_relations(self, domain, table, expected):
         members = domain.list_members(
             DomainMemberFilter(
-                types=[MetadataObject.Type.TABLE], name_contains="ice.schema.orders"
+                expand=True,
+                types=[MetadataObject.Type.TABLE],
+                name_contains="ice.schema.orders",
             )
         )
         reverse = [
@@ -851,6 +905,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         self._assert_table_relations(second, table, {inherited_schema})
         selected = parent.list_members(
             DomainMemberFilter(
+                expand=True,
                 domains=[first.name(), second.name()],
                 types=[MetadataObject.Type.TABLE],
                 name_contains="ORDERS",
@@ -865,12 +920,17 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [],
             parent.list_members(
                 DomainMemberFilter(
-                    domains=[first.name()], types=[MetadataObject.Type.VIEW]
+                    expand=True,
+                    domains=[first.name()],
+                    types=[MetadataObject.Type.VIEW],
                 )
             ),
         )
         self.assertEqual(
-            [], first.list_members(DomainMemberFilter(domains=[second.name()]))
+            [],
+            first.list_members(
+                DomainMemberFilter(expand=True, domains=[second.name()])
+            ),
         )
 
         # Removing one route must preserve the other routes and the member's own child scope.

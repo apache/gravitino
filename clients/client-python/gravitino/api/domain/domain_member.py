@@ -24,7 +24,13 @@ from gravitino.api.domain.domain_relation import DomainRelation
 
 @dataclass(frozen=True)
 class DomainMember:
-    """A leaf object and every applicable relation to the listed domain."""
+    """An object and every applicable relation to the listed domain.
+
+    By default a listing returns direct members: objects that carry a backing tag
+    themselves, including catalogs and schemas (``CONTAINER_TYPES``). A catalog or
+    schema member includes its children. An expanded listing returns only leaf
+    objects (``SUPPORTED_TYPES``).
+    """
 
     SUPPORTED_TYPES: ClassVar[frozenset[MetadataObject.Type]] = frozenset(
         {
@@ -35,6 +41,9 @@ class DomainMember:
             MetadataObject.Type.MODEL,
             MetadataObject.Type.SEMANTIC_MODEL,
         }
+    )
+    CONTAINER_TYPES: ClassVar[frozenset[MetadataObject.Type]] = frozenset(
+        {MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA}
     )
     _object: MetadataObject
     _relations: tuple[DomainRelation, ...]

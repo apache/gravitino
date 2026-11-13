@@ -271,6 +271,7 @@ public class DomainIT extends BaseIT {
         0,
         domain.listMembers(
                 DomainMemberFilter.builder()
+                    .withExpand(true)
                     .withTypes(MetadataObject.Type.TABLE, MetadataObject.Type.VIEW)
                     .withDomains("Tax_EU", "Trading_US_East")
                     .withNameContains("x /?&+%,")
@@ -385,7 +386,7 @@ public class DomainIT extends BaseIT {
 
     // An object can be inherited from Finance and reached through Trading at the same time.
     Map<String, DomainMember> members =
-        Arrays.stream(finance.listMembers(DomainMemberFilter.builder().build()))
+        Arrays.stream(finance.listMembers(DomainMemberFilter.builder().withExpand(true).build()))
             .collect(Collectors.toMap(member -> member.object().fullName(), member -> member));
     assertEquals(
         Set.of(
@@ -404,6 +405,30 @@ public class DomainIT extends BaseIT {
         DomainRelation.Type.DIRECT, members.get("files.schema.data").relations()[0].type());
     assertEquals(
         "ice.schema.hidden",
+        risk.listMembers(DomainMemberFilter.builder().withExpand(true).build())[0]
+            .object()
+            .fullName());
+
+    // By default the objects carrying a backing tag are listed, and the schema is listed once.
+    Map<String, DomainMember> direct =
+        Arrays.stream(finance.listMembers(DomainMemberFilter.builder().build()))
+            .collect(Collectors.toMap(member -> member.object().fullName(), member -> member));
+    assertEquals(
+        Set.of("ice.schema", "ice.schema.orders", "files.schema.data", "models.schema.model"),
+        direct.keySet());
+    assertEquals(MetadataObject.Type.SCHEMA, direct.get("ice.schema").object().type());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct()}, direct.get("ice.schema").relations());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain(child.name())},
+        direct.get("ice.schema.orders").relations());
+    assertEquals(
+        1,
+        finance.listMembers(
+                DomainMemberFilter.builder().withTypes(MetadataObject.Type.SCHEMA).build())
+            .length);
+    assertEquals(
+        "ice.schema.hidden",
         risk.listMembers(DomainMemberFilter.builder().build())[0].object().fullName());
 
     // Verify the reverse lookup exposed by every supported leaf resource.
@@ -417,27 +442,36 @@ public class DomainIT extends BaseIT {
     assertEquals(
         1,
         finance.listMembers(
-                DomainMemberFilter.builder().withDomains(child.name(), "unknown_scope").build())
+                DomainMemberFilter.builder()
+                    .withExpand(true)
+                    .withDomains(child.name(), "unknown_scope")
+                    .build())
             .length);
     assertEquals(
         5,
         finance.listMembers(
-                DomainMemberFilter.builder().withDomains(finance.name(), child.name()).build())
+                DomainMemberFilter.builder()
+                    .withExpand(true)
+                    .withDomains(finance.name(), child.name())
+                    .build())
             .length);
     assertEquals(
         2,
         finance.listMembers(
                 DomainMemberFilter.builder()
+                    .withExpand(true)
                     .withTypes(MetadataObject.Type.VIEW, MetadataObject.Type.MODEL)
                     .build())
             .length);
     assertEquals(
         2,
-        finance.listMembers(DomainMemberFilter.builder().withNameContains("ORDERS").build())
+        finance.listMembers(
+                DomainMemberFilter.builder().withExpand(true).withNameContains("ORDERS").build())
             .length);
     assertEquals(
         0,
-        finance.listMembers(DomainMemberFilter.builder().withNameContains("/ ?&+%,").build())
+        finance.listMembers(
+                DomainMemberFilter.builder().withExpand(true).withNameContains("/ ?&+%,").build())
             .length);
 
     // Membership roll-ups follow hierarchy changes without retagging the leaf object.
@@ -597,6 +631,7 @@ public class DomainIT extends BaseIT {
     DomainMember[] selected =
         parent.listMembers(
             DomainMemberFilter.builder()
+                .withExpand(true)
                 .withDomains(first.name(), second.name())
                 .withTypes(MetadataObject.Type.TABLE)
                 .withNameContains("ORDERS")
@@ -607,6 +642,7 @@ public class DomainIT extends BaseIT {
         0,
         parent.listMembers(
                 DomainMemberFilter.builder()
+                    .withExpand(true)
                     .withDomains(first.name())
                     .withTypes(MetadataObject.Type.VIEW)
                     .build())
@@ -615,7 +651,9 @@ public class DomainIT extends BaseIT {
     // Child scopes do not include their siblings; detaching changes only the parent's roll-up.
     assertEquals(
         0,
-        first.listMembers(DomainMemberFilter.builder().withDomains(second.name()).build()).length);
+        first.listMembers(
+                DomainMemberFilter.builder().withExpand(true).withDomains(second.name()).build())
+            .length);
     table
         .supportsTags()
         .associateTags(new String[0], new String[] {parent.backingTag().orElseThrow().name()});
@@ -728,7 +766,7 @@ public class DomainIT extends BaseIT {
     assertThrows(NoSuchDomainException.class, removed::listSubdomainsInfo);
     assertThrows(
         NoSuchDomainException.class,
-        () -> removed.listMembers(DomainMemberFilter.builder().build()));
+        () -> removed.listMembers(DomainMemberFilter.builder().withExpand(true).build()));
     assertThrows(
         NoSuchDomainException.class,
         () -> removed.createSubdomain("orphan", null, null, TagValue.noValue("orphan-tag"), true));
@@ -830,7 +868,7 @@ public class DomainIT extends BaseIT {
 
     table.supportsTags().associateTags(new String[] {"value-contract-tag"}, new String[0]);
     DomainMemberFilter filter =
-        DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+        DomainMemberFilter.builder().withExpand(true).withTypes(MetadataObject.Type.TABLE).build();
     DomainMember member = loaded.listMembers(filter)[0];
     DomainMember reloaded = loaded.listMembers(filter)[0];
     MetadataObject object = MetadataObjects.parse("ice.schema.orders", MetadataObject.Type.TABLE);
@@ -880,6 +918,7 @@ public class DomainIT extends BaseIT {
     DomainMember[] members =
         domain.listMembers(
             DomainMemberFilter.builder()
+                .withExpand(true)
                 .withTypes(MetadataObject.Type.TABLE)
                 .withNameContains("ice.schema.orders")
                 .build());

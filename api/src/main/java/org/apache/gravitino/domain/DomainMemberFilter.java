@@ -46,8 +46,12 @@ import org.apache.gravitino.annotation.Evolving;
  * </ul>
  *
  * <p>The members of the listed domain itself are the listed members whose {@link
- * DomainMember#relations() relations} include {@link DomainRelation.Type#DIRECT} or {@link
- * DomainRelation.Type#INHERITED}; select them to keep only those.
+ * DomainMember#relations() relations} include {@link DomainRelation.Type#DIRECT} or, when the
+ * listing is expanded, {@link DomainRelation.Type#INHERITED}; select them to keep only those.
+ *
+ * <p>The expand option chooses what is listed. Without it, the default, the objects that carry a
+ * backing tag themselves are listed, including catalogs and schemas, each once. With it, a catalog
+ * or schema is replaced by the recorded leaf objects under it that inherit the backing tag.
  */
 @Evolving
 public final class DomainMemberFilter {
@@ -55,11 +59,13 @@ public final class DomainMemberFilter {
   private final Set<MetadataObject.Type> types;
   @Nullable private final String nameContains;
   private final Set<String> domains;
+  private final boolean expand;
 
   private DomainMemberFilter(Builder builder) {
     this.types = builder.types;
     this.nameContains = builder.nameContains;
     this.domains = builder.domains;
+    this.expand = builder.expand;
   }
 
   /**
@@ -74,8 +80,9 @@ public final class DomainMemberFilter {
   /**
    * Returns the metadata object types of the members to list.
    *
-   * @return The metadata object types, or an empty set to list members of all {@link
-   *     DomainMember#SUPPORTED_TYPES supported types}.
+   * @return The metadata object types, or an empty set to list members of all types: the {@link
+   *     DomainMember#SUPPORTED_TYPES supported types} and, without expansion, the {@link
+   *     DomainMember#CONTAINER_TYPES container types}.
    */
   public Set<MetadataObject.Type> types() {
     return types;
@@ -101,6 +108,18 @@ public final class DomainMemberFilter {
   }
 
   /**
+   * Returns whether catalog and schema members are expanded to the recorded leaf objects under
+   * them.
+   *
+   * @return {@code true} to list leaf objects only, with {@link DomainRelation.Type#INHERITED}
+   *     relations for the leaf objects that inherit a backing tag; {@code false}, the default, to
+   *     list the objects that carry a backing tag themselves.
+   */
+  public boolean expand() {
+    return expand;
+  }
+
+  /**
    * Compares this filter with another object.
    *
    * @param other The object to compare.
@@ -117,7 +136,8 @@ public final class DomainMemberFilter {
     DomainMemberFilter that = (DomainMemberFilter) other;
     return types.equals(that.types)
         && Objects.equals(nameContains, that.nameContains)
-        && domains.equals(that.domains);
+        && domains.equals(that.domains)
+        && expand == that.expand;
   }
 
   /**
@@ -127,7 +147,7 @@ public final class DomainMemberFilter {
    */
   @Override
   public int hashCode() {
-    return Objects.hash(types, nameContains, domains);
+    return Objects.hash(types, nameContains, domains, expand);
   }
 
   /**
@@ -144,6 +164,8 @@ public final class DomainMemberFilter {
         + nameContains
         + ", domains="
         + domains
+        + ", expand="
+        + expand
         + "}";
   }
 
@@ -153,27 +175,32 @@ public final class DomainMemberFilter {
     private Set<MetadataObject.Type> types = ImmutableSet.of();
     @Nullable private String nameContains;
     private Set<String> domains = ImmutableSet.of();
+    private boolean expand;
 
     private Builder() {}
 
     /**
-     * Sets the metadata object types of the members to list. Defaults to all {@link
-     * DomainMember#SUPPORTED_TYPES supported types}.
+     * Sets the metadata object types of the members to list. Defaults to all types. A type is one
+     * of the {@link DomainMember#SUPPORTED_TYPES supported types} or, for a listing that is not
+     * expanded, one of the {@link DomainMember#CONTAINER_TYPES container types}.
      *
-     * @param types The metadata object types, or none to list members of all supported types.
+     * @param types The metadata object types, or none to list members of all types.
      * @return This builder.
      * @throws IllegalArgumentException If the types are null, contain null, or contain a type that
-     *     is not in {@link DomainMember#SUPPORTED_TYPES}.
+     *     is in neither {@link DomainMember#SUPPORTED_TYPES} nor {@link
+     *     DomainMember#CONTAINER_TYPES}.
      */
     public Builder withTypes(MetadataObject.Type... types) {
       Preconditions.checkArgument(types != null, "types must not be null");
       for (MetadataObject.Type type : types) {
         Preconditions.checkArgument(type != null, "types must not contain null");
         Preconditions.checkArgument(
-            DomainMember.SUPPORTED_TYPES.contains(type),
-            "Type %s cannot be a domain member, supported types are %s",
+            DomainMember.SUPPORTED_TYPES.contains(type)
+                || DomainMember.CONTAINER_TYPES.contains(type),
+            "Type %s cannot be a domain member, supported types are %s and %s",
             type,
-            DomainMember.SUPPORTED_TYPES);
+            DomainMember.SUPPORTED_TYPES,
+            DomainMember.CONTAINER_TYPES);
       }
       this.types = ImmutableSet.copyOf(types);
       return this;
@@ -216,11 +243,30 @@ public final class DomainMemberFilter {
     }
 
     /**
+     * Sets whether catalog and schema members are expanded to the recorded leaf objects under them.
+     * Defaults to {@code false}.
+     *
+     * @param expand {@code true} to list leaf objects only, {@code false} to list the objects that
+     *     carry a backing tag themselves.
+     * @return This builder.
+     */
+    public Builder withExpand(boolean expand) {
+      this.expand = expand;
+      return this;
+    }
+
+    /**
      * Builds a domain member filter.
      *
      * @return The immutable domain member filter.
+     * @throws IllegalArgumentException If the listing is expanded and the types include a {@link
+     *     DomainMember#CONTAINER_TYPES container type}, which an expanded listing never lists.
      */
     public DomainMemberFilter build() {
+      Preconditions.checkArgument(
+          !expand || types.stream().noneMatch(DomainMember.CONTAINER_TYPES::contains),
+          "An expanded listing has only leaf members, types %s are not supported with expand",
+          DomainMember.CONTAINER_TYPES);
       return new DomainMemberFilter(this);
     }
   }

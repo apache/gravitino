@@ -179,6 +179,15 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query["types"], "TABLE,TOPIC")
         self.assertEqual(query.get_list("domains"), ["child,one", "child & 二"])
         self.assertEqual(query["nameContains"], "a&b + %/?")
+        self.assertNotIn("expand", query)
+
+        await self._call(
+            "list_domain_members",
+            {"domain_name": "sales", "types": ["TABLE"], "expand": True},
+        )
+        query = self.requests[-1].url.params
+        self.assertEqual(query["types"], "TABLE")
+        self.assertEqual(query["expand"], "true")
 
     async def test_encoded_paths_and_authorization(self):
         value = "a/b ?#%,二"
