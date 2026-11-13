@@ -175,7 +175,12 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> topicOperationDispatcher.loadTopic(topicIdent1));
-    Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
+    Assertions.assertTrue(exception.getMessage().contains("topic " + topicIdent1));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external topic"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
     verify(entityStore).put(any(TopicEntity.class), eq(false));
     reset(entityStore);
     TopicEntity topicEntity =

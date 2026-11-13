@@ -552,7 +552,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         // or because the external identifier is already stored under another Gravitino path.
         // Reload to distinguish a successful concurrent import from an identity conflict.
         LOG.info(
-            "View {} import conflicted with existing metadata; reloading from store.", ident, e);
+            "View {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
         entityCombinedView =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
         if (!entityCombinedView.imported()) {

@@ -111,6 +111,9 @@ public abstract class OperationDispatcher {
       case VIEW:
         entityName = "view";
         break;
+      case TOPIC:
+        entityName = "topic";
+        break;
       default:
         entityName = "object";
     }
@@ -119,7 +122,7 @@ public abstract class OperationDispatcher {
         String.format(
             "%s %s cannot be imported because its name or external identifier is already managed "
                 + "under a different Gravitino identifier. Gravitino does not automatically "
-                + "reconcile external %s renames or stale registrations, and it does not support "
+                + "reconcile conflicting external %s registrations, and it does not support "
                 + "metadata-only unregister of an individual external %s. Recovery requires an "
                 + "administrator to force-drop and recreate the containing Gravitino catalog "
                 + "registration. This catalog-wide reset removes every stored registration and "

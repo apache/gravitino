@@ -917,7 +917,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             UnsupportedOperationException.class,
             () -> tableOperationDispatcher.loadTable(tableIdent1));
     Assertions.assertTrue(
-        exception.getMessage().contains("does not automatically reconcile external table renames"));
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external table registrations"));
     Assertions.assertTrue(
         exception
             .getMessage()
@@ -1421,7 +1423,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             UnsupportedOperationException.class,
             () -> tableOperationDispatcher.loadTable(tableIdent));
     Assertions.assertTrue(
-        exception.getMessage().contains("does not automatically reconcile external table renames"));
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external table registrations"));
     Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
     verify(entityStore).put(any(TableEntity.class), eq(false));
   }

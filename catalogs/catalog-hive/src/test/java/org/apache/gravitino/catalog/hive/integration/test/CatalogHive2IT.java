@@ -1591,7 +1591,8 @@ public class CatalogHive2IT extends BaseIT {
       Assertions.assertTrue(
           exception
               .getMessage()
-              .contains("does not automatically reconcile external table renames"),
+              .contains(
+                  "does not automatically reconcile conflicting external table registrations"),
           exception.getMessage());
       MetadataObject[] objects = metalake.getTag(tagName).associatedObjects().objects();
       Assertions.assertEquals(1, objects.length);

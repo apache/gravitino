@@ -543,7 +543,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
     Assertions.assertTrue(
-        exception.getMessage().contains("does not automatically reconcile external view renames"));
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external view registrations"));
     Assertions.assertTrue(
         exception.getMessage().contains("metadata-only unregister of an individual external view"));
     Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));

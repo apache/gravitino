@@ -23,9 +23,11 @@ Earlier 2.0.0 snapshots with identifier-only primary keys also require these pri
 Apply the updated 1.3.0-to-2.0.0 upgrade script using the backup and shutdown procedure below;
 the existing 2.0.0 version label does not mean the database already has composite primary keys.
 
-Loading an externally renamed object no longer automatically moves a conflicting active
-registration. There is no per-object metadata-only unregister API; recovery here requires catalog
-re-registration as described below.
+Table and view imports do not automatically move registrations after an external rename.
+Schema imports retain the existing same-catalog rename handling: a registration can move only
+after confirming that its old source path no longer exists. An ID active in another catalog
+cannot be moved by an import. There is no per-object metadata-only unregister API; recovery from
+unresolved identity conflicts requires catalog re-registration as described below.
 
 Dropping a catalog clears owner, privilege, tag, and statistic associations for the catalog
 and its descendants. The upgrade also soft-deletes orphaned associations for retained schema,

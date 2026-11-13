@@ -244,7 +244,11 @@ public class CatalogKafkaIT extends BaseIT {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> conflictingCatalog.asTopicCatalog().loadTopic(topicIdent));
-    Assertions.assertTrue(exception.getMessage().contains("immutable Kafka topic UUID"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external topic"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
 
     // The rejected import must not move the active entity away from its original path.
     Assertions.assertEquals(

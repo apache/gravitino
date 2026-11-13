@@ -206,14 +206,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           () -> {
             boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
             if (!isManagedSchema) {
-              // Check before source creation so an existing registration cannot be replaced.
-              // Never interpret a store failure as permission to replace its identity.
+              // Check before source creation so a renamed schema can still be imported under its
+              // new name. Never interpret a store failure as permission to replace its identity.
               try {
                 if (store.exists(ident, SCHEMA)) {
                   throw new SchemaAlreadyExistsException(
-                      "Schema %s is already registered in Gravitino. Verify the registered and source "
-                          + "identities and follow the catalog-specific recovery guidance before "
-                          + "removing the stale registration or creating this name.",
+                      "Schema %s is already registered in Gravitino. If it was renamed externally, "
+                          + "loadSchema under its new name before creating this name. Otherwise, "
+                          + "verify the old source identity is gone before removing its registration.",
                       ident);
                 }
               } catch (IOException e) {
@@ -671,11 +671,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 LockType.WRITE,
                 () -> importSchemaFromCatalog(ident, importAudit));
       } catch (EntityAlreadyExistsException e) {
-        // A create-only import can conflict either because another Gravitino node won an HA race,
-        // or because the external identifier is already stored under another Gravitino path.
-        // Reload to distinguish a successful concurrent import from an identity conflict.
+        // A create-only import can conflict with a concurrent import or an identity registered
+        // under another catalog. Reload to verify the winning registration's identity.
         LOG.info(
-            "Schema {} import conflicted with existing metadata; reloading from store.", ident, e);
+            "Schema {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
         EntityCombinedSchema reloaded =
             TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadSchema(ident));
         if (!reloaded.imported()) {
@@ -721,31 +722,41 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     long uid;
     if (stringId != null) {
-      // An external identifier may already be stored under another Gravitino path because the
-      // schema was renamed outside Gravitino or because multiple catalogs expose one metastore.
-      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
-      // stored identity because doing so can silently move the schema between catalogs. The
-      // create-only write below reports the conflict for manual identifier cleanup.
+      // If the entity in the store doesn't match the one in the external system, we use the data
+      // of external system to correct it.
       LOG.warn(
-          "Schema uid {} exists externally but is not imported at {}. Gravitino will use a "
-              + "create-only import; if this uid is already stored under another identifier, "
-              + "manual identifier cleanup is required.",
-          stringId,
-          identifier);
+          "Verifying ownership of schema identifier {} before import; the source may have been "
+              + "renamed externally or may carry a copied identifier.",
+          stringId);
       uid = stringId.id();
     } else {
       // If the entity doesn't exist, we import the entity from the external system.
       uid = idGenerator.nextId();
     }
 
+    SchemaEntity previousEntity = null;
     if (stringId != null) {
       try {
         for (SchemaEntity existing :
             store.list(identifier.namespace(), SchemaEntity.class, SCHEMA)) {
-          if (existing.id() == uid && !existing.nameIdentifier().equals(identifier)) {
-            // Keep the ownership check for copied source identifiers and external renames, but
-            // require manual cleanup instead of moving the existing registration to this path.
-            throw retainedExternalIdentifierConflictException(identifier, SCHEMA);
+          if (existing.id() == uid) {
+            if (existing.nameIdentifier().equals(identifier)) {
+              previousEntity = existing;
+              break;
+            }
+            try {
+              doWithCatalog(
+                  getCatalogIdentifier(existing.nameIdentifier()),
+                  c -> c.doWithSchemaOps(ops -> ops.loadSchema(existing.nameIdentifier())),
+                  NoSuchSchemaException.class);
+            } catch (NoSuchSchemaException e) {
+              // Preserve a genuine external rename only after confirming the old object is gone.
+              previousEntity = existing;
+              break;
+            }
+            throw new SchemaAlreadyExistsException(
+                "Schema %s carries the identifier of existing schema %s; refusing to move its metadata",
+                identifier, existing.nameIdentifier());
           }
         }
       } catch (IOException e) {
@@ -794,9 +805,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .withAuditInfo(audit)
             .build();
     try {
-      // Never overwrite imported schema metadata. In particular, an overwrite by stable ID can
-      // silently change catalog ownership and make existing privileges refer to the wrong path.
-      store.put(schemaEntity, false);
+      if (previousEntity == null) {
+        // An untrusted source marker must never overwrite an entity in another namespace.
+        store.put(schemaEntity, false);
+      } else {
+        store.update(
+            previousEntity.nameIdentifier(),
+            SchemaEntity.class,
+            SCHEMA,
+            existing -> {
+              if (!existing.id().equals(schemaEntity.id())) {
+                throw new OptimisticLockException("Schema identifier changed during import");
+              }
+              return schemaEntity;
+            });
+      }
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {

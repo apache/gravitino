@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -207,7 +208,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  void testExternalRenameRequiresManualIdentityCleanup() throws Exception {
+  void testExternalRenamePreservesSchemaIdentity() throws Exception {
     NameIdentifier original = NameIdentifier.of(metalake, catalog, "external_rename_original");
     NameIdentifier renamed = NameIdentifier.of(metalake, catalog, "external_rename_new");
     dispatcher.createSchema(original, "original", ImmutableMap.of("k1", "v1", "k2", "v2"));
@@ -233,7 +234,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                 dispatcher.createSchema(
                     original, "replacement", ImmutableMap.of("k1", "v1", "k2", "v2")));
     Assertions.assertTrue(conflict.getMessage().contains(original.toString()));
-    Assertions.assertTrue(conflict.getMessage().contains("catalog-specific recovery guidance"));
+    Assertions.assertTrue(conflict.getMessage().contains("loadSchema under its new name"));
     Assertions.assertEquals(
         originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
     catalogManager.doWithCatalogWrapper(
@@ -245,17 +246,15 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertTrue(renamedExists);
           return null;
         });
-    UnsupportedOperationException importConflict =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.loadSchema(renamed));
-    Assertions.assertTrue(
-        importConflict
-            .getMessage()
-            .contains("does not automatically reconcile external schema renames"));
+    Assertions.assertEquals(renamed.name(), dispatcher.loadSchema(renamed).name());
     Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
+    Assertions.assertFalse(entityStore.exists(original, SCHEMA));
+    dispatcher.createSchema(original, "replacement", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Assertions.assertNotEquals(
         originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
-    Assertions.assertFalse(entityStore.exists(renamed, SCHEMA));
-    verify(entityStore, never()).put(any(SchemaEntity.class), eq(false));
+    Assertions.assertEquals(
+        originalEntity.id(), entityStore.get(renamed, SCHEMA, SchemaEntity.class).id());
   }
 
   @Test
@@ -296,7 +295,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
           c.doWithSchemaOps(ops -> ops.createSchema(copy, "copy", copiedProperties));
           return null;
         });
-    Assertions.assertThrows(UnsupportedOperationException.class, () -> dispatcher.loadSchema(copy));
+    Assertions.assertThrows(SchemaAlreadyExistsException.class, () -> dispatcher.loadSchema(copy));
     Assertions.assertEquals(
         originalEntity.id(), entityStore.get(original, SCHEMA, SchemaEntity.class).id());
     Assertions.assertFalse(entityStore.exists(copy, SCHEMA));
@@ -434,10 +433,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // Audit info is gotten from catalog, not from the entity store
     Assertions.assertEquals("test", loadedSchema2.auditInfo().creator());
 
-    // Case 4: An external rename or conflicting path must not overwrite the stored identity.
+    // Case 4: Test if the fetched schema entity is matched.
     reset(entityStore);
-    SchemaEntity storedBeforeConflict =
-        entityStore.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
     SchemaEntity unmatchedEntity =
         SchemaEntity.builder()
             .withId(1L)
@@ -450,29 +447,16 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                     .build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.SCHEMA), any());
-    UnsupportedOperationException exception =
-        Assertions.assertThrows(
-            UnsupportedOperationException.class, () -> dispatcher.loadSchema(schemaIdent));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains("does not automatically reconcile external schema renames"));
-    Assertions.assertTrue(
-        exception
-            .getMessage()
-            .contains("metadata-only unregister of an individual external schema"));
-    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
-    Assertions.assertTrue(
-        exception.getMessage().contains("privileges, tags, and other relationships"));
-    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
-    verify(entityStore).put(any(SchemaEntity.class), eq(false));
-
-    // The rejected import leaves the existing entity and its identity unchanged.
+    Schema loadedSchema3 = dispatcher.loadSchema(schemaIdent);
+    // Succeed to import the schema entity
     reset(entityStore);
-    SchemaEntity storedAfterConflict =
-        entityStore.get(schemaIdent, Entity.EntityType.SCHEMA, SchemaEntity.class);
-    Assertions.assertEquals(storedBeforeConflict.id(), storedAfterConflict.id());
-    Assertions.assertEquals(storedBeforeConflict.name(), storedAfterConflict.name());
+    SchemaEntity schemaEntity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+    Assertions.assertEquals("test", schemaEntity.auditInfo().creator());
+    Assertions.assertEquals(schema.name(), loadedSchema3.name());
+    Assertions.assertEquals(schema.comment(), loadedSchema3.comment());
+    testProperties(props, loadedSchema3.properties());
+    // Audit info is gotten from catalog, not from the entity store
+    Assertions.assertEquals("test", loadedSchema3.auditInfo().creator());
   }
 
   @Test
@@ -497,6 +481,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // EntityAlreadyExistsException, and the dispatcher-level retry sees the entity on the third
     // get.
     reset(entityStore);
+    doReturn(Collections.emptyList())
+        .when(entityStore)
+        .list(schemaIdent.namespace(), SchemaEntity.class, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(concurrentSchemaEntity)
@@ -548,6 +535,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     // an entity with a mismatched ID (operateOnEntity returns null → imported=false → error
     // thrown).
     reset(entityStore);
+    doReturn(Collections.emptyList())
+        .when(entityStore)
+        .list(schemaIdent.namespace(), SchemaEntity.class, SCHEMA);
     doThrow(new NoSuchEntityException("mock error"))
         .doThrow(new NoSuchEntityException("mock error"))
         .doReturn(mismatchedSchemaEntity)
@@ -563,7 +553,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(
         exception
             .getMessage()
-            .contains("does not automatically reconcile external schema renames"));
+            .contains(
+                "does not automatically reconcile conflicting external schema registrations"));
     Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
     verify(entityStore).put(any(SchemaEntity.class), eq(false));
   }
