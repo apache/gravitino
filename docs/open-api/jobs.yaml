@@ -293,6 +293,15 @@ paths:
               examples:
                 JobResponse:
                   $ref: "#/components/examples/JobResponse"
+        "400":
+          description: Bad Request - A query parameter is malformed or invalid
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                JobQueryIllegalArgumentException:
+                  $ref: "#/components/examples/JobQueryIllegalArgumentException"
         "404":
           description: Not Found - The specified job does not exist in the specified metalake
           content:
@@ -1208,6 +1217,13 @@ components:
           "java.lang.IllegalArgumentException: Invalid argument xxx",
           "..."
         ]
+      }
+
+    JobQueryIllegalArgumentException:
+      value: {
+        "code": 1001,
+        "type": "IllegalArgumentException",
+        "message": "Invalid value for QueryParam parameter 'outputMaxLines': For input string: \"abc\""
       }
 
     JobRunIllegalArgumentException:

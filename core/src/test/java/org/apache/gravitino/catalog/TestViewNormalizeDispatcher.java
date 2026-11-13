@@ -22,8 +22,11 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -32,6 +35,7 @@ import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
   private static ViewNormalizeDispatcher viewNormalizeDispatcher;
@@ -46,6 +50,20 @@ public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(
             TestViewOperationDispatcher.schemaOperationDispatcher, catalogManager);
+  }
+
+  /** Explicit imports normalize names while preserving their audit arguments. */
+  @Test
+  public void testImportNormalizesIdentifierAndPassesAudit() {
+    ViewDispatcher delegate = Mockito.mock(ViewDispatcher.class);
+    ViewNormalizeDispatcher normalizer = new ViewNormalizeDispatcher(delegate, catalogManager);
+    AuditInfo audit = AuditInfo.builder().withCreator("creator").build();
+    NameIdentifier requested = NameIdentifier.of(metalake, catalog, "schema", "MiXeD");
+    normalizer.importView(requested, audit);
+    Mockito.verify(delegate)
+        .importView(
+            Mockito.eq(NameIdentifier.of(metalake, catalog, "schema", "mixed")),
+            Mockito.same(audit));
   }
 
   @Test
@@ -102,5 +120,66 @@ public class TestViewNormalizeDispatcher extends TestOperationDispatcher {
             () -> viewNormalizeDispatcher.dropView(NameIdentifier.of(viewNs, "a?")));
     Assertions.assertEquals(
         "The VIEW name 'a?' is illegal. Illegal name: a?", exception.getMessage());
+  }
+
+  @Test
+  public void testDefaultsLength() {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_defaults_length");
+    Map<String, String> props = ImmutableMap.of("k1", "v1");
+    schemaNormalizeDispatcher.createSchema(NameIdentifier.of(viewNs.levels()), "comment", props);
+
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    String maxLength = StringUtils.repeat("a", EntityFieldLimits.MAX_NAME_LENGTH);
+    String tooLong = maxLength + "a";
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewNormalizeDispatcher.createView(
+                    viewIdent, "comment", new Column[0], representations, tooLong, null, props));
+    Assertions.assertEquals(
+        "The default catalog of the view must not exceed 128 characters", exception.getMessage());
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewNormalizeDispatcher.createView(
+                    viewIdent, "comment", new Column[0], representations, null, tooLong, props));
+    Assertions.assertEquals(
+        "The default schema of the view must not exceed 128 characters", exception.getMessage());
+    Assertions.assertFalse(viewNormalizeDispatcher.viewExists(viewIdent));
+
+    View view =
+        viewNormalizeDispatcher.createView(
+            viewIdent, "comment", new Column[0], representations, maxLength, maxLength, props);
+    Assertions.assertEquals(maxLength, view.defaultCatalog());
+    Assertions.assertEquals(maxLength, view.defaultSchema());
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewNormalizeDispatcher.alterView(
+                    viewIdent,
+                    ViewChange.replaceView(
+                        new Column[0], representations, tooLong, null, "comment")));
+    Assertions.assertEquals(
+        "The default catalog of the view must not exceed 128 characters", exception.getMessage());
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                viewNormalizeDispatcher.alterView(
+                    viewIdent,
+                    ViewChange.replaceView(
+                        new Column[0], representations, null, tooLong, "comment")));
+    Assertions.assertEquals(
+        "The default schema of the view must not exceed 128 characters", exception.getMessage());
+    Assertions.assertEquals(
+        maxLength, viewNormalizeDispatcher.loadView(viewIdent).defaultCatalog());
   }
 }

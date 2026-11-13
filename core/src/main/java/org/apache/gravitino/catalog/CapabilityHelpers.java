@@ -19,18 +19,27 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
+import static org.apache.gravitino.rel.Column.INITIAL_DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ObjectArrays;
+import java.io.IOException;
 import java.util.Arrays;
+import java.util.function.Supplier;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.SupportsTableNameResolution;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -105,6 +114,63 @@ public class CapabilityHelpers {
     } catch (RuntimeException e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }
+  }
+
+  /**
+   * Normalizes the identifier of an existing catalog object to the identifier stored by Gravitino.
+   * Tag and authorization lookups use it, so they find the same stored object.
+   *
+   * <ul>
+   *   <li>Names follow the catalog's case rules for each scope.
+   *   <li>A table, or the parent table of a column, is resolved to its physical name by {@link
+   *       #resolvePhysicalTableName}.
+   *   <li>A column keeps the requested name when its table has a stored column with exactly that
+   *       name. A custom {@link Capability#normalizeName} can fold a name that the source stored
+   *       with another case, and an exact name must still find that column.
+   *   <li>A Semantic Model name is owned by Gravitino, so only its schema is normalized.
+   * </ul>
+   *
+   * @param ident the entity identifier of the object
+   * @param scope the capability scope of the object
+   * @param catalogManager the catalog manager used to load capabilities and resolve table names
+   * @param entityStore supplies the entity store that holds the stored columns of a table. It is
+   *     called only for a column whose name the catalog rules change.
+   * @return the normalized identifier
+   * @throws NoSuchCatalogException if the catalog does not exist
+   * @throws RuntimeException if capabilities, the physical table name or the stored table cannot be
+   *     loaded
+   */
+  public static NameIdentifier normalizeMetadataIdentifier(
+      NameIdentifier ident,
+      Capability.Scope scope,
+      CatalogManager catalogManager,
+      Supplier<EntityStore> entityStore) {
+    Capability capability = getCapability(ident, catalogManager);
+    if (scope == Capability.Scope.COLUMN) {
+      NameIdentifier table =
+          resolvePhysicalTableName(
+              applyCaseSensitive(
+                  NameIdentifier.of(ident.namespace().levels()),
+                  Capability.Scope.TABLE,
+                  capability),
+              catalogManager);
+      String column = applyCaseSensitiveOnName(scope, ident.name(), capability);
+      if (!column.equals(ident.name()) && hasStoredColumn(table, ident.name(), entityStore.get())) {
+        column = ident.name();
+      }
+      return NameIdentifier.of(
+          Namespace.of(ObjectArrays.concat(table.namespace().levels(), table.name())), column);
+    }
+
+    if (scope == Capability.Scope.SEMANTIC_MODEL) {
+      return NameIdentifier.of(
+          applyCaseSensitive(ident.namespace(), scope, capability), ident.name());
+    }
+
+    NameIdentifier normalized = applyCaseSensitive(ident, scope, capability);
+    return scope == Capability.Scope.TABLE
+        ? resolvePhysicalTableName(normalized, catalogManager)
+        : normalized;
   }
 
   public static Column[] applyCapabilities(Column[] columns, Capability capabilities) {
@@ -288,6 +354,18 @@ public class CapabilityHelpers {
     return namespace;
   }
 
+  private static boolean hasStoredColumn(
+      NameIdentifier table, String column, EntityStore entityStore) {
+    try {
+      return entityStore.get(table, Entity.EntityType.TABLE, TableEntity.class).columns().stream()
+          .anyMatch(storedColumn -> storedColumn.name().equals(column));
+    } catch (NoSuchEntityException e) {
+      return false;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load stored columns of table: " + table, e);
+    }
+  }
+
   private static boolean hasSchemaParent(Capability.Scope resourceScope) {
     switch (resourceScope) {
       case TABLE:
@@ -450,15 +528,23 @@ public class CapabilityHelpers {
     return TableChange.rename(newName, newSchemaName);
   }
 
+  private static void applyExistingColumnName(String name, Capability capabilities) {
+    CapabilityResult result =
+        capabilities.specificationOnExistingName(Capability.Scope.COLUMN, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
+  }
+
   private static TableChange applyCapabilities(
       TableChange.ColumnChange change, Capability capabilities) {
-    applyNameSpecification(Capability.Scope.COLUMN, change.fieldName()[0], capabilities);
-    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
-
     if (change instanceof TableChange.AddColumn) {
       return applyCapabilities((TableChange.AddColumn) change, capabilities);
+    }
 
-    } else if (change instanceof TableChange.UpdateColumnNullability) {
+    applyExistingColumnName(change.fieldName()[0], capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(change.fieldName(), capabilities);
+
+    if (change instanceof TableChange.UpdateColumnNullability) {
       return applyCapabilities((TableChange.UpdateColumnNullability) change, capabilities);
 
     } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
@@ -481,16 +567,10 @@ public class CapabilityHelpers {
     } else if (change instanceof TableChange.UpdateColumnPosition) {
       TableChange.UpdateColumnPosition updateColumnPosition =
           (TableChange.UpdateColumnPosition) change;
-      if (updateColumnPosition.getPosition() instanceof TableChange.After) {
-        TableChange.After afterPosition = (TableChange.After) updateColumnPosition.getPosition();
-        applyNameSpecification(Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        String afterFieldName =
-            applyCaseSensitiveOnName(
-                Capability.Scope.COLUMN, afterPosition.getColumn(), capabilities);
-        return TableChange.updateColumnPosition(
-            fieldName, TableChange.ColumnPosition.after(afterFieldName));
-      }
-      return TableChange.updateColumnPosition(fieldName, updateColumnPosition.getPosition());
+      return TableChange.updateColumnPosition(
+          fieldName,
+          normalizeColumnPosition(
+              updateColumnPosition.getPosition(), capabilities, fieldName.length == 1));
 
     } else if (change instanceof TableChange.UpdateColumnType) {
       return TableChange.updateColumnType(
@@ -503,28 +583,45 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.AddColumn addColumn, Capability capabilities) {
-    Column appliedColumn =
-        applyCapabilities(
-            Column.of(
-                addColumn.fieldName()[0],
-                addColumn.getDataType(),
-                addColumn.getComment(),
-                addColumn.isNullable(),
-                addColumn.isAutoIncrement(),
-                addColumn.getDefaultValue()),
-            capabilities);
+    Column column =
+        Column.of(
+            addColumn.fieldName()[0],
+            addColumn.getDataType(),
+            addColumn.getComment(),
+            addColumn.isNullable(),
+            addColumn.isAutoIncrement(),
+            addColumn.getDefaultValue());
+    applyColumnNotNull(column, capabilities);
+    applyColumnDefaultValue(column, capabilities);
 
-    String[] standardizeFieldName =
-        Arrays.copyOf(addColumn.fieldName(), addColumn.fieldName().length);
-    standardizeFieldName[0] = appliedColumn.name();
+    boolean topLevel = addColumn.fieldName().length == 1;
+    if (topLevel) {
+      applyNameSpecification(Capability.Scope.COLUMN, column.name(), capabilities);
+    } else {
+      // For a nested addition the first component names an existing parent column.
+      applyExistingColumnName(addColumn.fieldName()[0], capabilities);
+    }
     return TableChange.addColumn(
-        standardizeFieldName,
-        appliedColumn.dataType(),
-        appliedColumn.comment(),
-        addColumn.getPosition(),
-        appliedColumn.nullable(),
-        appliedColumn.autoIncrement(),
-        appliedColumn.defaultValue());
+        applyCaseSensitiveOnColumnName(addColumn.fieldName(), capabilities),
+        column.dataType(),
+        column.comment(),
+        normalizeColumnPosition(addColumn.getPosition(), capabilities, topLevel),
+        column.nullable(),
+        column.autoIncrement(),
+        column.defaultValue());
+  }
+
+  private static TableChange.ColumnPosition normalizeColumnPosition(
+      TableChange.ColumnPosition position, Capability capabilities, boolean topLevel) {
+    // Nested siblings follow the connector's own field rules rather than top-level name rules.
+    if (position instanceof TableChange.After && topLevel) {
+      // AFTER identifies an existing sibling; it does not introduce a new column name.
+      String afterColumn = ((TableChange.After) position).getColumn();
+      applyExistingColumnName(afterColumn, capabilities);
+      return TableChange.ColumnPosition.after(
+          applyCaseSensitiveOnName(Capability.Scope.COLUMN, afterColumn, capabilities));
+    }
+    return position;
   }
 
   private static TableChange applyCapabilities(
@@ -554,7 +651,7 @@ public class CapabilityHelpers {
 
   private static TableChange applyCapabilities(
       TableChange.RenameColumn renameColumn, Capability capabilities) {
-    String[] fieldName = applyCapabilities(renameColumn.fieldName(), capabilities);
+    String[] fieldName = applyCaseSensitiveOnColumnName(renameColumn.fieldName(), capabilities);
     String newName = renameColumn.getNewName();
     if (fieldName.length == 1) {
       newName = applyCapabilitiesOnName(Capability.Scope.COLUMN, newName, capabilities);
@@ -572,7 +669,8 @@ public class CapabilityHelpers {
         column.comment(),
         column.nullable(),
         column.autoIncrement(),
-        column.defaultValue());
+        column.defaultValue(),
+        column.initialDefaultValue());
   }
 
   static String applyCapabilitiesOnName(
@@ -620,6 +718,7 @@ public class CapabilityHelpers {
 
   private static void applyColumnDefaultValue(Column column, Capability capabilities) {
     applyColumnDefaultValue(column.name(), column.defaultValue(), capabilities);
+    applyColumnInitialDefaultValue(column.name(), column.initialDefaultValue());
   }
 
   private static void applyColumnDefaultValue(
@@ -627,6 +726,23 @@ public class CapabilityHelpers {
     Preconditions.checkArgument(
         capabilities.columnDefaultValue().supported() || DEFAULT_VALUE_NOT_SET.equals(defaultValue),
         capabilities.columnDefaultValue().unsupportedMessage() + " Illegal column: " + columnName);
+  }
+
+  /**
+   * Rejects setting {@code initialDefaultValue} on create/add-column. Catalogs that support write
+   * defaults (e.g. MySQL) still do not apply Iceberg-style initial defaults, so reusing {@link
+   * Capability#columnDefaultValue()} would accept a value the catalog silently drops. Until a
+   * catalog can write initial defaults, require unset ({@code null} or {@link
+   * Column#INITIAL_DEFAULT_VALUE_NOT_SET}).
+   */
+  private static void applyColumnInitialDefaultValue(
+      String columnName, Expression initialDefaultValue) {
+    Preconditions.checkArgument(
+        initialDefaultValue == null || INITIAL_DEFAULT_VALUE_NOT_SET.equals(initialDefaultValue),
+        "Column initial default value is read-only for now: catalogs may return it on load "
+            + "(e.g. Iceberg v3), but setting it on create/add-column is not supported by any "
+            + "catalog capability yet. Illegal column: "
+            + columnName);
   }
 
   private static void applyNameSpecification(

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
@@ -167,7 +168,7 @@ public class TestLanceTableOperations {
     }
   }
 
-  /** Legacy registration flags also protect drop and overwrite, while purge remains destructive. */
+  /** Legacy registrations retain their data unless the catalog explicitly permits purging it. */
   @ParameterizedTest
   @CsvSource(
       value = {
@@ -232,17 +233,111 @@ public class TestLanceTableOperations {
                       new Index[0]));
       Assertions.assertEquals("true", replaced.properties().get(Table.PROPERTY_EXTERNAL));
     } else if ("purge".equals(operation)) {
-      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
     } else {
       Assertions.assertTrue(lanceTableOps.dropTable(ident));
     }
-    verify(store).delete(ident, Entity.EntityType.TABLE);
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
-    } else {
+    verify(store, Mockito.times("purge".equals(operation) ? 0 : 1))
+        .delete(ident, Entity.EntityType.TABLE);
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      value = {"true,NULL", "true,false", "true,true", "false,NULL", "false,false", "false,true"},
+      nullValues = "NULL")
+  void testPurgeRequiresCatalogPermissionForExternalData(boolean external, String catalogPermission)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "purge_policy");
+    String location = tempDir.resolve("purge_policy").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // Purge must preserve both a real dataset and its metadata when the policy rejects it.
+    }
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_EXTERNAL,
+            Boolean.toString(external),
+            LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+            "true");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity(ident, List.of(), properties));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    if (catalogPermission != null) {
+      lanceTableOps.setCatalogProperties(
+          Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, catalogPermission));
+    }
+
+    if (external && !Boolean.parseBoolean(catalogPermission)) {
+      UnsupportedOperationException error =
+          Assertions.assertThrowsExactly(
+              UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+      Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+      verify(store, never()).delete(any(), any());
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
       }
+    } else {
+      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      verify(store).delete(ident, Entity.EntityType.TABLE);
+      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
+    }
+  }
+
+  @Test
+  void testOverwriteCannotPurgeExternalDataWithoutCatalogPermission() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "protected_table");
+    String location = tempDir.resolve("protected_table").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // The existing external dataset is not owned by this overwrite request.
+    }
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    Table.PROPERTY_EXTERNAL,
+                    "true")));
+    String replacement = tempDir.resolve("replacement").toString();
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    replacement,
+                    LANCE_CREATION_MODE,
+                    "OVERWRITE",
+                    LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                    "true"),
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+    verify(store, never()).delete(any(), any());
+    verify(store, never()).put(any(), anyBoolean());
+    Assertions.assertFalse(Files.exists(Paths.get(replacement)));
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 

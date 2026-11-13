@@ -106,13 +106,13 @@ public interface Capability {
   }
 
   /**
-   * Checks a table or schema name on an existing-table deletion path.
+   * Checks an existing table or schema name for deletion, or an existing column reference.
    *
    * <p>The default preserves the create-time restrictions. A catalog may accept additional native
-   * names only when its deletion operations safely quote them. This does not relax creation or
-   * rename validation.
+   * names only when the corresponding operations safely quote them. This does not relax creation or
+   * rename-target validation.
    *
-   * @param scope the table or schema scope
+   * @param scope the table, schema, or column scope
    * @param name the existing name to check
    * @return whether the existing name is supported
    */
@@ -125,6 +125,12 @@ public interface Capability {
    * used to determine whether Gravitino should manage the lifecycle of the metadata and related
    * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will
    * also delete all underlying data associated with the catalog.
+   *
+   * <p>For managed table storage, creating a new table must persist the server-supplied {@code
+   * gravitino.identifier} as its entity ID. If creation returns an existing table, its stored ID
+   * must be retained instead. Core uses these identities to distinguish creation from reuse before
+   * assigning ownership. A connector may omit the reserved identifier from the returned table
+   * properties if it is preserved in the entity store; core reads the stored ID in that case.
    *
    * @param scope The scope of the capability.
    * @return The capability of the managed storage.

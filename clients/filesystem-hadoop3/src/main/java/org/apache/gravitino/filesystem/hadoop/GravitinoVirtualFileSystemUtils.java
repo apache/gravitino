@@ -41,6 +41,7 @@ import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.KerberosTokenProvider;
+import org.apache.gravitino.client.OAuth2ClientAuthenticationMethod;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.hadoop.conf.Configuration;
 
@@ -196,12 +197,22 @@ public class GravitinoVirtualFileSystemUtils {
           GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY,
           scope);
 
+      String authenticationMethodValue =
+          configuration.getOrDefault(
+              GravitinoVirtualFileSystemConfiguration
+                  .FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY,
+              "client_secret_post");
+
+      OAuth2ClientAuthenticationMethod authenticationMethod =
+          OAuth2ClientAuthenticationMethod.fromValue(authenticationMethodValue);
+
       DefaultOAuth2TokenProvider authDataProvider =
           DefaultOAuth2TokenProvider.builder()
               .withUri(authServerUri)
               .withCredential(credential)
               .withPath(path)
               .withScope(scope)
+              .withClientAuthenticationMethod(authenticationMethod)
               .build();
 
       return GravitinoClient.builder(serverUri)

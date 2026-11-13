@@ -719,6 +719,18 @@ The `clients` property for example:
 `catalog-impl` has no effect.
 :::
 
+Unknown Iceberg catalog keys are passed through after the `gravitino.iceberg-rest.` prefix is stripped. For a PostgreSQL JDBC backend, a repeatedly executed prepared statement can switch to a generic plan after a few runs and make namespace/table existence checks much slower. Scope `plan_cache_mode=force_custom_plan` to Gravitino's connections with:
+
+```properties
+gravitino.iceberg-rest.jdbc.options = -c plan_cache_mode=force_custom_plan
+```
+
+That maps to Iceberg's `jdbc.options` JDBC connection property, so you do not need database-owner privileges.
+
+| Configuration item                    | Description                                                                                                                                                         | Default value | Required |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.jdbc.options` | Extra JDBC connection options passed through to the Iceberg JDBC catalog. For PostgreSQL, `-c plan_cache_mode=force_custom_plan` keeps existence checks on custom plans. | (none)        | No       |
+
 #### Event Listeners
 
 Gravitino generates pre-event and post-event for table operations and provide a pluggable event listener to allow you to inject custom logic. For more details, refer to [Event listener configuration](gravitino-server-config.md#event-listener-configuration).
@@ -807,7 +819,7 @@ Root-level aliases are also available for global traffic managers that require p
 
 After an observed `OutOfMemoryError`, all health endpoints and root aliases return 503 with a `jvm` failure until restart. See [out-of-memory failures](health-and-readiness.md#out-of-memory-failures) for detection scope.
 
-All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. `status` is `UP` or `DOWN`. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
+All endpoints return a JSON body with the same shape as the main Gravitino server. The `code` field is always `0`. Both the top-level `status` and each `checks[].status` use uppercase `UP` or `DOWN`, unlike the lowercase `up`/`down` returned by Gravitino and Lance REST. Liveness reports `httpServer` and readiness reports `catalogWrapperManager`.
 
 Healthy response (HTTP 200):
 

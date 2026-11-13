@@ -26,18 +26,69 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.meta.AuditInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
   private static SchemaNormalizeDispatcher schemaNormalizeDispatcher;
+
+  @Test
+  void testOversizedCommentRejectedBeforeCatalogMutation() {
+    SchemaDispatcher delegate = Mockito.mock(SchemaDispatcher.class);
+    SchemaNormalizeDispatcher dispatcher = new SchemaNormalizeDispatcher(delegate, catalogManager);
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "oversized_comment");
+    String comment = "c".repeat(257);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> dispatcher.createSchema(ident, comment, ImmutableMap.of()));
+    Assertions.assertTrue(error.getMessage().contains("comment"));
+    Assertions.assertTrue(error.getMessage().contains("256"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            dispatcher.createSchema(
+                ident, comment, ImmutableMap.of(), ImmutableMap.of(), ImmutableMap.of()));
+    Mockito.verifyNoInteractions(delegate);
+  }
+
+  @Test
+  void testCommentLengthBoundary() {
+    NameIdentifier ident = NameIdentifier.of(metalake, catalog, "comment_boundary");
+    String comment = "c".repeat(256);
+    Schema schema =
+        schemaNormalizeDispatcher.createSchema(
+            ident, comment, ImmutableMap.of("k1", "v1", "k2", "v2"));
+    Assertions.assertEquals(comment, schema.comment());
+    Schema altered =
+        schemaNormalizeDispatcher.alterSchema(ident, SchemaChange.setProperty("k1", "updated"));
+    Assertions.assertEquals("updated", altered.properties().get("k1"));
+    Assertions.assertEquals(comment, altered.comment());
+    Assertions.assertEquals(comment, schemaNormalizeDispatcher.loadSchema(ident).comment());
+    Assertions.assertTrue(schemaNormalizeDispatcher.dropSchema(ident, false));
+  }
 
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     TestSchemaOperationDispatcher.initialize();
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(TestSchemaOperationDispatcher.dispatcher, catalogManager);
+  }
+
+  /** Explicit imports normalize names while preserving their audit arguments. */
+  @Test
+  public void testImportNormalizesIdentifierAndPassesAudit() {
+    SchemaDispatcher delegate = Mockito.mock(SchemaDispatcher.class);
+    SchemaNormalizeDispatcher normalizer = new SchemaNormalizeDispatcher(delegate, catalogManager);
+    AuditInfo audit = AuditInfo.builder().withCreator("creator").build();
+    NameIdentifier requested = NameIdentifier.of(metalake, catalog, "MiXeD");
+    normalizer.importSchema(requested, audit);
+    Mockito.verify(delegate)
+        .importSchema(
+            Mockito.eq(NameIdentifier.of(metalake, catalog, "mixed")), Mockito.same(audit));
   }
 
   @Test

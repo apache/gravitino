@@ -61,6 +61,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -68,10 +69,13 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
@@ -83,6 +87,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -139,6 +144,566 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaOperationDispatcher, true);
   }
 
+  /**
+   * Imports write creation audit once and recover safely after competing imports or deletion.
+   *
+   * @param scenario the source audit and competing-import ordering to exercise
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced", "deleted"})
+  public void testImportCreationAudit(String scenario) throws Exception {
+    Instant importTime = Instant.EPOCH.plusSeconds(60);
+    AuditInfo importAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
+    AuditInfo catalogAudit =
+        "reported".equals(scenario)
+            ? AuditInfo.builder().withCreator("catalog_user").withCreateTime(Instant.EPOCH).build()
+            : "modified".equals(scenario)
+                ? AuditInfo.builder()
+                    .withCreateTime(Instant.EPOCH)
+                    .withLastModifier("modifier")
+                    .withLastModifiedTime(Instant.EPOCH)
+                    .build()
+                : AuditInfo.EMPTY;
+    String expectedCreator =
+        "reported".equals(scenario) ? "catalog_user" : "load".equals(scenario) ? null : "alice";
+    Instant expectedTime =
+        "reported".equals(scenario) || "modified".equals(scenario)
+            ? Instant.EPOCH
+            : "load".equals(scenario) ? null : importTime;
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_audit_table_" + scenario);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "table_import_audit");
+    Column[] columns = {
+      TestColumn.builder().withName("col").withPosition(0).withType(Types.StringType.get()).build()
+    };
+    tableOperationDispatcher.createTable(identifier, columns, "comment", props, new Transform[0]);
+    TestTable catalogTable = (TestTable) operations.loadTable(identifier);
+    FieldUtils.writeField(catalogTable, "auditInfo", catalogAudit, true);
+    entityStore.delete(identifier, TABLE);
+    clearInvocations(entityStore);
+
+    if ("raced".equals(scenario) || "deleted".equals(scenario)) {
+      tableOperationDispatcher.loadTable(identifier);
+      clearInvocations(entityStore);
+    }
+    if ("deleted".equals(scenario)) {
+      doAnswer(
+              call -> {
+                entityStore.delete(identifier, TABLE);
+                throw new OptimisticLockException("Registration deleted during audit recovery");
+              })
+          .when(entityStore)
+          .update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    }
+    Table loaded =
+        "load".equals(scenario)
+            ? tableOperationDispatcher.loadTable(identifier)
+            : tableOperationDispatcher.importTable(identifier, importAudit);
+
+    if ("deleted".equals(scenario)) {
+      EntityCombinedTable combined = (EntityCombinedTable) loaded;
+      Assertions.assertFalse(combined.imported());
+      Assertions.assertNull(combined.tableFromGravitino());
+      Assertions.assertNull(loaded.auditInfo().creator());
+      Assertions.assertEquals(identifier.name(), loaded.name());
+      Assertions.assertEquals("col", loaded.columns()[0].name());
+      verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+      reset(entityStore);
+      tableOperationDispatcher.loadTable(identifier);
+      Assertions.assertNull(
+          entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+      return;
+    }
+
+    TableEntity imported = entityStore.get(identifier, TABLE, TableEntity.class);
+    Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
+    Assertions.assertEquals(expectedCreator, loaded.auditInfo().creator());
+    Assertions.assertEquals(expectedTime, loaded.auditInfo().createTime());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? "modifier" : null, imported.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? Instant.EPOCH : null,
+        imported.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
+    for (ColumnEntity column : imported.columns()) {
+      Assertions.assertEquals(expectedCreator, column.auditInfo().creator());
+      Assertions.assertEquals(expectedTime, column.auditInfo().createTime());
+    }
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore).put(any(TableEntity.class), anyBoolean());
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+
+    clearInvocations(entityStore);
+    tableOperationDispatcher.importTable(
+        identifier,
+        AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? "bob" : expectedCreator,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().creator());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
+        entityStore.get(identifier, TABLE, TableEntity.class).auditInfo().createTime());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(TableEntity.class), eq(TABLE), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+  }
+
+  /** Explicit imports require audit information. */
+  @Test
+  public void testImportRejectsNullAudit() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableOperationDispatcher.importTable(
+                NameIdentifier.of(metalake, catalog, "schema", "missing"), null));
+  }
+
+  /** Checks blocked source DDL permits warm sibling metadata reads. */
+  @Test
+  public void testBlockedSourceDropDoesNotBlockSiblingMetadataReads() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "drop_source_lock_scope");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier target = NameIdentifier.of(ns, "target");
+    NameIdentifier sibling = NameIdentifier.of(ns, "sibling");
+    createTable(target);
+    createTable(sibling);
+    NameIdentifier completedDrop = NameIdentifier.of(ns, "completed_drop");
+    createTable(completedDrop);
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    TestCatalog base =
+        catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source = spy(original);
+    FieldUtils.writeField(base, "ops", source, true);
+    doAnswer(
+            invocation -> {
+              started.countDown();
+              Assertions.assertTrue(release.await(5, TimeUnit.SECONDS));
+              return invocation.callRealMethod();
+            })
+        .when(source)
+        .dropTable(target);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Boolean> drop = executor.submit(() -> tableOperationDispatcher.dropTable(target));
+    try {
+      Assertions.assertTrue(started.await(5, TimeUnit.SECONDS));
+      // Cleanup for a completed drop must not queue a schema writer behind the blocked drop.
+      Assertions.assertTrue(
+          executor
+              .submit(() -> tableOperationDispatcher.dropTable(completedDrop))
+              .get(3, TimeUnit.SECONDS));
+      executor
+          .submit(
+              () -> {
+                Assertions.assertEquals(2, tableOperationDispatcher.listTables(ns).length);
+                Assertions.assertEquals(
+                    "sibling", tableOperationDispatcher.loadTable(sibling).name());
+              })
+          .get(3, TimeUnit.SECONDS);
+      Assertions.assertFalse(drop.isDone());
+      release.countDown();
+      Assertions.assertTrue(drop.get(5, TimeUnit.SECONDS));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  @Test
+  void testSchemaCleanupProbeFailureAndRecreatedSchemaPreserveRegistration() throws Exception {
+    for (boolean failProbe : new boolean[] {true, false}) {
+      Namespace ns = Namespace.of(metalake, catalog, "cleanup_probe_" + failProbe);
+      NameIdentifier schemaIdent = NameIdentifier.of(ns.levels());
+      schemaOperationDispatcher.createSchema(
+          schemaIdent, "comment", Map.of("k1", "v1", "k2", "v2"));
+      NameIdentifier tableIdent = NameIdentifier.of(ns, "t");
+      createTable(tableIdent);
+      TestCatalog base =
+          catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+      TestCatalogOperations original = (TestCatalogOperations) base.ops();
+      TestCatalogOperations source = spy(original);
+      FieldUtils.writeField(base, "ops", source, true);
+      try {
+        if (failProbe) {
+          doThrow(new IllegalStateException("schema probe failed"))
+              .when(source)
+              .schemaExists(schemaIdent);
+        } else {
+          // The schema reappears between the read probe and the write-locked recheck.
+          doReturn(false, true).when(source).schemaExists(schemaIdent);
+        }
+        clearInvocations(entityStore);
+        Assertions.assertTrue(tableOperationDispatcher.dropTable(tableIdent));
+        verify(source, times(failProbe ? 1 : 2)).schemaExists(schemaIdent);
+        verify(entityStore, never()).delete(eq(schemaIdent), eq(SCHEMA), anyBoolean());
+      } finally {
+        FieldUtils.writeField(base, "ops", original, true);
+      }
+    }
+  }
+
+  /** Checks external comments preserve complete responses and column identities. */
+  @Test
+  public void testExternalCommentsAreProjectedForStorageAndPreservedInResponses() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "external_comment_projection");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "native_table");
+    String sourceComment = "a\0" + "😀".repeat(3000) + "tail";
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          TestCatalogOperations ops = (TestCatalogOperations) c.ops();
+          ops.createTable(
+              ident,
+              new Column[] {Column.of("c", Types.StringType.get(), sourceComment)},
+              "comment",
+              Map.of("k1", "v1", "k2", "v2"),
+              new Transform[0]);
+          return null;
+        });
+    Table imported = tableOperationDispatcher.loadTable(ident);
+    Assertions.assertEquals(sourceComment, imported.columns()[0].comment());
+    TableEntity stored = entityStore.get(ident, TABLE, TableEntity.class);
+    String projection = ColumnEntity.commentForStorage(sourceComment);
+    Assertions.assertEquals(projection, stored.columns().get(0).comment());
+    Assertions.assertFalse(projection.contains("\0"));
+    Assertions.assertTrue(projection.length() <= EntityFieldLimits.MAX_COLUMN_COMMENT_LENGTH);
+    long columnId = stored.columns().get(0).id();
+    // A second native comment change exercises the existing-column update path.
+    String updated = "b\0" + "x".repeat(5000);
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          ((TestCatalogOperations) c.ops())
+              .alterTable(ident, TableChange.updateColumnComment(new String[] {"c"}, updated));
+          return null;
+        });
+    Assertions.assertEquals(
+        updated, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    TableEntity reloaded = entityStore.get(ident, TABLE, TableEntity.class);
+    Assertions.assertEquals(columnId, reloaded.columns().get(0).id());
+    Assertions.assertEquals(
+        ColumnEntity.commentForStorage(updated), reloaded.columns().get(0).comment());
+    clearInvocations(entityStore);
+    Assertions.assertEquals(
+        updated, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    String changedSuffix = updated + "different suffix";
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        c -> {
+          ((TestCatalogOperations) c.ops())
+              .alterTable(
+                  ident, TableChange.updateColumnComment(new String[] {"c"}, changedSuffix));
+          return null;
+        });
+    Assertions.assertEquals(
+        changedSuffix, tableOperationDispatcher.loadTable(ident).columns()[0].comment());
+    verify(entityStore, never()).update(eq(ident), eq(TableEntity.class), eq(TABLE), any());
+  }
+
+  @Test
+  void testColumnDifferenceUsesBoundedCommentProjection() throws Exception {
+    Column source = Column.of("c", Types.StringType.get(), "a".repeat(5000));
+    ColumnEntity stored = ColumnEntity.toColumnEntity(source, 0, 1L, AuditInfo.EMPTY);
+    String same =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", source, 0, stored);
+    Assertions.assertEquals("", same);
+    Column changed = Column.of("c", Types.StringType.get(), "b\0" + "b".repeat(5000));
+    String difference =
+        (String)
+            MethodUtils.invokeMethod(
+                tableOperationDispatcher, true, "columnDifferenceContent", changed, 0, stored);
+    Assertions.assertFalse(difference.contains("\0"));
+    Assertions.assertFalse(difference.contains("b".repeat(4097)));
+    Assertions.assertTrue(difference.contains("b".repeat(4096)));
+  }
+
+  @Test
+  void testUnicodeCommentsExceedingStorageFailBeforeSourceDdl() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "unicode_comment_request");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog base =
+        catalogManager.doWithCatalog(NameIdentifier.of(metalake, catalog), c -> (TestCatalog) c);
+    TestCatalogOperations original = (TestCatalogOperations) base.ops();
+    TestCatalogOperations source = spy(original);
+    FieldUtils.writeField(base, "ops", source, true);
+    try {
+      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    tableOperationDispatcher.createTable(
+                        ident,
+                        new Column[] {Column.of("c", Types.StringType.get(), comment)},
+                        "comment",
+                        Map.of("k1", "v1", "k2", "v2"),
+                        new Transform[0]));
+        Assertions.assertTrue(error.getMessage().contains("4096 UTF-16"));
+      }
+      verify(source, never()).createTable(any(), any(), any(), any(), any(Transform[].class));
+      createTable(ident);
+      clearInvocations(source);
+      for (String comment : new String[] {"a".repeat(4095) + "😀", "😀".repeat(4096)}) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), comment)));
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, comment)));
+      }
+      verify(source, never()).alterTable(any(), any(TableChange[].class));
+    } finally {
+      FieldUtils.writeField(base, "ops", original, true);
+    }
+  }
+
+  /** Checks invalid request comments cannot partially apply source DDL. */
+  @Test
+  public void testNulColumnCommentsFailBeforeSourceDdl() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "nul_comment_request");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(ns.levels()), "comment", Map.of("k1", "v1", "k2", "v2"));
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    IllegalArgumentException createError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.createTable(
+                    ident,
+                    new Column[] {Column.of("c", Types.StringType.get(), "bad\0comment")},
+                    "comment",
+                    Map.of("k1", "v1", "k2", "v2"),
+                    new Transform[0]));
+    Assertions.assertTrue(createError.getMessage().contains("Column comment for c"));
+    Assertions.assertFalse(tableOperationDispatcher.tableExists(ident));
+    createTable(ident);
+    IllegalArgumentException addError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"added"}, Types.StringType.get(), "bad\0comment")));
+    Assertions.assertTrue(addError.getMessage().contains("Column comment for added"));
+    IllegalArgumentException alterError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tableOperationDispatcher.alterTable(
+                    ident, TableChange.updateColumnComment(new String[] {"col1"}, "bad\0comment")));
+    Assertions.assertTrue(alterError.getMessage().contains("Column comment for col1"));
+    Assertions.assertEquals(1, tableOperationDispatcher.loadTable(ident).columns().length);
+  }
+
+  @Test
+  void testManagedCreateOutcomeSkipsConcurrentExistOkOwnerInitialization() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "managed_create_outcome");
+    Map<String, String> props = Map.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(ns.levels()), "", props);
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = (TestCatalogOperations) source.ops();
+    TestCatalogOperations operations = spy(originalOps);
+    Capability originalCapability = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : originalCapability.managedStorage(scope);
+          }
+        };
+    doAnswer(
+            invocation -> {
+              try {
+                return originalOps.loadTable(ident);
+              } catch (NoSuchTableException e) {
+                return invocation.callRealMethod();
+              }
+            })
+        .when(operations)
+        .createTable(eq(ident), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(source, "capability", managed, true);
+    FieldUtils.writeField(source, "ops", operations, true);
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              initializing.countDown();
+              Assertions.assertTrue(release.await(30, TimeUnit.SECONDS));
+              return null;
+            })
+        .when(owners)
+        .setOwner(any(), any(), any(), any());
+    TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<Table> first =
+          executor.submit(() -> hook.createTable(ident, new Column[0], "", props));
+      Assertions.assertTrue(initializing.await(30, TimeUnit.SECONDS));
+      // The table exists, but its creator has not initialized ownership. A second create returning
+      // it must not try to claim it, even though an owner lookup would still return empty.
+      EntityCombinedTable existing =
+          (EntityCombinedTable) hook.createTable(ident, new Column[0], "", props);
+      Assertions.assertTrue(existing.createdTableId().isEmpty());
+      Assertions.assertFalse(existing.properties().containsKey(ID_KEY));
+      release.countDown();
+      EntityCombinedTable created = (EntityCombinedTable) first.get(30, TimeUnit.SECONDS);
+      long id = StringIdentifier.fromProperties(originalOps.loadTable(ident).properties()).id();
+      Assertions.assertEquals(id, created.createdTableId().orElseThrow());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
+      verify(owners, never()).getOwner(any(), any());
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      FieldUtils.writeField(source, "capability", originalCapability, true);
+      FieldUtils.writeField(source, "ops", originalOps, true);
+    }
+  }
+
+  @Test
+  void testManagedCreateWithoutReturnedIdentifierUsesStoredIdentity() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "managed_sanitized_create");
+    Map<String, String> props = Map.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(ns.levels()), "", props);
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = (TestCatalogOperations) source.ops();
+    TestCatalogOperations operations = spy(originalOps);
+    Capability originalCapability = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : originalCapability.managedStorage(scope);
+          }
+        };
+    doAnswer(
+            invocation -> {
+              Table table;
+              try {
+                table = originalOps.loadTable(ident);
+              } catch (NoSuchTableException e) {
+                table = (Table) invocation.callRealMethod();
+                TableEntity entity =
+                    TableEntity.builder()
+                        .withId(StringIdentifier.fromProperties(table.properties()).id())
+                        .withName(ident.name())
+                        .withNamespace(ns)
+                        .withProperties(table.properties())
+                        .withColumns(List.of())
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build();
+                entityStore.put(entity, false);
+              }
+              // A valid managed connector can drop the identifier from its returned table and keep
+              // it in storage. The same result is used for a new table and for EXIST_OK.
+              return GenericTable.builder()
+                  .withName(table.name())
+                  .withColumns(new Column[0])
+                  .withPartitioning(new Transform[0])
+                  .withDistribution(Distributions.NONE)
+                  .withSortOrders(new SortOrder[0])
+                  .withIndexes(Indexes.EMPTY_INDEXES)
+                  .withProperties(StringIdentifier.newPropertiesWithoutId(table.properties()))
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build();
+            })
+        .when(operations)
+        .createTable(eq(ident), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(source, "capability", managed, true);
+    FieldUtils.writeField(source, "ops", operations, true);
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
+    try {
+      EntityCombinedTable created =
+          (EntityCombinedTable) hook.createTable(ident, new Column[0], "", props);
+      long createdId = entityStore.get(ident, TABLE, TableEntity.class).id();
+      Assertions.assertEquals(createdId, created.createdTableId().orElseThrow());
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
+
+      // A replacement observed by the fallback belongs to another request.
+      TableEntity replacement =
+          TableEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(ident.name())
+              .withNamespace(ns)
+              .withColumns(List.of())
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      entityStore.delete(ident, TABLE);
+      entityStore.put(replacement, false);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      entityStore.delete(ident, TABLE);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
+
+      IOException failure = new IOException("entity store unavailable");
+      doThrow(failure).when(entityStore).get(ident, TABLE, TableEntity.class);
+      GravitinoRuntimeException error =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class,
+              () -> hook.createTable(ident, new Column[0], "", props));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertTrue(error.getMessage().contains(ident.toString()));
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
+    } finally {
+      FieldUtils.writeField(source, "capability", originalCapability, true);
+      FieldUtils.writeField(source, "ops", originalOps, true);
+    }
+  }
+
   @Test
   public void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");
@@ -163,6 +728,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Table table1 =
         tableOperationDispatcher.createTable(
             tableIdent1, columns, "comment", props, new Transform[0]);
+    Assertions.assertEquals(
+        entityStore.get(tableIdent1, TABLE, TableEntity.class).id(),
+        ((EntityCombinedTable) table1).createdTableId().orElseThrow());
     Assertions.assertEquals("table1", table1.name());
     Assertions.assertEquals("comment", table1.comment());
     testProperties(props, table1.properties());
@@ -455,11 +1023,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   /**
    * Verifies a native table is imported from one source read and keeps its identity on warm loads.
    *
+   * @param explicitImport whether to import with caller-provided audit information
    * @throws Exception if fixture setup or concurrent verification fails
    */
-  @Test
-  public void testNativeTableImportLoadsSourceOnce() throws Exception {
-    Namespace ns = Namespace.of(metalake, catalog, "schema_import_once");
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testNativeTableImportLoadsSourceOnce(boolean explicitImport) throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "schema_import_once_" + explicitImport);
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(ns.levels()), "", ImmutableMap.of("k1", "v1", "k2", "v2"));
     NameIdentifier ident = NameIdentifier.of(ns, "native_table");
@@ -476,12 +1046,22 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Distributions.NONE,
         new SortOrder[0],
         Indexes.EMPTY_INDEXES);
+    FieldUtils.writeField(original.loadTable(ident), "auditInfo", AuditInfo.EMPTY, true);
     TestCatalogOperations operations = spy(original);
     FieldUtils.writeField(source, "ops", operations, true);
     try {
-      Table loaded = tableOperationDispatcher.loadTable(ident);
+      AuditInfo importAudit =
+          AuditInfo.builder().withCreator("alice").withCreateTime(Instant.EPOCH).build();
+      Table loaded =
+          explicitImport
+              ? tableOperationDispatcher.importTable(ident, importAudit)
+              : tableOperationDispatcher.loadTable(ident);
       Assertions.assertEquals("native", loaded.comment());
       Assertions.assertTrue(entityStore.exists(ident, TABLE));
+      Assertions.assertEquals(explicitImport ? "alice" : null, loaded.auditInfo().creator());
+      Assertions.assertEquals(
+          explicitImport ? "alice" : null,
+          entityStore.get(ident, TABLE, TableEntity.class).auditInfo().creator());
       verify(operations, times(1)).loadTable(ident);
       long importedId = entityStore.get(ident, TABLE, TableEntity.class).id();
       clearInvocations(entityStore);
@@ -490,6 +1070,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
       verify(entityStore, times(2)).get(ident, TABLE, TableEntity.class);
       verify(operations, times(2)).loadTable(ident);
       Assertions.assertEquals(importedId, entityStore.get(ident, TABLE, TableEntity.class).id());
+      Assertions.assertEquals(
+          explicitImport ? "alice" : null,
+          entityStore.get(ident, TABLE, TableEntity.class).auditInfo().creator());
     } finally {
       FieldUtils.writeField(source, "ops", original, true);
     }

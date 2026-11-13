@@ -32,6 +32,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagList;
@@ -43,6 +44,7 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   private final ViewDTO viewDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
   private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericView(ViewDTO viewDTO, RESTClient restClient, Namespace viewNs) {
@@ -50,6 +52,8 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
     List<String> viewFullName =
         Lists.newArrayList(viewNs.level(1), viewNs.level(2), viewDTO.name());
     MetadataObject viewObject = MetadataObjects.of(viewFullName, MetadataObject.Type.VIEW);
+    this.objectSemanticModelOperations =
+        new MetadataObjectSemanticModelOperations(viewNs.level(0), viewObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(viewNs.level(0), viewObject, restClient);
     this.objectSecretOperations =
@@ -94,6 +98,11 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   @Override
   public Map<String, String> properties() {
     return viewDTO.properties();
+  }
+
+  @Override
+  public SupportsSemanticModels supportsSemanticModels() {
+    return objectSemanticModelOperations;
   }
 
   @Override

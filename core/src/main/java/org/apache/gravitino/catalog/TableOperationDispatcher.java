@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -70,6 +72,7 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
@@ -135,6 +138,22 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   }
 
   /**
+   * Checks whether a table exists, treating catalogs without table operations as empty.
+   *
+   * @param ident the table identifier
+   * @return whether the table exists
+   */
+  @Override
+  public boolean tableExists(NameIdentifier ident) {
+    boolean supportsTables =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof TableCatalog),
+            RuntimeException.class);
+    return supportsTables && TableDispatcher.super.tableExists(ident);
+  }
+
+  /**
    * Lists the tables within a schema.
    *
    * @param namespace The namespace of the schema containing the tables.
@@ -164,55 +183,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.READ,
-            () -> {
-              // A cold external table will be loaded under its own WRITE lock below. Do not
-              // fetch it here only to discard the snapshot and fetch it again during import.
-              // Managed catalogs do not need the external import path, even without a store row.
-              if (getEntity(ident, TABLE, TableEntity.class) == null
-                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
-                return null;
-              }
-              return internalLoadTable(ident);
-            });
+    return loadAndImportTable(ident, AuditInfo.EMPTY);
+  }
 
-    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
-      // Load the schema to make sure the schema is imported.
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      // Import under the table lock: the source snapshot and store write exclude local changes
-      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
-      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
-      try {
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
-      } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this table. Reload from the
-        // entity store to pick up the entity stored by the winning node.
-        LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
-        if (!entityCombinedTable.imported()) {
-          throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
-        }
-      }
-    }
-
-    // Update the column entities in Gravitino store if the columns are different from the ones
-    // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
-
-    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenProperties(entityCombinedTable.hiddenProperties())
-        .withImported(entityCombinedTable.imported());
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportTable(ident, auditInfo);
   }
 
   /**
@@ -464,42 +442,46 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
   @Override
   public boolean dropTable(NameIdentifier ident) {
     NameIdentifier schemaIdentifier = getSchemaIdentifier(ident);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdentifier,
-        LockType.WRITE,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          boolean droppedFromCatalog =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithTableOps(t -> t.dropTable(ident)),
-                  RuntimeException.class);
+    Pair<Boolean, Boolean> result =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.WRITE,
+            () -> {
+              NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+              boolean droppedFromCatalog =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithTableOps(t -> t.dropTable(ident)),
+                      RuntimeException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
-          if (isManagedTable) {
-            return droppedFromCatalog;
-          }
+              boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+              if (isManagedTable) {
+                return Pair.of(droppedFromCatalog, isManagedTable);
+              }
 
-          // A false result is ambiguous: the external table may have been renamed or dropped out of
-          // band. Preserve the registration because deleting it after a rename would lose
-          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
-          // registration that requires separate cleanup.
-          if (droppedFromCatalog) {
-            try {
-              store.delete(ident, TABLE);
-            } catch (OptimisticLockException e) {
-              throw e;
-            } catch (NoSuchEntityException e) {
-              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-            } catch (Exception e) {
-              throw new RuntimeException(e);
-            }
-          }
-          // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
-          // cleanup is best-effort and stops as soon as a schema still exists.
-          OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdentifier);
-          return droppedFromCatalog;
-        });
+              // A false result is ambiguous: the external table may have been renamed or dropped
+              // out of band. Preserve the registration because deleting it after a rename would
+              // lose Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+              // registration that requires separate cleanup.
+              if (droppedFromCatalog) {
+                try {
+                  store.delete(ident, TABLE);
+                } catch (OptimisticLockException e) {
+                  throw e;
+                } catch (NoSuchEntityException e) {
+                  LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+                } catch (Exception e) {
+                  throw new RuntimeException(e);
+                }
+              }
+              return Pair.of(droppedFromCatalog, isManagedTable);
+            });
+    if (!result.getRight()) {
+      // Run even after a false drop result: out-of-band drops can leave orphaned schemas.
+      // Release the table lock before cleanup to avoid a lock upgrade.
+      cleanUpOrphanedSchema(getCatalogIdentifier(ident), schemaIdentifier);
+    }
+    return result.getLeft();
   }
 
   /**
@@ -587,7 +569,118 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
   }
 
-  private EntityCombinedTable importTable(NameIdentifier identifier) {
+  private Table loadAndImportTable(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchTableException {
+    EntityCombinedTable entityCombinedTable =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
+
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
+      try {
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(
+                ident, LockType.WRITE, () -> importTableFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // HA race: another Gravitino node concurrently imported this table. Reload from the
+        // entity store to pick up the entity stored by the winning node.
+        LOG.info(
+            "Table {} was concurrently imported by another node; reloading from store.", ident);
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        if (!entityCombinedTable.imported()) {
+          throw new UnsupportedOperationException(
+              "Table managed by multiple catalogs. This may cause unexpected issues such as "
+                  + "privilege conflicts. To resolve: Remove all catalogs managing this table, "
+                  + "then recreate one catalog to ensure single-catalog management.");
+        }
+      }
+    }
+
+    // Update the column entities in Gravitino store if the columns are different from the ones
+    // fetching from the underlying source.
+    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    updatedEntity =
+        fillMissingCreationAudit(
+            updatedEntity,
+            TableEntity.class,
+            entityCombinedTable.tableFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withProperties(current.properties())
+                    .withColumns(fillMissingColumnCreationAudit(current.columns(), audit))
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
+                    .withAuditInfo(audit)
+                    .build());
+
+    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
+        .withHiddenProperties(entityCombinedTable.hiddenProperties())
+        .withImported(
+            entityCombinedTable.imported()
+                && (entityCombinedTable.tableFromGravitino() == null || updatedEntity != null));
+  }
+
+  private static List<ColumnEntity> fillMissingColumnCreationAudit(
+      List<ColumnEntity> columns, AuditInfo tableAudit) {
+    return columns.stream()
+        .map(
+            column -> {
+              Audit audit = column.auditInfo();
+              if (audit.creator() != null) {
+                return column;
+              }
+              return ColumnEntity.builder()
+                  .withId(column.id())
+                  .withName(column.name())
+                  .withPosition(column.position())
+                  .withDataType(column.dataType())
+                  .withComment(column.comment())
+                  .withNullable(column.nullable())
+                  .withAutoIncrement(column.autoIncrement())
+                  .withDefaultValue(column.defaultValue())
+                  .withAuditInfo(
+                      AuditInfo.builder()
+                          .withCreator(tableAudit.creator())
+                          .withCreateTime(
+                              audit.createTime() == null
+                                  ? tableAudit.createTime()
+                                  : audit.createTime())
+                          .withLastModifier(audit.lastModifier())
+                          .withLastModifiedTime(audit.lastModifiedTime())
+                          .build())
+                  .build();
+            })
+        .collect(Collectors.toList());
+  }
+
+  private EntityCombinedTable importTableFromCatalog(
+      NameIdentifier identifier, AuditInfo importAudit) {
     EntityCombinedTable table = internalLoadTable(identifier);
 
     if (table.imported()) {
@@ -623,6 +716,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withLastModifier(table.auditInfo().lastModifier())
             .withLastModifiedTime(table.auditInfo().lastModifiedTime())
             .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     List<ColumnEntity> columnEntityList =
         toColumnEntities(table.tableFromCatalog().columns(), audit);
     TableEntity tableEntity =
@@ -769,7 +865,34 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      // ManagedTableOperations persists the server-issued ID on insertion and preserves the old
+      // ID when returning an existing table. Inspect the unmasked snapshot: the public properties
+      // omit this reserved identifier. Do not infer creation from the presence of an owner.
+      StringIdentifier persistedId = StringIdentifier.fromProperties(table.properties());
+      EntityCombinedTable result =
+          EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      long persistedTableId;
+      if (persistedId != null) {
+        persistedTableId = persistedId.id();
+      } else {
+        // Custom managed connectors may omit reserved properties from their returned Table. Read
+        // the stored identity in that case; absence or a replacement cannot prove this request
+        // created the object. Never require an extra connector read after external creation.
+        try {
+          persistedTableId = store.get(ident, TABLE, TableEntity.class).id();
+        } catch (NoSuchEntityException e) {
+          return result;
+        } catch (IOException e) {
+          throw new GravitinoRuntimeException(
+              e,
+              "Table %s was returned by the catalog, but its stored creation identity could not be read. "
+                  + "Check the entity store before retrying or assigning ownership.",
+              ident);
+        }
+      }
+      return persistedTableId == catalogResult.id
+          ? result.withCreatedTableId(catalogResult.id)
+          : result;
     }
 
     AuditInfo audit =
@@ -810,6 +933,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
+        .withCreatedTableId(tableEntity.id())
         .withHiddenProperties(catalogResult.hiddenProperties);
   }
 
@@ -900,7 +1024,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     return Objects.equal(left.name(), right.name())
         && columnPosition == right.position()
         && Objects.equal(left.dataType(), right.dataType())
-        && Objects.equal(left.comment(), right.comment())
+        && Objects.equal(ColumnEntity.commentForStorage(left.comment()), right.comment())
         && left.nullable() == right.nullable()
         && left.autoIncrement() == right.autoIncrement()
         && isSameDefaultValue(left.defaultValue(), right.defaultValue());
@@ -948,10 +1072,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           String.format(
               "type[catalog=%s, store=%s]", catalogColumn.dataType(), entityColumn.dataType()));
     }
-    if (!Objects.equal(catalogColumn.comment(), entityColumn.comment())) {
+    String storedComment = ColumnEntity.commentForStorage(catalogColumn.comment());
+    if (!Objects.equal(storedComment, entityColumn.comment())) {
       differences.add(
-          String.format(
-              "comment[catalog=%s, store=%s]", catalogColumn.comment(), entityColumn.comment()));
+          String.format("comment[catalog=%s, store=%s]", storedComment, entityColumn.comment()));
     }
     if (catalogColumn.nullable() != entityColumn.nullable()) {
       differences.add(
@@ -1207,7 +1331,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 .withName(column.name())
                 .withPosition(columnPair.getLeft())
                 .withDataType(column.dataType())
-                .withComment(column.comment())
+                .withComment(ColumnEntity.commentForStorage(column.comment()))
                 .withNullable(column.nullable())
                 .withAutoIncrement(column.autoIncrement())
                 .withDefaultValue(column.defaultValue())
@@ -1322,10 +1446,39 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                 combinedTable.tableFromGravitino().id()));
   }
 
+  private void cleanUpOrphanedSchema(NameIdentifier catalogIdent, NameIdentifier schemaIdent) {
+    try {
+      // A queued schema writer also blocks new readers. Avoid queuing one behind another table's
+      // source DDL when the schema still exists and there is nothing to clean up.
+      boolean schemaExists =
+          TreeLockUtils.doWithTreeLock(
+              schemaIdent,
+              LockType.READ,
+              () ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
+                      RuntimeException.class));
+      if (schemaExists) {
+        return;
+      }
+      TreeLockUtils.doWithTreeLock(
+          schemaIdent,
+          LockType.WRITE,
+          () -> {
+            // Recheck under the write lock before deleting any registration.
+            OrphanedSchemaCleanup.cleanUp(this, catalogIdent, schemaIdent);
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.warn("Failed to clean up orphaned schema entities starting from {}", schemaIdent, e);
+    }
+  }
+
   private static void validateColumns(Column[] columns) {
     for (Column column : columns) {
       ColumnEntity.NAME.validate(column.name(), COLUMN);
-      ColumnEntity.COMMENT.validate(column.comment(), COLUMN);
+      ColumnEntity.validateCommentForWrite(column.name(), column.comment());
     }
   }
 
@@ -1334,7 +1487,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
       if (addColumn.getFieldName().length == 1) {
         ColumnEntity.NAME.validate(addColumn.getFieldName()[0], COLUMN);
-        ColumnEntity.COMMENT.validate(addColumn.getComment(), COLUMN);
+        ColumnEntity.validateCommentForWrite(addColumn.getFieldName()[0], addColumn.getComment());
       }
     } else if (change instanceof TableChange.RenameColumn) {
       TableChange.RenameColumn renameColumn = (TableChange.RenameColumn) change;
@@ -1344,7 +1497,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     } else if (change instanceof TableChange.UpdateColumnComment) {
       TableChange.UpdateColumnComment updateComment = (TableChange.UpdateColumnComment) change;
       if (updateComment.getFieldName().length == 1) {
-        ColumnEntity.COMMENT.validate(updateComment.getNewComment(), COLUMN);
+        ColumnEntity.validateCommentForWrite(
+            updateComment.getFieldName()[0], updateComment.getNewComment());
       }
     }
   }

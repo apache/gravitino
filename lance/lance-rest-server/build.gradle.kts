@@ -69,7 +69,23 @@ lanceSparkBundleVersions.forEach { version ->
   }
 }
 
+// Keeps the Jackson line brought in by Arrow on its latest patch release. The BOM sits in a
+// dedicated configuration so that it only applies to this module and is not exported to the
+// modules that depend on it.
+val jacksonBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+listOf(
+  "compileClasspath",
+  "runtimeClasspath",
+  "testCompileClasspath",
+  "testRuntimeClasspath"
+).forEach {
+  configurations.named(it) { extendsFrom(jacksonBom) }
+}
 dependencies {
+  jacksonBom(platform(libs.jackson.bom.v218))
   implementation(project(":api"))
   implementation(project(":common")) {
     exclude("*")

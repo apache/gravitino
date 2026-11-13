@@ -39,7 +39,7 @@ For the values `tlsProtocol` and `enableCipherAlgorithms` accept, see the "Addit
 
 ## Local Development Example
 
-The following produces a self-signed certificate so you can exercise an HTTPS endpoint on one machine. It is not a production setup, since a self-signed certificate trusted by editing a JVM trust store is not how certificates are managed in a real deployment.
+The following produces a self-signed certificate so you can exercise an HTTPS endpoint on one machine. It is not a production setup, since self-signed certificates are generally not how certificates are managed in a real deployment.
 
 **1. Generate a key store.**
 
@@ -60,11 +60,13 @@ bin/keytool -export -alias localhost -keystore localhost.jks \
   -file localhost.crt -storepass {store_password}
 ```
 
-**3. Import it into the JVM trust store** so a local Java client will accept it.
+**3. Import it into a client trust store** so the Gravitino Java client can trust the server certificate without modifying the JVM-wide trust store.
 
 ```shell
-bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts \
-  -file localhost.crt -storepass changeit -noprompt
+bin/keytool -importcert -alias localhost \
+  -keystore client-truststore.p12 -storetype PKCS12 \
+  -file localhost.crt \
+  -storepass {truststore_password} -noprompt
 ```
 
 **4. Configure the server.** Append the following to `conf/gravitino.conf`, then start Gravitino. Configuration files do not resolve environment variables, so write the expanded path rather than `${JAVA_HOME}`.
@@ -77,16 +79,32 @@ gravitino.server.webserver.keyStorePassword = {store_password}
 gravitino.server.webserver.managerPassword = {key_password}
 ```
 
-**5. Connect.** From Java, the client takes the HTTPS URI directly:
+**5. Connect.** From Java, configure the client to trust the server certificate using the client trust store:
 
 ```java
+import java.nio.file.Path;
+
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoVersion;
+import org.apache.gravitino.client.TLSConfigurer;
+import org.apache.gravitino.client.TLSConfigurers;
 
 public class Main {
     public static void main(String[] args) {
         String uri = "https://localhost:8433";
-        GravitinoClient client = GravitinoClient.builder(uri).withMetalake("metalake").build();
+        TLSConfigurer tlsConfigurer =
+            TLSConfigurers.builder()
+                .trustStore(
+                    Path.of("/path/to/client-truststore.p12"),
+                    "{truststore_password}")
+                .build();
+
+        GravitinoClient client =
+            GravitinoClient.builder(uri)
+                .withMetalake("metalake")
+                .withTlsConfigurer(tlsConfigurer)
+                .build();
+
         GravitinoVersion gravitinoVersion = client.getVersion();
         System.out.println(gravitinoVersion);
     }
