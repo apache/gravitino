@@ -145,6 +145,31 @@ public abstract class SparkPaimonCatalogIT extends SparkCommonIT {
   }
 
   @Test
+  void testPaimonRemoveOrphanFilesProcedure() {
+    // remove_orphan_files works on the Paimon catalog instead of a loaded table, so it needs the
+    // Gravitino catalog to expose the underlying Paimon catalog.
+    String tableName = "test_paimon_remove_orphan_files";
+    dropTableIfExists(tableName);
+    sql(
+        String.format(
+            "CREATE TABLE %s (id INT COMMENT 'id comment', name STRING COMMENT '', address STRING COMMENT '') USING paimon",
+            tableName));
+    sql(String.format("INSERT INTO %s VALUES(1, 'a', 'beijing')", tableName));
+
+    String fullTableName = String.format("%s.%s", getDefaultDatabase(), tableName);
+    List<Row> result =
+        getSparkSession()
+            .sql(
+                String.format(
+                    "CALL %s.sys.remove_orphan_files(table => '%s', dry_run => true)",
+                    getCatalogName(), fullTableName))
+            .collectAsList();
+    Assertions.assertEquals(1, result.size());
+    Assertions.assertEquals(0L, result.get(0).getLong(0));
+    Assertions.assertEquals(1, getTableData(tableName).size());
+  }
+
+  @Test
   void testPaimonPartitionManagement() {
     testPaimonListAndDropPartition();
     // TODO: replace, add and load partition operations are unsupported now.
