@@ -20,7 +20,12 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import org.apache.gravitino.rel.Table;
 import org.apache.iceberg.spark.procedures.SparkProcedures;
+import org.apache.iceberg.spark.source.SparkTable;
+import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.ProcedureCatalog;
 import org.apache.spark.sql.connector.catalog.procedures.UnboundProcedure;
@@ -32,6 +37,42 @@ import org.apache.spark.sql.connector.catalog.procedures.UnboundProcedure;
  */
 public class GravitinoIcebergCatalogSpark41 extends GravitinoIcebergCatalog
     implements ProcedureCatalog {
+
+  private static final Pattern BRANCH_SELECTOR = Pattern.compile("branch_(.*)");
+
+  /**
+   * Also loads {@code <database>.<table>.branch_<name>} as that branch of the table. Iceberg's
+   * Spark 4.1 extensions resolve the {@code branch} read option and the WAP branch by renaming the
+   * relation this way, and Spark 4.1 loads the relation again by that name before running the
+   * query. A query that names {@code <database>.<table>.branch_<name>} directly reads the branch
+   * the same way; the loaded table refuses Spark writes and deletes.
+   *
+   * @param ident the table identifier
+   * @return the loaded table
+   * @throws NoSuchTableException if the table does not exist
+   */
+  @Override
+  public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident)
+      throws NoSuchTableException {
+    Matcher branch = BRANCH_SELECTOR.matcher(ident.name());
+    if (ident.namespace().length != 2 || !branch.matches()) {
+      return super.loadTable(ident);
+    }
+    Identifier tableIdent =
+        Identifier.of(new String[] {ident.namespace()[0]}, ident.namespace()[1]);
+    // A denied table throws here rather than returning AuthorizationTable.deny: when Spark loads
+    // the relation again, it would report the placeholder only as a changed table id.
+    Table gravitinoTable = loadGravitinoTable(tableIdent);
+    SparkTable sparkTable = (SparkTable) loadSparkTable(tableIdent);
+    return createSparkTable(
+        tableIdent,
+        gravitinoTable,
+        SparkTable.create(sparkTable.table(), branch.group(1)),
+        sparkCatalog,
+        propertiesConverter,
+        sparkTransformConverter,
+        getSparkTypeConverter());
+  }
 
   /**
    * Procedures validate that the catalog registered with Spark's catalogManager is the same one

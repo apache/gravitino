@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.spark.connector.jdbc;
 
+import org.apache.spark.sql.connector.read.SupportsPushDownJoin;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScanBuilder;
 
 /**
  * Carries the {@code JDBCScanBuilder} constructor call for {@link SparkJdbcScanBuilder}. Spark 4.1
  * added a fourth constructor parameter, so each Spark line has its own copy of this class while the
- * scan builder itself stays shared.
+ * scan builder itself stays shared. Spark 4.1 also added join pushdown, which this copy turns off
+ * when the builder is the left side of the join, the side Spark asks.
  */
 public abstract class SparkJdbcScanBuilderBase extends JDBCScanBuilder {
 
@@ -40,5 +42,19 @@ public abstract class SparkJdbcScanBuilderBase extends JDBCScanBuilder {
         delegate.schema(),
         delegate.jdbcOptions(),
         delegate.additionalMetrics());
+  }
+
+  /**
+   * Keeps joins with this builder on the left in Spark. Spark 4.1 can push a join of two tables of
+   * the same JDBC source. It compiles the join condition without {@link SparkJdbcPushDownPolicy},
+   * and the left table's policy, which knows only that table's columns, then decides on aggregates
+   * and Top-N over both tables.
+   *
+   * @param other the scan builder of the other side of the join
+   * @return false
+   */
+  @Override
+  public boolean isOtherSideCompatibleForJoin(SupportsPushDownJoin other) {
+    return false;
   }
 }

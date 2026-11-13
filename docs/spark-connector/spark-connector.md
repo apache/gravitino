@@ -170,7 +170,7 @@ could return different results:
 - Date parts other than year, quarter, month, day, hour, and minute, such as `second()` or
   `weekofyear()`. The source can compute them differently.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
-  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
+  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4 does not.
 - Value-dependent aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 

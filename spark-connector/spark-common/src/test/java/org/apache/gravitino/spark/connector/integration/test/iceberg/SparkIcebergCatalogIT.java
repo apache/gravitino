@@ -373,6 +373,7 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
   void testIcebergSQLExtensions() throws NoSuchTableException {
     testIcebergPartitionFieldOperations();
     testIcebergBranchOperations();
+    testIcebergBranchReads();
     testIcebergTagOperations();
     testIcebergIdentifierOperations();
     testIcebergDistributionAndOrderingOperations();
@@ -905,6 +906,48 @@ public abstract class SparkIcebergCatalogIT extends SparkCommonIT {
     Assertions.assertThrows(
         unknownVersionException(),
         () -> sql(String.format("SELECT * FROM %s VERSION AS OF '%s'", tableName, branch1)));
+  }
+
+  // Iceberg's Spark 4.1 module resolves the branch read option and the WAP branch in an analyzer
+  // rule that renames the relation to <table>.branch_<name>, and Spark 4.1 loads that name from
+  // the catalog again before the query runs.
+  private void testIcebergBranchReads() {
+    String tableName = "test_iceberg_branch_reads";
+    String branch = "audit";
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    sql(String.format("INSERT INTO %s VALUES(1, '1', 1);", tableName));
+    sql(String.format("ALTER TABLE %s CREATE BRANCH `%s`", tableName, branch));
+    sql(String.format("INSERT INTO %s VALUES(2, '2', 2);", tableName));
+
+    List<String> branchData =
+        getSparkSession()
+            .read()
+            .option("branch", branch)
+            .table(tableName)
+            .orderBy("id")
+            .collectAsList()
+            .stream()
+            .map(row -> row.mkString(","))
+            .collect(Collectors.toList());
+    Assertions.assertEquals(ImmutableList.of("1,1,1"), branchData);
+
+    sql(String.format("ALTER TABLE %s SET TBLPROPERTIES ('write.wap.enabled'='true')", tableName));
+    sql(String.format("SET spark.wap.branch=%s", branch));
+    try {
+      Assertions.assertEquals(ImmutableList.of("1,1,1"), getTableData(tableName));
+    } finally {
+      sql("RESET spark.wap.branch");
+    }
+    // A branch_ name reads the branch on Spark 4.1 but must not let a write reach main.
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            sql(
+                String.format(
+                    "TRUNCATE TABLE %s.%s.branch_%s", getDefaultDatabase(), tableName, branch)));
+    Assertions.assertEquals(
+        "1,1,1;2,2,2", String.join(";", getQueryData(getSelectAllSqlWithOrder(tableName, "id"))));
   }
 
   private void testIcebergTagOperations() throws NoSuchTableException {
