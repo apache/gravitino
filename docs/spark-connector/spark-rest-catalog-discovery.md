@@ -79,6 +79,41 @@ Set `spark.sql.gravitino.lanceREST.catalogProperties.namespaceDelimiter` when th
 server uses a namespace delimiter other than the default `$`. The property is used for the
 discovery request and is also copied to each discovered catalog.
 
+### User identity
+
+When `spark.sql.gravitino.authType` is `simple` (the default), the discovery plugin uses
+`SparkContext.sparkUser()` as the Lance user. It sends an HTTP Basic header with the UTF-8 encoded
+value `<user>:unused` for discovery and copies it to each automatically registered Lance catalog.
+The password is a placeholder. Usernames containing a colon require explicit credentials because
+HTTP Basic uses the colon to separate the username from the password.
+
+Set `spark.sql.gravitino.lanceREST.catalogProperties.headers.Authorization` to use explicit
+credentials for discovery and as the default for registered catalogs. A per-catalog
+`spark.sql.catalog.<name>.headers.Authorization` overrides the global header for that catalog's
+operations. Header names are case-insensitive. Within each configuration scope, equivalent keys
+with identical values are collapsed and conflicting values are rejected.
+
+The plugin generates a header only when `authType` is `simple`. This setting selects the default
+for the Lance endpoint independently of Hadoop security, so a Kerberos-enabled Spark application
+can use it to access an independent simple-auth Lance REST server. Configure explicit credentials
+when the Lance endpoint uses a different authentication scheme. Manually registered catalogs
+require their own configuration.
+
+#### Upgrading existing jobs
+
+Default-simple jobs now send a Basic header even if they previously sent no authentication header.
+In auxiliary mode, requests that previously fell back to the Lance REST service user may now
+execute as the Spark user. Before upgrading, register that user and grant the permissions needed
+for discovery and subsequent operations. Missing grants can cause HTTP 403 responses, and objects
+created by the job may have a different creator or owner. To keep running as the previous
+service user, set the global Authorization header to credentials that the Lance endpoint accepts
+for that service user. For example, if the endpoint accepts Simple authentication, use a Basic
+header for the service user's name.
+
+A standalone Lance REST server may reject the generated Basic header with HTTP 401 if it uses
+another scheme. Configure the server's expected Authorization header explicitly. Standalone
+servers continue to use their configured service credentials to access the Gravitino backend.
+
 ## Registration policy
 
 By default, every discovered catalog is registered under its discovered name. To filter or rename

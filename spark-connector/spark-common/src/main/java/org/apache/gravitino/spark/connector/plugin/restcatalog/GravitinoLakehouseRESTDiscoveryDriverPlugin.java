@@ -35,7 +35,10 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.auth.AuthProperties;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
@@ -73,7 +76,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
-    initialize(sc.conf());
+    initialize(sc.conf(), BuiltinRESTCatalogProviders.providerClassNames(), sc.sparkUser());
     return Collections.emptyMap();
   }
 
@@ -84,6 +87,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf, Map<String, String> providerClassNames) {
+    initialize(sparkConf, providerClassNames, null);
+  }
+
+  @VisibleForTesting
+  void initialize(
+      SparkConf sparkConf, Map<String, String> providerClassNames, @Nullable String sparkUser) {
     validatePluginOrder(sparkConf);
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
@@ -105,6 +114,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
+          provider.normalizeCatalogProperties(globalProperties);
+          provider.applyCatalogDefaults(
+              globalProperties,
+              userConf.get(
+                  GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE),
+              sparkUser);
           List<String> discoveredCatalogs = listCatalogs(provider, format, uri, globalProperties);
           if (discoveredCatalogs.isEmpty()) {
             LOG.warn("Discovered no {} REST catalog from {}.", format, uri);
@@ -127,7 +142,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           extensions.addAll(Arrays.asList(provider.sparkExtensions()));
         });
 
-    applyRegistrations(sparkConf, userConf, registrations);
+    applyRegistrations(sparkConf, registrations);
     registerSqlExtensions(sparkConf, extensions);
   }
 
@@ -397,13 +412,24 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           mergedProperties.put(key, value);
         });
 
+    String catalogPrefix = SPARK_CATALOG_PREFIX + registeredCatalogName + ".";
+    Map<String, String> overrides = new LinkedHashMap<>();
+    for (Tuple2<String, String> entry : userConf.getAllWithPrefix(catalogPrefix)) {
+      overrides.put(entry._1, entry._2);
+    }
+    Set<String> originalKeys = new LinkedHashSet<>(overrides.keySet());
+    provider.normalizeCatalogProperties(overrides);
+    originalKeys.removeAll(overrides.keySet());
+    mergedProperties.putAll(overrides);
+
     registrations.add(
         new CatalogRegistration(
             format,
             discoveredCatalogName,
             registeredCatalogName,
             provider.catalogClassName(),
-            mergedProperties));
+            mergedProperties,
+            originalKeys));
   }
 
   /**
@@ -431,17 +457,13 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   }
 
   private static void applyRegistrations(
-      SparkConf sparkConf, SparkConf userConf, List<CatalogRegistration> registrations) {
+      SparkConf sparkConf, List<CatalogRegistration> registrations) {
     for (CatalogRegistration registration : registrations) {
       String catalogPrefix = SPARK_CATALOG_PREFIX + registration.registeredCatalogName;
       sparkConf.set(catalogPrefix, registration.catalogClassName);
+      registration.removedProperties.forEach(key -> sparkConf.remove(catalogPrefix + "." + key));
       registration.properties.forEach(
-          (key, value) -> {
-            String sparkConfigKey = catalogPrefix + "." + key;
-            if (!userConf.contains(sparkConfigKey)) {
-              sparkConf.set(sparkConfigKey, value);
-            }
-          });
+          (key, value) -> sparkConf.set(catalogPrefix + "." + key, value));
       if (!registration.discoveredCatalogName.equals(registration.registeredCatalogName)) {
         LOG.info(
             "Register {} REST catalog {} as Spark catalog {}.",
@@ -487,18 +509,21 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     private final String registeredCatalogName;
     private final String catalogClassName;
     private final Map<String, String> properties;
+    private final Set<String> removedProperties;
 
     private CatalogRegistration(
         String format,
         String discoveredCatalogName,
         String registeredCatalogName,
         String catalogClassName,
-        Map<String, String> properties) {
+        Map<String, String> properties,
+        Set<String> removedProperties) {
       this.format = format;
       this.discoveredCatalogName = discoveredCatalogName;
       this.registeredCatalogName = registeredCatalogName;
       this.catalogClassName = catalogClassName;
       this.properties = properties;
+      this.removedProperties = removedProperties;
     }
   }
 }
