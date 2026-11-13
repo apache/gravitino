@@ -37,6 +37,10 @@ import org.apache.gravitino.exceptions.NoSuchTermException;
  * <p>Reads authorize semantic-model read access before checking metrics or listing their terms.
  * Glossary view or management privileges grant no semantic-model access. Returned terms, including
  * their domains and nested relations, follow {@link GlossaryTerm}'s visibility rules.
+ *
+ * <p>All term read and write checks also require effective {@code VIEW_DEFINITION}, using the
+ * grant-implication and explicit-deny rules in {@link GlossaryOperations}. Ownership, create or
+ * manage access cannot bypass an explicit view denial.
  */
 @Evolving
 public interface SupportsMetricTerms {

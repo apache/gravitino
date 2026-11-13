@@ -36,9 +36,14 @@ import org.apache.gravitino.exceptions.TermAlreadyExistsException;
  * CREATE_DEFINITION} includes view access and permits creating and maintaining terms owned by the
  * caller. {@code MANAGE_DEFINITIONS} includes create and view access and permits managing all
  * terms, including other owners' drafts. Ownership means the current owner, including group
- * members; ownership alone does not replace effective create access. Explicit denies apply to each
- * required capability. These privileges are granted on the metalake in Step 1. The metalake owner
- * passes privilege checks, but remains subject to the Step 2 workflow and no-self-approval rule.
+ * members; ownership alone does not replace effective create access. Expand allowed grant
+ * implications before applying explicit denies to each required capability. Every term read and
+ * write requires effective {@code VIEW_DEFINITION}; denying view hides terms from reads and blocks
+ * writes even for an owner with create access. Denying create prevents creation even with an allow
+ * on manage, but effective manage can still authorize edits. Denying manage removes the all-term
+ * path without removing effective create access to own terms. These privileges are granted on the
+ * metalake in Step 1. The metalake owner passes privilege checks, but remains subject to the Step 2
+ * workflow and no-self-approval rule.
  *
  * <p>The write methods describe Step 1: changes take effect immediately, without review. Step 2
  * adds scoped management and review: new terms default to draft, and another authorized manage user
@@ -79,9 +84,9 @@ public interface GlossaryOperations {
    * Creates a term in Step 1. The caller becomes its owner. Without a status, the server uses
    * {@link GlossaryTerm.Status#APPROVED}; this does not mean that a human reviewed the term.
    *
-   * <p>The caller needs effective {@code CREATE_DEFINITION} and read access to each requested
-   * domain ({@code USE_DOMAIN}). Returned domains and relations follow the same visibility rules as
-   * reads.
+   * <p>The caller needs effective {@code VIEW_DEFINITION}, effective {@code CREATE_DEFINITION}, and
+   * read access to each requested domain ({@code USE_DOMAIN}) and referenced broader or related
+   * term. Returned domains and relations follow the same visibility rules as reads.
    *
    * @param spec The content of the term.
    * @return The created term.
@@ -89,7 +94,7 @@ public interface GlossaryOperations {
    *     already exists.
    * @throws NoSuchTermException If a broader or related term does not exist or is not visible to
    *     the caller.
-   * @throws NotFoundException If a domain does not exist or is not visible to the caller.
+   * @throws NotFoundException If a requested domain does not exist.
    * @throws ForbiddenException If the caller lacks the required creation or domain privilege.
    * @throws IllegalArgumentException If a synonym is the name of another term, or a relation is not
    *     allowed.
@@ -103,9 +108,10 @@ public interface GlossaryOperations {
    * is applied. The revision of the term increases by one. Use {@link
    * TermChange#setStatus(GlossaryTerm.Status)} to change the status without an approval decision.
    *
-   * <p>The caller needs effective {@code MANAGE_DEFINITIONS}, or must be the current owner with
-   * effective {@code CREATE_DEFINITION}. Read access to referenced terms and domains is also
-   * required. Returned domains and relations follow the same visibility rules as reads.
+   * <p>The caller needs effective {@code VIEW_DEFINITION}, plus effective {@code
+   * MANAGE_DEFINITIONS} or current ownership with effective {@code CREATE_DEFINITION}. Read access
+   * to referenced terms and domains is also required. Returned domains and relations follow the
+   * same visibility rules as reads.
    *
    * @param name The name of the term.
    * @param changes The changes to apply.
@@ -114,7 +120,7 @@ public interface GlossaryOperations {
    *     exist or is not visible to the caller.
    * @throws TermAlreadyExistsException If the term is renamed to the name of another term, or its
    *     source reference is set to the one of another term.
-   * @throws NotFoundException If a domain to add does not exist or is not visible to the caller.
+   * @throws NotFoundException If a domain to add does not exist.
    * @throws ForbiddenException If the caller can see the term but lacks the required edit or domain
    *     privilege.
    * @throws IllegalArgumentException If a change is not valid, for example a synonym that is the

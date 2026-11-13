@@ -47,9 +47,10 @@ public interface GlossaryTerm extends Auditable {
   /** The status of a term. */
   enum Status {
     /**
-     * The term is being written. In Step 1, only its current owner with effective {@code
-     * CREATE_DEFINITION}, including group members, or a caller with effective {@code
-     * MANAGE_DEFINITIONS} can read it. Create access alone does not expose another owner's draft.
+     * The term is being written. In Step 1, reading requires effective {@code VIEW_DEFINITION}. The
+     * caller must also be the current owner with effective {@code CREATE_DEFINITION} (including
+     * group members), or have effective {@code MANAGE_DEFINITIONS}. The shared deny rules in {@link
+     * GlossaryOperations} apply; create access alone does not expose another owner's draft.
      */
     DRAFT,
     /**

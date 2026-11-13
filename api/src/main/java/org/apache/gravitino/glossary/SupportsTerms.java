@@ -33,6 +33,10 @@ import org.apache.gravitino.exceptions.NoSuchTermException;
  * management privileges do not replace target access. Only visible terms are returned, and their
  * domains and nested relations follow {@link GlossaryTerm}'s visibility rules. Step 1 supports
  * bindings to a view itself, but not to view output columns.
+ *
+ * <p>All term read and write checks also require effective {@code VIEW_DEFINITION}, using the
+ * grant-implication and explicit-deny rules in {@link GlossaryOperations}. Ownership, create or
+ * manage access cannot bypass an explicit view denial.
  */
 @Evolving
 public interface SupportsTerms {
