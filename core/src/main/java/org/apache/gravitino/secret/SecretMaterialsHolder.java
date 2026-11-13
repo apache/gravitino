@@ -18,23 +18,33 @@
  */
 package org.apache.gravitino.secret;
 
+import com.google.common.base.Preconditions;
+
 /**
- * Mutable holder so {@code store.update} lambdas can record prepared secrets.
+ * Mutable holder so {@code store.update} lambdas can record secret version changes.
  *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secrets inside {@code
+ * <p>Used by catalog, schema, and fileset alter paths that prepare secret versions inside {@code
  * store.update}, commit them after the update and roll them back on failure.
  */
 public final class SecretMaterialsHolder {
 
-  private PreparedSecrets prepared = PreparedSecrets.EMPTY;
+  private SecretVersionChanges prepared = SecretVersionChanges.EMPTY;
 
-  /** Returns the prepared secrets. */
-  public PreparedSecrets get() {
+  /**
+   * Returns the recorded secret version changes.
+   *
+   * @return the recorded changes, {@link SecretVersionChanges#EMPTY} until {@link #set} is called
+   */
+  public SecretVersionChanges get() {
     return prepared;
   }
 
-  /** Records the prepared secrets. */
-  public void set(PreparedSecrets prepared) {
-    this.prepared = prepared;
+  /**
+   * Records the secret version changes of the alter.
+   *
+   * @param prepared the changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   */
+  public void set(SecretVersionChanges prepared) {
+    this.prepared = Preconditions.checkNotNull(prepared, "prepared must not be null");
   }
 }

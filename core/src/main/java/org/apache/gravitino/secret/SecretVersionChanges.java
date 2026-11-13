@@ -26,17 +26,17 @@ import javax.annotation.Nullable;
  *
  * <p>Created by the {@code SecretAlterChanges.prepare*Changes} methods. After the entity alter
  * commits, {@link SecretManager#commitSecrets} applies them; if the alter fails, {@link
- * SecretManager#rollbackSecrets(PreparedSecrets)} deletes the written versions.
+ * SecretManager#rollbackSecrets(SecretVersionChanges)} deletes the written versions.
  */
-public final class PreparedSecrets {
+public final class SecretVersionChanges {
 
-  /** Prepared secrets with nothing written or released. */
-  public static final PreparedSecrets EMPTY = new PreparedSecrets(List.of(), List.of());
+  /** Secret version changes with nothing written or released. */
+  public static final SecretVersionChanges EMPTY = new SecretVersionChanges(List.of(), List.of());
 
   private final List<WrittenVersion> written;
   private final List<Version> released;
 
-  PreparedSecrets(List<WrittenVersion> written, List<Version> released) {
+  SecretVersionChanges(List<WrittenVersion> written, List<Version> released) {
     this.written = List.copyOf(written);
     this.released = List.copyOf(released);
   }
@@ -47,10 +47,10 @@ public final class PreparedSecrets {
    * <p>For an alter whose entity update may not have been stored, where the entity can still
    * reference the released URNs.
    *
-   * @return prepared secrets with the same written versions and nothing released
+   * @return changes with the same written versions and nothing released
    */
-  public PreparedSecrets withoutReleased() {
-    return new PreparedSecrets(written, List.of());
+  public SecretVersionChanges withoutReleased() {
+    return new SecretVersionChanges(written, List.of());
   }
 
   /** Versions written by the alter, to make current on commit and delete on rollback. */

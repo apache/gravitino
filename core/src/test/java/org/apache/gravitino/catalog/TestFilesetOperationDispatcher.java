@@ -39,6 +39,8 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
@@ -402,6 +404,108 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
       Assertions.assertTrue(filesets.dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testDropDeletesSecretsOnEitherSide() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      schemaOperationDispatcher.createSchema(
+          NameIdentifier.of(metalake, catalog, "schema_drop_entity_urns"),
+          "comment",
+          ImmutableMap.of("k1", "v1"));
+      NameIdentifier ident =
+          NameIdentifier.of(metalake, catalog, "schema_drop_entity_urns", "fileset_entity_urns");
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      filesets.createMultipleLocationFileset(
+          ident,
+          "comment",
+          Fileset.Type.MANAGED,
+          locations,
+          ImmutableMap.of("k1", "v1"),
+          Map.of(
+              "k2", new SecretBinding("memory", "s3cr3t"),
+              "k3", new SecretBinding("memory", "other")),
+          Map.of());
+      Map<String, String> created =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident))
+              .properties();
+      String urn = created.get("k2");
+      String catalogOnlyUrn = created.get("k3");
+      // The catalog no longer returns k2, which only the FilesetEntity holds; the entity misses k3,
+      // which only the catalog holds.
+      catalogManager.doWithCatalogWrapper(
+          NameIdentifier.of(metalake, catalog),
+          c ->
+              c.doWithFilesetOps(
+                  ops -> ops.alterFileset(ident, FilesetChange.removeProperty("k2"))));
+      entityStore.put(
+          FilesetEntity.builder()
+              .withId(Long.parseLong(SecretUrn.parse(urn).identifierSegments().get(1)))
+              .withName(ident.name())
+              .withNamespace(ident.namespace())
+              .withComment("comment")
+              .withFilesetType(Fileset.Type.MANAGED)
+              .withStorageLocations(locations)
+              .withProperties(Map.of("k1", "v1", "k2", urn))
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build(),
+          true);
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals("other", secrets.readSecret(SecretUrn.parse(catalogOnlyUrn)));
+
+      Assertions.assertTrue(filesets.dropFileset(ident));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> secrets.readSecret(SecretUrn.parse(catalogOnlyUrn)));
+    }
+  }
+
+  @Test
+  public void testAlterOfNeverImportedFilesetRejectsSecretBinding() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      schemaOperationDispatcher.createSchema(
+          NameIdentifier.of(metalake, catalog, "schema_never_imported_fileset"),
+          "comment",
+          ImmutableMap.of("k1", "v1"));
+      NameIdentifier ident =
+          NameIdentifier.of(
+              metalake, catalog, "schema_never_imported_fileset", "fileset_never_imported");
+      // Created in the catalog only: no gravitino.identifier property and no FilesetEntity.
+      catalogManager.doWithCatalogWrapper(
+          NameIdentifier.of(metalake, catalog),
+          c ->
+              c.doWithFilesetOps(
+                  ops ->
+                      ops.createMultipleLocationFileset(
+                          ident,
+                          "comment",
+                          Fileset.Type.MANAGED,
+                          Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
+                          Map.of("k1", "v1"))));
+
+      try {
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () ->
+                    filesets.alterFileset(
+                        ident,
+                        FilesetChange.setSecretBinding("k2", new SecretBinding("memory", "s"))));
+        Assertions.assertTrue(error.getMessage().contains("no Gravitino entity id"));
+        Fileset altered = filesets.alterFileset(ident, FilesetChange.setProperty("k1", "v2"));
+        Assertions.assertEquals("v2", altered.properties().get("k1"));
+      } finally {
+        filesets.dropFileset(ident);
+      }
     }
   }
 

@@ -119,7 +119,7 @@ public class InMemorySecretsProvider implements SecretProvider {
   }
 
   @Override
-  public void promoteSecretVersion(SecretUrn urn, String version) {
+  public void setCurrentSecretVersion(SecretUrn urn, String version) {
     checkUrn(urn);
     checkVersion(version);
     secrets.compute(

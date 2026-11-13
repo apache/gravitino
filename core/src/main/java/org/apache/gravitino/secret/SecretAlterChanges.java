@@ -35,7 +35,8 @@ import org.apache.gravitino.file.FilesetChange;
  * Rewrites entity alter changes that involve secrets into plain setProperty / removeProperty.
  *
  * <p>Write-through plaintexts are written as new secret versions after the whole batch is applied,
- * and the returned {@link PreparedSecrets} must be committed or rolled back with the entity alter.
+ * and the returned {@link SecretVersionChanges} must be committed or rolled back with the entity
+ * alter.
  */
 public final class SecretAlterChanges {
 
@@ -46,14 +47,17 @@ public final class SecretAlterChanges {
    *
    * @param secretManager secret manager
    * @param currentProperties current catalog properties (may be null)
-   * @param entityId catalog entity id
+   * @param entityId catalog entity id, or null if the catalog has none yet; then the batch cannot
+   *     bind, rewrite, replace or remove a write-through secret
    * @param changes catalog changes
    * @return effective changes and the prepared write-through secret versions
+   * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
+   *     write-through secret
    */
-  public static Pair<CatalogChange[], PreparedSecrets> prepareCatalogChanges(
+  public static Pair<CatalogChange[], SecretVersionChanges> prepareCatalogChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
-      long entityId,
+      @Nullable Long entityId,
       CatalogChange... changes) {
     Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
@@ -62,12 +66,17 @@ public final class SecretAlterChanges {
     for (CatalogChange change : changes) {
       if (change instanceof CatalogChange.SetSecretBinding) {
         CatalogChange.SetSecretBinding c = (CatalogChange.SetSecretBinding) change;
+        long id =
+            SecretPropertyUtils.requireEntityIdForWriteThrough(
+                entityId, "catalog", c.getProperty());
         String urn =
             secretManager.alterSetSecretBinding(
-                properties, "catalog", entityId, c.getProperty(), c.getBinding(), plaintexts);
+                properties, "catalog", id, c.getProperty(), c.getBinding(), plaintexts);
         out.add(CatalogChange.setProperty(c.getProperty(), urn));
       } else if (change instanceof CatalogChange.SetSecretReference) {
         CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "catalog", c.getProperty(), properties.get(c.getProperty()));
         String urn =
             secretManager.alterSetSecretReference(
                 properties, c.getProperty(), c.getReference(), plaintexts);
@@ -80,15 +89,20 @@ public final class SecretAlterChanges {
         out.add(CatalogChange.setProperty(c.getProperty(), value));
       } else if (change instanceof CatalogChange.RemoveProperty) {
         CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "catalog", c.getProperty(), properties.get(c.getProperty()));
         secretManager.alterRemoveProperty(properties, c.getProperty(), plaintexts);
         out.add(change);
       } else {
         out.add(change);
       }
     }
-    PreparedSecrets prepared =
-        secretManager.prepareSecretVersions(
-            currentProperties, properties, "catalog", entityId, plaintexts);
+    // Without an id the checks above let no change write or release a write-through secret.
+    SecretVersionChanges prepared =
+        entityId == null
+            ? SecretVersionChanges.EMPTY
+            : secretManager.prepareSecretVersions(
+                currentProperties, properties, "catalog", entityId, plaintexts);
     return Pair.of(out.toArray(new CatalogChange[0]), prepared);
   }
 
@@ -149,14 +163,17 @@ public final class SecretAlterChanges {
    *
    * @param secretManager secret manager
    * @param currentProperties current schema properties (may be null)
-   * @param entityId schema entity id
+   * @param entityId schema entity id, or null if the schema has none yet; then the batch cannot
+   *     bind, rewrite, replace or remove a write-through secret
    * @param changes schema changes
    * @return effective changes and the prepared write-through secret versions
+   * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
+   *     write-through secret
    */
-  public static Pair<SchemaChange[], PreparedSecrets> prepareSchemaChanges(
+  public static Pair<SchemaChange[], SecretVersionChanges> prepareSchemaChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
-      long entityId,
+      @Nullable Long entityId,
       SchemaChange... changes) {
     Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
@@ -165,12 +182,16 @@ public final class SecretAlterChanges {
     for (SchemaChange change : changes) {
       if (change instanceof SchemaChange.SetSecretBinding) {
         SchemaChange.SetSecretBinding c = (SchemaChange.SetSecretBinding) change;
+        long id =
+            SecretPropertyUtils.requireEntityIdForWriteThrough(entityId, "schema", c.getProperty());
         String urn =
             secretManager.alterSetSecretBinding(
-                properties, "schema", entityId, c.getProperty(), c.getBinding(), plaintexts);
+                properties, "schema", id, c.getProperty(), c.getBinding(), plaintexts);
         out.add(SchemaChange.setProperty(c.getProperty(), urn));
       } else if (change instanceof SchemaChange.SetSecretReference) {
         SchemaChange.SetSecretReference c = (SchemaChange.SetSecretReference) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "schema", c.getProperty(), properties.get(c.getProperty()));
         String urn =
             secretManager.alterSetSecretReference(
                 properties, c.getProperty(), c.getReference(), plaintexts);
@@ -183,15 +204,20 @@ public final class SecretAlterChanges {
         out.add(SchemaChange.setProperty(c.getProperty(), value));
       } else if (change instanceof SchemaChange.RemoveProperty) {
         SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "schema", c.getProperty(), properties.get(c.getProperty()));
         secretManager.alterRemoveProperty(properties, c.getProperty(), plaintexts);
         out.add(change);
       } else {
         out.add(change);
       }
     }
-    PreparedSecrets prepared =
-        secretManager.prepareSecretVersions(
-            currentProperties, properties, "schema", entityId, plaintexts);
+    // Without an id the checks above let no change write or release a write-through secret.
+    SecretVersionChanges prepared =
+        entityId == null
+            ? SecretVersionChanges.EMPTY
+            : secretManager.prepareSecretVersions(
+                currentProperties, properties, "schema", entityId, plaintexts);
     return Pair.of(out.toArray(new SchemaChange[0]), prepared);
   }
 
@@ -200,14 +226,17 @@ public final class SecretAlterChanges {
    *
    * @param secretManager secret manager
    * @param currentProperties current fileset properties (may be null)
-   * @param entityId fileset entity id
+   * @param entityId fileset entity id, or null if the fileset has none yet; then the batch cannot
+   *     bind, rewrite, replace or remove a write-through secret
    * @param changes fileset changes
    * @return effective changes and the prepared write-through secret versions
+   * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
+   *     write-through secret
    */
-  public static Pair<FilesetChange[], PreparedSecrets> prepareFilesetChanges(
+  public static Pair<FilesetChange[], SecretVersionChanges> prepareFilesetChanges(
       SecretManager secretManager,
       @Nullable Map<String, String> currentProperties,
-      long entityId,
+      @Nullable Long entityId,
       FilesetChange... changes) {
     Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
@@ -216,12 +245,17 @@ public final class SecretAlterChanges {
     for (FilesetChange change : changes) {
       if (change instanceof FilesetChange.SetSecretBinding) {
         FilesetChange.SetSecretBinding c = (FilesetChange.SetSecretBinding) change;
+        long id =
+            SecretPropertyUtils.requireEntityIdForWriteThrough(
+                entityId, "fileset", c.getProperty());
         String urn =
             secretManager.alterSetSecretBinding(
-                properties, "fileset", entityId, c.getProperty(), c.getBinding(), plaintexts);
+                properties, "fileset", id, c.getProperty(), c.getBinding(), plaintexts);
         out.add(FilesetChange.setProperty(c.getProperty(), urn));
       } else if (change instanceof FilesetChange.SetSecretReference) {
         FilesetChange.SetSecretReference c = (FilesetChange.SetSecretReference) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "fileset", c.getProperty(), properties.get(c.getProperty()));
         String urn =
             secretManager.alterSetSecretReference(
                 properties, c.getProperty(), c.getReference(), plaintexts);
@@ -234,15 +268,20 @@ public final class SecretAlterChanges {
         out.add(FilesetChange.setProperty(c.getProperty(), value));
       } else if (change instanceof FilesetChange.RemoveProperty) {
         FilesetChange.RemoveProperty c = (FilesetChange.RemoveProperty) change;
+        SecretPropertyUtils.checkWriteThroughHasEntityId(
+            entityId, "fileset", c.getProperty(), properties.get(c.getProperty()));
         secretManager.alterRemoveProperty(properties, c.getProperty(), plaintexts);
         out.add(change);
       } else {
         out.add(change);
       }
     }
-    PreparedSecrets prepared =
-        secretManager.prepareSecretVersions(
-            currentProperties, properties, "fileset", entityId, plaintexts);
+    // Without an id the checks above let no change write or release a write-through secret.
+    SecretVersionChanges prepared =
+        entityId == null
+            ? SecretVersionChanges.EMPTY
+            : secretManager.prepareSecretVersions(
+                currentProperties, properties, "fileset", entityId, plaintexts);
     return Pair.of(out.toArray(new FilesetChange[0]), prepared);
   }
 }

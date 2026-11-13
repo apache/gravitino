@@ -81,8 +81,8 @@ public interface SecretProvider {
    *
    * <p>The new version becomes the value {@link #readSecret} returns only when {@code urn} has no
    * current version. Otherwise the current version stays readable until {@link
-   * #promoteSecretVersion} is called, so a failed entity alter can discard the new version and keep
-   * the value the entity still references.
+   * #setCurrentSecretVersion} is called, so a failed entity alter can discard the new version and
+   * keep the value the entity still references.
    *
    * <p>Providers that support write-through must implement this method and the other version
    * methods; altering a write-through secret uses them. Providers that only build external
@@ -106,8 +106,8 @@ public interface SecretProvider {
    *
    * <p>Write-through providers must implement this method; see {@link #writeSecretVersion}.
    *
-   * <p>If this method throws, the promote must not take effect afterwards, and {@link
-   * #currentSecretVersion} must already report whether it did: after a failed promote Gravitino
+   * <p>If this method throws, the switch must not take effect afterwards, and {@link
+   * #currentSecretVersion} must already report whether it did: after a failed call Gravitino
    * deletes the previous version if {@code version} is current and {@code version} otherwise, and
    * deletes neither if {@code currentSecretVersion} throws. Settle an unknown outcome before
    * throwing, for example with a conditional update, and read the current version with
@@ -118,7 +118,7 @@ public interface SecretProvider {
    * @throws IllegalArgumentException if {@code urn} has no such version
    * @throws UnsupportedOperationException if this provider does not support versions
    */
-  default void promoteSecretVersion(SecretUrn urn, String version) {
+  default void setCurrentSecretVersion(SecretUrn urn, String version) {
     throw new UnsupportedOperationException(type() + " does not support secret versions");
   }
 

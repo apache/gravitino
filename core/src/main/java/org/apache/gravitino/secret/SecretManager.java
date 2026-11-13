@@ -331,13 +331,13 @@ public class SecretManager implements Closeable {
    * committed alter. If making a written version current fails and the provider then reports it as
    * current, the previous version is deleted; otherwise the written version is deleted. If the
    * current version cannot be looked up, both versions are kept. Running the same change again
-   * writes and promotes a new version.
+   * writes a new version and makes it current.
    *
-   * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param prepared changes returned by a {@code SecretAlterChanges.prepare*Changes} method
    */
-  public void commitSecrets(PreparedSecrets prepared) {
+  public void commitSecrets(SecretVersionChanges prepared) {
     Preconditions.checkArgument(prepared != null, "prepared must not be null");
-    for (PreparedSecrets.WrittenVersion written : prepared.written()) {
+    for (SecretVersionChanges.WrittenVersion written : prepared.written()) {
       // Without a previous version the write already made the new version current.
       if (written.previousId() == null) {
         continue;
@@ -346,7 +346,7 @@ public class SecretManager implements Closeable {
       SecretProvider provider = null;
       try {
         provider = registry.getProvider(urn.providerName());
-        provider.promoteSecretVersion(urn, written.version().id());
+        provider.setCurrentSecretVersion(urn, written.version().id());
       } catch (RuntimeException e) {
         LOG.error(
             "Failed to make version {} of secret {} current after the alter committed",
@@ -354,7 +354,7 @@ public class SecretManager implements Closeable {
             urn,
             e);
         if (provider != null) {
-          deleteUnusedVersionAfterFailedPromote(provider, written);
+          deleteUnusedVersionAfterFailedSwitch(provider, written);
         }
         continue;
       }
@@ -368,12 +368,12 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Deletes the version a failed promote left unused. The promote may have taken effect before it
+   * Deletes the version a failed switch left unused. The switch may have taken effect before it
    * failed, so the version that is current now is kept; if the current version cannot be looked up,
    * both versions are kept.
    */
-  private static void deleteUnusedVersionAfterFailedPromote(
-      SecretProvider provider, PreparedSecrets.WrittenVersion written) {
+  private static void deleteUnusedVersionAfterFailedSwitch(
+      SecretProvider provider, SecretVersionChanges.WrittenVersion written) {
     SecretUrn urn = written.version().urn();
     String writtenId = written.version().id();
     String current;
@@ -381,7 +381,7 @@ public class SecretManager implements Closeable {
       current = provider.currentSecretVersion(urn);
     } catch (RuntimeException e) {
       LOG.warn(
-          "Could not look up the current version of secret {} after a failed promote; keeping"
+          "Could not look up the current version of secret {} after a failed switch; keeping"
               + " versions {} and {}",
           urn,
           written.previousId(),
@@ -391,7 +391,8 @@ public class SecretManager implements Closeable {
     }
     String unused;
     if (writtenId.equals(current)) {
-      LOG.info("Version {} of secret {} is current although its promote failed", writtenId, urn);
+      LOG.info(
+          "Version {} of secret {} is current although making it current failed", writtenId, urn);
       unused = written.previousId();
     } else {
       unused = writtenId;
@@ -410,12 +411,12 @@ public class SecretManager implements Closeable {
    * secrets keep the values it still references. A secret that {@link #alterSetProperty} rewrote
    * right away is not restored.
    *
-   * @param prepared secrets prepared by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param prepared changes returned by a {@code SecretAlterChanges.prepare*Changes} method
    */
-  public void rollbackSecrets(PreparedSecrets prepared) {
+  public void rollbackSecrets(SecretVersionChanges prepared) {
     Preconditions.checkArgument(prepared != null, "prepared must not be null");
-    List<PreparedSecrets.Version> versions = new ArrayList<>(prepared.written().size());
-    for (PreparedSecrets.WrittenVersion written : prepared.written()) {
+    List<SecretVersionChanges.Version> versions = new ArrayList<>(prepared.written().size());
+    for (SecretVersionChanges.WrittenVersion written : prepared.written()) {
       versions.add(written.version());
     }
     deleteSecretVersions(versions);
@@ -438,7 +439,7 @@ public class SecretManager implements Closeable {
    * @throws UnsupportedOperationException if a provider of a written or released secret does not
    *     support secret versions
    */
-  PreparedSecrets prepareSecretVersions(
+  SecretVersionChanges prepareSecretVersions(
       @Nullable Map<String, String> startProperties,
       Map<String, String> finalProperties,
       String entityType,
@@ -446,9 +447,9 @@ public class SecretManager implements Closeable {
       Map<String, String> plaintexts) {
     // Look up the released versions first, so an unsupported provider of a released URN fails
     // before any version is written.
-    List<PreparedSecrets.Version> released =
+    List<SecretVersionChanges.Version> released =
         releasedVersions(startProperties, finalProperties, entityType, entityId);
-    List<PreparedSecrets.WrittenVersion> written = new ArrayList<>(plaintexts.size());
+    List<SecretVersionChanges.WrittenVersion> written = new ArrayList<>(plaintexts.size());
     try {
       for (Map.Entry<String, String> entry : plaintexts.entrySet()) {
         SecretUrn urn = SecretUrn.parse(finalProperties.get(entry.getKey()));
@@ -462,19 +463,20 @@ public class SecretManager implements Closeable {
           throw unsupportedVersions(urn, e);
         }
         written.add(
-            new PreparedSecrets.WrittenVersion(new PreparedSecrets.Version(urn, id), previousId));
+            new SecretVersionChanges.WrittenVersion(
+                new SecretVersionChanges.Version(urn, id), previousId));
       }
     } catch (RuntimeException e) {
-      List<PreparedSecrets.Version> versions = new ArrayList<>(written.size());
+      List<SecretVersionChanges.Version> versions = new ArrayList<>(written.size());
       written.forEach(w -> versions.add(w.version()));
       deleteSecretVersions(versions);
       throw e;
     }
-    return new PreparedSecrets(written, released);
+    return new SecretVersionChanges(written, released);
   }
 
   /** Current versions of this entity's write-through URNs that {@code finalProperties} dropped. */
-  private List<PreparedSecrets.Version> releasedVersions(
+  private List<SecretVersionChanges.Version> releasedVersions(
       @Nullable Map<String, String> startProperties,
       Map<String, String> finalProperties,
       String entityType,
@@ -482,7 +484,7 @@ public class SecretManager implements Closeable {
     if (startProperties == null || startProperties.isEmpty()) {
       return List.of();
     }
-    List<PreparedSecrets.Version> released = new ArrayList<>();
+    List<SecretVersionChanges.Version> released = new ArrayList<>();
     for (Map.Entry<String, String> entry : startProperties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
@@ -494,7 +496,7 @@ public class SecretManager implements Closeable {
       try {
         String id = registry.getProvider(urn.providerName()).currentSecretVersion(urn);
         if (id != null) {
-          released.add(new PreparedSecrets.Version(urn, id));
+          released.add(new SecretVersionChanges.Version(urn, id));
         }
       } catch (UnsupportedOperationException e) {
         throw unsupportedVersions(urn, e);
@@ -516,8 +518,8 @@ public class SecretManager implements Closeable {
         cause);
   }
 
-  private void deleteSecretVersions(List<PreparedSecrets.Version> versions) {
-    for (PreparedSecrets.Version version : versions) {
+  private void deleteSecretVersions(List<SecretVersionChanges.Version> versions) {
+    for (SecretVersionChanges.Version version : versions) {
       SecretUrn urn = version.urn();
       try {
         registry.getProvider(urn.providerName()).deleteSecretVersion(urn, version.id());
@@ -635,25 +637,29 @@ public class SecretManager implements Closeable {
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
-   * @param entityId stable numeric entity id
+   * @param entityId stable numeric entity id, or null if the entity has none yet
    * @param property property key
    * @param value new property value (plaintext when rewriting a secret, or plain value)
    * @param plaintexts property key → plaintext to write, updated as changes are applied
    * @return value to use in SetProperty change (URN or plaintext)
+   * @throws IllegalArgumentException if {@code entityId} is null and the current value is a
+   *     write-through secret URN
    */
   public String alterSetProperty(
       Map<String, String> properties,
       String entityType,
-      long entityId,
+      @Nullable Long entityId,
       String property,
       String value,
       Map<String, String> plaintexts) {
     SecretPropertyUtils.validateAlterSetPropertyValue(property, value);
     String current = properties.get(property);
     if (SecretPropertyUtils.isSecretProperty(property, current)) {
+      SecretPropertyUtils.checkWriteThroughHasEntityId(entityId, entityType, property, current);
       SecretUrn currentUrn = SecretUrn.parse(current);
       SecretBinding binding = new SecretBinding(currentUrn.providerName(), value);
-      if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+      if (entityId != null
+          && SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
         return alterSetSecretBinding(
             properties, entityType, entityId, property, binding, plaintexts);
       }

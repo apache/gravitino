@@ -90,7 +90,7 @@ public class TestInMemorySecretsProvider {
   }
 
   @Test
-  public void testWrittenVersionStaysPendingUntilPromoted() {
+  public void testWrittenVersionStaysPendingUntilMadeCurrent() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());
     SecretUrn urn = provider.writeSecret("old", writeAttributes());
@@ -102,7 +102,7 @@ public class TestInMemorySecretsProvider {
     Assertions.assertEquals(oldVersion, provider.currentSecretVersion(urn));
     Assertions.assertEquals("old", provider.readSecret(urn));
 
-    provider.promoteSecretVersion(urn, newVersion);
+    provider.setCurrentSecretVersion(urn, newVersion);
     Assertions.assertEquals(newVersion, provider.currentSecretVersion(urn));
     Assertions.assertEquals("new", provider.readSecret(urn));
 
@@ -157,7 +157,7 @@ public class TestInMemorySecretsProvider {
     Assertions.assertNull(provider.currentSecretVersion(urn));
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
 
-    provider.promoteSecretVersion(urn, newVersion);
+    provider.setCurrentSecretVersion(urn, newVersion);
     Assertions.assertEquals("new", provider.readSecret(urn));
 
     provider.deleteSecretVersion(urn, newVersion);
@@ -166,16 +166,16 @@ public class TestInMemorySecretsProvider {
   }
 
   @Test
-  public void testPromoteRejectsUnknownVersion() {
+  public void testSetCurrentRejectsUnknownVersion() {
     InMemorySecretsProvider provider = new InMemorySecretsProvider();
     provider.initialize("memory", Map.of());
     SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.promoteSecretVersion(urn, "1"));
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, "1"));
 
     String version = provider.writeSecretVersion(urn, "first");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.promoteSecretVersion(urn, version + "0"));
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, version + "0"));
     Assertions.assertEquals("first", provider.readSecret(urn));
   }
 
@@ -189,7 +189,7 @@ public class TestInMemorySecretsProvider {
     provider.deleteSecret(urn);
     Assertions.assertNull(provider.currentSecretVersion(urn));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.promoteSecretVersion(urn, newVersion));
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, newVersion));
   }
 
   @Test
@@ -202,7 +202,7 @@ public class TestInMemorySecretsProvider {
     provider.writeSecret("new", writeAttributes());
     Assertions.assertEquals("new", provider.readSecret(urn));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.promoteSecretVersion(urn, pending));
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, pending));
   }
 
   @Test
@@ -218,7 +218,7 @@ public class TestInMemorySecretsProvider {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> provider.writeSecretVersion(otherProvider, "s3cr3t"));
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> provider.promoteSecretVersion(urn, null));
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, null));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> provider.deleteSecretVersion(null, "1"));
     Assertions.assertThrows(

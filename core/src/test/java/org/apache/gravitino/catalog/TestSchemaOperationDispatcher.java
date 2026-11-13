@@ -710,6 +710,44 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testAlterOfNeverImportedSchemaRejectsSecretBinding() throws Exception {
+    reset(entityStore);
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_never_imported");
+      // Created in the catalog only: no gravitino.identifier property and no SchemaEntity.
+      catalogManager.doWithCatalogWrapper(
+          NameIdentifier.of(metalake, catalog),
+          c -> c.doWithSchemaOps(ops -> ops.createSchema(ident, "comment", Map.of("k1", "v1"))));
+      try {
+        SchemaChange bind = SchemaChange.setSecretBinding("k2", new SecretBinding("memory", "s"));
+        IllegalArgumentException error =
+            Assertions.assertThrows(
+                IllegalArgumentException.class, () -> d.alterSchema(ident, bind));
+        Assertions.assertTrue(error.getMessage().contains("load the schema to import it first"));
+        Assertions.assertThrows(
+            NoSuchSchemaException.class,
+            () -> d.alterSchema(NameIdentifier.of(metalake, catalog, "schema_missing"), bind));
+
+        d.alterSchema(ident, SchemaChange.setProperty("k1", "v2"));
+        Assertions.assertFalse(entityStore.exists(ident, SCHEMA));
+
+        // Loading the schema imports it, which gives it an id.
+        d.loadSchema(ident);
+        d.alterSchema(ident, bind);
+        SecretUrn urn =
+            SecretUrn.parse(
+                entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().get("k2"));
+        Assertions.assertEquals("s", secrets.readSecret(urn));
+      } finally {
+        reset(entityStore);
+        d.dropSchema(ident, false);
+      }
+    }
+  }
+
+  @Test
   public void testDropHierarchicalSchemaCleansUpOrphanedAncestors() throws IOException {
     // Clear any spy stubs leaked from other tests sharing the static entityStore.
     reset(entityStore);

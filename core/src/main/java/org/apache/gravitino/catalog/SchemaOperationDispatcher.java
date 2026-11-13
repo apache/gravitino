@@ -26,6 +26,7 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -55,7 +56,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
-import org.apache.gravitino.secret.PreparedSecrets;
 import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
@@ -65,6 +65,7 @@ import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.SecretVersionChanges;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -366,16 +367,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // Asked before the alter, so nothing that can throw runs between the alter and the
           // secret commit below.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
-          Triple<Schema, SchemaChange[], PreparedSecrets> alterResult =
+          Triple<Schema, SchemaChange[], SecretVersionChanges> alterResult =
               alterSchemaUnderLock(ident, catalogIdent, isManagedSchema, changes);
           Schema alteredSchema = alterResult.getLeft();
           SchemaChange[] effectiveChanges = alterResult.getMiddle();
           // Secrets of an external alter that read a SchemaEntity, to commit after its update.
-          PreparedSecrets preparedSecrets = alterResult.getRight();
+          SecretVersionChanges secretVersionChanges = alterResult.getRight();
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           if (isManagedSchema) {
-            secretManager.commitSecrets(preparedSecrets);
+            secretManager.commitSecrets(secretVersionChanges);
             return EntityCombinedSchema.of(alteredSchema)
                 .withHiddenProperties(
                     getMaskAndOmitKeys(
@@ -390,7 +391,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           if (stringId == null) {
             se = getEntity(ident, SCHEMA, SchemaEntity.class);
             if (se == null) {
-              secretManager.commitSecrets(preparedSecrets.withoutReleased());
+              secretManager.commitSecrets(secretVersionChanges.withoutReleased());
               return EntityCombinedSchema.of(alteredSchema)
                   .withHiddenProperties(
                       getMaskAndOmitKeys(
@@ -438,7 +439,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // does not match. The new versions are made current either way; if it returns null, the
           // released ones are kept because the entity may still reference them.
           secretManager.commitSecrets(
-              updatedSchemaEntity == null ? preparedSecrets.withoutReleased() : preparedSecrets);
+              updatedSchemaEntity == null
+                  ? secretVersionChanges.withoutReleased()
+                  : secretVersionChanges);
 
           return EntityCombinedSchema.of(alteredSchema, updatedSchemaEntity)
               .withHiddenProperties(
@@ -449,7 +452,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         });
   }
 
-  private Triple<Schema, SchemaChange[], PreparedSecrets> alterSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretVersionChanges> alterSchemaUnderLock(
       NameIdentifier ident,
       NameIdentifier catalogIdent,
       boolean isManagedSchema,
@@ -468,7 +471,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         NoSuchSchemaException.class);
   }
 
-  private Triple<Schema, SchemaChange[], PreparedSecrets> alterManagedSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretVersionChanges> alterManagedSchemaUnderLock(
       NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException {
     validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
 
@@ -486,7 +489,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     existing.properties() == null
                         ? new HashMap<>()
                         : new HashMap<>(existing.properties());
-                Pair<SchemaChange[], PreparedSecrets> secretResult =
+                Pair<SchemaChange[], SecretVersionChanges> secretResult =
                     SecretAlterChanges.prepareSchemaChanges(
                         secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
@@ -502,7 +505,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               .withProperties(updatedEntity.properties())
               .withAuditInfo(updatedEntity.auditInfo())
               .build();
-      return Triple.of(alteredSchema, effectiveChangesHolder[0], PreparedSecrets.EMPTY);
+      return Triple.of(alteredSchema, effectiveChangesHolder[0], SecretVersionChanges.EMPTY);
     } catch (NoSuchEntityException e) {
       throw new NoSuchSchemaException(e, "Schema %s does not exist", ident);
     } catch (IOException e) {
@@ -514,10 +517,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
   }
 
-  private Triple<Schema, SchemaChange[], PreparedSecrets> alterExternalSchemaUnderLock(
+  private Triple<Schema, SchemaChange[], SecretVersionChanges> alterExternalSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
     Schema currentSchema = null;
+    NoSuchSchemaException missingSchema = null;
     try {
       currentSchema =
           doWithCatalog(
@@ -526,6 +530,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               NoSuchSchemaException.class);
     } catch (NoSuchSchemaException e) {
       // Defer missing-schema handling to catalog alterSchema to preserve catalog semantics.
+      missingSchema = e;
     }
     // Prefer SchemaEntity properties for secret URNs (catalog loadSchema may omit them).
     SchemaEntity schemaEntityForSecrets = getEntity(ident, SCHEMA, SchemaEntity.class);
@@ -543,19 +548,26 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
 
     StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
-    long entityIdForSecrets;
+    // Null for a schema that was never imported: then the alter cannot touch write-through secrets.
+    Long entityIdForSecrets;
     if (currentStringId != null) {
       entityIdForSecrets = currentStringId.id();
     } else if (schemaEntityForSecrets != null) {
       entityIdForSecrets = schemaEntityForSecrets.id();
     } else {
-      entityIdForSecrets = 0L;
+      entityIdForSecrets = null;
+    }
+    // A binding needs the id, so report the missing schema rather than the missing id.
+    if (missingSchema != null
+        && entityIdForSecrets == null
+        && Arrays.stream(changes).anyMatch(c -> c instanceof SchemaChange.SetSecretBinding)) {
+      throw missingSchema;
     }
 
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<SchemaChange[], PreparedSecrets> secretResult =
+      Pair<SchemaChange[], SecretVersionChanges> secretResult =
           SecretAlterChanges.prepareSchemaChanges(
               secretManager, currentProperties, entityIdForSecrets, changes);
       writtenSecretMaterials.set(secretResult.getRight());
@@ -570,7 +582,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       if (schemaEntityForSecrets == null) {
         // No SchemaEntity references the released secrets.
         secretManager.commitSecrets(writtenSecretMaterials.get());
-        return Triple.of(alteredSchema, effectiveChanges, PreparedSecrets.EMPTY);
+        return Triple.of(alteredSchema, effectiveChanges, SecretVersionChanges.EMPTY);
       }
       return Triple.of(alteredSchema, effectiveChanges, writtenSecretMaterials.get());
     } finally {
