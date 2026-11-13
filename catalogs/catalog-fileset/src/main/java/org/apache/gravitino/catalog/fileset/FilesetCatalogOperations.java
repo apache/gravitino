@@ -1476,7 +1476,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         new FileSystemCacheKey(scheme, authority),
         cacheKey -> {
           try {
-            return getFileSystem(path, conf);
+            // Create the file system for the user it is cached under.
+            return getFileSystem(path, conf, cacheKey.currentUser);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
                 e, "Failed to get FileSystem for fileset: path: %s", path);
@@ -1493,6 +1494,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+    // Read the user here: a pool thread keeps the Subject of the request that started it.
+    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName());
+  }
+
+  FileSystem getFileSystem(Path path, Map<String, String> config, String user) throws IOException {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1517,8 +1523,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
-    // Read the user here: a pool thread keeps the Subject of the request that started it.
-    String user = PrincipalUtils.getCurrentUserName();
     try {
       return executeFileSystemTask(
           () -> createFileSystem(path, config, scheme, provider, user), timeoutSeconds);

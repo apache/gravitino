@@ -2618,7 +2618,9 @@ public class TestFilesetCatalogOperations {
 
     try (FilesetCatalogOperations ops =
         Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
-      doReturn(fileSystem).when(ops).getFileSystem(Mockito.eq(path), Mockito.anyMap());
+      doReturn(fileSystem)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString());
       ConnectionFailedException failure =
           Assertions.assertThrows(
               ConnectionFailedException.class,
@@ -2657,19 +2659,25 @@ public class TestFilesetCatalogOperations {
     }
   }
 
-  @Test
-  public void testGetFileSystemUsesRequestUserOnPoolThread() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetFileSystemUsesRequestUserOnPoolThread(boolean cached) throws Exception {
     try (FilesetCatalogOperations ops =
         Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
       ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       List<String> users = recordFileSystemUsers(ops);
       startPoolThreadsAs(ops, "alice");
 
+      Path path = new Path(TEST_ROOT_PATH, "pool_thread_user");
       PrincipalUtils.doAs(
           new UserPrincipal("bob"),
           () -> {
-            ops.getFileSystem(new Path(TEST_ROOT_PATH, "pool_thread_user"), ImmutableMap.of())
-                .close();
+            if (cached) {
+              // ops.close() closes the cached file system.
+              ops.getFileSystemWithCache(path, ImmutableMap.of());
+            } else {
+              ops.getFileSystem(path, ImmutableMap.of()).close();
+            }
             return null;
           });
 
@@ -2738,7 +2746,9 @@ public class TestFilesetCatalogOperations {
     return users;
   }
 
-  // Threads that a request starts keep that request's Subject. Keep them alive for the test.
+  // The tests rely on a thread started inside Subject.doAs keeping that Subject, as it does up to
+  // JDK 22. Revisit them when PrincipalUtils moves off Subject.getSubject, which later JDKs no
+  // longer support. Keep the threads alive so that bob's request does not start new ones.
   private static void startPoolThreadsAs(FilesetCatalogOperations ops, String user)
       throws Exception {
     ops.fileSystemExecutor.allowCoreThreadTimeOut(false);
@@ -3499,7 +3509,7 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(any(), any()))
+      when(mockOps.getFileSystem(any(), any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
@@ -3512,6 +3522,7 @@ public class TestFilesetCatalogOperations {
       FileSystem fs2 =
           mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
+      Assertions.assertNotNull(fs1);
       Assertions.assertSame(fs1, fs2);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -4043,7 +4054,9 @@ public class TestFilesetCatalogOperations {
           randomCatalogInfo("m1", "c1"),
           FILESET_PROPERTIES_METADATA);
       ops.fileSystemCache.invalidateAll();
-      Mockito.doThrow(cause).when(ops).getFileSystem(Mockito.eq(path), Mockito.eq(conf));
+      Mockito.doThrow(cause)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.eq(conf), Mockito.anyString());
 
       GravitinoRuntimeException e =
           Assertions.assertThrows(
