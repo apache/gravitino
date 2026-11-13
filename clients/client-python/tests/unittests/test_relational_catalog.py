@@ -176,6 +176,17 @@ class TestRelationalCatalog(unittest.TestCase):
         self.assertIs(self.catalog.supports_credentials(), self.catalog)
         self.assertIs(self.catalog.support_credentials(), self.catalog)
 
+    def test_get_credentials(self):
+        mock_credentials = [Mock()]
+        with patch.object(
+            self.catalog._object_credential_operations,  # pylint: disable=protected-access
+            "get_credentials",
+            return_value=mock_credentials,
+        ) as mock_get_credentials:
+            result = self.catalog.get_credentials()
+            mock_get_credentials.assert_called_once()
+            self.assertEqual(mock_credentials, result)
+
     def test_supports_secrets(self):
         self.assertIsInstance(self.catalog, SupportsSecrets)
         self.assertIs(self.catalog.supports_secrets(), self.catalog)

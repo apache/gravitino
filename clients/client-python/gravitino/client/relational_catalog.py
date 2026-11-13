@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from typing import Final, Optional, overload
+from typing import Final, List, Optional, overload
 
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.catalog import Catalog
@@ -118,7 +118,7 @@ class RelationalCatalog(
         """Deprecated alias for supports_credentials."""
         return self.supports_credentials()
 
-    def get_credentials(self) -> list[Credential]:
+    def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
 
     def supports_secrets(self) -> SupportsSecrets:
