@@ -174,6 +174,19 @@ public class TestSemanticModelValidator {
         "datasets[0].fields[1].name: duplicate field name 'id'; first declared at "
             + "datasets[0].fields[0].name");
 
+    // Field names resolve case-insensitively, so names equal ignoring case are duplicates too.
+    Dataset caseFoldedDuplicateFields =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withFields(
+                new Field[] {field("id", expression("id")), field("ID", expression("other_id"))})
+            .build();
+    assertInvalid(
+        definition(caseFoldedDuplicateFields),
+        "datasets[0].fields[1].name: duplicate field name 'id'; first declared at "
+            + "datasets[0].fields[0].name");
+
     assertDoesNotThrow(
         () ->
             SemanticModelValidator.validateDefinition(

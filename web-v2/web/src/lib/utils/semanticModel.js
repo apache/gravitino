@@ -208,7 +208,13 @@ const validateDatasets = (datasets, errors) => {
       validateMetadata(field, path, errors)
     })
 
-    const duplicateFields = duplicatesOf((fields || []).map(field => field?.name).filter(isNonBlankString))
+    // Field names resolve case-insensitively, so names equal ignoring case must not coexist.
+    const duplicateFields = duplicatesOf(
+      (fields || [])
+        .map(field => field?.name)
+        .filter(isNonBlankString)
+        .map(normalizeFieldName)
+    )
     if (duplicateFields.length) {
       errors.push(`Field names must be unique within dataset "${dataset.name}": ${duplicateFields.join(', ')}.`)
     }

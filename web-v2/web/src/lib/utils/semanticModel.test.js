@@ -113,6 +113,22 @@ describe('validateSemanticModelDefinition', () => {
     expect(errors).toEqual(['Field names must be unique within dataset "orders": order_id.'])
   })
 
+  test('rejects field names that differ only by case', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [
+        {
+          ...orders,
+          fields: [
+            ...orders.fields,
+            { name: 'Order_Id', expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'other_id' }] } }
+          ]
+        }
+      ]
+    })
+
+    expect(errors).toEqual(['Field names must be unique within dataset "orders": order_id.'])
+  })
+
   test('accepts the same field name in two different datasets', () => {
     const errors = validateSemanticModelDefinition({
       datasets: [orders, { ...customers, fields: orders.fields }]
@@ -238,7 +254,13 @@ describe('validateSemanticModelDefinition', () => {
 
 describe('nested Semantic Model contract validation', () => {
   const expression = { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] }
-  const relationship = { name: 'self', from: 'orders', to: 'orders', fromColumns: ['order_id'], toColumns: ['order_id'] }
+  const relationship = {
+    name: 'self',
+    from: 'orders',
+    to: 'orders',
+    fromColumns: ['order_id'],
+    toColumns: ['order_id']
+  }
 
   test.each(['field', 'metric'])('accepts only the server-supported optional %s data types', kind => {
     const withType = datatype =>
@@ -372,7 +394,12 @@ describe('nested Semantic Model contract validation', () => {
         datasets: [
           {
             ...orders,
-            fields: [...orders.fields, { name: 'amount', expression }, { name: 'id', expression }, { name: 'region', expression }],
+            fields: [
+              ...orders.fields,
+              { name: 'amount', expression },
+              { name: 'id', expression },
+              { name: 'region', expression }
+            ],
             primaryKey: ['order_id'],
             uniqueKeys: [['amount'], ['id', 'region']]
           }

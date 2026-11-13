@@ -53,7 +53,8 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
  *
  * <p>Following the Ossie Name Resolution rules, {@code primaryKey}, {@code uniqueKeys}, {@code
  * fromColumns}, and {@code toColumns} name fields declared in the referenced datasets, not columns
- * of the datasets' sources. Field names are compared case-insensitively. A dataset that declares no
+ * of the datasets' sources. Field names are compared case-insensitively, including for uniqueness,
+ * so a dataset that declares two names equal ignoring case is rejected. A dataset that declares no
  * fields exposes no names to keys or relationships.
  *
  * <p>Validation is deterministic and performs no catalog I/O. Catalog-backed source validation,
@@ -126,7 +127,9 @@ final class SemanticModelValidator {
       String fieldPath = path + "[" + index + "]";
       Field field = fields[index];
       String namePath = fieldPath + ".name";
-      validateUniqueName(field.name(), namePath, "field", uniqueNames);
+      // Key and relationship references resolve field names case-insensitively, so two
+      // declared names equal ignoring case would make every reference to them ambiguous.
+      validateUniqueName(normalizeFieldName(field.name()), namePath, "field", uniqueNames);
       fieldNames.add(normalizeFieldName(field.name()));
     }
     return fieldNames;
