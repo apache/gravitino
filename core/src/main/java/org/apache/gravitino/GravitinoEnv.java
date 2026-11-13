@@ -19,6 +19,7 @@
 package org.apache.gravitino;
 
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import org.apache.gravitino.audit.AuditLogManager;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AccessControlManager;
@@ -52,6 +53,7 @@ import org.apache.gravitino.catalog.SchemaOperationDispatcher;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
 import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
+import org.apache.gravitino.catalog.StaleRegistrationReconciler;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
@@ -213,6 +215,7 @@ public class GravitinoEnv {
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
   private StatisticDispatcher internalStatisticDispatcher;
+  private StaleRegistrationReconciler staleRegistrationReconciler;
 
   protected GravitinoEnv() {}
 
@@ -611,6 +614,19 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the stale registration reconciler associated with the Gravitino environment.
+   *
+   * <p>The reconciler is created with full server components only; it is {@code null} for base
+   * component profiles such as the Iceberg REST server.
+   *
+   * @return The StaleRegistrationReconciler instance, or {@code null} when not initialized.
+   */
+  @Nullable
+  public StaleRegistrationReconciler staleRegistrationReconciler() {
+    return staleRegistrationReconciler;
+  }
+
+  /**
    * Get the EventBus associated with the Gravitino environment.
    *
    * @return The EventBus instance.
@@ -815,6 +831,15 @@ public class GravitinoEnv {
   /** Shutdown the Gravitino environment. */
   public void shutdown() {
     LOG.info("Shutting down Gravitino Environment...");
+
+    if (staleRegistrationReconciler != null) {
+      try {
+        staleRegistrationReconciler.close();
+        staleRegistrationReconciler = null;
+      } catch (Exception e) {
+        LOG.warn("Failed to close StaleRegistrationReconciler", e);
+      }
+    }
 
     // Stop the auxiliary services first, since they share the event bus. Then stop the event
     // listeners, so the async listeners finish the queued events, such as audit logs and built-in
@@ -1077,6 +1102,12 @@ public class GravitinoEnv {
     BuiltInJobTemplateEventListener builtInJobTemplateListener =
         new BuiltInJobTemplateEventListener(jobManager, entityStore, idGenerator);
     eventListenerManager.addEventListener("builtin-job-template", builtInJobTemplateListener);
+
+    // Stale registration reconcile. Disabled by default; start() is a no-op unless
+    // gravitino.reconcile.enabled is true.
+    this.staleRegistrationReconciler =
+        new StaleRegistrationReconciler(config, entityStore, catalogManager);
+    this.staleRegistrationReconciler.start();
   }
 
   private void initPublicMetadataDispatchers(MetadataOperations metadataOperations) {
