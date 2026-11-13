@@ -480,6 +480,69 @@ tests:
       - failedTemplate:
           errorMessage: "postgresql.init.existingSecret is required when postgresql.init.enabled is true for external PostgreSQL"
 
+  - it: fails when entity.jdbcUrl authority is IPv6 and host/port are derived from the URL
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://[::1]:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host and postgresql.init.port explicitly (JDBC URL host/port fallback supports only a single host:port)"
+
+  - it: fails when entity.jdbcUrl authority is multi-host and host/port are derived from the URL
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg1.example.ci.local:5432,pg2.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorMessage: "entity.jdbcUrl authority is IPv6 or multi-host; set postgresql.init.host and postgresql.init.port explicitly (JDBC URL host/port fallback supports only a single host:port)"
+
+  - it: renders when IPv6 entity.jdbcUrl has explicit postgresql.init.host and port
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          host: "::1"
+          port: 5432
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://[::1]:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "psql -h ::1"
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGPORT
+            value: "5432"
+          any: true
+
   - it: overrides JDBC-derived port and sslmode with postgresql.init.port and sslMode
     template: deployment.yaml
     release:
