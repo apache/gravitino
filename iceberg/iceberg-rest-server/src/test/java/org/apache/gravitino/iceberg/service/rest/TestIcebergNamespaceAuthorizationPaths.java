@@ -35,11 +35,13 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import javax.inject.Singleton;
 import javax.ws.rs.core.Application;
+import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapperProvider;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.filter.IcebergRESTAuthInterceptionService;
@@ -89,6 +91,8 @@ public class TestIcebergNamespaceAuthorizationPaths extends JerseyTest {
               @Override
               protected void configure() {
                 bind(dispatcher).to(IcebergNamespaceOperationDispatcher.class);
+                bind(new IcebergIdempotencyManager(new IcebergConfig()))
+                    .to(IcebergIdempotencyManager.class);
                 bind(IcebergRESTAuthInterceptionService.class)
                     .to(InterceptionService.class)
                     .in(Singleton.class);

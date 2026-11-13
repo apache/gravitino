@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -148,17 +149,34 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
       throws Throwable {
     resetContext(null, false);
     boolean update = operation.equals("updateNamespace");
-    Method method =
-        update
-            ? IcebergNamespaceOperations.class.getMethod(
-                operation, String.class, String.class, UpdateNamespacePropertiesRequest.class)
-            : IcebergNamespaceOperations.class.getMethod(operation, String.class, String.class);
-    Object[] args =
-        update
-            ? new Object[] {
-              TEST_CATALOG + "/", namespace, Mockito.mock(UpdateNamespacePropertiesRequest.class)
-            }
-            : new Object[] {TEST_CATALOG + "/", namespace};
+    Method method;
+    Object[] args;
+    if (update) {
+      method =
+          IcebergNamespaceOperations.class.getMethod(
+              operation,
+              String.class,
+              String.class,
+              UpdateNamespacePropertiesRequest.class,
+              String.class,
+              UriInfo.class);
+      args =
+          new Object[] {
+            TEST_CATALOG + "/",
+            namespace,
+            Mockito.mock(UpdateNamespacePropertiesRequest.class),
+            null,
+            null
+          };
+    } else if (operation.equals("dropNamespace")) {
+      method =
+          IcebergNamespaceOperations.class.getMethod(
+              operation, String.class, String.class, String.class, UriInfo.class);
+      args = new Object[] {TEST_CATALOG + "/", namespace, null, null};
+    } else {
+      method = IcebergNamespaceOperations.class.getMethod(operation, String.class, String.class);
+      args = new Object[] {TEST_CATALOG + "/", namespace};
+    }
     MethodInvocation invocation = Mockito.mock(MethodInvocation.class);
     Mockito.when(invocation.getMethod()).thenReturn(method);
     Mockito.when(invocation.getArguments()).thenReturn(args);

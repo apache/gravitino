@@ -43,6 +43,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
 import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
@@ -60,6 +61,7 @@ public class IcebergConfigOperations {
   private HttpServletRequest httpRequest;
 
   private final IcebergCatalogWrapperManager catalogWrapperManager;
+  private final IcebergIdempotencyManager idempotencyManager;
 
   private static final List<Endpoint> DEFAULT_ENDPOINTS =
       ImmutableList.<Endpoint>builder()
@@ -97,8 +99,11 @@ public class IcebergConfigOperations {
           .build();
 
   @Inject
-  public IcebergConfigOperations(IcebergCatalogWrapperManager catalogWrapperManager) {
+  public IcebergConfigOperations(
+      IcebergCatalogWrapperManager catalogWrapperManager,
+      IcebergIdempotencyManager idempotencyManager) {
     this.catalogWrapperManager = catalogWrapperManager;
+    this.idempotencyManager = idempotencyManager;
   }
 
   @GET
@@ -124,6 +129,9 @@ public class IcebergConfigOperations {
     if (StringUtils.isNotBlank(warehouse)) {
       builder.withDefault("prefix", warehouse);
     }
+    // Advertised only when idempotency is enabled: the Iceberg REST spec reads the absence of this
+    // field as "the server does not support Idempotency-Key semantics".
+    idempotencyManager.advertisedKeyLifetime().ifPresent(builder::withIdempotencyKeyLifetime);
     return IcebergRESTUtils.ok(builder.build());
   }
 
