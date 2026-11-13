@@ -668,9 +668,14 @@ export default function TableDetailsPage({ ...props }) {
                 />
               }
             >
-              <span className='cursor-pointer hover:text-defaultPrimary' title='Column settings'>
+              <button
+                type='button'
+                aria-label='Column settings'
+                title='Column settings'
+                className='cursor-pointer border-0 bg-transparent p-0 hover:text-defaultPrimary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2'
+              >
                 <Icons.Settings className='size-4' />
-              </span>
+              </button>
             </Popover>
           </Flex>
           <Spin spinning={store.activatedDetailsLoading}>

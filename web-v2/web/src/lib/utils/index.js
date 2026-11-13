@@ -19,7 +19,7 @@
 
 import _, { intersectionWith, isEqual, mergeWith, unionWith } from 'lodash-es'
 import { isArray, isObject } from './is'
-import { ColumnSpesicalType } from '@/config'
+import { ColumnSpesicalType, ColumnTypeSupportAutoIncrement } from '@/config'
 import dayjs from 'dayjs'
 import { original } from '@reduxjs/toolkit'
 
@@ -31,6 +31,12 @@ const getColumnType = type => {
   } else {
     return type.type
   }
+}
+
+export const isAutoIncrementColumnTypeSupported = type => {
+  if (typeof type !== 'string') return false
+
+  return ColumnTypeSupportAutoIncrement.includes(type.trim().toLowerCase())
 }
 
 export const isDevEnv = process.env.NODE_ENV === 'development'
@@ -63,6 +69,50 @@ export const loggerGitHubInfo = (stars, forks) => {
     `Gravitino GitHubInfo: %c Stars ${stars}, Forks ${forks}`,
     `color: white; background-color: #6062E0; padding: 2px; border-radius: 4px;`
   )
+}
+
+export const normalizeColumnDefaultValue = expression => {
+  if (!expression || typeof expression !== 'object') return expression
+
+  switch (expression.type) {
+    case 'literal':
+      return {
+        type: 'literal',
+        dataType: expression.dataType || 'string',
+        value: expression.value
+      }
+
+    case 'field': {
+      const fieldName = expression.fieldName
+
+      return {
+        type: 'field',
+        fieldName: Array.isArray(fieldName) ? fieldName : [fieldName]
+      }
+    }
+
+    case 'function':
+      return {
+        type: 'function',
+        funcName: expression.funcName,
+        funcArgs: (expression.funcArgs ?? []).map(normalizeColumnDefaultValue)
+      }
+
+    case 'unparsed':
+      return {
+        type: 'unparsed',
+        unparsedExpression: expression.unparsedExpression
+      }
+
+    default:
+      return expression.type
+        ? expression
+        : {
+            type: 'literal',
+            dataType: expression.dataType || 'string',
+            value: expression.value
+          }
+  }
 }
 
 export const genUpdates = (originalData, newData, disableUpdate = false) => {
@@ -150,6 +200,7 @@ export const genUpdates = (originalData, newData, disableUpdate = false) => {
         fieldName: [newColumn.name],
         type: newColumn.type,
         nullable: newColumn.nullable,
+        autoIncrement: Boolean(newColumn.autoIncrement),
         comment: newColumn.comment,
         ...(newColumn.defaultValue !== undefined && newColumn.defaultValue !== null
           ? { defaultValue: newColumn.defaultValue }

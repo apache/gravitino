@@ -18,9 +18,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import { genUpdates } from './index'
+import { genUpdates, normalizeColumnDefaultValue, isAutoIncrementColumnTypeSupported } from './index'
 
-const createTableData = autoIncrement => ({
+const createTableData = (autoIncrement, defaultValue) => ({
   name: 'users',
   columns: [
     {
@@ -29,7 +29,8 @@ const createTableData = autoIncrement => ({
       type: 'long',
       nullable: false,
       autoIncrement,
-      comment: ''
+      comment: '',
+      ...(defaultValue !== undefined ? { defaultValue } : {})
     }
   ]
 })
@@ -54,5 +55,119 @@ describe('genUpdates', () => {
     const newData = createTableData(false)
 
     expect(genUpdates(originalData, newData)).toEqual([])
+  })
+
+  it('preserves REST function defaults without generating unnecessary updates', () => {
+    const defaultValue = {
+      type: 'function',
+      funcName: 'current_timestamp',
+      funcArgs: []
+    }
+
+    const normalized = normalizeColumnDefaultValue(defaultValue)
+
+    const originalData = createTableData(false, defaultValue)
+    const newData = createTableData(false, normalized)
+
+    expect(normalized).toEqual(defaultValue)
+    expect(genUpdates(originalData, newData)).toEqual([])
+  })
+
+  it('preserves nested function expressions using REST property names', () => {
+    const expression = {
+      type: 'function',
+      funcName: 'coalesce',
+      funcArgs: [
+        {
+          type: 'field',
+          fieldName: ['created_at']
+        },
+        {
+          type: 'function',
+          funcName: 'lower',
+          funcArgs: [
+            {
+              type: 'literal',
+              dataType: 'string',
+              value: 'UNKNOWN'
+            }
+          ]
+        }
+      ]
+    }
+
+    expect(normalizeColumnDefaultValue(expression)).toEqual(expression)
+  })
+
+  it('preserves field default expressions', () => {
+    const expression = {
+      type: 'field',
+      fieldName: ['created_at']
+    }
+
+    expect(normalizeColumnDefaultValue(expression)).toEqual(expression)
+  })
+
+  it('preserves unparsed default expressions', () => {
+    const expression = {
+      type: 'unparsed',
+      unparsedExpression: 'CURRENT_TIMESTAMP'
+    }
+
+    expect(normalizeColumnDefaultValue(expression)).toEqual(expression)
+  })
+
+  it.each([true, false])('includes autoIncrement when adding a new column: %s', autoIncrement => {
+    const originalData = {
+      name: 'users',
+      columns: []
+    }
+
+    const newData = createTableData(autoIncrement)
+
+    expect(genUpdates(originalData, newData)).toContainEqual({
+      '@type': 'addColumn',
+      fieldName: ['id'],
+      type: 'long',
+      nullable: false,
+      autoIncrement,
+      comment: ''
+    })
+  })
+
+  it.each([undefined, null, '', 'string', 'map'])('safely rejects unsupported or missing column type: %s', type => {
+    expect(isAutoIncrementColumnTypeSupported(type)).toBe(false)
+  })
+
+  it.each(['long', 'Long', 'LONG', ' Long '])('recognizes supported AutoIncrement type: %s', type => {
+    expect(isAutoIncrementColumnTypeSupported(type)).toBe(true)
+  })
+
+  it('generates an update when a function default actually changes', () => {
+    const originalDefault = {
+      type: 'function',
+      funcName: 'current_timestamp',
+      funcArgs: []
+    }
+
+    const newDefault = {
+      type: 'function',
+      funcName: 'date_trunc',
+      funcArgs: [
+        {
+          type: 'literal',
+          dataType: 'string',
+          value: 'day'
+        }
+      ]
+    }
+
+    const updates = genUpdates(createTableData(false, originalDefault), createTableData(false, newDefault))
+
+    expect(updates).toContainEqual({
+      '@type': 'updateColumnDefaultValue',
+      fieldName: ['id'],
+      newDefaultValue: newDefault
+    })
   })
 })

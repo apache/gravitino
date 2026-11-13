@@ -53,7 +53,6 @@ import {
   ColumnSpesicalType,
   ColumnType,
   ColumnTypeForUnsigned,
-  ColumnTypeSupportAutoIncrement,
   ColumnWithParamType,
   UnsupportColumnType,
   autoIncrementInfoMap,
@@ -68,60 +67,18 @@ import {
 } from '@/config'
 import { tableDefaultProps } from '@/config/catalog'
 import { nameRegex } from '@/lib/utils/regex'
-import { capitalizeFirstLetter, genUpdates } from '@/lib/utils'
+import {
+  capitalizeFirstLetter,
+  genUpdates,
+  normalizeColumnDefaultValue,
+  isAutoIncrementColumnTypeSupported
+} from '@/lib/utils'
 import { cn } from '@/lib/utils/tailwind'
 import { createTable, updateTable, getTableDetails } from '@/lib/store/metalakes'
 import { useAppDispatch } from '@/lib/hooks/useStore'
 
 const { Paragraph } = Typography
 const { TextArea } = Input
-
-const normalizeColumnDefaultValue = expression => {
-  if (!expression || typeof expression !== 'object') return expression
-
-  switch (expression.type) {
-    case 'literal':
-      return {
-        type: 'literal',
-        dataType: expression.dataType || 'string',
-        value: expression.value
-      }
-
-    case 'field': {
-      const fieldName = expression.fieldName
-
-      return {
-        type: 'field',
-        fieldName: Array.isArray(fieldName) ? fieldName : [fieldName]
-      }
-    }
-
-    case 'function': {
-      const functionArgs = expression.functionArgs || expression.funcArgs || []
-
-      return {
-        type: 'function',
-        functionName: expression.functionName || expression.funcName,
-        functionArgs: functionArgs.map(normalizeColumnDefaultValue)
-      }
-    }
-
-    case 'unparsed':
-      return {
-        type: 'unparsed',
-        unparsedExpression: expression.unparsedExpression
-      }
-
-    default:
-      return expression.type
-        ? expression
-        : {
-            type: 'literal',
-            dataType: expression.dataType || 'string',
-            value: expression.value
-          }
-  }
-}
 
 export default function CreateTableDialog({ ...props }) {
   const {
@@ -977,9 +934,7 @@ export default function CreateTableDialog({ ...props }) {
                     >
                       <Switch
                         size='small'
-                        disabled={
-                          !ColumnTypeSupportAutoIncrement.includes(values?.columns[subField.name]?.typeObj?.type)
-                        }
+                        disabled={!isAutoIncrementColumnTypeSupported(values?.columns?.[subField.name]?.typeObj?.type)}
                       />
                     </Form.Item>
                     <Form.Item
