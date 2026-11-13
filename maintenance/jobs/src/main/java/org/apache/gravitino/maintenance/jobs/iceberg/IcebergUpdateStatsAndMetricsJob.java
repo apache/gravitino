@@ -370,6 +370,8 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
         throw new IllegalArgumentException(
             String.format(Locale.ROOT, "Partition value for column '%s' is null", name));
       }
+      // Spark/Iceberg partition fields keep transform-native values (years/months/hours as
+      // Iceberg ints, days as DateType → ISO via String.valueOf). Do not reinterpret here.
       entries.add(new PartitionEntryImpl(name, String.valueOf(value)));
     }
     return PartitionPath.of(entries);

@@ -21,6 +21,9 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -34,9 +37,26 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.rel.types.Types;
 
+/**
+ * Builds Iceberg Spark {@code rewrite_data_files} {@code where} predicates from partition paths.
+ *
+ * <p>Expressions must match Iceberg Spark system functions ({@code years}/{@code months}/{@code
+ * days}/{@code hours}/{@code bucket}/{@code truncate}) so {@code SparkV2Filters} can push them
+ * down. Spark builtins such as {@code day()} / {@code year()} are intentionally not used.
+ *
+ * <p>String and typed literals ({@code DATE}/{@code TIMESTAMP}/{@code TIME}) use double quotes
+ * because the job embeds the clause in {@code CALL ... where => '...'}—single-quoted typed literals
+ * are eaten by that outer string even when SQL-escaped.
+ */
 public class PartitionUtils {
 
+  /**
+   * Builds an OR of per-partition predicates, each wrapped in parentheses.
+   *
+   * <p>Example: {@code (a = "x" AND b = 1) OR (a = "y" AND b = 2)}.
+   */
   public static String getWhereClauseForPartitions(
       List<PartitionPath> partitions, Column[] columns, Transform[] partitioning) {
     Preconditions.checkArgument(
@@ -49,18 +69,23 @@ public class PartitionUtils {
     for (PartitionPath partition : partitions) {
       predicates.add(getWhereClauseForPartition(partition.entries(), columns, partitioning));
     }
-    // Wrap each partition-level predicate in parentheses to preserve logical grouping
-    // e.g. "(col1 = v1 AND col2 = v2) OR (col1 = v3 AND col2 = v4)"
     return predicates.stream().map(p -> "(" + p + ")").collect(Collectors.joining(" OR "));
   }
 
-  // For Identity transform, the where clause is like "columnName = value"
-  // For bucket transform, the where clause is like "bucket(columnName, numBuckets) = value"
-  // For truncate transform, the where clause is like "truncate(columnName, width) = value"
-  // For year/month/day/hour transform, the where clause is like "year(columnName) = value"
-  // We could get value from partition.get(i).partitionValue(), if the value type is string, we need
-  // to add quotes like "value",  if the value type is number, we don't need to add quotes. if the
-  // value type is date/datetime, we need to add quotes like TIMESTAMP '2024-01-01'
+  /**
+   * Builds a single-partition AND predicate.
+   *
+   * <ul>
+   *   <li>Identity: {@code column = literal}
+   *   <li>Bucket / truncate: Iceberg argument order ({@code bucket(N, col)}, {@code truncate(W,
+   *       col)})
+   *   <li>{@code years}/{@code months}/{@code hours}: compare to the stored Iceberg int (years
+   *       since 1970, etc.)—not a calendar year/month
+   *   <li>{@code days}: Iceberg Spark {@code days()} returns {@code DateType}, so the RHS is {@code
+   *       DATE "yyyy-MM-dd"}. Stored partition strings must be ISO {@code yyyy-MM-dd} (same as
+   *       Iceberg {@code DateTimeUtil.isoDateToDays})
+   * </ul>
+   */
   public static String getWhereClauseForPartition(
       List<PartitionEntry> partition, Column[] columns, Transform[] partitioning) {
     Preconditions.checkArgument(
@@ -82,14 +107,19 @@ public class PartitionUtils {
       Transform transform = partitioning[i];
 
       String columnName = getColumnName(transform);
-      Column column =
-          Preconditions.checkNotNull(
-              columnMap.get(columnName.toLowerCase(Locale.ROOT)),
-              "Column '%s' not found in table schema",
-              columnName);
+      // Nested paths like event.ts are absent from schema; fall back to top-level event.
+      Column column = columnMap.get(columnName.toLowerCase(Locale.ROOT));
+      if (column == null && columnName.indexOf('.') >= 0) {
+        column =
+            columnMap.get(
+                columnName.substring(0, columnName.indexOf('.')).toLowerCase(Locale.ROOT));
+      }
+      Preconditions.checkNotNull(column, "Column '%s' not found in table schema", columnName);
 
       String expression = buildExpression(transform, columnName);
-      String literal = formatLiteral(transform, column, entry.partitionValue());
+      // Walk into struct fields so nested identity uses TIMESTAMP/INT/... not STRUCT→string.
+      String literal =
+          formatLiteral(transform, resolveLeafDataType(column, columnName), entry.partitionValue());
       predicates.add(String.format("%s = %s", expression, literal));
     }
 
@@ -110,40 +140,92 @@ public class PartitionUtils {
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
+  /** Resolves the leaf type for {@code event.ts}-style paths under a top-level struct column. */
+  private static Type resolveLeafDataType(Column column, String columnName) {
+    // Exact match (including odd top-level names that contain '.') — no nested walk.
+    if (column.name().equalsIgnoreCase(columnName) || columnName.indexOf('.') < 0) {
+      return column.dataType();
+    }
+    Type type = column.dataType();
+    String[] parts = columnName.split("\\.");
+    for (int i = 1; i < parts.length; i++) {
+      if (!(type instanceof Types.StructType)) {
+        throw new IllegalArgumentException(
+            "Cannot resolve nested field '" + columnName + "': not a struct path");
+      }
+      Types.StructType.Field matched = null;
+      for (Types.StructType.Field field : ((Types.StructType) type).fields()) {
+        if (field.name().equalsIgnoreCase(parts[i])) {
+          matched = field;
+          break;
+        }
+      }
+      if (matched == null) {
+        throw new IllegalArgumentException(
+            "Nested field '" + columnName + "' not found in table schema");
+      }
+      type = matched.type();
+    }
+    return type;
+  }
+
+  /**
+   * Builds the left-hand side of a partition predicate using Iceberg Spark system functions.
+   *
+   * <p>Temporal transforms use plural names ({@code years}/{@code months}/{@code days}/{@code
+   * hours}) matching {@code org.apache.iceberg.spark.functions.SparkFunctions}. {@code bucket} and
+   * {@code truncate} put the width argument first, matching Iceberg's Spark UDF signatures.
+   */
   private static String buildExpression(Transform transform, String columnName) {
     if (transform instanceof Transforms.IdentityTransform) {
       return columnName;
-    } else if (transform instanceof Transforms.YearTransform
-        || transform instanceof Transforms.MonthTransform
-        || transform instanceof Transforms.DayTransform
-        || transform instanceof Transforms.HourTransform) {
-      return transform.name() + "(" + columnName + ")";
+    } else if (transform instanceof Transforms.YearTransform) {
+      return "years(" + columnName + ")";
+    } else if (transform instanceof Transforms.MonthTransform) {
+      return "months(" + columnName + ")";
+    } else if (transform instanceof Transforms.DayTransform) {
+      return "days(" + columnName + ")";
+    } else if (transform instanceof Transforms.HourTransform) {
+      return "hours(" + columnName + ")";
     } else if (transform instanceof Transforms.BucketTransform) {
       return "bucket("
-          + columnName
-          + ", "
           + ((Transforms.BucketTransform) transform).numBuckets()
+          + ", "
+          + columnName
           + ")";
     } else if (transform instanceof Transforms.TruncateTransform) {
       return "truncate("
-          + columnName
-          + ", "
           + ((Transforms.TruncateTransform) transform).width()
+          + ", "
+          + columnName
           + ")";
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
-  private static String formatLiteral(Transform transform, Column column, String rawValue) {
+  private static String formatLiteral(Transform transform, Type type, String rawValue) {
+    // years/months/hours/bucket: raw Iceberg ints from producers (e.g. update-stats
+    // String.valueOf(Spark partition field)). years = years since 1970 (calendar 2024 → 54),
+    // not a calendar year/month; months/hours likewise. Validate before emitting.
     if (transform instanceof Transforms.YearTransform
         || transform instanceof Transforms.MonthTransform
-        || transform instanceof Transforms.DayTransform
         || transform instanceof Transforms.HourTransform
         || transform instanceof Transforms.BucketTransform) {
-      return rawValue;
+      try {
+        return Long.toString(Long.parseLong(rawValue));
+      } catch (NumberFormatException e) {
+        throw new IllegalArgumentException(
+            "Partition value for years/months/hours/bucket must be an integer, but got: "
+                + rawValue,
+            e);
+      }
     }
 
-    Type type = column.dataType();
+    // days() → DateType; double-quoted DATE survives CALL where => '...' embedding.
+    if (transform instanceof Transforms.DayTransform) {
+      return "DATE \"" + escapeStringLiteral(toIsoDateFromDayPartitionValue(rawValue)) + "\"";
+    }
+
     switch (type.name()) {
       case BOOLEAN:
         return rawValue.toLowerCase(Locale.ROOT);
@@ -156,16 +238,40 @@ public class PartitionUtils {
       case DECIMAL:
         return rawValue;
       case DATE:
-        return "DATE '" + rawValue + "'";
       case TIMESTAMP:
-        return "TIMESTAMP '" + rawValue + "'";
       case TIME:
-        return "TIME '" + rawValue + "'";
+        // Same CALL embedding constraint as days(); escape " / \ like string literals.
+        return type.name() + " \"" + escapeStringLiteral(rawValue) + "\"";
       default:
         return "\"" + escapeStringLiteral(rawValue) + "\"";
     }
   }
 
+  /**
+   * Validates and normalizes a day-partition stored value to {@code yyyy-MM-dd}.
+   *
+   * <p>Only ISO {@code yyyy-MM-dd} is accepted, matching Iceberg {@code
+   * DateTimeUtil.isoDateToDays(String)}. TMS update-stats stores Spark {@code DateType} partition
+   * values via {@code String.valueOf}, which is already ISO. Epoch-day ints and compact forms like
+   * {@code 20260101} are rejected rather than guessed.
+   */
+  private static String toIsoDateFromDayPartitionValue(String rawValue) {
+    try {
+      return LocalDate.parse(rawValue, DateTimeFormatter.ISO_LOCAL_DATE)
+          .format(DateTimeFormatter.ISO_LOCAL_DATE);
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(
+          "Day partition value must be an ISO date (yyyy-MM-dd), but got: " + rawValue, e);
+    }
+  }
+
+  /**
+   * Escapes a value for a double-quoted Iceberg Spark literal ({@code \} → {@code \\}, {@code "} →
+   * {@code \"}).
+   *
+   * <p>Does not apply CALL {@code where => '...'} outer escaping; the job builder doubles
+   * backslashes when embedding this clause.
+   */
   private static String escapeStringLiteral(String value) {
     return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }

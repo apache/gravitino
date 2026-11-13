@@ -25,11 +25,12 @@ Confirm your environment matches this list before starting an evaluation against
   rewrite data files (compaction), rewrite manifests, expire snapshots, and remove orphan files.
   Scheduling and `minIntervalMs` stay outside strategy evaluation. Sort and cluster maintenance
   still need custom strategies.
-- Compaction's **policy/strategy** path prefers identity partitions (time/bucket filters can fail
-  Spark translation). Direct `builtin-iceberg-rewrite-data-files` with an empty `where_clause`
-  covers broader layouts such as `PARTITIONED BY (p, days(ts))`; see
-  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures). The other three jobs
-  are not limited by that partition caveat.
+- Compaction's **policy/strategy** path generates Iceberg Spark system-function predicates (for
+  example `days(ts) = DATE "yyyy-MM-dd"`, `years|months|hours(ts) = N`, `bucket(16, id) = V`) for
+  non-identity partitions, and double-quoted typed literals for identity `DATE`/`TIMESTAMP`
+  columns (`dt = DATE "yyyy-MM-dd"`). Direct `builtin-iceberg-rewrite-data-files` with an empty
+  `where_clause` still covers whole-table rewrite on broader layouts; see
+  [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
 - The in-process service, `timeTrigger`, and the cron path are documented in [Service](./service.md). The rest of this page is the manual CLI workflow.
 
 ## How It Works

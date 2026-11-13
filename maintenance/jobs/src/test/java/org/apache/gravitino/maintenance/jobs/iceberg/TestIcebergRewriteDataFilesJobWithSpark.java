@@ -18,12 +18,23 @@
  */
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
+import java.util.Collections;
+import java.util.List;
+import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
+import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.recommender.job.PartitionUtils;
+import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.expressions.transforms.Transform;
+import org.apache.gravitino.rel.expressions.transforms.Transforms;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.Dataset;
 import org.apache.spark.sql.Row;
 import org.apache.spark.sql.SparkSession;
@@ -79,7 +90,10 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   public static void tearDown() {
     if (spark != null) {
       spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.test_table");
-      spark.sql("DROP NAMESPACE IF EXISTS " + catalogName + ".db");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_sq");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_qb_plain");
+      spark.sql("DROP TABLE IF EXISTS " + catalogName + ".db.pu_qb_ansi");
+      spark.sql("DROP NAMESPACE IF EXISTS " + catalogName + ".db CASCADE");
       spark.stop();
     }
   }
@@ -431,5 +445,90 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
     assertTrue(
         sql.contains("'description', 'Rewrite with \"quoted\" text'")
             || sql.contains("description"));
+  }
+
+  /**
+   * End-to-end: PartitionUtils where + IcebergJobUtils.escapeSparkCallStringArg (via
+   * buildProcedureCall) + real Spark rewrite_data_files. Covers a string identity value with an
+   * embedded single quote.
+   */
+  @Test
+  public void testPartitionUtilsWhereWithSingleQuoteThroughJobEscapeAndSpark() {
+    String table = catalogName + ".db.pu_sq";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, region STRING) USING iceberg PARTITIONED BY (region)");
+      spark.sql("INSERT INTO " + table + " SELECT id, 'O''Brien' FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("region", "O'Brien")))),
+              new Column[] {column("region", Types.StringType.get())},
+              new Transform[] {Transforms.identity("region")});
+      assertEquals("(region = \"O'Brien\")", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_sq", "binpack", null, where, null);
+      // Outer CALL string doubles the embedded single quote.
+      assertTrue(sql.contains("where => '(region = \"O''Brien\")'"));
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * End-to-end: PartitionUtils backslash/double-quote escaping survives job embedding and Spark
+   * CALL parsing (ansi.doubleQuotedIdentifiers on and off).
+   */
+  @Test
+  public void testPartitionUtilsWhereWithQuoteAndBackslashThroughJobEscapeAndSpark() {
+    String partitionValue = "a\"b\\c";
+    // PartitionUtils: one-level \" / \\ ; job builder doubles backslashes for CALL where => '...'.
+    String expectedWhere = "(region = \"a\\\"b\\\\c\")";
+    String expectedCallWhere = "(region = \"a\\\\\"b\\\\\\\\c\")";
+    for (boolean ansi : new boolean[] {false, true}) {
+      spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(ansi));
+      String tableSuffix = "pu_qb_" + (ansi ? "ansi" : "plain");
+      String table = catalogName + ".db." + tableSuffix;
+      try {
+        spark.sql("DROP TABLE IF EXISTS " + table);
+        spark.sql(
+            "CREATE TABLE "
+                + table
+                + " (id INT, region STRING) USING iceberg PARTITIONED BY (region)");
+        // Spark SQL string: \" → ", \\ → \
+        spark.sql("INSERT INTO " + table + " SELECT id, 'a\\\"b\\\\c' FROM range(0, 20)");
+        assertEquals(
+            partitionValue,
+            spark.sql("SELECT region FROM " + table + " LIMIT 1").first().getString(0));
+
+        String where =
+            PartitionUtils.getWhereClauseForPartitions(
+                Collections.singletonList(
+                    PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
+                new Column[] {column("region", Types.StringType.get())},
+                new Transform[] {Transforms.identity("region")});
+        assertEquals(expectedWhere, where);
+
+        String sql =
+            IcebergRewriteDataFilesJob.buildProcedureCall(
+                catalogName, "db." + tableSuffix, "binpack", null, where, null);
+        assertTrue(sql.contains("where => '" + expectedCallWhere + "'"));
+        assertDoesNotThrow(() -> spark.sql(sql).collect());
+      } finally {
+        spark.sql("DROP TABLE IF EXISTS " + table);
+      }
+    }
+    spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", "false");
+  }
+
+  private static Column column(String name, org.apache.gravitino.rel.types.Type type) {
+    return ColumnDTO.builder().withName(name).withDataType(type).build();
   }
 }
