@@ -60,6 +60,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.cli.CommandContext;
 import org.apache.gravitino.cli.commands.Command;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.rel.Table;
@@ -134,6 +135,8 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       new TagListTableFormat(context).output((Tag[]) entity);
     } else if (entity instanceof Map) {
       new PropertiesListTableFormat(context).output((Map<?, ?>) entity);
+    } else if (entity instanceof Function[]) {
+      new FunctionListTableFormat(context).output((Function[]) entity);
     } else {
       throw new IllegalArgumentException(
           "Unsupported object type: " + (entity == null ? "null" : entity.getClass().getName()));
@@ -1182,6 +1185,29 @@ public abstract class TableFormat<T> extends BaseOutputFormat<T> {
       Column name = new Column(context, "name");
       Arrays.stream(entity).forEach(topic -> name.addCell(topic.name()));
 
+      return getTableFormat(name);
+    }
+  }
+
+  /**
+   * Formats an array of {@link Function} into a single-column table display. Lists all function
+   * names in a vertical format.
+   */
+  static final class FunctionListTableFormat extends TableFormat<Function[]> {
+    /**
+     * Creates a new {@link TableFormat} with the specified command context.
+     *
+     * @param context the command context.
+     */
+    FunctionListTableFormat(CommandContext context) {
+      super(context);
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public String getOutput(Function[] entity) {
+      Column name = new Column(context, "name");
+      Arrays.stream(entity).forEach(function -> name.addCell(function.name()));
       return getTableFormat(name);
     }
   }
