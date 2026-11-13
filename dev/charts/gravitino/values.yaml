@@ -123,9 +123,12 @@ postgresql:
     ## @param init.host PostgreSQL hostname for the init-postgresql psql client (-h).
     ## When postgresql.enabled is true and this is empty, defaults to {{ .Release.Name }}-postgresql.
     ## For external PostgreSQL with init.enabled=true, falls back to the host in entity.jdbcUrl when empty.
+    ## JDBC URL fallback supports only a single host or host:port (IPv4 / DNS name).
+    ## IPv6 bracket URLs and multi-host JDBC authorities are not parsed; set host (and port) here instead.
     ##
     host: ""
     ## @param init.port TCP port for psql (PGPORT). Defaults to 5432, or the port in entity.jdbcUrl for external PostgreSQL.
+    ## Same single host:port limitation as init.host when deriving from entity.jdbcUrl.
     ##
     port: ""
     ## @param init.sslMode libpq sslmode (PGSSLMODE), for example require. Defaults to sslmode from entity.jdbcUrl when set.
