@@ -945,7 +945,6 @@ public class TestGenericCatalogOperations {
     List<SchemaLocationContext> provisioned = FakeSchemaLocationProvider.provisioned();
     Assertions.assertEquals(1, provisioned.size());
     Assertions.assertEquals(schemaIdent, provisioned.get(0).schemaIdentifier());
-    Assertions.assertFalse(provisioned.get(0).cascade());
     Assertions.assertTrue(provisioned.get(0).tablesWithRetainedData().isEmpty());
 
     Schema schema = opsWithSchemaProvider.loadSchema(schemaIdent);
@@ -1026,7 +1025,6 @@ public class TestGenericCatalogOperations {
     Assertions.assertEquals(1, unprovisioned.size());
     SchemaLocationContext context = unprovisioned.get(0);
     Assertions.assertEquals(schemaIdent, context.schemaIdentifier());
-    Assertions.assertFalse(context.cascade());
     Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
     // The stored properties are read before the schema is removed.
     Assertions.assertEquals(
@@ -1065,7 +1063,6 @@ public class TestGenericCatalogOperations {
     // decision.
     List<SchemaLocationContext> unprovisioned = FakeSchemaLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
-    Assertions.assertTrue(unprovisioned.get(0).cascade());
     Assertions.assertEquals(
         List.of(
             NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "external_table")),
@@ -1073,12 +1070,39 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testAFailedSchemaUnprovisionStillReportsTheDropAsSuccessful() {
+  public void testAFailedSchemaUnprovisionFailsTheDropAndKeepsTheSchema() {
     NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
     FakeSchemaLocationProvider.failOnUnprovision(true);
 
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> opsWithSchemaProvider.dropSchema(schemaIdent, false));
+    Assertions.assertTrue(opsWithSchemaProvider.schemaExists(schemaIdent));
+
+    // A retry calls the provider again for the same schema, which is why it must be idempotent.
+    FakeSchemaLocationProvider.failOnUnprovision(false);
     Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, false));
-    Assertions.assertEquals(1, FakeSchemaLocationProvider.unprovisioned().size());
+    Assertions.assertEquals(2, FakeSchemaLocationProvider.unprovisioned().size());
+    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testAFailedSchemaUnprovisionAfterACascadeKeepsTheEmptiedSchema() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    NameIdentifier tableIdent =
+        NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "managed_table");
+    createTableThroughCatalog(
+        opsWithSchemaProvider, schemaIdent, tableIdent.name(), ImmutableMap.of());
+    FakeSchemaLocationProvider.failOnUnprovision(true);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> opsWithSchemaProvider.dropSchema(schemaIdent, true /* cascade */));
+    // The tables are dropped before the provider is asked, and stay dropped.
+    Assertions.assertFalse(opsWithSchemaProvider.tableExists(tableIdent));
+    Assertions.assertTrue(opsWithSchemaProvider.schemaExists(schemaIdent));
+
+    FakeSchemaLocationProvider.failOnUnprovision(false);
+    Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, false));
     Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
   }
 
