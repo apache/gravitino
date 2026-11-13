@@ -175,6 +175,12 @@ const transform = {
   requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
 
+    if (config.url === '/configs') {
+      config.headers.delete('Authorization')
+      
+return config
+    }
+
     // Skip token retrieval for GitHub API calls entirely
     if (config.url === githubApis.GET) {
       return config
