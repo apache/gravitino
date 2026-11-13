@@ -195,13 +195,13 @@ The header applies to the create, update, drop, register, and rename endpoints f
 
 Phase-1 limitations:
 
-- Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation.
+- Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
 - Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
 - The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
 - This phase does not schedule `IdempotencyStore.purgeExpired`. The in-memory store reclaims expired entries through Caffeine. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup; durable-store purge scheduling belongs to the JDBC follow-up.
 
 :::caution
-The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
+Enabling `idempotency-enabled=true` with the default `idempotency-store-type=in-memory` on more than one replica does **not** provide cluster-wide deduplication: retries can execute a mutation twice. The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
 :::
 
 ### Catalog Backend Configuration

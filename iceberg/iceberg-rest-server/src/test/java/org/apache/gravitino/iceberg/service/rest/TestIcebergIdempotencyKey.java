@@ -168,9 +168,11 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
 
     Assertions.assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
     Assertions.assertNull(response.getHeaderString(HttpHeaders.RETRY_AFTER));
+    JsonNode error = response.readEntity(JsonNode.class).get("error");
+    Assertions.assertEquals("IdempotencyConflictException", error.get("type").asText());
     Assertions.assertEquals(
-        "IdempotencyConflictException",
-        response.readEntity(JsonNode.class).get("error").get("type").asText());
+        "Idempotency-Key: " + KEY + " was already used for a different operation; use a new key",
+        error.get("message").asText());
     // The table is still there: the drop never ran.
     Assertions.assertEquals(
         Status.OK.getStatusCode(),

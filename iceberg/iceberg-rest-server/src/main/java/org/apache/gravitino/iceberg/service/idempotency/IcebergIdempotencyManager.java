@@ -173,7 +173,11 @@ public class IcebergIdempotencyManager {
     boolean finalized = false;
     try {
       Response response = action.get();
-      if (isFinalizable(response.getStatus())) {
+      int status = response.getStatus();
+      // Store successful and terminal client responses. Release 5xx and auth outcomes so retries
+      // can re-evaluate them; serialization/finalization failure also releases only our claim.
+      if (status < Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
+          && !NON_FINALIZABLE_STATUSES.contains(status)) {
         finalized = tryFinalize(idempotencyStore, key, claim, response);
       }
       return response;
@@ -253,9 +257,7 @@ public class IcebergIdempotencyManager {
       return conflict(
           "Idempotency-Key: "
               + idempotencyKey
-              + " was already used for `"
-              + found.operationBinding()
-              + "`, the Iceberg REST spec requires a new key for a different operation",
+              + " was already used for a different operation; use a new key",
           false);
     }
 
@@ -275,7 +277,14 @@ public class IcebergIdempotencyManager {
       IdempotencyStore idempotencyStore, String idempotencyKey, long claim, Response response) {
     String responseSummary;
     try {
-      responseSummary = serializeEntity(response.getEntity());
+      Object entity = response.getEntity();
+      if (entity == null) {
+        responseSummary = null;
+      } else if (entity instanceof String) {
+        responseSummary = (String) entity;
+      } else {
+        responseSummary = icebergObjectMapper.writeValueAsString(entity);
+      }
     } catch (JsonProcessingException e) {
       LOG.warn(
           "Failed to serialize the response for Idempotency-Key: {}, it will not be replayed.",
@@ -298,17 +307,6 @@ public class IcebergIdempotencyManager {
     return finalized;
   }
 
-  @Nullable
-  private String serializeEntity(@Nullable Object entity) throws JsonProcessingException {
-    if (entity == null) {
-      return null;
-    }
-    if (entity instanceof String) {
-      return (String) entity;
-    }
-    return icebergObjectMapper.writeValueAsString(entity);
-  }
-
   private static Response conflict(String message, boolean retryable) {
     Response response =
         Response.status(Response.Status.CONFLICT)
@@ -325,17 +323,5 @@ public class IcebergIdempotencyManager {
     return Response.fromResponse(response)
         .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
         .build();
-  }
-
-  /**
-   * Returns whether a response finalizes the key. Per the Iceberg REST spec, {@code 5xx} responses
-   * are retryable and must not be stored, while {@code 2xx} and deterministic terminal {@code 4xx}
-   * responses are replayed. Authentication/authorization outcomes (401, 403, 419) also release the
-   * claim so changed credentials can be evaluated on retry. Serialization or finalization failure
-   * releases only this attempt's claim as well.
-   */
-  private static boolean isFinalizable(int httpStatus) {
-    return httpStatus < Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
-        && !NON_FINALIZABLE_STATUSES.contains(httpStatus);
   }
 }
