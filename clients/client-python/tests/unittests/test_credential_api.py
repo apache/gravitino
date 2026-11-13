@@ -14,18 +14,25 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-from typing import List
 import json
-import unittest
 from http.client import HTTPResponse
-from unittest.mock import patch, Mock
+from typing import List
+import unittest
+from unittest.mock import Mock, patch
 
 from gravitino import GravitinoClient, NameIdentifier
+from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.s3_token_credential import S3TokenCredential
 from gravitino.client.generic_fileset import GenericFileset
+from gravitino.client.relational_catalog import RelationalCatalog
+from gravitino.dto.audit_dto import AuditDTO
+from gravitino.exceptions.base import (
+    NoSuchCredentialException,
+    UnsupportedOperationException,
+)
 from gravitino.namespace import Namespace
-from gravitino.utils import Response, HTTPClient
+from gravitino.utils import HTTPClient, Response
 from tests.unittests import mock_base
 
 
@@ -46,10 +53,39 @@ class TestCredentialApi(unittest.TestCase):
             "gravitino.utils.http_client.HTTPClient.get",
             return_value=mock_resp,
         ):
+            credentials = catalog.supports_credentials().get_credentials()
+            self._check_credential(credentials)
+
+            credentials_alias = catalog.support_credentials().get_credentials()
+            self._check_credential(credentials_alias)
+
+            s3_cred = catalog.supports_credentials().get_credential("s3-token")
+            self.assertEqual("s3-token", s3_cred.credential_type())
+
+            with self.assertRaises(NoSuchCredentialException):
+                catalog.supports_credentials().get_credential("non_existent")
+
             credentials = (
-                catalog.as_fileset_catalog().support_credentials().get_credentials()
+                catalog.as_fileset_catalog().supports_credentials().get_credentials()
             )
             self._check_credential(credentials)
+
+            credentials_alias = (
+                catalog.as_fileset_catalog().support_credentials().get_credentials()
+            )
+            self._check_credential(credentials_alias)
+
+            s3_cred = (
+                catalog.as_fileset_catalog()
+                .supports_credentials()
+                .get_credential("s3-token")
+            )
+            self.assertEqual("s3-token", s3_cred.credential_type())
+
+            with self.assertRaises(NoSuchCredentialException):
+                catalog.as_fileset_catalog().supports_credentials().get_credential(
+                    "non_existent"
+                )
 
         fileset_dto = catalog.as_fileset_catalog().load_fileset(
             NameIdentifier.of("schema", "fileset")
@@ -76,6 +112,68 @@ class TestCredentialApi(unittest.TestCase):
         ):
             credentials = fileset.support_credentials().get_credentials()
             self._check_credential(credentials)
+
+    def test_relational_catalog_credentials(self, *mock_method):
+        json_str = self._get_s3_token_str()
+        mock_resp = self._get_mock_http_resp(json_str)
+
+        catalog = RelationalCatalog(
+            catalog_namespace=Namespace.of("metalake_demo"),
+            name="relational_catalog",
+            catalog_type=Catalog.Type.RELATIONAL,
+            provider="test_provider",
+            audit=AuditDTO("test"),
+            rest_client=HTTPClient("http://localhost:8090"),
+        )
+
+        # pylint: disable=protected-access
+        request_path = catalog._object_credential_operations._request_path
+        expected_path = (
+            "api/metalakes/metalake_demo/objects/catalog/relational_catalog/credentials"
+        )
+        self.assertEqual(expected_path, request_path)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=mock_resp,
+        ):
+            credentials = catalog.supports_credentials().get_credentials()
+            self._check_credential(credentials)
+
+            credentials_alias = catalog.support_credentials().get_credentials()
+            self._check_credential(credentials_alias)
+
+            s3_cred = catalog.supports_credentials().get_credential("s3-token")
+            self.assertEqual("s3-token", s3_cred.credential_type())
+
+            with self.assertRaises(NoSuchCredentialException):
+                catalog.supports_credentials().get_credential("non_existent")
+
+    def test_default_catalog_supports_credentials_raises(self, *mock_method):
+        class DefaultCatalog(Catalog):
+            def name(self):
+                return "test"
+
+            def type(self):
+                return Catalog.Type.UNSUPPORTED
+
+            def provider(self):
+                return "test"
+
+            def comment(self):
+                return None
+
+            def properties(self):
+                return {}
+
+            def audit_info(self):
+                return None
+
+        catalog = DefaultCatalog()
+        with self.assertRaises(UnsupportedOperationException):
+            catalog.supports_credentials()
+        with self.assertRaises(UnsupportedOperationException):
+            catalog.support_credentials()
 
     def _get_mock_http_resp(self, json_str: str):
         mock_http_resp = Mock(HTTPResponse)

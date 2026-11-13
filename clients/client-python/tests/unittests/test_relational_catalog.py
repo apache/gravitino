@@ -22,6 +22,7 @@ from typing import Optional
 from unittest.mock import Mock, patch
 
 from gravitino.api.authorization.privileges import Privilege
+from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.rel.column import Column
 from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.indexes.index import Index
@@ -30,6 +31,7 @@ from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.table_change import TableChange
 from gravitino.api.rel.types.types import Types
 from gravitino.api.rel.view_change import ViewChange
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.rel.column_dto import ColumnDTO
@@ -168,6 +170,27 @@ class TestRelationalCatalog(unittest.TestCase):
     def test_as_view_catalog(self):
         view_catalog = self.catalog.as_view_catalog()
         self.assertIs(view_catalog, self.catalog)
+
+    def test_supports_credentials(self):
+        self.assertIsInstance(self.catalog, SupportsCredentials)
+        self.assertIs(self.catalog.supports_credentials(), self.catalog)
+        self.assertIs(self.catalog.support_credentials(), self.catalog)
+
+    def test_get_credentials(self):
+        mock_credentials = [Mock()]
+        with patch.object(
+            self.catalog._object_credential_operations,  # pylint: disable=protected-access
+            "get_credentials",
+            return_value=mock_credentials,
+        ) as mock_get_credentials:
+            result = self.catalog.get_credentials()
+            mock_get_credentials.assert_called_once()
+            self.assertEqual(mock_credentials, result)
+
+    def test_supports_secrets(self):
+        self.assertIsInstance(self.catalog, SupportsSecrets)
+        self.assertIs(self.catalog.supports_secrets(), self.catalog)
+        self.assertIs(self.catalog.support_secrets(), self.catalog)
 
     def test_create_table(self):
         resp_body = TableResponse(0, self.table_dto)

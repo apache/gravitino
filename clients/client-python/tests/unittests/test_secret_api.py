@@ -19,10 +19,13 @@ import unittest
 from http.client import HTTPResponse
 from unittest.mock import Mock, patch
 
+from gravitino.api.catalog import Catalog
 from gravitino.api.rel.dialects import Dialects
+from gravitino.client.fileset_catalog import FilesetCatalog
 from gravitino.client.generic_model import GenericModel
 from gravitino.client.generic_view import GenericView
 from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino.client.relational_catalog import RelationalCatalog
 from gravitino.client.relational_table import RelationalTable
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metalake_dto import MetalakeDTO
@@ -30,6 +33,7 @@ from gravitino.dto.model_dto import ModelDTO
 from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.rel.view_dto import ViewDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.namespace import Namespace
 from gravitino.utils import Response, HTTPClient
 from tests.unittests.fixtures.table_fixtures import TABLE_DTO_JSON_STRING
@@ -65,8 +69,18 @@ class TestSecretApi(unittest.TestCase):
             "gravitino.utils.http_client.HTTPClient.get",
             return_value=self._mock_resp(self.expected_secrets),
         ) as mock_get:
-            secrets = supports_secrets.support_secrets().get_secrets()
-            self.assertEqual(self.expected_secrets, secrets)
+            if hasattr(supports_secrets, "supports_secrets"):
+                secrets = supports_secrets.supports_secrets().get_secrets()
+                self.assertEqual(self.expected_secrets, secrets)
+                mock_get.assert_called()
+                self.assertEqual(expected_path, mock_get.call_args.args[0])
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get",
+            return_value=self._mock_resp(self.expected_secrets),
+        ) as mock_get:
+            secrets_alias = supports_secrets.support_secrets().get_secrets()
+            self.assertEqual(self.expected_secrets, secrets_alias)
             mock_get.assert_called()
             self.assertEqual(expected_path, mock_get.call_args.args[0])
 
@@ -138,6 +152,64 @@ class TestSecretApi(unittest.TestCase):
             model,
             f"api/metalakes/{self.METALAKE}/objects/model/{full_name}/secrets",
         )
+
+    def test_get_secrets_for_relational_catalog(self):
+        catalog = RelationalCatalog(
+            catalog_namespace=Namespace.of(self.METALAKE),
+            name=self.CATALOG,
+            catalog_type=Catalog.Type.RELATIONAL,
+            provider="test",
+            audit=AuditDTO("test"),
+            rest_client=self.rest_client,
+        )
+        self._assert_get_secrets(
+            catalog,
+            f"api/metalakes/{self.METALAKE}/objects/catalog/{self.CATALOG}/secrets",
+        )
+        self.assertIs(catalog.supports_secrets(), catalog)
+        self.assertIs(catalog.support_secrets(), catalog)
+
+    def test_get_secrets_for_fileset_catalog(self):
+        catalog = FilesetCatalog(
+            namespace=Namespace.of(self.METALAKE),
+            name=self.CATALOG,
+            catalog_type=Catalog.Type.FILESET,
+            provider="hadoop",
+            audit=AuditDTO("test"),
+            rest_client=self.rest_client,
+        )
+        self._assert_get_secrets(
+            catalog,
+            f"api/metalakes/{self.METALAKE}/objects/catalog/{self.CATALOG}/secrets",
+        )
+        self.assertIs(catalog.supports_secrets(), catalog)
+        self.assertIs(catalog.support_secrets(), catalog)
+
+    def test_default_catalog_supports_secrets_raises(self):
+        class DefaultCatalog(Catalog):
+            def name(self):
+                return "test"
+
+            def type(self):
+                return Catalog.Type.UNSUPPORTED
+
+            def provider(self):
+                return "test"
+
+            def comment(self):
+                return None
+
+            def properties(self):
+                return {}
+
+            def audit_info(self):
+                return None
+
+        catalog = DefaultCatalog()
+        with self.assertRaises(UnsupportedOperationException):
+            catalog.supports_secrets()
+        with self.assertRaises(UnsupportedOperationException):
+            catalog.support_secrets()
 
 
 if __name__ == "__main__":
