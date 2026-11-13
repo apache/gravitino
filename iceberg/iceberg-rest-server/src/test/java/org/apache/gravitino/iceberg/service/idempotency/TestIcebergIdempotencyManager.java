@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.idempotency;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -31,11 +32,13 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.UriInfo;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveResult;
 import org.apache.gravitino.iceberg.common.idempotency.InMemoryIdempotencyStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestIcebergIdempotencyManager {
@@ -251,17 +254,74 @@ public class TestIcebergIdempotencyManager {
     queryParameters.putSingle("purgeRequested", "true");
     queryParameters.putSingle("mode", "async");
     UriInfo uriInfo = Mockito.mock(UriInfo.class);
-    Mockito.when(uriInfo.getPath()).thenReturn("v1/cat1/namespaces/ns1/tables/t1");
+    Mockito.when(uriInfo.getPath(false)).thenReturn("v1/cat1/namespaces/ns1/tables/t1");
     Mockito.when(uriInfo.getQueryParameters()).thenReturn(queryParameters);
 
     Assertions.assertEquals(
-        "DELETE v1/cat1/namespaces/ns1/tables/t1?mode=async&purgeRequested=true",
+        "DELETE /v1/cat1/namespaces/ns1/tables/t1?mode=async&purgeRequested=true",
         IcebergIdempotencyManager.operationBinding("DELETE", uriInfo));
   }
 
   @Test
   void testOperationBindingWithoutUriInfoFallsBackToTheMethod() {
     Assertions.assertEquals("POST", IcebergIdempotencyManager.operationBinding("POST", null));
+  }
+
+  @Test
+  void testNoOpFinalizeReleasesOnlyItsOwnClaim() {
+    IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
+    Mockito.when(
+            store.reserve(
+                Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        .thenReturn(ReserveResult.RESERVED);
+    IcebergIdempotencyManager manager =
+        new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
+    Response response = execute(manager, KEY, new AtomicInteger());
+    Assertions.assertEquals(200, response.getStatus());
+    ArgumentCaptor<Long> claim = ArgumentCaptor.forClass(Long.class);
+    Mockito.verify(store)
+        .reserve(Mockito.eq(KEY), Mockito.anyString(), claim.capture(), Mockito.anyLong());
+    Mockito.verify(store).release(KEY, claim.getValue());
+  }
+
+  @Test
+  void testFinalizeWithReplacementClaimReleasesOnlyOriginalClaim() {
+    IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
+    Mockito.when(
+            store.reserve(
+                Mockito.eq(KEY), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        .thenAnswer(
+            invocation -> {
+              long originalClaim = invocation.getArgument(2);
+              Mockito.when(store.load(KEY))
+                  .thenReturn(
+                      Optional.of(
+                          IdempotencyRecord.reserved(
+                                  KEY, BINDING, originalClaim + 1, 0, Long.MAX_VALUE)
+                              .withResponse(200, "replacement")));
+              return ReserveResult.RESERVED;
+            });
+    IcebergIdempotencyManager manager =
+        new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
+    Assertions.assertEquals(200, execute(manager, KEY, new AtomicInteger()).getStatus());
+    ArgumentCaptor<Long> claim = ArgumentCaptor.forClass(Long.class);
+    Mockito.verify(store)
+        .reserve(Mockito.eq(KEY), Mockito.anyString(), claim.capture(), Mockito.anyLong());
+    Mockito.verify(store).release(KEY, claim.getValue());
+  }
+
+  @Test
+  void testQueryValuesAreEncodedSortedAndPreserveDuplicates() {
+    UriInfo uri = Mockito.mock(UriInfo.class);
+    Mockito.when(uri.getPath(false)).thenReturn("v1/namespaces/ns%2Fone/tables");
+    MultivaluedMap<String, String> query = new MultivaluedHashMap<>();
+    query.put("a&b", Arrays.asList("z", "x=y&c", "z"));
+    Mockito.when(uri.getQueryParameters()).thenReturn(query);
+    String binding = IcebergIdempotencyManager.operationBinding("POST", uri);
+    Assertions.assertEquals(
+        "POST /v1/namespaces/ns%2Fone/tables?a%26b=x%3Dy%26c&a%26b=z&a%26b=z", binding);
+    query.put("a&b", Arrays.asList("z", "z", "x=y&c"));
+    Assertions.assertEquals(binding, IcebergIdempotencyManager.operationBinding("POST", uri));
   }
 
   private static Response execute(

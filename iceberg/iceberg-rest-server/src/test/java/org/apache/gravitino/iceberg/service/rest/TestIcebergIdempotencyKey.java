@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service.rest;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.Optional;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -167,6 +168,9 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
 
     Assertions.assertEquals(Status.CONFLICT.getStatusCode(), response.getStatus());
     Assertions.assertNull(response.getHeaderString(HttpHeaders.RETRY_AFTER));
+    Assertions.assertEquals(
+        "IdempotencyConflictException",
+        response.readEntity(JsonNode.class).get("error").get("type").asText());
     // The table is still there: the drop never ran.
     Assertions.assertEquals(
         Status.OK.getStatusCode(),
@@ -192,6 +196,66 @@ public class TestIcebergIdempotencyKey extends IcebergNamespaceTestBase {
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), dropTable("dropped_table", KEY));
     // Without idempotency the retry would be a 404; the stored 204 is replayed instead.
     Assertions.assertEquals(Status.NO_CONTENT.getStatusCode(), dropTable("dropped_table", KEY));
+  }
+
+  @Test
+  void testLongQueryBindingsDoNotAlias() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    String prefix = "x".repeat(600);
+    try (Response first = createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "a"));
+        Response different =
+            createTableWithQuery("long_query", ImmutableMap.of("tag", prefix + "b"))) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(409, different.getStatus());
+    }
+  }
+
+  @Test
+  void testQueryDelimitersDoNotAlias() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    try (Response first = createTableWithQuery("query_delimiter", ImmutableMap.of("a", "b&c=d"));
+        Response different =
+            createTableWithQuery("query_delimiter", ImmutableMap.of("a", "b", "c", "d"))) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(409, different.getStatus());
+    }
+  }
+
+  @Test
+  void testChangedBodyWithSameKeyDoesNotCreateSecondTable() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    try (Response first = createTable("original_body", KEY);
+        Response changed = createTable("changed_body", KEY)) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(200, changed.getStatus());
+      Assertions.assertEquals(first.readEntity(String.class), changed.readEntity(String.class));
+    }
+    try (Response missing = getTableClientBuilder(NAMESPACE, Optional.of("changed_body")).get()) {
+      Assertions.assertEquals(404, missing.getStatus());
+    }
+  }
+
+  @Test
+  void testReplayPreservesWireJsonAndOmitsEtag() {
+    Assertions.assertEquals(200, doCreateNamespace(NAMESPACE).getStatus());
+    try (Response first = createTable("wire_json", KEY);
+        Response retry = createTable("wire_json", KEY)) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(first.getStatus(), retry.getStatus());
+      Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, retry.getMediaType());
+      Assertions.assertNotNull(first.getHeaderString(HttpHeaders.ETAG));
+      Assertions.assertNull(retry.getHeaderString(HttpHeaders.ETAG));
+      Assertions.assertEquals(first.readEntity(String.class), retry.readEntity(String.class));
+    }
+  }
+
+  private Response createTableWithQuery(String name, Map<String, String> query) {
+    return getIcebergClientBuilder(
+            IcebergRestTestUtil.NAMESPACE_PATH + "/idempotency_test/tables", Optional.of(query))
+        .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY, KEY)
+        .post(
+            Entity.json(
+                CreateTableRequest.builder().withName(name).withSchema(TABLE_SCHEMA).build()));
   }
 
   private Response createTable(String name, String idempotencyKey) {

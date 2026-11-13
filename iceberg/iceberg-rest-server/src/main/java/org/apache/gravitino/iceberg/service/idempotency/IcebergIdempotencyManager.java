@@ -22,7 +22,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.hash.Hashing;
 import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +35,7 @@ import java.util.StringJoiner;
 import java.util.TreeMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.MediaType;
@@ -55,13 +59,23 @@ import org.slf4j.LoggerFactory;
  * Applies {@code Idempotency-Key} semantics to Iceberg REST mutation endpoints.
  *
  * <p>Each mutation runs through {@link #replayOrExecute}, which claims the key, executes the
- * mutation exactly once, and stores its response so that retries carrying the same key get the
- * original answer back instead of a second mutation. Idempotency is off by default; when it is off,
- * or when a request carries no key, the mutation runs directly and nothing is stored.
+ * mutation, and stores its response. While that record remains available, retries carrying the same
+ * key get the original answer back instead of a second mutation. Idempotency is off by default;
+ * when it is off, or when a request carries no key, the mutation runs directly and nothing is
+ * stored.
  *
  * <p>A replayed response carries the original status and body. Response headers are not stored, so
  * a replayed create or update does not carry the {@code ETag} the first response did; clients that
  * rely on it simply load the table again.
+ *
+ * <p>Request bodies and behavior-changing headers are not compared. Reusing a key on the same URL
+ * with different body/header values replays the first response; clients must use a new key for a
+ * different logical operation. The catalog mutation and response storage are not transactional:
+ * eviction, a crash, serialization failure, or a post-commit exception can permit re-execution.
+ *
+ * <p>This phase does not schedule {@link IdempotencyStore#purgeExpired}. The in-memory store uses
+ * Caffeine for reclamation. Custom stores must enforce deadlines and arrange their own cleanup;
+ * scheduling durable cleanup belongs to the JDBC-store integration.
  */
 public class IcebergIdempotencyManager {
 
@@ -69,9 +83,6 @@ public class IcebergIdempotencyManager {
 
   /** The idempotency key header defined by the Iceberg REST spec. */
   public static final String IDEMPOTENCY_KEY = "Idempotency-Key";
-
-  /** Cap on the stored operation binding, matching the width a database backed store can hold. */
-  @VisibleForTesting static final int MAX_OPERATION_BINDING_LENGTH = 512;
 
   /** Seconds a client should wait before retrying a request whose key is still in flight. */
   private static final int RETRY_AFTER_SECONDS = 1;
@@ -149,7 +160,8 @@ public class IcebergIdempotencyManager {
     }
 
     IdempotencyStore idempotencyStore = store.get();
-    String binding = truncate(operationBinding);
+    String binding =
+        Hashing.sha256().hashString(operationBinding, StandardCharsets.UTF_8).toString();
     long expiresAtMs = System.currentTimeMillis() + keyLifetime.toMillis();
     // A fresh claim per attempt, so that if this reservation is dropped underneath us and another
     // request takes the key, our finalize or release lands on nothing instead of on its record.
@@ -167,8 +179,8 @@ public class IcebergIdempotencyManager {
       return response;
     } finally {
       if (!finalized) {
-        // The mutation failed in a way the spec treats as retryable, or its response could not be
-        // stored. Either way the key must go back so the client can retry with it.
+        // Only release this attempt's claim when the response is retryable or was not retained.
+        // A replacement owner's reservation must remain untouched.
         idempotencyStore.release(key, claim);
       }
     }
@@ -178,28 +190,32 @@ public class IcebergIdempotencyManager {
    * Builds the request identity stored alongside a key. Retries of the same logical operation
    * produce the same binding, while a key reused for a different request does not.
    *
-   * <p>The identity covers the method, path, and query parameters, not the request body. A client
-   * that reuses one key for two different bodies on the same endpoint gets the first response
-   * replayed, which is exactly what the header promises; the spec already requires a fresh key per
-   * operation.
+   * <p>The identity covers the method, encoded path, and sorted, encoded query parameters. Bodies
+   * and behavior-changing headers are not compared; clients must use a fresh key for a different
+   * logical operation. The manager stores a SHA-256 digest of the complete identity to fit the
+   * store's bounded binding column without truncating distinct requests.
    *
    * @param httpMethod the HTTP method of the endpoint
    * @param uriInfo the request URI, may be {@code null} outside a request context
-   * @return the operation binding, for example {@code POST v1/cat1/namespaces/ns1/tables}
+   * @return the operation binding, for example {@code POST /v1/cat1/namespaces/ns1/tables}
    */
   public static String operationBinding(String httpMethod, @Nullable UriInfo uriInfo) {
     if (uriInfo == null) {
       return httpMethod;
     }
-    StringBuilder binding = new StringBuilder(httpMethod).append(' ').append(uriInfo.getPath());
+    StringBuilder binding =
+        new StringBuilder(httpMethod).append(" /").append(uriInfo.getPath(false));
     MultivaluedMap<String, String> queryParameters = uriInfo.getQueryParameters();
     if (queryParameters != null && !queryParameters.isEmpty()) {
       // Sorted, so that clients that order query parameters differently between a request and its
       // retry still land on the same binding.
       StringJoiner query = new StringJoiner("&", "?", "");
       for (Map.Entry<String, List<String>> parameter : new TreeMap<>(queryParameters).entrySet()) {
-        for (String value : parameter.getValue()) {
-          query.add(parameter.getKey() + "=" + value);
+        for (String value : parameter.getValue().stream().sorted().collect(Collectors.toList())) {
+          query.add(
+              URLEncoder.encode(parameter.getKey(), StandardCharsets.UTF_8)
+                  + "="
+                  + URLEncoder.encode(value, StandardCharsets.UTF_8));
         }
       }
       binding.append(query);
@@ -268,7 +284,18 @@ public class IcebergIdempotencyManager {
       return false;
     }
     idempotencyStore.finalizeRecord(idempotencyKey, claim, response.getStatus(), responseSummary);
-    return true;
+    boolean finalized =
+        idempotencyStore
+            .load(idempotencyKey)
+            .filter(record -> record.isFinalized() && record.claim() == claim)
+            .isPresent();
+    if (!finalized) {
+      LOG.warn(
+          "Response for Idempotency-Key: {} was not retained under this claim", idempotencyKey);
+    }
+    // Keep the actual mutation response: returning a synthetic 5xx could encourage clients to
+    // retry an operation that already committed. Release is fenced to our claim in the caller.
+    return finalized;
   }
 
   @Nullable
@@ -284,8 +311,14 @@ public class IcebergIdempotencyManager {
 
   private static Response conflict(String message, boolean retryable) {
     Response response =
-        IcebergRESTUtils.errorResponse(
-            new IdempotencyConflictException(message), Response.Status.CONFLICT.getStatusCode());
+        Response.status(Response.Status.CONFLICT)
+            .entity(
+                IcebergRESTUtils.errorResponse(
+                    Response.Status.CONFLICT.getStatusCode(),
+                    "IdempotencyConflictException",
+                    message))
+            .type(MediaType.APPLICATION_JSON)
+            .build();
     if (!retryable) {
       return response;
     }
@@ -297,16 +330,12 @@ public class IcebergIdempotencyManager {
   /**
    * Returns whether a response finalizes the key. Per the Iceberg REST spec, {@code 5xx} responses
    * are retryable and must not be stored, while {@code 2xx} and deterministic terminal {@code 4xx}
-   * responses are replayed.
+   * responses are replayed. Authentication/authorization outcomes (401, 403, 419) also release the
+   * claim so changed credentials can be evaluated on retry. Serialization or finalization failure
+   * releases only this attempt's claim as well.
    */
   private static boolean isFinalizable(int httpStatus) {
     return httpStatus < Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
         && !NON_FINALIZABLE_STATUSES.contains(httpStatus);
-  }
-
-  private static String truncate(String operationBinding) {
-    return operationBinding.length() <= MAX_OPERATION_BINDING_LENGTH
-        ? operationBinding
-        : operationBinding.substring(0, MAX_OPERATION_BINDING_LENGTH);
   }
 }

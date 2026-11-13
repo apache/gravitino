@@ -180,11 +180,11 @@ The settings below tune the background workers and are optional.
 
 #### Idempotency Key
 
-The Iceberg REST spec defines an optional `Idempotency-Key` header on mutation endpoints so that a client can safely retry a request whose response it never saw. When the header is present, the server executes the mutation once, stores the response, and replays that stored response to every retry carrying the same key.
+The Iceberg REST spec defines an optional `Idempotency-Key` header on mutation endpoints so that a client can safely retry a request whose response it never saw. When enabled and the header is present, the server reserves the key, executes the mutation, and stores the response for replay while the record remains available.
 
 Support is disabled by default. Once enabled, the reuse window is advertised as `idempotency-key-lifetime` in `GET /v1/config`; per the spec, clients must assume idempotency is unsupported when that field is absent.
 
-The header applies to the create, update, drop, register, and rename endpoints for tables, namespaces, and views. Its value must be a UUIDv7 in string form ([RFC 9562](https://www.rfc-editor.org/rfc/rfc9562)); anything else returns `400 Bad Request`. Keys must be globally unique: reusing one for a different operation returns `409 Conflict` rather than replaying an unrelated response, and so does a retry that arrives while the first request is still running (with a `Retry-After` header). Successful and deterministic terminal `4xx` responses are stored and replayed, while `5xx` responses release the key so the client can retry with it.
+The header applies to the create, update, drop, register, and rename endpoints for tables, namespaces, and views. Its value must be a UUIDv7 in string form ([RFC 9562](https://www.rfc-editor.org/rfc/rfc9562)); anything else returns `400 Bad Request`. Keys must be globally unique: reusing one with a different HTTP method, path, or query returns `409 Conflict`, and so does a retry that arrives while the first request is still running (with a `Retry-After` header). Successful and deterministic terminal `4xx` responses are stored and replayed, while `5xx`, `401`, `403`, and `419` responses release the key so the client can retry with it.
 
 | Configuration item                                | Description                                                                                                                                                                  | Default value | Required |
 |---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
@@ -193,8 +193,15 @@ The header applies to the create, update, drop, register, and rename endpoints f
 | `gravitino.iceberg-rest.idempotency-store-type`   | The store holding idempotency records, either the `in-memory` short name or the fully-qualified class name of an `IdempotencyStore` implementation.                           | `in-memory`   | No       |
 | `gravitino.iceberg-rest.idempotency-max-entries`  | The maximum number of records retained by the in-memory store. Records beyond it are evicted before their reuse window elapses.                                               | `10000`       | No       |
 
+Phase-1 limitations:
+
+- Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation.
+- Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
+- This phase does not schedule `IdempotencyStore.purgeExpired`. The in-memory store reclaims expired entries through Caffeine. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup; durable-store purge scheduling belongs to the JDBC follow-up.
+
 :::caution
-The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses. Use it for single-node deployments, development, and testing.
+The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
 :::
 
 ### Catalog Backend Configuration
