@@ -82,6 +82,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1009,6 +1010,38 @@ public class TestCatalogManager {
         () -> catalogManager.alterCatalog(ident, CatalogChange.removeProperty("validation-max")));
     Assertions.assertEquals(
         "4", catalogManager.loadCatalog(ident).properties().get("validation-max"));
+  }
+
+  @Test
+  public void testCreateCatalogPropagatesBackendForbidden() throws Exception {
+    // The create-time probe reports that the backend refuses the configured credentials: the
+    // ForbiddenException must reach the caller unwrapped, and creation must roll back the cache and
+    // the store.
+    NameIdentifier forbidIdent = NameIdentifier.of("metalake", "verify-testconn-forbid");
+    Map<String, String> forbidProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.VALIDATE_ON_CREATE,
+                "true",
+                TestCatalogOperations.FORBID_TEST,
+                "true"));
+    ForbiddenException exception =
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                catalogManager.createCatalog(
+                    forbidIdent, Catalog.Type.RELATIONAL, provider, "comment", forbidProps));
+    Assertions.assertEquals("Backend denied access", exception.getMessage());
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(forbidIdent));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(forbidIdent, EntityType.CATALOG, CatalogEntity.class));
   }
 
   @Test
