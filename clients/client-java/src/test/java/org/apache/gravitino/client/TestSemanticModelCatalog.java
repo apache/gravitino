@@ -22,6 +22,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_NOT_FOUND;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
+import static org.apache.hc.core5.http.HttpStatus.SC_UNPROCESSABLE_CONTENT;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,6 +50,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
+import org.apache.gravitino.dto.requests.PlanSemanticQueryRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
@@ -57,6 +59,7 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetricInfoListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticQueryPlanResponse;
 import org.apache.gravitino.dto.semantic.MetricDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
@@ -75,6 +78,7 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
@@ -89,12 +93,20 @@ import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
+import org.apache.gravitino.semantic.PlanFieldRef;
+import org.apache.gravitino.semantic.PlanFilter;
+import org.apache.gravitino.semantic.PlanSelection;
+import org.apache.gravitino.semantic.PlanSource;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryFilter;
+import org.apache.gravitino.semantic.SemanticQueryFilter.Operator;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.BeforeAll;
@@ -303,6 +315,7 @@ public class TestSemanticModelCatalog extends TestBase {
             .loadSemanticModel(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME));
 
     assertInstanceOf(GenericSemanticModel.class, loaded);
+    assertEquals(3L, loaded.version());
     assertSemanticModel(semanticModelDTO, loaded);
     assertEquals("Use certified metrics", loaded.definition().aiContext().object().instructions());
     assertEquals(
@@ -469,6 +482,84 @@ public class TestSemanticModelCatalog extends TestBase {
     NameIdentifier ident = NameIdentifier.of(SCHEMA_NAME, MODEL_NAME);
     assertTrue(semanticModels.dropSemanticModel(ident));
     assertFalse(semanticModels.dropSemanticModel(ident));
+  }
+
+  @Test
+  public void testPlanSemanticQueryReturnsPlan() throws JsonProcessingException {
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.singletonList("region"))
+            .withFilters(
+                Collections.singletonList(
+                    SemanticQueryFilter.of("order_date", Operator.GE, "2024-01-01")))
+            .withLimit(100L)
+            .build();
+    PlanSemanticQueryRequest request = PlanSemanticQueryRequest.fromQuery(query);
+    SemanticQueryPlan plan = semanticPlan();
+    String path =
+        withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME) + "/plan");
+    buildMockResource(Method.POST, path, request, new SemanticQueryPlanResponse(plan), SC_OK);
+
+    SemanticQueryPlan actual =
+        catalog
+            .asSemanticModelCatalog()
+            .planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), query);
+
+    assertEquals(plan, actual);
+
+    JsonNode body = MAPPER.valueToTree(request);
+    assertEquals("revenue", body.path("metrics").get(0).asText());
+    assertEquals("ge", body.path("filters").get(0).path("operator").asText());
+    assertEquals(100L, body.path("limit").asLong());
+  }
+
+  @Test
+  public void testPlanSemanticQueryMapsUnprocessableToException() throws JsonProcessingException {
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.emptyList())
+            .withFilters(Collections.emptyList())
+            .build();
+    PlanSemanticQueryRequest request = PlanSemanticQueryRequest.fromQuery(query);
+    ErrorResponse unprocessable =
+        ErrorResponse.unprocessableEntity(
+            SemanticQueryPlanException.class.getSimpleName(),
+            "Metric 'revenue' does not exist",
+            null);
+    String path =
+        withSlash(semanticModelPath() + "/" + RESTUtils.encodeString(MODEL_NAME) + "/plan");
+    buildMockResource(Method.POST, path, request, unprocessable, SC_UNPROCESSABLE_CONTENT);
+
+    SemanticQueryPlanException exception =
+        assertThrows(
+            SemanticQueryPlanException.class,
+            () ->
+                catalog
+                    .asSemanticModelCatalog()
+                    .planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), query));
+    assertTrue(exception.getMessage().contains("does not exist"));
+  }
+
+  @Test
+  public void testPlanSemanticQueryRejectsInvalidInput() {
+    SemanticModelCatalog semanticModels = catalog.asSemanticModelCatalog();
+    SemanticQuery query =
+        SemanticQuery.builder()
+            .withMetrics(Collections.singletonList("revenue"))
+            .withDimensions(Collections.emptyList())
+            .withFilters(Collections.emptyList())
+            .build();
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> semanticModels.planSemanticQuery(NameIdentifier.of(SCHEMA_NAME, MODEL_NAME), null));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            semanticModels.planSemanticQuery(
+                NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME), query));
   }
 
   @Test
@@ -728,6 +819,7 @@ public class TestSemanticModelCatalog extends TestBase {
   private static SemanticModelDTO semanticModelDTO(String name) {
     return SemanticModelDTO.builder()
         .withName(name)
+        .withVersion(3L)
         .withComment("Governed sales metrics")
         .withDefinition(SemanticModelDefinitionDTO.fromDefinition(definition()))
         .withProperties(Map.of("certified", "true"))
@@ -817,6 +909,30 @@ public class TestSemanticModelCatalog extends TestBase {
         .build();
   }
 
+  private static SemanticQueryPlan semanticPlan() {
+    PlanFieldRef revenue =
+        PlanFieldRef.ofExpression(
+            "orders", expression(Dialects.ANSI_SQL, "SUM(orders.amount)"), DataType.DECIMAL);
+    PlanFieldRef region =
+        PlanFieldRef.ofExpression(
+            "orders", expression(Dialects.ANSI_SQL, "orders.region"), DataType.STRING);
+    return SemanticQueryPlan.builder()
+        .withSemanticModel(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, MODEL_NAME))
+        .withSemanticModelVersion(3)
+        .withSources(
+            Collections.singletonList(
+                PlanSource.of("orders", NameIdentifier.of(CATALOG_NAME, "db", "orders"))))
+        .withSelections(
+            Arrays.asList(
+                PlanSelection.of("revenue", PlanSelection.Role.METRIC, true, revenue),
+                PlanSelection.of("region", PlanSelection.Role.DIMENSION, false, region)))
+        .withFilters(Collections.singletonList(PlanFilter.of(region, Operator.GE, "2024-01-01")))
+        .withGroupBy(Collections.singletonList("region"))
+        .withLimit(100L)
+        .withWarnings(Collections.singletonList("amount treated as decimal"))
+        .build();
+  }
+
   private static Expression expression(String dialect, String value) {
     return Expression.builder()
         .withDialects(
@@ -837,6 +953,7 @@ public class TestSemanticModelCatalog extends TestBase {
 
   private static void assertSemanticModel(SemanticModel expected, SemanticModel actual) {
     assertEquals(expected.name(), actual.name());
+    assertEquals(expected.version(), actual.version());
     assertEquals(expected.comment(), actual.comment());
     assertEquals(expected.definition(), actual.definition());
     assertEquals(expected.properties(), actual.properties());

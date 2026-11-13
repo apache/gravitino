@@ -45,6 +45,16 @@ class SemanticModel(Auditable):
     def definition(self) -> SemanticModelDefinition:
         """Returns the Ossie-compatible Semantic Model definition."""
 
+    def version(self) -> int:
+        """Returns the current committed definition version.
+
+        The version is positive, increases monotonically per Semantic Model
+        whenever the model is altered, and is recorded in every resolved
+        `SemanticQueryPlan` so consumers can detect definition drift. It is
+        `0` when the implementation does not track versions.
+        """
+        return 0
+
     def properties(self) -> dict[str, str]:
         """Returns the Gravitino-specific Semantic Model properties."""
         return {}

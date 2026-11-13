@@ -42,6 +42,7 @@ import org.apache.gravitino.tag.TagValue;
 class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolicies {
 
   private final String name;
+  private final long version;
   private final SemanticModelDefinition definition;
   private final Map<String, String> properties;
   private final Audit audit;
@@ -53,6 +54,7 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   GenericSemanticModel(
       SemanticModel semanticModel, RESTClient restClient, Namespace semanticModelNamespace) {
     this.name = semanticModel.name();
+    this.version = semanticModel.version();
     this.comment = semanticModel.comment();
     this.definition = semanticModel.definition();
     Map<String, String> sourceProperties = semanticModel.properties();
@@ -77,6 +79,12 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   @Override
   public String name() {
     return name;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long version() {
+    return version;
   }
 
   /** {@inheritDoc} */
@@ -193,6 +201,7 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
     }
     GenericSemanticModel that = (GenericSemanticModel) other;
     return name.equals(that.name)
+        && version == that.version
         && Objects.equals(comment, that.comment)
         && definition.equals(that.definition)
         && properties.equals(that.properties)
@@ -202,7 +211,7 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
   /** {@inheritDoc} */
   @Override
   public int hashCode() {
-    return Objects.hash(name, comment, definition, properties, audit);
+    return Objects.hash(name, version, comment, definition, properties, audit);
   }
 
   /** {@inheritDoc} */
@@ -212,6 +221,8 @@ class GenericSemanticModel implements SemanticModel, SupportsTags, SupportsPolic
         + "name='"
         + name
         + '\''
+        + ", version="
+        + version
         + ", comment='"
         + comment
         + '\''

@@ -28,6 +28,12 @@ import org.apache.gravitino.annotation.Evolving;
  * An immutable metric in a semantic model. A metric gives a model-scoped name to an aggregate or
  * otherwise calculated {@link Expression} and may carry descriptive, type, AI, and extension
  * metadata.
+ *
+ * <p>A metric belongs to one dataset. Qualify at least one source reference in the metric
+ * expression with the dataset name, for example {@code SUM(orders.amount)}, so that query
+ * resolution can attribute the metric deterministically. When no source reference is qualified,
+ * resolution falls back to the datasets that declare the field names mentioned by the expression
+ * and rejects the query if that is ambiguous.
  */
 @Evolving
 public final class Metric {

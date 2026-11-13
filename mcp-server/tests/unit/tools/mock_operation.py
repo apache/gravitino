@@ -546,3 +546,19 @@ class MockSemanticModelOperation(SemanticModelOperation):
         self, catalog_name: str, schema_name: str, semantic_model_name: str
     ) -> str:
         return "true"
+
+    # pylint: disable=too-many-positional-arguments
+    async def plan_semantic_query(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        metrics: Optional[list[str]] = None,
+        dimensions: Optional[list[str]] = None,
+        filters: Optional[list[dict]] = None,
+        limit: Optional[int] = None,
+    ) -> str:
+        return (
+            '{"semanticModelVersion": 1, "sources": [], "joins": [], '
+            '"selections": [], "filters": [], "groupBy": [], "warnings": []}'
+        )

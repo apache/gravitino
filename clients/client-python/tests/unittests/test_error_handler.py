@@ -59,6 +59,7 @@ from gravitino.exceptions.base import (
     RoleAlreadyExistsException,
     SchemaAlreadyExistsException,
     SemanticModelAlreadyExistsException,
+    SemanticQueryPlanException,
     ServiceUnavailableException,
     TableAlreadyExistsException,
     UnauthorizedException,
@@ -1033,6 +1034,17 @@ class TestErrorHandler(unittest.TestCase):
             SEMANTIC_MODEL_ERROR_HANDLER.handle(
                 ErrorResponse.generate_error_response(NotInUseException, "mock error")
             )
+
+        plan_response = ErrorResponse.from_json(
+            '{"code":1014,"type":"SemanticQueryPlanException",'
+            '"message":"Metric revenue does not exist in the Semantic Model",'
+            '"stack":null}'
+        )
+        with self.assertRaisesRegex(
+            SemanticQueryPlanException,
+            "Metric revenue does not exist in the Semantic Model",
+        ):
+            SEMANTIC_MODEL_ERROR_HANDLER.handle(plan_response)
 
         with self.assertRaises(RESTException):
             SEMANTIC_MODEL_ERROR_HANDLER.handle(

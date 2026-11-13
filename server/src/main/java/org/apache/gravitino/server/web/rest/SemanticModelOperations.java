@@ -44,12 +44,14 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.dto.requests.PlanSemanticQueryRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticQueryPlanResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.semantic.OssieDocument;
@@ -57,6 +59,9 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
+import org.apache.gravitino.semantic.SemanticQueryResolver;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -302,6 +307,74 @@ public class SemanticModelOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleSemanticModelException(
           OperationType.LOAD, semanticModel, schema, e);
+    }
+  }
+
+  /**
+   * Resolves a Semantic Model query into a dialect-neutral logical plan without executing it.
+   *
+   * <p>The current committed definition is used. The server authorizes the caller and resolves the
+   * query to the sources, joins, selections, filters, grouping set and limit of a single relational
+   * plan. The response records the Semantic Model version the plan was resolved against. The server
+   * never renders SQL or executes the plan, and a returned plan is not an authorization to execute
+   * it: the caller materializes the plan with a {@code SemanticQueryPlanConverter} and remains
+   * responsible for enforcing access to the physical sources.
+   *
+   * @param metalake The metalake name.
+   * @param catalog The catalog name.
+   * @param schema The schema name.
+   * @param semanticModel The Semantic Model name.
+   * @param request The query to resolve.
+   * @return A response containing the dialect-neutral plan, the Semantic Model version, and
+   *     warnings.
+   */
+  @POST
+  @Path("{semanticModel}/plan")
+  @Consumes(MediaType.APPLICATION_JSON)
+  @Produces(VND_GRAVITINO_V1_JSON)
+  @Timed(name = "plan-semantic-query." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "plan-semantic-query", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SEMANTIC_MODEL)
+  public Response planSemanticQuery(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("semanticModel") @AuthorizationMetadata(type = Entity.EntityType.SEMANTIC_MODEL)
+          String semanticModel,
+      PlanSemanticQueryRequest request) {
+    LOG.info(
+        "Received plan Semantic Model query request: {}.{}.{}.{}",
+        metalake,
+        catalog,
+        schema,
+        semanticModel);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (request == null) {
+              throw new IllegalArgumentException("Request body must not be null");
+            }
+            SemanticQuery query = request.toQuery();
+            NameIdentifier ident =
+                NameIdentifierUtil.ofSemanticModel(metalake, catalog, schema, semanticModel);
+            SemanticModel model = dispatcher.loadSemanticModel(ident);
+            SemanticQueryPlan plan = SemanticQueryResolver.resolve(ident, model, query);
+            LOG.info(
+                "Resolved Semantic Model query: {}.{}.{}.{} against version {}",
+                metalake,
+                catalog,
+                schema,
+                semanticModel,
+                plan.semanticModelVersion());
+            return Utils.ok(new SemanticQueryPlanResponse(plan));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleSemanticModelException(
+          OperationType.PLAN_SEMANTIC_QUERY, semanticModel, schema, e);
     }
   }
 

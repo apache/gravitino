@@ -38,6 +38,7 @@ class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
     _name: Optional[str] = field(
         default=None, metadata=config(field_name="name", exclude=is_none)
     )
+    _version: int = field(default=0, metadata=config(field_name="version"))
     _comment: Optional[str] = field(
         default=None,
         metadata=config(field_name="comment", exclude=is_none),
@@ -57,6 +58,9 @@ class SemanticModelDTO(SemanticModel, SemanticJsonMixin):
 
     def comment(self) -> Optional[str]:
         return self._comment
+
+    def version(self) -> int:
+        return self._version
 
     def definition(self) -> SemanticModelDefinition:
         Precondition.check_argument(

@@ -62,6 +62,20 @@ public interface SemanticModel extends Auditable {
   String comment();
 
   /**
+   * Returns the version of the current committed definition.
+   *
+   * <p>The version is positive, increases monotonically per Semantic Model, and changes whenever
+   * the model is altered, including comment-only edits. A {@link SemanticQueryPlan} records the
+   * version it was resolved against so that a consumer can detect definition drift.
+   *
+   * @return The current committed version, or {@code 0} when the implementation predates version
+   *     tracking.
+   */
+  default long version() {
+    return 0;
+  }
+
+  /**
    * Returns the immutable Semantic Model definition.
    *
    * @return The Semantic Model definition.

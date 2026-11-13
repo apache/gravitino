@@ -69,6 +69,9 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryFilter;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 
 try (GravitinoClient client = GravitinoClient.builder("http://localhost:8090")
@@ -98,6 +101,8 @@ from gravitino.api.semantic.metric import Metric
 from gravitino.api.semantic.relationship import Relationship
 from gravitino.api.semantic.semantic_model_change import SemanticModelChange
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.semantic.semantic_query import SemanticQuery
+from gravitino.api.semantic.semantic_query_filter import SemanticQueryFilter
 from gravitino.namespace import Namespace
 
 client = GravitinoClient(uri="http://localhost:8090", metalake_name="example")
@@ -734,6 +739,84 @@ server's default when the property is omitted; import records the document versi
 properties are exchanged through the root `GRAVITINO_PROPERTIES` custom extension, whose `data`
 is a JSON object encoded as a string. Its values must be strings. Use `properties` when creating a
 model through the native API; the reserved extension is for Ossie exchange.
+
+## Plan a Semantic Query
+
+A Semantic Model describes metrics and dimensions. Resolving a query against that description is a
+separate, read-only step that produces a dialect-neutral logical plan; the server does not render
+SQL, choose a dialect, or execute anything. The plan names the physical sources, join structure,
+selections, filters, grouping set, and row limit, and records the committed
+`semanticModelVersion` it was resolved against, so a consumer can detect definition drift. Plans
+are not cached. A plan is not authorization to execute the query: the consumer remains responsible
+for access control on the underlying sources.
+
+A query must select at least one metric or dimension. Filters compare a field with a string value
+using `eq`, `ne`, `gt`, `ge`, `lt`, or `le`. `limit` caps the number of rows the consumer should
+return.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "metrics": ["total_revenue"],
+    "dimensions": ["region"],
+    "filters": [{"field": "region", "operator": "eq", "value": "EMEA"}],
+    "limit": 100
+  }' \
+  http://localhost:8090/api/metalakes/example/catalogs/sales/schemas/mart/semantic-models/sales_model/plan
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+SemanticQuery query = SemanticQuery.builder()
+    .withMetrics(List.of("total_revenue"))
+    .withDimensions(List.of("region"))
+    .withFilters(List.of(
+        SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")))
+    .withLimit(100L)
+    .build();
+SemanticQueryPlan plan = models.planSemanticQuery(ident, query);
+long version = plan.semanticModelVersion();
+List<PlanSource> sources = plan.sources();
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+plan = models.plan_semantic_query(
+    ident,
+    SemanticQuery(
+        metrics=["total_revenue"],
+        dimensions=["region"],
+        filters=[
+            SemanticQueryFilter.of("region", SemanticQueryFilter.Operator.EQ, "EMEA")
+        ],
+        limit=100,
+    ),
+)
+version = plan.semantic_model_version()
+sources = plan.sources()
+```
+
+</TabItem>
+</Tabs>
+
+The response contains a `plan` with the model identifier, `semanticModelVersion`, `sources`,
+`joins`, `selections`, `filters`, `groupBy`, `limit`, and any non-fatal `warnings`. A malformed
+query is rejected with `400`. A well-formed query that the model cannot satisfy, for example an
+unknown metric or no join path between the requested datasets, returns `422` with a
+`SemanticQueryPlanException`. A caller without access to the model returns `403`, and one without
+access to a referenced source returns `403` as well.
+
+Consumers turn the plan into SQL or an engine-native plan. The `api` module defines a
+`SemanticQueryPlanConverter` SPI; `SqlSemanticQueryPlanConverter` is its subtype for engines that
+consume statement text.
 
 ## Ownership and Privileges
 

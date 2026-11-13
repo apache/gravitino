@@ -23,6 +23,7 @@ import static org.apache.gravitino.semantic.SemanticModel.PROPERTY_OSSIE_VERSION
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
@@ -62,6 +63,7 @@ import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
+import org.apache.gravitino.dto.requests.PlanSemanticQueryRequest;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
@@ -70,8 +72,10 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
+import org.apache.gravitino.dto.responses.SemanticQueryPlanResponse;
 import org.apache.gravitino.dto.semantic.DatasetDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticQueryFilterDTO;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
@@ -83,6 +87,7 @@ import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.SemanticModelEventDispatcher;
@@ -113,6 +118,8 @@ import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticQueryFilter;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.gravitino.semantic.SemanticModelSource;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -391,6 +398,107 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         ErrorConstants.NOT_IN_USE_CODE,
         MetalakeNotInUseException.class.getSimpleName(),
         "metalake is not in use");
+  }
+
+  @Test
+  void testPlanSemanticQueryReturnsPlan() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    when(dispatcher.loadSemanticModel(ident)).thenReturn(semanticModel("sales", null));
+    PlanSemanticQueryRequest request =
+        new PlanSemanticQueryRequest(
+            List.of("order_total"),
+            List.of("order_id"),
+            List.of(new SemanticQueryFilterDTO("order_id", "eq", "o-1")),
+            5L);
+
+    Response response = postPlan(semanticModelPath() + "/sales/plan", request);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    SemanticQueryPlanResponse body = response.readEntity(SemanticQueryPlanResponse.class);
+    body.validate();
+    SemanticQueryPlan plan = body.toPlan();
+    Assertions.assertEquals(ident, plan.semanticModel());
+    Assertions.assertEquals(1L, plan.semanticModelVersion());
+    Assertions.assertEquals(1, plan.sources().size());
+    Assertions.assertEquals("orders", plan.sources().get(0).dataset());
+    Assertions.assertEquals(
+        NameIdentifier.of(catalog, schema, "orders"), plan.sources().get(0).source());
+    Assertions.assertTrue(plan.joins().isEmpty());
+    Assertions.assertEquals(2, plan.selections().size());
+    Assertions.assertEquals("order_total", plan.selections().get(0).name());
+    Assertions.assertEquals("METRIC", plan.selections().get(0).role().name());
+    Assertions.assertTrue(plan.selections().get(0).aggregate());
+    Assertions.assertEquals("order_id", plan.selections().get(1).name());
+    Assertions.assertEquals("DIMENSION", plan.selections().get(1).role().name());
+    Assertions.assertFalse(plan.selections().get(1).aggregate());
+    Assertions.assertEquals(List.of("order_id"), plan.groupBy());
+    Assertions.assertEquals(1, plan.filters().size());
+    Assertions.assertEquals(SemanticQueryFilter.Operator.EQ, plan.filters().get(0).operator());
+    Assertions.assertEquals(5L, plan.limit());
+    Assertions.assertTrue(plan.warnings().isEmpty());
+
+    verify(dispatcher).loadSemanticModel(ident);
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testPlanSemanticQueryRejectsInvalidRequests() {
+    assertError(
+        postJson(semanticModelPath() + "/sales/plan", "null"),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "Request body must not be null");
+    assertError(
+        postPlan(
+            semanticModelPath() + "/sales/plan",
+            new PlanSemanticQueryRequest(
+                List.of(),
+                List.of(),
+                List.of(new SemanticQueryFilterDTO("region", "eq", "EMEA")),
+                null)),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "At least one metric or dimension");
+    assertError(
+        postPlan(
+            semanticModelPath() + "/sales/plan",
+            new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), -1L)),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "\"limit\" field must be null or non-negative");
+    verifyNoInteractions(dispatcher);
+  }
+
+  @Test
+  void testPlanSemanticQueryErrors() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModel semanticModel = semanticModel("sales", null);
+    when(dispatcher.loadSemanticModel(ident)).thenReturn(semanticModel);
+    PlanSemanticQueryRequest request =
+        new PlanSemanticQueryRequest(List.of("order_total"), List.of(), List.of(), null);
+
+    doThrow(new NoSuchSemanticModelException("sales does not exist"))
+        .when(dispatcher)
+        .loadSemanticModel(ident);
+    assertError(
+        postPlan(semanticModelPath() + "/sales/plan", request),
+        Response.Status.NOT_FOUND,
+        ErrorConstants.NOT_FOUND_CODE,
+        NoSuchSemanticModelException.class.getSimpleName(),
+        "sales does not exist");
+
+    doReturn(semanticModel).when(dispatcher).loadSemanticModel(ident);
+    assertError(
+        postPlan(
+            semanticModelPath() + "/sales/plan",
+            new PlanSemanticQueryRequest(List.of("missing_metric"), List.of(), List.of(), null)),
+        422,
+        ErrorConstants.UNPROCESSABLE_ENTITY_CODE,
+        SemanticQueryPlanException.class.getSimpleName(),
+        "Metric 'missing_metric' does not exist");
   }
 
   @Test
@@ -1573,6 +1681,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         .withId(1L)
         .withName(name)
         .withNamespace(namespace)
+        .withVersion(1L)
         .withComment(comment)
         .withDefinition(semanticModelDefinition())
         .withProperties(Map.of("domain", "sales"))
@@ -1649,6 +1758,13 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
+  private Response postPlan(String path, PlanSemanticQueryRequest request) {
+    return target(path)
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept(VND_V1_JSON)
+        .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
   private Response postJson(String path, String json) {
     return target(path)
         .request(MediaType.APPLICATION_JSON_TYPE)
@@ -1691,7 +1807,21 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
       int expectedCode,
       String expectedType,
       String expectedMessageFragment) {
-    Assertions.assertEquals(expectedStatus.getStatusCode(), response.getStatus());
+    return assertError(
+        response,
+        expectedStatus.getStatusCode(),
+        expectedCode,
+        expectedType,
+        expectedMessageFragment);
+  }
+
+  private static ErrorResponse assertError(
+      Response response,
+      int expectedStatus,
+      int expectedCode,
+      String expectedType,
+      String expectedMessageFragment) {
+    Assertions.assertEquals(expectedStatus, response.getStatus());
     ErrorResponse error = response.readEntity(ErrorResponse.class);
     Assertions.assertEquals(expectedCode, error.getCode());
     Assertions.assertEquals(expectedType, error.getType());

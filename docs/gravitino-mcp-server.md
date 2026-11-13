@@ -146,6 +146,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
 | `drop_semantic_model`               | Drop a Semantic Model's metadata.                                             | `semantic_model` |
+| `plan_semantic_query`               | Resolve a Semantic Model query into a dialect-neutral logical plan.           | `semantic_model` |
 
 ### Semantic Models
 
@@ -239,6 +240,16 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
+
+`plan_semantic_query` takes `catalog_name`, `schema_name`, `semantic_model_name`, and optional
+`metrics`, `dimensions`, `filters`, and `limit`, and returns a `plan` with the model identifier,
+`semanticModelVersion`, `sources`, `joins`, `selections`, `filters`, `groupBy`, `limit`, and
+`warnings` as JSON. Filters are objects with `field`, `operator` (`eq`, `ne`, `gt`, `ge`, `lt`, or
+`le`), and `value` strings. A query must select at least one metric or dimension. The server
+resolves the plan itself; it does not render SQL, choose a dialect, or execute anything. A plan is
+not authorization to execute the query, so the caller remains responsible for access control on the
+underlying sources. A malformed query is reported as an error, as is a well-formed query the model
+cannot satisfy.
 
 ## Configuration
 

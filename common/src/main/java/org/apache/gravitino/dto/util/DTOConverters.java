@@ -94,6 +94,7 @@ import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDTO;
 import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
+import org.apache.gravitino.dto.semantic.SemanticQueryPlanDTO;
 import org.apache.gravitino.dto.stats.StatisticDTO;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
@@ -145,6 +146,7 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValueConstraint;
@@ -362,11 +364,22 @@ public class DTOConverters {
   public static SemanticModelDTO toDTO(SemanticModel semanticModel) {
     return SemanticModelDTO.builder()
         .withName(semanticModel.name())
+        .withVersion(semanticModel.version())
         .withComment(semanticModel.comment())
         .withDefinition(SemanticModelDefinitionDTO.fromDefinition(semanticModel.definition()))
         .withProperties(semanticModel.properties())
         .withAudit(toDTO(semanticModel.auditInfo()))
         .build();
+  }
+
+  /**
+   * Converts a {@link SemanticQueryPlan} to a {@link SemanticQueryPlanDTO}.
+   *
+   * @param plan The resolved Semantic Model query plan.
+   * @return The plan DTO.
+   */
+  public static SemanticQueryPlanDTO toDTO(SemanticQueryPlan plan) {
+    return SemanticQueryPlanDTO.fromPlan(plan);
   }
 
   /**

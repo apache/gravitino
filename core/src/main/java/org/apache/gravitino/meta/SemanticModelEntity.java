@@ -67,6 +67,11 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
   public static final Field PROPERTIES =
       Field.optional("properties", Map.class, "The properties of the Semantic Model entity.");
 
+  /** The current committed version field of the Semantic Model entity. */
+  public static final Field VERSION =
+      Field.optional(
+          "version", Long.class, "The current committed version of the Semantic Model entity.");
+
   /** The audit information field of the Semantic Model entity. */
   public static final Field AUDIT_INFO =
       Field.required(
@@ -77,6 +82,7 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
   private Namespace namespace;
   private SemanticModelDefinition definition;
   private Map<String, String> properties = Collections.emptyMap();
+  private long version;
   private AuditInfo auditInfo;
 
   @JsonIgnore @ToString.Exclude
@@ -111,6 +117,7 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
     fields.put(COMMENT, comment);
     fields.put(DEFINITION, definition);
     fields.put(PROPERTIES, properties);
+    fields.put(VERSION, version);
     fields.put(AUDIT_INFO, auditInfo);
     return Collections.unmodifiableMap(fields);
   }
@@ -177,6 +184,16 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
   }
 
   /**
+   * Returns the current committed version of the Semantic Model.
+   *
+   * @return The positive version, or {@code 0} when the entity has no version yet.
+   */
+  @Override
+  public long version() {
+    return version;
+  }
+
+  /**
    * Returns the audit information of the Semantic Model entity.
    *
    * @return The audit information.
@@ -227,6 +244,7 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
         && Objects.equals(comment, that.comment)
         && Objects.equals(definition, that.definition)
         && Objects.equals(properties, that.properties)
+        && version == that.version
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
@@ -237,7 +255,7 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
    */
   @Override
   public int hashCode() {
-    return Objects.hash(id, name, namespace, comment, definition, properties, auditInfo);
+    return Objects.hash(id, name, namespace, comment, definition, properties, version, auditInfo);
   }
 
   /**
@@ -333,6 +351,17 @@ public class SemanticModelEntity implements Entity, Auditable, HasIdentifier, Se
     public Builder withProperties(@Nullable Map<String, String> properties) {
       semanticModel.properties =
           properties == null ? Collections.emptyMap() : ImmutableMap.copyOf(properties);
+      return this;
+    }
+
+    /**
+     * Sets the current committed version of the Semantic Model.
+     *
+     * @param version The positive version.
+     * @return This builder.
+     */
+    public Builder withVersion(long version) {
+      semanticModel.version = version;
       return this;
     }
 

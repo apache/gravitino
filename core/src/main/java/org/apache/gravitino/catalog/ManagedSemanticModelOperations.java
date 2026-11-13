@@ -46,6 +46,7 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
+import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** EntityStore-backed operations for Gravitino-managed Semantic Models. */
@@ -196,6 +197,7 @@ public class ManagedSemanticModelOperations {
             .withDefinition(definition)
             .withSourceUpdate(sourceUpdate)
             .withProperties(properties)
+            .withVersion(SemanticModelPO.INITIAL_VERSION)
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(PrincipalUtils.getCurrentUserName())
@@ -335,6 +337,7 @@ public class ManagedSemanticModelOperations {
         .withDefinition(newDefinition)
         .withSourceUpdate(sourceUpdate)
         .withProperties(newProperties)
+        .withVersion(oldEntity.version() + 1)
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(oldAudit.creator())

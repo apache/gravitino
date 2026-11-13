@@ -80,6 +80,8 @@ import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticQuery;
+import org.apache.gravitino.semantic.SemanticQueryPlan;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -170,6 +172,12 @@ class RelationalCatalog extends BaseSchemaCatalog
   @Override
   public OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format) {
     return semanticModelOperations.exportOssieDocument(ident, format);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticQueryPlan planSemanticQuery(NameIdentifier ident, SemanticQuery query) {
+    return semanticModelOperations.planSemanticQuery(ident, query);
   }
 
   /** {@inheritDoc} */

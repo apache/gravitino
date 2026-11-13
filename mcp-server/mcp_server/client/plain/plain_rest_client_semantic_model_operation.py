@@ -131,6 +131,33 @@ class PlainRESTClientSemanticModelOperation(SemanticModelOperation):
         )
         return extract_content_from_response(response, "dropped", False)
 
+    # pylint: disable=too-many-positional-arguments
+    async def plan_semantic_query(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        semantic_model_name: str,
+        metrics: Optional[list[str]] = None,
+        dimensions: Optional[list[str]] = None,
+        filters: Optional[list[dict]] = None,
+        limit: Optional[int] = None,
+    ) -> str:
+        body = {}
+        if metrics is not None:
+            body["metrics"] = metrics
+        if dimensions is not None:
+            body["dimensions"] = dimensions
+        if filters is not None:
+            body["filters"] = filters
+        if limit is not None:
+            body["limit"] = limit
+        response = await self.rest_client.post(
+            f"{self._model_path(catalog_name, schema_name, semantic_model_name)}"
+            "/plan",
+            json=body,
+        )
+        return extract_content_from_response(response, "plan", {})
+
     def _models_path(self, catalog_name: str, schema_name: str) -> str:
         return (
             f"/api/metalakes/{encode_path_segment(self.metalake_name)}"

@@ -54,6 +54,7 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
             semantic_model_ns (Namespace): The full metalake.catalog.schema namespace.
         """
         self._name = semantic_model_dto.name()
+        self._version = semantic_model_dto.version()
         self._comment = semantic_model_dto.comment()
         self._definition = semantic_model_dto.definition()
         self._properties = dict(semantic_model_dto.properties())
@@ -72,6 +73,9 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
     def name(self) -> str:
         return self._name
 
+    def version(self) -> int:
+        return self._version
+
     def comment(self) -> Optional[str]:
         return self._comment
 
@@ -89,6 +93,7 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
             return False
         return (
             self._name == other.name()
+            and self._version == other.version()
             and self._comment == other.comment()
             and self._definition == other.definition()
             and self._properties == other.properties()
@@ -96,13 +101,13 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
         )
 
     def __hash__(self) -> int:
-        return hash((self._name, self._comment, self._definition))
+        return hash((self._name, self._version, self._comment, self._definition))
 
     def __repr__(self) -> str:
         return (
-            f"GenericSemanticModel(name={self._name!r}, comment={self._comment!r}, "
-            f"definition={self._definition!r}, properties={self._properties!r}, "
-            f"audit={self._audit!r})"
+            f"GenericSemanticModel(name={self._name!r}, version={self._version!r}, "
+            f"comment={self._comment!r}, definition={self._definition!r}, "
+            f"properties={self._properties!r}, audit={self._audit!r})"
         )
 
     def supports_tags(self) -> SupportsTags:

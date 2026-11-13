@@ -27,6 +27,7 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticQueryPlanException;
 
 /** The public catalog API for managing Semantic Models in a schema. */
 @Evolving
@@ -163,6 +164,31 @@ public interface SemanticModelCatalog {
   default OssieDocument exportOssieDocument(NameIdentifier ident, OssieFormat format)
       throws NoSuchSemanticModelException, IllegalSemanticModelException {
     throw new UnsupportedOperationException("Ossie export is not supported");
+  }
+
+  /**
+   * Plans a semantic query against a Semantic Model without executing it.
+   *
+   * <p>Gravitino validates the query, authorizes the caller, loads the current committed
+   * definition, and resolves it into a dialect-neutral {@link SemanticQueryPlan}. The plan records
+   * the {@code semanticModelVersion} it was resolved against so that a consumer can detect
+   * definition drift. Engine-specific materialization happens in a {@link
+   * SemanticQueryPlanConverter} outside the server. The server never generates SQL, executes the
+   * query, or caches the plan.
+   *
+   * <p>Plan authorization is not execution authorization: the converter and the engine that
+   * executes the plan are responsible for their own credentials and row or column policies.
+   *
+   * @param ident The Semantic Model identifier.
+   * @param query The semantic query to resolve.
+   * @return The resolved plan.
+   * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
+   * @throws IllegalArgumentException If the query is malformed.
+   * @throws SemanticQueryPlanException If the model cannot satisfy the query.
+   */
+  default SemanticQueryPlan planSemanticQuery(NameIdentifier ident, SemanticQuery query)
+      throws NoSuchSemanticModelException {
+    throw new UnsupportedOperationException("Semantic query planning is not supported");
   }
 
   /**

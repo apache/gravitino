@@ -574,6 +574,85 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 self.assertIs(result, dropped)
                 self._assert_request("DELETE", f"{_MODELS_PATH}/sales_model")
 
+    async def test_plan_semantic_query(self):
+        plan = {
+            "semanticModel": [
+                "test_metalake",
+                "catalog",
+                "schema",
+                "sales_model",
+            ],
+            "semanticModelVersion": 2,
+            "sources": [
+                {
+                    "dataset": "orders",
+                    "source": ["catalog", "schema", "orders"],
+                }
+            ],
+            "joins": [],
+            "selections": [],
+            "filters": [],
+            "groupBy": [],
+            "limit": 10,
+            "warnings": [],
+        }
+        self.response = {"code": 0, "plan": plan}
+        result = await self._call(
+            "plan_semantic_query",
+            {
+                **_MODEL_ARGS,
+                "metrics": ["total_revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "region", "operator": "eq", "value": "EMEA"}
+                ],
+                "limit": 10,
+            },
+        )
+        self.assertEqual(result, plan)
+        self._assert_request(
+            "POST",
+            f"{_MODELS_PATH}/sales_model/plan",
+            {
+                "metrics": ["total_revenue"],
+                "dimensions": ["region"],
+                "filters": [
+                    {"field": "region", "operator": "eq", "value": "EMEA"}
+                ],
+                "limit": 10,
+            },
+        )
+
+    async def test_plan_semantic_query_omits_unset_fields(self):
+        self.response = {
+            "code": 0,
+            "plan": {
+                "semanticModel": [
+                    "test_metalake",
+                    "catalog",
+                    "schema",
+                    "sales_model",
+                ],
+                "semanticModelVersion": 2,
+                "sources": [],
+                "joins": [],
+                "selections": [],
+                "filters": [],
+                "groupBy": [],
+                "warnings": ["approximate"],
+            },
+        }
+        result = await self._call(
+            "plan_semantic_query",
+            {**_MODEL_ARGS, "metrics": ["order_count"]},
+        )
+        self.assertEqual(result["warnings"], ["approximate"])
+        self._assert_request(
+            "POST",
+            f"{_MODELS_PATH}/sales_model/plan",
+            {"metrics": ["order_count"]},
+        )
+
     async def test_all_operations_encode_each_path_segment(self):
         namespace = {
             "metalake": "ml/a",
@@ -612,6 +691,15 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "DELETE",
                 {"semantic_model_name": model_name},
                 "/sales%20%25",
+            ),
+            (
+                "plan_semantic_query",
+                "POST",
+                {
+                    "semantic_model_name": model_name,
+                    "metrics": ["m"],
+                },
+                "/sales%20%25/plan",
             ),
         ):
             with self.subTest(tool=tool):
@@ -707,6 +795,15 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             ),
             ("drop_semantic_model", _MODEL_ARGS, 409, "NotInUseException"),
             ("drop_semantic_model", _MODEL_ARGS, 403, "ForbiddenException"),
+            (
+                "plan_semantic_query",
+                {
+                    **_MODEL_ARGS,
+                    "metrics": ["total_revenue"],
+                },
+                422,
+                "SemanticQueryPlanException",
+            ),
         ):
             with self.subTest(tool=tool, status=status):
                 self.status = status
@@ -743,6 +840,7 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
                 "create_semantic_model",
                 "alter_semantic_model",
                 "drop_semantic_model",
+                "plan_semantic_query",
             },
         )
         for tool in tools.values():
@@ -781,6 +879,14 @@ class TestSemanticModelTool(unittest.IsolatedAsyncioTestCase):
             set(tools["drop_semantic_model"].inputSchema["required"]),
             {"catalog_name", "schema_name", "semantic_model_name"},
         )
+        self.assertEqual(
+            set(tools["plan_semantic_query"].inputSchema["required"]),
+            {
+                "catalog_name",
+                "schema_name",
+                "semantic_model_name",
+            },
+        )
 
 
 class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
@@ -812,6 +918,22 @@ class TestSemanticModelToolWithMockOperation(unittest.IsolatedAsyncioTestCase):
                 model,
             ),
             ("drop_semantic_model", model_args, True),
+            (
+                "plan_semantic_query",
+                {
+                    **model_args,
+                    "metrics": ["total_revenue"],
+                },
+                {
+                    "semanticModelVersion": 1,
+                    "sources": [],
+                    "joins": [],
+                    "selections": [],
+                    "filters": [],
+                    "groupBy": [],
+                    "warnings": [],
+                },
+            ),
         )
         with patch.object(
             RESTClientFactory, "_rest_client_class", MockOperation

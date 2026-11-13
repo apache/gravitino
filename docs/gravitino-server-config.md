@@ -681,6 +681,19 @@ server, are documented with those services. See
 | `gravitino.job.outputMaxLines`         | Maximum number of lines returned when fetching a job's stdout/stderr output.                                                                                   | `1000`                        |
 | `gravitino.job.outputMaxBytes`         | Maximum number of bytes returned from the tail of a job's stdout/stderr when fetching its output.                                                              | `262144` (256KB)              |
 
+#### Semantic query planning
+
+The Semantic Model `/plan` endpoint has no server configuration. The server resolves a query
+against the committed model definition into a dialect-neutral logical plan and returns that plan;
+it does not render SQL, choose a dialect, or execute anything. Plan resolution is read-only and the
+plan is not cached.
+
+Consumers materialize SQL or an engine plan themselves. The `api` module defines a
+`SemanticQueryPlanConverter` SPI to turn a resolved `SemanticQueryPlan` into a target
+representation; `SqlSemanticQueryPlanConverter` is the subtype for engines that consume statement
+text. A `SemanticQueryPlanException` reports a query the model cannot satisfy as unprocessable with
+`422`.
+
 #### Table maintenance cooldowns
 
 When a table-maintenance policy omits `minIntervalMs`, the server uses these per-type keys, then

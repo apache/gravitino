@@ -37,11 +37,14 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 @EqualsAndHashCode
 @ToString
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"name", "comment", "definition", "properties", "audit"})
+@JsonPropertyOrder({"name", "version", "comment", "definition", "properties", "audit"})
 public class SemanticModelDTO implements SemanticModel {
 
   @JsonProperty("name")
   private String name;
+
+  @JsonProperty("version")
+  private long version;
 
   @Nullable
   @JsonProperty("comment")
@@ -60,11 +63,13 @@ public class SemanticModelDTO implements SemanticModel {
 
   private SemanticModelDTO(
       String name,
+      long version,
       @Nullable String comment,
       SemanticModelDefinitionDTO definition,
       @Nullable Map<String, String> properties,
       AuditDTO audit) {
     this.name = name;
+    this.version = version;
     this.comment = comment;
     this.definition = definition;
     this.properties = immutableProperties(properties);
@@ -74,6 +79,11 @@ public class SemanticModelDTO implements SemanticModel {
   @Override
   public String name() {
     return name;
+  }
+
+  @Override
+  public long version() {
+    return version;
   }
 
   @Override
@@ -120,6 +130,7 @@ public class SemanticModelDTO implements SemanticModel {
   public static final class Builder {
 
     private String name;
+    private long version;
     @Nullable private String comment;
     private SemanticModelDefinitionDTO definition;
     @Nullable private Map<String, String> properties;
@@ -135,6 +146,18 @@ public class SemanticModelDTO implements SemanticModel {
      */
     public Builder withName(String name) {
       this.name = name;
+      return this;
+    }
+
+    /**
+     * Sets the current committed version of the Semantic Model.
+     *
+     * @param version The positive version, or {@code 0} for a response that predates version
+     *     tracking.
+     * @return This builder.
+     */
+    public Builder withVersion(long version) {
+      this.version = version;
       return this;
     }
 
@@ -190,10 +213,11 @@ public class SemanticModelDTO implements SemanticModel {
      */
     public SemanticModelDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
+      Preconditions.checkArgument(version >= 0, "version cannot be negative");
       Preconditions.checkArgument(definition != null, "definition cannot be null");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
 
-      return new SemanticModelDTO(name, comment, definition, properties, audit);
+      return new SemanticModelDTO(name, version, comment, definition, properties, audit);
     }
   }
 

@@ -30,6 +30,7 @@ from gravitino.exceptions.base import (
     NotInUseException,
     InUseException,
     OptimisticLockException,
+    SemanticQueryPlanException,
     ServiceUnavailableException,
     UnauthorizedException,
 )
@@ -80,6 +81,9 @@ class ErrorConstants(IntEnum):
     # Error codes for service unavailable.
     SERVICE_UNAVAILABLE_CODE = 1013
 
+    # Error codes for well-formed requests that cannot be processed.
+    UNPROCESSABLE_ENTITY_CODE = 1014
+
     # Error codes for invalid state.
     UNKNOWN_ERROR_CODE = 1100
 
@@ -97,6 +101,7 @@ EXCEPTION_MAPPING = {
     NotInUseException: ErrorConstants.NOT_IN_USE_CODE,
     InUseException: ErrorConstants.IN_USE_CODE,
     OptimisticLockException: ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE,
+    SemanticQueryPlanException: ErrorConstants.UNPROCESSABLE_ENTITY_CODE,
     ServiceUnavailableException: ErrorConstants.SERVICE_UNAVAILABLE_CODE,
     UnauthorizedException: ErrorConstants.UNAUTHORIZED_CODE,
 }
