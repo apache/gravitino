@@ -21,6 +21,7 @@ package org.apache.gravitino.iceberg.service;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
@@ -29,8 +30,10 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.iceberg.BaseTransaction;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.MetadataUpdate;
@@ -72,8 +75,13 @@ import org.apache.iceberg.rest.responses.PlanTableScanResponse;
  * <p>Federation-specific behavior is expressed through polymorphic overrides instead of {@code
  * instanceof RESTCatalog} checks scattered across the base class. Table load, create and register
  * use authenticated REST calls so {@code X-Iceberg-Access-Delegation} can be forwarded when the
- * client requested credential vending. Update still uses the Iceberg Catalog API. This wrapper
- * never injects Gravitino-generated credentials.
+ * client requested credential vending. Update still uses the Iceberg Catalog API.
+ *
+ * <p>By default the wrapper passes through the storage credentials the remote catalog vends and
+ * never injects Gravitino-generated credentials. With {@code
+ * rest-backend-storage-credential-source=local}, it never asks the remote catalog for credentials
+ * and instead issues them through this catalog's own credential providers, scoped to the table
+ * location and to the caller's privilege, exactly as for a local catalog.
  *
  * <p>Portions of the table update handling are derived from Apache Iceberg's {@code
  * org.apache.iceberg.rest.CatalogHandlers}:
@@ -87,11 +95,41 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   private static final String VENDED_CREDENTIALS = "vended-credentials";
 
   /**
+   * Config key prefixes that carry storage credentials. With Gravitino credential vending, keys
+   * with these prefixes are dropped from remote responses so remote credentials never reach
+   * clients.
+   */
+  private static final List<String> REMOTE_CREDENTIAL_KEY_PREFIXES =
+      ImmutableList.of(
+          "s3.access-key-id",
+          "s3.secret-access-key",
+          "s3.session-token",
+          "s3.remote-signing-enabled",
+          "gcs.oauth2.",
+          "adls.sas-token",
+          "client.access-key-id",
+          "client.access-key-secret",
+          "client.security-token",
+          "client.refresh-credentials-",
+          "s3.refresh-credentials-",
+          "s3.sse.key",
+          "adls.token",
+          "adls.auth.shared-key.",
+          "gcs.client-lib-token",
+          "gcs.encryption-key",
+          "gcs.decryption-key",
+          "token",
+          "urn:ietf:params:oauth:token-type:");
+
+  /**
    * Caches whether the remote catalog advertises the scan-plan endpoint. Only successful lookups
    * are cached, so a failure to reach the remote can be retried. Races just repeat an idempotent
    * lookup.
    */
   private volatile Boolean remoteSupportsScanPlan;
+
+  /** Whether storage credentials come from this catalog's providers rather than the remote. */
+  private final boolean vendCredentialsLocally;
 
   /**
    * Creates a federated wrapper.
@@ -101,6 +139,62 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    */
   public FederatedCatalogWrapper(String catalogName, IcebergConfig config) {
     super(catalogName, config);
+    // A service account's credentials reflect what the service account may do, not the caller,
+    // so a catalog connected as a service account never passes the remote's credentials through.
+    this.vendCredentialsLocally =
+        IcebergConstants.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE_LOCAL.equals(
+                config.get(IcebergConfig.REST_BACKEND_STORAGE_CREDENTIAL_SOURCE))
+            || config.isRestBackendServiceAccount();
+  }
+
+  /**
+   * Requires local authorization when the remote catalog is accessed as a service account.
+   *
+   * @param serverContext the REST server context
+   */
+  @Override
+  public void validateServerContext(IcebergRESTServerContext serverContext) {
+    if (getIcebergConfig().isRestBackendServiceAccount()
+        && !serverContext.isAuthorizationEnabled()) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Catalog %s connects to its remote catalog as a service account (%s=%s), which"
+                  + " requires authorization to be enabled",
+              catalogCredentialManager.catalogName(),
+              IcebergConstants.REST_BACKEND_AUTH_TYPE,
+              IcebergConstants.REST_BACKEND_AUTH_TYPE_SERVICE_ACCOUNT));
+    }
+  }
+
+  /**
+   * Reports whether the remote catalog receives the calling user's access token.
+   *
+   * @return {@code true} for a user-token connection, or {@code false} for a service account
+   */
+  @Override
+  public boolean forwardsUserToken() {
+    return !getIcebergConfig().isRestBackendServiceAccount();
+  }
+
+  /**
+   * Keeps cleanup of the remote catalog's files on the remote server.
+   *
+   * @return {@code false}, since this server must forward purge requests to the remote catalog
+   */
+  @Override
+  public boolean supportsAsyncPurge() {
+    return false;
+  }
+
+  /**
+   * Forwards a purge to the remote catalog, which owns deletion of the table's files.
+   *
+   * @param tableIdentifier the table to purge
+   */
+  @Override
+  public void purgeTable(TableIdentifier tableIdentifier) {
+    invalidateTableMetadata(tableIdentifier);
+    CatalogHandlers.purgeTable(getCatalog(), tableIdentifier);
   }
 
   /**
@@ -120,7 +214,15 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse createTable(
       Namespace namespace, CreateTableRequest request, boolean requestCredential) {
-    return createTableViaREST(namespace, request, requestCredential);
+    if (!vendCredentialsLocally) {
+      return createTableViaREST(namespace, request, requestCredential);
+    }
+    // The creator owns the new table, so it receives write credentials, as for a local catalog.
+    return withLocalCredentials(
+        TableIdentifier.of(namespace, request.name()),
+        createTableViaREST(namespace, request, false),
+        requestCredential,
+        CredentialPrivilege.WRITE);
   }
 
   /**
@@ -129,18 +231,23 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * <p>Always uses a dedicated REST GET rather than Iceberg's {@link RESTCatalog#loadTable}, which
    * cannot send {@code X-Iceberg-Access-Delegation}. When credential vending is requested the
    * header is forwarded so the remote catalog returns {@code storage-credentials} inline. Upstream
-   * credential refresh endpoints are rewritten to this IRC catalog. The {@code privilege} is
-   * ignored because the remote catalog decides what to vend.
+   * credential refresh endpoints are rewritten to this IRC catalog. With Gravitino credential
+   * vending, the remote is not asked for credentials and this catalog's providers issue them for
+   * the caller's {@code privilege}; otherwise the remote catalog decides what to vend.
    *
    * @param identifier the table identifier.
    * @param requestCredential whether the client requested vended credentials.
-   * @param privilege ignored; the remote REST catalog vends its own credentials.
+   * @param privilege the caller's privilege, used only with Gravitino credential vending.
    * @return the load-table response, including rewritten remote credentials when requested.
    */
   @Override
   public LoadTableResponse loadTable(
       TableIdentifier identifier, boolean requestCredential, CredentialPrivilege privilege) {
-    return loadTableViaREST(identifier, requestCredential);
+    if (!vendCredentialsLocally) {
+      return loadTableViaREST(identifier, requestCredential);
+    }
+    return withLocalCredentials(
+        identifier, loadTableViaREST(identifier, false), requestCredential, privilege);
   }
 
   /**
@@ -159,7 +266,16 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   @Override
   public LoadTableResponse registerTable(
       Namespace namespace, RegisterTableRequest request, boolean requestCredential) {
-    return registerTableViaREST(namespace, request, requestCredential);
+    if (!vendCredentialsLocally) {
+      return registerTableViaREST(namespace, request, requestCredential);
+    }
+    // The registering user owns the table, so it receives write credentials, as for a local
+    // catalog.
+    return withLocalCredentials(
+        TableIdentifier.of(namespace, request.name()),
+        registerTableViaREST(namespace, request, false),
+        requestCredential,
+        CredentialPrivilege.WRITE);
   }
 
   @Override
@@ -175,20 +291,23 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
   }
 
   /**
-   * Fetches table credentials from the remote REST catalog instead of vending Gravitino-managed
-   * credentials. The {@code privilege} is ignored because the remote catalog decides what to vend.
+   * Fetches table credentials from the remote REST catalog, or, with Gravitino credential vending,
+   * issues them through this catalog's credential providers for the caller's {@code privilege}.
    *
    * <p>The upstream credentials are rewritten via {@link IcebergRESTUtils#rewriteTableCredentials}
    * so their {@code refresh-credentials-endpoint} points at this IRC catalog rather than the remote
    * catalog, consistent with the {@link #loadTable}/{@code createTable} federation paths.
    *
    * @param identifier the table identifier.
-   * @param privilege ignored; the remote REST catalog vends its own credentials.
+   * @param privilege the caller's privilege, used only with Gravitino credential vending.
    * @return the remote credentials with IRC-local refresh endpoints.
    */
   @Override
   public LoadCredentialsResponse getTableCredentials(
       TableIdentifier identifier, CredentialPrivilege privilege) {
+    if (vendCredentialsLocally) {
+      return super.getTableCredentials(identifier, privilege);
+    }
     LoadCredentialsResponse upstream =
         getRESTTableCredentials((RESTCatalog) getCatalog(), identifier);
     return IcebergRESTUtils.rewriteTableCredentials(
@@ -205,7 +324,7 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * @param tableIdentifier the table to scan.
    * @param scanRequest the scan request parameters.
    * @param requestCredentialVending whether the client requested vended credentials.
-   * @param privilege ignored; the remote REST catalog decides what to vend.
+   * @param privilege the caller's privilege, used only with Gravitino credential vending.
    * @return the scan response from the remote catalog, with rewritten credential refresh endpoints.
    */
   @Override
@@ -215,6 +334,17 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
       boolean requestCredentialVending,
       CredentialPrivilege privilege) {
     Table table = getCatalog().loadTable(tableIdentifier);
+    if (vendCredentialsLocally) {
+      // Drop anything the remote returned unasked, so its credentials never reach the client.
+      PlanTableScanResponse response =
+          IcebergRESTUtils.copyWithCredentials(
+              getRESTTablePlanScan(
+                  (RESTCatalog) getCatalog(), tableIdentifier, scanRequest, false, table.specs()),
+              Collections.emptyList());
+      return requestCredentialVending && !isLocalOrHdfsLocation(table.location())
+          ? injectScanCredentials(tableIdentifier, table, response, privilege)
+          : response;
+    }
     PlanTableScanResponse response =
         getRESTTablePlanScan(
             (RESTCatalog) getCatalog(),
@@ -525,6 +655,37 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
     LoadTableResponse upstream =
         getRESTRegisterTable((RESTCatalog) getCatalog(), namespace, request, requestCredential);
     return rewriteRemoteLoadTable(TableIdentifier.of(namespace, request.name()), upstream);
+  }
+
+  /**
+   * Adds credentials issued by this catalog's credential providers to a response fetched from the
+   * remote catalog without vended credentials.
+   *
+   * @param identifier the table identifier
+   * @param remote the remote response
+   * @param requestCredential whether the client requested vended credentials
+   * @param privilege the caller's privilege on the table
+   * @return the response, with Gravitino-issued credentials when they were requested and never with
+   *     credentials from the remote catalog
+   */
+  private LoadTableResponse withLocalCredentials(
+      TableIdentifier identifier,
+      LoadTableResponse remote,
+      boolean requestCredential,
+      CredentialPrivilege privilege) {
+    // Drop anything the remote returned unasked, so its credentials never reach the client.
+    Map<String, String> config =
+        Maps.filterKeys(
+            remote.config(),
+            key -> REMOTE_CREDENTIAL_KEY_PREFIXES.stream().noneMatch(key::startsWith));
+    LoadTableResponse withoutRemoteCredentials =
+        LoadTableResponse.builder()
+            .withTableMetadata(remote.tableMetadata())
+            .addAllConfig(config)
+            .build();
+    return shouldGenerateCredential(withoutRemoteCredentials, requestCredential)
+        ? injectCredentialConfig(identifier, withoutRemoteCredentials, privilege)
+        : withoutRemoteCredentials;
   }
 
   private LoadTableResponse rewriteRemoteLoadTable(

@@ -121,7 +121,15 @@ class TestSnapshotExpirationPolicyDTO {
     "streamResults,\"true\"",
     "streamResults,\"false\"",
     "streamResults,[]",
-    "streamResults,{}"
+    "streamResults,{}",
+    "minIntervalMs,1.9",
+    "minIntervalMs,\"100\"",
+    "commitTrigger,1",
+    "commitTrigger,\"false\"",
+    "timeTrigger,1",
+    "timeTrigger,true",
+    "jobOptions,1",
+    "updaterOptions,true"
   })
   void rejectInvalidValuesInCreateAndUpdate(String field, String value) {
     String content = "{\"" + field + "\":" + value + "}";

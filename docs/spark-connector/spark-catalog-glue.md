@@ -282,6 +282,10 @@ INSERT INTO orders VALUES (1, 'alice', 99.99, TIMESTAMP '2024-01-01 00:00:00');
 SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01';
 ```
 
+:::note
+Iceberg tables use the Iceberg type mapping, as with the Iceberg catalog: a Spark `TIMESTAMP` column is an Iceberg `timestamptz`, and a Spark `TIMESTAMP_NTZ` column an Iceberg `timestamp`. Hive-format tables store a Spark `TIMESTAMP` as a Hive `timestamp` and do not support `TIMESTAMP_NTZ`.
+:::
+
 
 ## Catalog Properties
 

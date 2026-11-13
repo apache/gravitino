@@ -25,6 +25,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
@@ -66,6 +67,16 @@ public interface Topic extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Topic does not support tag operations.");
+  }
+
+  /**
+   * Returns the domain operations for this topic.
+   *
+   * @return The {@link SupportsDomains} if the topic supports domain operations.
+   * @throws UnsupportedOperationException If the topic does not support domain operations.
+   */
+  default SupportsDomains supportsDomains() {
+    throw new UnsupportedOperationException("Topic does not support domain operations.");
   }
 
   /**

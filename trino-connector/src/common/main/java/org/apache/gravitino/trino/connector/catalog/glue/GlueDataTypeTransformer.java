@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.trino.connector.catalog.glue;
 
+import io.trino.spi.TrinoException;
 import io.trino.spi.type.TimeType;
 import io.trino.spi.type.TimestampType;
 import io.trino.spi.type.TimestampWithTimeZoneType;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Type.Name;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveDataTypeTransformer;
 
 /**
@@ -42,6 +44,21 @@ public class GlueDataTypeTransformer extends HiveDataTypeTransformer {
     } else if (TimestampWithTimeZoneType.class.isAssignableFrom(typeClass)) {
       // Iceberg supports TIMESTAMP WITH TIME ZONE; Hive does not.
       return Types.TimestampType.withTimeZone(TRINO_MICROS_PRECISION);
+    } else if (TimestampType.class.isAssignableFrom(typeClass)) {
+      // timestamp(6) is the Iceberg timestamp; timestamp(3) is the Hive one. Which of the two a
+      // table takes depends on its format, which the metadata adapter checks.
+      int precision = ((TimestampType) type).getPrecision();
+      if (precision == TRINO_MICROS_PRECISION) {
+        return Types.TimestampType.withoutTimeZone(TRINO_MICROS_PRECISION);
+      }
+      if (precision != TRINO_MILLIS_PRECISION) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            String.format(
+                "Glue tables support timestamp(3) for Hive-format tables and timestamp(6) for"
+                    + " Iceberg tables, got timestamp(%d)",
+                precision));
+      }
     }
     return super.getGravitinoType(type);
   }

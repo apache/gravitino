@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,6 +52,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -80,11 +82,13 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NonEmptyCatalogException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
@@ -231,6 +235,199 @@ public class TestCatalogManager {
     if (catalogManager != null) {
       catalogManager.close();
       catalogManager = null;
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testCatalogCreateIsInvisibleUntilValidationCompletes(boolean failValidation)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of(metalake, "publication_test");
+    CountDownLatch validationStarted = new CountDownLatch(1);
+    CountDownLatch releaseValidation = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    RuntimeException failure = new IllegalArgumentException("backend validation failed");
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(
+                new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                validationStarted.countDown();
+                Assertions.assertTrue(releaseValidation.await(10, TimeUnit.SECONDS));
+                if (failValidation) {
+                  throw failure;
+                }
+                return invocation.callRealMethod();
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      Future<Catalog> creation =
+          executor.submit(
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(PROPERTY_KEY4, new SecretBinding("memory", "password")),
+                      Map.of()));
+      try {
+        Assertions.assertTrue(validationStarted.await(5, TimeUnit.SECONDS));
+        Assertions.assertEquals(
+            0,
+            executor
+                .submit(() -> manager.listCatalogs(Namespace.of(metalake)))
+                .get(3, TimeUnit.SECONDS)
+                .length);
+        Assertions.assertEquals(
+            0,
+            executor
+                .submit(() -> manager.listCatalogsInfo(Namespace.of(metalake)))
+                .get(3, TimeUnit.SECONDS)
+                .length);
+        Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+        releaseValidation.countDown();
+        if (failValidation) {
+          Exception error =
+              Assertions.assertThrows(Exception.class, () -> creation.get(5, TimeUnit.SECONDS));
+          Assertions.assertSame(failure, error.getCause());
+          Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+        } else {
+          Assertions.assertEquals(ident.name(), creation.get(5, TimeUnit.SECONDS).name());
+          Assertions.assertEquals(1, manager.listCatalogsInfo(Namespace.of(metalake)).length);
+          Mockito.verify(manager, Mockito.never())
+              .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+        }
+      } finally {
+        releaseValidation.countDown();
+        executor.shutdownNow();
+        Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+      }
+    }
+  }
+
+  @Test
+  void testCatalogInsertAndCachePublicationDoNotPermitDuplicateLoad() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    NameIdentifier ident = NameIdentifier.of(metalake, "publication_gap");
+    CountDownLatch inserted = new CountDownLatch(1);
+    CountDownLatch releaseInsert = new CountDownLatch(1);
+    CountDownLatch loadStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Mockito.doAnswer(
+            invocation -> {
+              Object result = invocation.callRealMethod();
+              inserted.countDown();
+              Assertions.assertTrue(releaseInsert.await(10, TimeUnit.SECONDS));
+              return result;
+            })
+        .when(store)
+        .put(any(CatalogEntity.class), eq(false));
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                loadStarted.countDown();
+                return invocation.callRealMethod();
+              })
+          .when(manager)
+          .acquireCatalogLease(ident);
+      Future<Catalog> creation =
+          executor.submit(
+              () ->
+                  manager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", catalogProps()));
+      try {
+        Assertions.assertTrue(inserted.await(5, TimeUnit.SECONDS));
+        Future<Catalog[]> listing =
+            executor.submit(() -> manager.listCatalogsInfo(Namespace.of(metalake)));
+        Assertions.assertTrue(loadStarted.await(5, TimeUnit.SECONDS));
+        Assertions.assertThrows(
+            TimeoutException.class, () -> listing.get(200, TimeUnit.MILLISECONDS));
+        releaseInsert.countDown();
+        Assertions.assertEquals(ident.name(), creation.get(5, TimeUnit.SECONDS).name());
+        Assertions.assertEquals(ident.name(), listing.get(5, TimeUnit.SECONDS)[0].name());
+        Mockito.verify(manager, Mockito.times(1))
+            .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+        Mockito.verify(manager, Mockito.never())
+            .createCatalogWrapper(any(CatalogEntity.class), eq(null));
+      } finally {
+        releaseInsert.countDown();
+        executor.shutdownNow();
+        Assertions.assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+      }
+    } finally {
+      store.close();
+    }
+  }
+
+  @Test
+  void testFailedCatalogInsertClosesInitializedWrapper() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    IOException failure = new IOException("catalog insert failed");
+    Mockito.doThrow(failure).when(store).put(any(CatalogEntity.class), eq(false));
+    AtomicReference<CatalogManager.CatalogWrapper> initialized = new AtomicReference<>();
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            Mockito.spy(new CatalogManager(config, store, new RandomIdGenerator(), secrets))) {
+      Mockito.doAnswer(
+              invocation -> {
+                CatalogManager.CatalogWrapper wrapper =
+                    (CatalogManager.CatalogWrapper) invocation.callRealMethod();
+                initialized.set(wrapper);
+                return wrapper;
+              })
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), Mockito.anyMap());
+      RuntimeException error =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  manager.createCatalog(
+                      NameIdentifier.of(metalake, "failed_insert"),
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps()));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertNotNull(initialized.get());
+      Assertions.assertTrue(initialized.get().isRetired());
+      Assertions.assertEquals(0, initialized.get().activeOperations());
+      Assertions.assertNull(initialized.get().catalog());
+      Mockito.verify(store, Mockito.never()).delete(any(), eq(EntityType.CATALOG), eq(true));
+    } finally {
+      store.close();
+    }
+  }
+
+  /** Checks a catalog creation does not take a sibling catalog lock. */
+  @Test
+  public void testCatalogCreationDoesNotLockSiblingCatalogs() throws Exception {
+    try (TreeLockTestSupport.HeldLock sibling =
+        TreeLockTestSupport.HeldLock.acquire(
+            NameIdentifier.of(metalake, "existing_sibling"), LockType.READ)) {
+      TreeLockTestSupport.assertRunsConcurrentlyWith(
+          sibling,
+          () ->
+              catalogManager.createCatalog(
+                  NameIdentifier.of(metalake, "independent_catalog_create"),
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  ImmutableMap.of(
+                      PROPERTY_KEY1,
+                      "value1",
+                      PROPERTY_KEY2,
+                      "value2",
+                      PROPERTY_KEY5_PREFIX + "1",
+                      "value3")));
     }
   }
 
@@ -747,6 +944,107 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testConfigurationValidationOnCreateWithoutBackendVerification() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-create");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "3",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    properties.put("validation-max", "4");
+    // The identifier is reusable after validation rollback. No backend initialization is needed.
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.createCatalog(
+                ident, Catalog.Type.RELATIONAL, provider, "comment", properties));
+  }
+
+  @Test
+  void testConfigurationValidationOnAlterUsesCompleteProposedProperties() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "static-invalid-alter");
+    Map<String, String> properties =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                "validation-min",
+                "1",
+                "validation-max",
+                "2",
+                TestCatalogOperations.FAIL_INITIALIZE,
+                "true"));
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", properties);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.setProperty("validation-min", "3")));
+    Assertions.assertEquals(
+        "1", catalogManager.loadCatalog(ident).properties().get("validation-min"));
+    Assertions.assertDoesNotThrow(
+        () ->
+            catalogManager.alterCatalog(
+                ident,
+                CatalogChange.setProperty("validation-min", "3"),
+                CatalogChange.setProperty("validation-max", "4")));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> catalogManager.alterCatalog(ident, CatalogChange.removeProperty("validation-max")));
+    Assertions.assertEquals(
+        "4", catalogManager.loadCatalog(ident).properties().get("validation-max"));
+  }
+
+  @Test
+  public void testCreateCatalogPropagatesBackendForbidden() throws Exception {
+    // The create-time probe reports that the backend refuses the configured credentials: the
+    // ForbiddenException must reach the caller unwrapped, and creation must roll back the cache and
+    // the store.
+    NameIdentifier forbidIdent = NameIdentifier.of("metalake", "verify-testconn-forbid");
+    Map<String, String> forbidProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.VALIDATE_ON_CREATE,
+                "true",
+                TestCatalogOperations.FORBID_TEST,
+                "true"));
+    ForbiddenException exception =
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                catalogManager.createCatalog(
+                    forbidIdent, Catalog.Type.RELATIONAL, provider, "comment", forbidProps));
+    Assertions.assertEquals("Backend denied access", exception.getMessage());
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(forbidIdent));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(forbidIdent, EntityType.CATALOG, CatalogEntity.class));
+  }
+
+  @Test
   public void testCreateCatalogVerifiesBackendViaTestConnection() throws Exception {
     // Opted in via validateOnCreate() force-probe, and the probe reports the backend unreachable:
     // creation must propagate ConnectionFailedException and roll back both the cache and the store.
@@ -771,7 +1069,7 @@ public class TestCatalogManager {
             catalogManager.createCatalog(
                 failIdent, Catalog.Type.RELATIONAL, provider, "comment", failProps));
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failIdent));
-    // Store rollback: the just-persisted entity is deleted.
+    // Failed backend validation must not leave a catalog entity.
     Assertions.assertThrows(
         NoSuchEntityException.class,
         () -> entityStore.get(failIdent, EntityType.CATALOG, CatalogEntity.class));
@@ -882,7 +1180,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testListCatalogsInfo() {
+  public void testListCatalogsInfo() throws IOException {
     NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
     NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
     Map<String, String> props =
@@ -899,6 +1197,52 @@ public class TestCatalogManager {
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
     catalogManager.getCatalogCache().invalidateAll();
+
+    Catalog[] catalogDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+    Assertions.assertEquals(2, catalogDescriptors.length);
+    for (Catalog catalog : catalogDescriptors) {
+      Assertions.assertEquals(provider, catalog.provider());
+      Assertions.assertEquals("comment", catalog.comment());
+      Assertions.assertNotNull(catalog.auditInfo());
+      Assertions.assertEquals(
+          ImmutableMap.of(Catalog.PROPERTY_IN_USE, "true"), catalog.properties());
+    }
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+
+    catalogManager.disableCatalog(fileIdent);
+    CatalogEntity legacy = entityStore.get(relIdent, EntityType.CATALOG, CatalogEntity.class);
+    Map<String, String> legacyProperties = Maps.newHashMap(legacy.getProperties());
+    legacyProperties.remove(Catalog.PROPERTY_IN_USE);
+    for (Map<String, String> descriptorProperties : Arrays.asList(legacyProperties, null)) {
+      entityStore.update(
+          relIdent,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          old ->
+              CatalogEntity.builder()
+                  .withId(old.id())
+                  .withName(old.name())
+                  .withNamespace(old.namespace())
+                  .withType(old.getType())
+                  .withProvider(old.getProvider())
+                  .withComment(old.getComment())
+                  .withProperties(descriptorProperties)
+                  .withAuditInfo((AuditInfo) old.auditInfo())
+                  .build());
+      Catalog[] stateDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+      for (Catalog catalog : stateDescriptors) {
+        Assertions.assertEquals(
+            ImmutableMap.of(
+                Catalog.PROPERTY_IN_USE,
+                catalog.name().equals(fileIdent.name()) ? "false" : "true"),
+            catalog.properties());
+      }
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+    }
+    entityStore.update(relIdent, CatalogEntity.class, EntityType.CATALOG, old -> legacy);
+    catalogManager.enableCatalog(fileIdent);
 
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);
@@ -1333,8 +1677,7 @@ public class TestCatalogManager {
         new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "failed_create_cleanup");
 
-    // A creation that fails validation (key1 is required but missing) stores the entity and then
-    // rolls it back via store.delete(), which writes a DROP record to the entity change log.
+    // Validation failure must leave no catalog row. A later valid create can reuse the name.
     Map<String, String> invalidProps =
         ImmutableMap.of(
             "provider", "test", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "v");
@@ -1359,8 +1702,8 @@ public class TestCatalogManager {
     Assertions.assertNotNull(manager.loadCatalogAndWrap(ident));
     Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Cleanup DROP and subsequent ALTER both invalidate the recreated entry. No local marker
-    // may suppress either record; active operations remain protected by CatalogLease.
+    // A replayed DROP from an earlier incarnation and subsequent ALTER must both invalidate the
+    // new entry. No local marker may suppress either record; leases protect active operations.
     store
         .listener
         .get()
@@ -1677,6 +2020,53 @@ public class TestCatalogManager {
     Assertions.assertFalse(ex instanceof ConnectionFailedException);
     Assertions.assertFalse(ex.getMessage().contains("force=true"));
     Assertions.assertTrue(entityStore.exists(ident, EntityType.CATALOG));
+  }
+
+  @Test
+  void testRefusedDropKeepsDisabledCatalogNotInUse() throws Exception {
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+
+    NameIdentifier ident = NameIdentifier.of("metalake", "refused_drop");
+    Map<String, String> props =
+        ImmutableMap.of(
+            "provider",
+            "test",
+            PROPERTY_KEY1,
+            "value1",
+            PROPERTY_KEY2,
+            "value2",
+            PROPERTY_KEY5_PREFIX + "1",
+            "value3",
+            BaseCatalog.CATALOG_OPERATION_IMPL,
+            SingleSchemaCatalogOperations.class.getName());
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.put(
+        SchemaEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(SingleSchemaCatalogOperations.SCHEMA_NAME)
+            .withNamespace(Namespace.of("metalake", "refused_drop"))
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+                    .withCreateTime(Instant.now())
+                    .build())
+            .build());
+
+    manager.disableCatalog(ident);
+    Assertions.assertThrows(
+        NonEmptyCatalogException.class, () -> manager.dropCatalog(ident, false));
+
+    // The operations built while checking schemas for the refused drop must not be reused by
+    // later calls on the disabled catalog.
+    Namespace schemaNs = Namespace.of("metalake", "refused_drop");
+    Assertions.assertThrows(
+        CatalogNotInUseException.class,
+        () -> manager.loadCatalogAndWrap(ident).doWithSchemaOps(ops -> ops.listSchemas(schemaNs)));
+    manager.close();
   }
 
   @Test
@@ -2281,6 +2671,37 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testInvalidConfigurationAlterDoesNotMutateSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "invalid_settings_secret");
+      manager.createCatalog(
+          ident,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "original-secret")),
+          Map.of());
+      CatalogEntity original = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urn = original.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              manager.alterCatalog(
+                  ident,
+                  CatalogChange.setProperty("validation-min", "3"),
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "replacement"))));
+      Assertions.assertEquals("original-secret", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertEquals(
+          original.getProperties(),
+          entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class).getProperties());
+    }
+  }
+
+  @Test
   void testConnectionChangesDoNotMutateSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager();
         CatalogManager manager =
@@ -2402,6 +2823,82 @@ public class TestCatalogManager {
     }
   }
 
+  @Test
+  void testCreateRejectsMaskedPlaceholderSecretBinding() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_mask_create");
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(
+                          PROPERTY_KEY4,
+                          new SecretBinding("memory", HiddenPropertyMaskUtils.MASKED_VALUE)),
+                      Map.of()));
+      Assertions.assertTrue(ex.getMessage().contains("masked placeholder"));
+      Assertions.assertFalse(manager.catalogExists(ident));
+    }
+  }
+
+  @Test
+  void testCatalogManageableWhenSecretMissing() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier broken = NameIdentifier.of("metalake", "secret_missing");
+      NameIdentifier healthy = NameIdentifier.of("metalake", "secret_healthy");
+      manager.createCatalog(
+          broken,
+          Catalog.Type.RELATIONAL,
+          provider,
+          "comment",
+          catalogProps(),
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "gone-soon")),
+          Map.of());
+      manager.createCatalog(healthy, Catalog.Type.RELATIONAL, provider, "comment", catalogProps());
+
+      String urn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, urn));
+      manager.getCatalogCache().invalidate(broken);
+
+      Catalog[] listed = manager.listCatalogsInfo(broken.namespace());
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(broken.name())));
+      Assertions.assertTrue(Arrays.stream(listed).anyMatch(c -> c.name().equals(healthy.name())));
+
+      // Re-bind while still in use (alter requires catalog in use).
+      Assertions.assertDoesNotThrow(
+          () ->
+              manager.alterCatalog(
+                  broken,
+                  CatalogChange.setSecretBinding(
+                      PROPERTY_KEY4, new SecretBinding("memory", "rebound"))));
+      String reboundUrn =
+          entityStore
+              .get(broken, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertEquals("rebound", secrets.readSecret(SecretUrn.parse(reboundUrn)));
+
+      secrets.deleteSecretsFromProperties(Map.of(PROPERTY_KEY4, reboundUrn));
+      manager.getCatalogCache().invalidate(broken);
+      Assertions.assertDoesNotThrow(() -> manager.disableCatalog(broken));
+      Assertions.assertTrue(manager.dropCatalog(broken, true));
+      Assertions.assertTrue(manager.dropCatalog(healthy, true));
+    }
+  }
+
   private static Map<String, String> catalogProps() {
     return ImmutableMap.of(
         "provider",
@@ -2439,5 +2936,24 @@ public class TestCatalogManager {
         TestReferenceSecretsProvider.class.getName());
     c.loadFromProperties(p);
     return new SecretManager(c);
+  }
+
+  /** Catalog operations whose backend always holds one user-created schema. */
+  public static class SingleSchemaCatalogOperations extends TestCatalogOperations {
+    static final String SCHEMA_NAME = "existing_schema";
+
+    public SingleSchemaCatalogOperations() {
+      super(ImmutableMap.of());
+    }
+
+    @Override
+    public NameIdentifier[] listSchemas(Namespace namespace) {
+      return new NameIdentifier[] {NameIdentifier.of(namespace, SCHEMA_NAME)};
+    }
+
+    @Override
+    public Schema loadSchema(NameIdentifier ident) {
+      return Mockito.mock(Schema.class);
+    }
   }
 }

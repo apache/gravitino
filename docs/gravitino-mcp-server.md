@@ -11,7 +11,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 
 ## Requirements
 
-1. Python 3.10+
+1. Python 3.11+
 2. uv is installed. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## Usage
@@ -141,6 +141,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `list_of_semantic_models`           | List the Semantic Models the caller can access in a schema.                    | `semantic_model` |
 | `list_metrics`                      | List visible metric identifiers across Semantic Models in a schema.           | `semantic_model` |
 | `list_metric_infos`                 | List complete visible metrics across Semantic Models in a schema.             | `semantic_model` |
+| `list_semantic_model_datasets`      | List visible datasets directly associated with a source table or view.         | `semantic_model` |
 | `load_semantic_model`               | Load a Semantic Model's metadata and definition.                               | `semantic_model` |
 | `create_semantic_model`             | Create a Semantic Model from a native REST definition.                         | `semantic_model` |
 | `alter_semantic_model`              | Apply Semantic Model updates atomically.                                      | `semantic_model` |
@@ -148,7 +149,7 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 ### Semantic Models
 
-Semantic Model tools manage schema-scoped semantic metadata through the Gravitino REST API.
+Semantic Model tools manage semantic metadata and discover source associations through the Gravitino REST API.
 For concepts and source requirements, see [Semantic Models](./semantic-models.md). For governance
 and Ossie import/export, see [Manage Semantic Model Metadata](./manage-semantic-model-metadata-using-gravitino.md).
 Use the `semantic_model` tag with `--include-tool-tags` to expose these tools.
@@ -174,6 +175,32 @@ datatype, AI context, and custom extensions. JSON number precision is preserved.
 Both modes follow containing-model visibility and sort by model identifier, then
 case-sensitive metric name. An empty result is `[]`; failures propagate as tool
 errors. These tools discover definitions and do not execute metric queries.
+
+`list_semantic_model_datasets` discovers datasets directly associated with a
+table or view using one REST request. Pass `source_type` (`table` or `view`),
+the source's `catalog_name`, `schema_name`, and `source_name`, and optionally `metalake`:
+
+```json
+{"metalake": "prod", "source_type": "table", "catalog_name": "sales", "schema_name": "raw", "source_name": "orders"}
+```
+
+Source `catalog_name`, `schema_name`, and `source_name` must not contain literal
+dots: the REST source lookup route uses `catalog.schema.name` without component
+escaping. The tool rejects these inputs before sending a request.
+
+The result is a JSON array of identifiers with `namespace`
+`[metalake, catalog, schema, semanticModel]` and the exact dataset `name`. Results
+may span catalogs and schemas in the selected metalake. Keep each component
+separate: a dataset name such as `orders.raw` contains a literal dot. The namespace
+components identify the containing Semantic Model. Server ordering is preserved:
+namespace components first, then dataset name, using case-sensitive UTF-16 ordering.
+
+The caller must be able to access the source metadata; Gravitino returns datasets
+only from models the caller can load. No visible matches returns `[]`; missing or
+inaccessible sources and other failures raise tool errors. Associations reflect the
+latest model definition write, including explicit replacement, and do not describe
+transitive dependencies or guarantee that a model can execute. An empty result is
+not evidence that a source can be safely changed or deleted.
 
 For example, call `create_semantic_model` with the following arguments after the
 `sales.mart.orders` source table exists in the selected metalake:
@@ -213,24 +240,78 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
 
+### Domains (read-only)
+
+See [Domains](./domains.md) for membership semantics and the
+[Domain guide](./manage-domains-in-gravitino.md) for SDK and REST mutations.
+
+Use `--include-tool-tags domain` to expose the five Domain tools.
+All are annotated as read-only and idempotent and issue only GET requests.
+
+| Tool | Arguments | Result |
+|------|-----------|--------|
+| `list_of_domains` | `details=true` | Domain snapshots, or names when false |
+| `get_domain_by_name` | `domain_name` | A complete domain snapshot |
+| `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
+| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains` | Recorded leaf members with all applicable relations |
+| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
+
+Results follow the existing MCP JSON-string convention; empty lists return `[]`.
+Snapshots retain the server's backing tag, status, parent, properties, audit and
+relation information. Relations can be `direct`, `inherited` (with the catalog or
+schema source), or `via_subdomain` (with the source domain). Multiple relations
+for the same member or domain remain intact. Names-only results omit relations.
+
+For example, call `list_domain_members` with:
+
+```json
+{
+  "domain_name": "sales",
+  "types": ["TABLE", "TOPIC"],
+  "domains": ["regional-sales", "online"],
+  "name_contains": "orders"
+}
+```
+
+`types` is a list of leaf object types; `domains` selects the union of named scopes using repeated query parameters.
+Selecting the requested domain includes its visible children. Well-formed names outside that scope are ignored.
+`name_contains` matches a case-insensitive substring of the full metadata object name.
+If `name_contains` is omitted, empty, or contains only whitespace, MCP omits the
+`nameContains` query parameter. Sending an empty or whitespace-only `nameContains`
+directly to the REST endpoint returns HTTP 400.
+Omitted or empty type/domain lists leave those filters unset.
+Leaf lookups support tables, filesets, topics, models, views and semantic models;
+use the REST object type spelling (for example `table` or `semantic_model`).
+Paths and filter values are URL encoded. Requests use the caller's existing
+Gravitino authentication, and server authorization, validation and not-found
+errors propagate through the standard MCP error handling. Results reflect the
+caller's visibility; no client-side hierarchy expansion or relation inference
+is performed.
+
+No Domain creation, modification, deletion, publishing, parent changes or
+binding changes are exposed. Existing tools in other groups retain their behavior.
+
 ## Configuration
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument                         | Description                                                                                                                     | Default value               | Required |
-|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                       | none                        | No       |
-| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
-| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
-| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
-| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.              | none (anonymous)            | No       |
-| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                   | none                        | No       |
-| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                               | none                        | No       |
-| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                       | none                        | No       |
-| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                              | none                        | No       |
-| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`. | `false`                     | No       |
-| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                         | none                        | No       |
-| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                        | none                        | No       |
+| Argument                         | Description                                                                                                                                                  | Default value               | Required |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------- | -------- |
+| `--metalake`                     | Default metalake, used by any tool call that does not name one. See Selecting a metalake.                                                                    | none                        | No       |
+| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                                                 | `http://127.0.0.1:8090`     | No       |
+| `--gravitino-read-timeout`       | Gravitino response read timeout in seconds; or set `GRAVITINO_READ_TIMEOUT`. Must be finite and positive. Connect, write and pool timeouts remain 5 seconds. | `60`                        | No       |
+| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                                                 | `stdio`                     | No       |
+| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                                               | `http://127.0.0.1:8000/mcp` | No       |
+| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.                                           | none (anonymous)            | No       |
+| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                                                | none                        | No       |
+| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                                                            | none                        | No       |
+| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                                                    | none                        | No       |
+| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                                                           | none                        | No       |
+| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`.                              | `false`                     | No       |
+| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                                                      | none                        | No       |
+| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                                                     | none                        | No       |
+
+A response read timeout means the MCP server stopped waiting for Gravitino. The operation may still complete on the server. Check the result before retrying, especially for writes. This timeout bounds waiting for response data, not the total duration of the server operation.
 
 ## Authentication
 
@@ -310,6 +391,24 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
   --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
 ```
 
+The server reads the certificate and key at startup, so restart it after rotating them.
+
+### Connecting to Gravitino over HTTPS
+
+When `--gravitino-uri` uses `https://`, the server verifies Gravitino's certificate against the public root certificates it ships with. If a private CA signed that certificate, set `SSL_CERT_FILE` to a PEM bundle that contains both the public roots and the CA:
+
+```shell
+cat "$(uv run python -c 'import certifi; print(certifi.where())')" /path/to/ca.crt > /path/to/ca-bundle.crt
+SSL_CERT_FILE=/path/to/ca-bundle.crt uv run mcp_server --metalake test \
+  --gravitino-uri https://gravitino.example.com:8433 \
+  --transport streamable-http --mcp-url https://localhost:8000/mcp \
+  --tls-cert /path/to/cert.pem --tls-key /path/to/key.pem
+```
+
+- `SSL_CERT_FILE` replaces the default roots instead of adding to them. A file with only the private CA breaks connections to servers with public certificates, such as an identity provider's token endpoint.
+- The bundle applies to every outbound HTTPS connection, including the `--oauth-token-endpoint` request.
+- If the certificate is not trusted, tool calls fail with `CERTIFICATE_VERIFY_FAILED`. Restart the server after replacing the bundle.
+
 ## Selecting a metalake
 
 A metalake is Gravitino's top-level tenant boundary, and every tool operates inside one. `--metalake` sets the **default**: the metalake used by any tool call that does not name one itself. It is optional on every transport.
@@ -361,10 +460,12 @@ Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-
 | Field        | Description                                                                                                                                                                             |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                          |
-| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-8-chars>` for a Bearer token, `oauth:<first-8-chars-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
+| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-16-hex-of-sha256-of-token>` for a Bearer token (a fingerprint of the token, so it changes when the token is refreshed), `oauth:<first-16-hex-of-sha256-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
 | `tool`       | Name of the invoked MCP tool.                                                                                                                                                           |
 | `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
 | `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |
+
+For every scheme other than `Basic`, `principal` is a fingerprint of one credential, not a stable user identity. The hash has no key, so the fingerprint suits high-entropy tokens only: a short static credential can be recovered from the log by guessing. To trace what one user did, use the Gravitino server's [audit log](./gravitino-server-config.md#audit-logging).
 
 Example record:
 

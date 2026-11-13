@@ -24,12 +24,14 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.iceberg.catalog.Namespace;
-import org.apache.iceberg.exceptions.ForbiddenException;
+import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 
 /**
@@ -53,6 +55,10 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
   @Override
   public void process(Map<EntityType, NameIdentifier> nameIdentifierMap) {
     CreateNamespaceRequest request = extractRequest();
+    if (request == null || request.namespace() == null || request.namespace().isEmpty()) {
+      throw new BadRequestException(
+          "Invalid namespace creation request: a non-empty namespace is required");
+    }
 
     NameIdentifier catalogIdent = nameIdentifierMap.get(EntityType.CATALOG);
     if (catalogIdent == null) {
@@ -62,6 +68,7 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
     String catalog = catalogIdent.name();
 
     Namespace namespace = request.namespace();
+    IcebergRESTUtils.checkNamespaceLevels(namespace);
     int levels = namespace.length();
 
     String separator = HierarchicalSchemaUtil.schemaSeparator();
@@ -79,6 +86,11 @@ public class CreateNamespaceAuthzHandler implements AuthorizationHandler {
   @Override
   public boolean authorizationCompleted() {
     return false;
+  }
+
+  @Override
+  public EntityType entityType() {
+    return EntityType.SCHEMA;
   }
 
   private CreateNamespaceRequest extractRequest() {

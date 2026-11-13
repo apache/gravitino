@@ -29,9 +29,14 @@ from mcp_server.client import (
     TableOperation,
     TagOperation,
 )
+from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.plain.exception import GravitinoException
 from mcp_server.client.plain.plain_rest_client_catalog_operation import (
     PlainRESTClientCatalogOperation,
+)
+from mcp_server.client.plain.plain_rest_client_domain_operation import (
+    PlainRESTClientDomainOperation,
 )
 from mcp_server.client.plain.plain_rest_client_fileset_operation import (
     PlainRESTClientFilesetOperation,
@@ -76,6 +81,30 @@ from mcp_server.client.semantic_model_operation import SemanticModelOperation
 from mcp_server.client.topic_operation import TopicOperation
 
 
+class _GravitinoAsyncClient(httpx.AsyncClient):
+    """Preserve actionable timeout details instead of FastMCP's generic timeout."""
+
+    async def send(self, request, **kwargs):
+        try:
+            return await super().send(request, **kwargs)
+        except httpx.ReadTimeout as exc:
+            # OAuth hooks can time out on their own token request, with a different budget.
+            # Preserve that exception instead of misreporting a Gravitino timeout.
+            if exc.request.url != request.url:
+                raise
+            # Include only the encoded path: queries, userinfo and credentials are excluded.
+            resource = request.url.raw_path.split(b"?", 1)[0].decode(
+                "ascii", errors="backslashreplace"
+            )
+            # Do not retry writes: the upstream operation may already have committed.
+            raise GravitinoException(
+                f"The MCP server stopped waiting for Gravitino ({request.method} "
+                f"{resource}) after a response read "
+                f"timeout of {self.timeout.read:g} seconds. The operation may still "
+                "complete on the server; check its result before retrying."
+            ) from exc
+
+
 # pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
     def __init__(
@@ -85,6 +114,7 @@ class PlainRESTClientOperation(GravitinoOperation):
         authorization: str = "",
         *,
         auth: Optional[httpx.Auth] = None,
+        read_timeout: float = 60.0,
     ):
         """Create a REST client for one identity.
 
@@ -95,14 +125,20 @@ class PlainRESTClientOperation(GravitinoOperation):
                 on every request (for example ``"Bearer <token>"`` for OAuth2 or
                 ``"Basic <base64(user:secret)>"`` for simple or Basic auth).
                 Empty string means anonymous (no header sent).
+            read_timeout: Response read timeout in seconds (default 60).
             auth: Optional httpx auth hook used instead of a frozen header
                 (OAuth client-credentials refresh).
         """
         headers = {}
         if authorization:
             headers["Authorization"] = authorization
-        _rest_client = httpx.AsyncClient(
-            base_url=uri, headers=headers, auth=auth
+        _rest_client = _GravitinoAsyncClient(
+            base_url=uri,
+            headers=headers,
+            auth=auth,
+            timeout=httpx.Timeout(
+                read_timeout, connect=5.0, pool=5.0, write=5.0
+            ),
         )
         # Kept so the shared connection pool can be closed (see close()).
         self._rest_client = _rest_client
@@ -119,6 +155,9 @@ class PlainRESTClientOperation(GravitinoOperation):
             metalake_name, _rest_client
         )
         self._model_operation = PlainRESTClientModelOperation(
+            metalake_name, _rest_client
+        )
+        self._domain_operation = PlainRESTClientDomainOperation(
             metalake_name, _rest_client
         )
         self._tag_operation = PlainRESTClientTagOperation(
@@ -195,3 +234,6 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_semantic_model_operation(self) -> SemanticModelOperation:
         return self._semantic_model_operation
+
+    def as_domain_operation(self) -> DomainOperation:
+        return self._domain_operation

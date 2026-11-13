@@ -111,6 +111,8 @@ import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
 import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionEvent;
 import org.apache.gravitino.listener.api.event.TestConnectionFailureEvent;
+import org.apache.gravitino.listener.api.event.domain.DomainEvent;
+import org.apache.gravitino.listener.api.event.domain.DomainFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
@@ -121,6 +123,8 @@ import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelEvent
 import org.apache.gravitino.listener.api.event.semantic.ExportSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ImportSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelDatasetsBySourceFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelMetricEvent;
@@ -300,6 +304,8 @@ public interface AuditLog {
 
     TABLE_EXISTS,
 
+    REPORT_TABLE_METRICS,
+
     PARTITION_EXIST,
 
     ADD_PARTITION,
@@ -335,6 +341,51 @@ public interface AuditLog {
     LIST_FILESET,
 
     LIST_FILESET_FILES,
+
+    /** Domain operation: ListDomains. */
+    LIST_DOMAIN,
+
+    /** Domain operation: ListDomainsInfo. */
+    LIST_DOMAINS_INFO,
+
+    /** Domain operation: GetDomain. */
+    GET_DOMAIN,
+
+    /** Domain operation: CreateDomain. */
+    CREATE_DOMAIN,
+
+    /** Domain operation: AlterDomain. */
+    ALTER_DOMAIN,
+
+    /** Domain operation: DeleteDomain. */
+    DELETE_DOMAIN,
+
+    /** Domain operation: PublishDomain. */
+    PUBLISH_DOMAIN,
+
+    /** Domain operation: UnpublishDomain. */
+    UNPUBLISH_DOMAIN,
+
+    /** Domain operation: UpdateDomainBackingTag. */
+    UPDATE_DOMAIN_BACKING_TAG,
+
+    /** Domain operation: AttachDomain. */
+    ATTACH_DOMAIN,
+
+    /** Domain operation: DetachDomain. */
+    DETACH_DOMAIN,
+
+    /** Domain operation: ListSubdomains. */
+    LIST_SUBDOMAINS,
+
+    /** Domain operation: ListSubdomainsInfo. */
+    LIST_SUBDOMAINS_INFO,
+
+    /** Domain operation: ListDomainMembers. */
+    LIST_DOMAIN_MEMBERS,
+
+    /** Domain operation: ListDomainsForMetadataObject. */
+    LIST_DOMAINS_FOR_METADATA_OBJECT,
 
     CREATE_TAG,
 
@@ -541,6 +592,8 @@ public interface AuditLog {
     LIST_SEMANTIC_MODEL,
     /** List identifiers of metrics contained in Semantic Models. */
     LIST_SEMANTIC_MODEL_METRIC,
+    /** Lists datasets associated with a source table or View. */
+    LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
     /** List complete metrics contained in Semantic Models. */
     LIST_SEMANTIC_MODEL_METRIC_INFOS,
     /** Import a Semantic Model from an Ossie document. */
@@ -565,6 +618,13 @@ public interface AuditLog {
     UNKNOWN_OPERATION;
 
     public static Operation fromEvent(Event event) {
+      if (event instanceof DomainEvent || event instanceof DomainFailureEvent) {
+        try {
+          return Operation.valueOf(event.operationType().name());
+        } catch (IllegalArgumentException e) {
+          return UNKNOWN_OPERATION;
+        }
+      }
       if (event instanceof CreateMetalakeEvent || event instanceof CreateMetalakeFailureEvent) {
         return CREATE_METALAKE;
       } else if (event instanceof AlterMetalakeEvent
@@ -670,6 +730,9 @@ public interface AuditLog {
       } else if (event instanceof ListSemanticModelEvent
           || event instanceof ListSemanticModelFailureEvent) {
         return LIST_SEMANTIC_MODEL;
+      } else if (event instanceof ListSemanticModelDatasetsBySourceEvent
+          || event instanceof ListSemanticModelDatasetsBySourceFailureEvent) {
+        return LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE;
       } else if (event instanceof ListSemanticModelMetricEvent
           || event instanceof ListSemanticModelMetricFailureEvent) {
         return LIST_SEMANTIC_MODEL_METRIC;

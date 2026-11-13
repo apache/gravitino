@@ -22,9 +22,12 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Lists;
@@ -51,6 +54,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.FilesetDispatcher;
+import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
@@ -97,6 +101,7 @@ public class TestRoleOperations extends BaseOperationsTest {
   private static final TableDispatcher tableDispatcher = mock(TableDispatcher.class);
   private static final TopicDispatcher topicDispatcher = mock(TopicDispatcher.class);
   private static final FilesetDispatcher filesetDispatcher = mock(FilesetDispatcher.class);
+  private static final ModelDispatcher modelDispatcher = mock(ModelDispatcher.class);
   private static final EntityStore entityStore = mock(EntityStore.class);
 
   private static class MockServletRequestFactory extends ServletRequestFactoryBase {
@@ -130,6 +135,8 @@ public class TestRoleOperations extends BaseOperationsTest {
         GravitinoEnv.getInstance(), "internalTopicDispatcher", topicDispatcher, true);
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalFilesetDispatcher", filesetDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalModelDispatcher", modelDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "entityStore", entityStore, true);
   }
 
@@ -155,6 +162,34 @@ public class TestRoleOperations extends BaseOperationsTest {
     return resourceConfig;
   }
 
+  /** Rejects initial role grants on internal tags at the REST boundary. */
+  @Test
+  public void testCreateRoleRejectsInternalTag() throws IOException {
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata properties = mock(PropertiesMetadata.class);
+    when(properties.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(properties);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    Mockito.clearInvocations(manager);
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {
+              DTOConverters.toDTO(
+                  SecurableObjects.ofTag(
+                      "GRAVITINO_HIDDEN_123", Lists.newArrayList(Privileges.ApplyTag.allow())))
+            });
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.json(request))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
   @Test
   public void testCreateRoleWithNullRequest() {
     Response resp =
@@ -164,6 +199,63 @@ public class TestRoleOperations extends BaseOperationsTest {
             .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
 
     assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testCreateRoleRejectsDottedName() {
+    clearInvocations(manager);
+    SecurableObject securableObject =
+        SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "a.b",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(securableObject)});
+
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("a.b"));
+    }
+    verify(manager, never()).createRole(any(), any(), any(), any());
+  }
+
+  @Test
+  void testCreateRoleRejectsMissingModel() throws IOException {
+    clearInvocations(manager, modelDispatcher);
+    when(modelDispatcher.modelExists(any())).thenReturn(false);
+    BaseMetalake metalake = mock(BaseMetalake.class);
+    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
+    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
+    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
+    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
+    SecurableObject model =
+        SecurableObjects.parse(
+            "catalog.schema.model",
+            MetadataObject.Type.MODEL,
+            Lists.newArrayList(Privileges.UseModel.allow()));
+    RoleCreateRequest request =
+        new RoleCreateRequest(
+            "model_role",
+            Collections.emptyMap(),
+            new SecurableObjectDTO[] {DTOConverters.toDTO(model)});
+    try (Response response =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE))) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertTrue(error.getMessage().contains("catalog.schema.model"));
+    }
+    verify(modelDispatcher).modelExists(any());
+    verify(manager, never()).createRole(any(), any(), any(), any());
   }
 
   @Test

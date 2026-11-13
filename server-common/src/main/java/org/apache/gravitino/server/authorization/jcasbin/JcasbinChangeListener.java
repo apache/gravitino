@@ -69,6 +69,7 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   private static final Set<MetadataObject.Type> VIRTUAL_NAMESPACE_TYPES =
       ImmutableSet.of(
           MetadataObject.Type.TAG,
+          MetadataObject.Type.DOMAIN,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE);

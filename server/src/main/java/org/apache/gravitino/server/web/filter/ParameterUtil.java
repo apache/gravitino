@@ -90,11 +90,20 @@ public class ParameterUtil {
         } catch (IllegalArgumentException e) {
           throw new IllegalMetadataObjectException(e, "Invalid metadata object type: %s", rawType);
         }
-        NameIdentifier nameIdentifier =
-            MetadataObjectUtil.toEntityIdent(metalake, MetadataObjects.parse(fullName.get(), type));
         nameIdentifierMap.putAll(
-            NameIdentifierUtil.splitNameIdentifier(
-                metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier));
+            RequestValidation.parse(
+                () -> {
+                  NameIdentifier nameIdentifier =
+                      MetadataObjectUtil.toEntityIdent(
+                          metalake, MetadataObjects.parse(fullName.get(), type));
+                  if (type == MetadataObject.Type.CATALOG) {
+                    // MetadataObjects.parse preserves single-level names, including embedded dots.
+                    NameIdentifierUtil.checkCatalog(nameIdentifier);
+                  }
+                  return NameIdentifierUtil.splitNameIdentifier(
+                      metalake, MetadataObjectUtil.toEntityType(type), nameIdentifier);
+                },
+                e -> new IllegalMetadataObjectException(e, "%s", e.getMessage())));
       }
     }
 

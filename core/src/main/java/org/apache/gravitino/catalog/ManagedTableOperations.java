@@ -312,6 +312,7 @@ public abstract class ManagedTableOperations implements TableCatalog {
           DOT.join(change.fieldName()));
       if (change instanceof TableChange.AddColumn addColumn) {
         String columnName = DOT.join(addColumn.getFieldName());
+        ColumnEntity.validateCommentForWrite(columnName, addColumn.getComment());
         boolean exists = newColumns.stream().anyMatch(col -> col.name().equals(columnName));
         if (exists) {
           throw new IllegalArgumentException(String.format("Column %s already exists", columnName));
@@ -456,6 +457,8 @@ public abstract class ManagedTableOperations implements TableCatalog {
       Optional<Integer> newPosition,
       Optional<Boolean> newNullable,
       Optional<Boolean> newAutoIncrement) {
+    newComment.ifPresent(
+        comment -> ColumnEntity.validateCommentForWrite(oldColumn.name(), comment));
     return ColumnEntity.builder()
         .withId(oldColumn.id())
         .withName(newName.orElse(oldColumn.name()))
@@ -511,7 +514,11 @@ public abstract class ManagedTableOperations implements TableCatalog {
     return columns == null
         ? Collections.emptyList()
         : IntStream.range(0, columns.length)
-            .mapToObj(i -> ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit))
+            .mapToObj(
+                i -> {
+                  ColumnEntity.validateCommentForWrite(columns[i].name(), columns[i].comment());
+                  return ColumnEntity.toColumnEntity(columns[i], i, idGenerator.nextId(), audit);
+                })
             .collect(Collectors.toList());
   }
 

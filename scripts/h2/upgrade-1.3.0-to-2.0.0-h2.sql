@@ -26,6 +26,9 @@
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
+-- Support external column names up to 300 characters (including BigQuery).
+ALTER TABLE `table_column_version_info` ALTER COLUMN `column_name` VARCHAR(300) NOT NULL;
+
 ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
 ALTER TABLE `model_meta` ADD COLUMN IF NOT EXISTS `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
 
@@ -229,3 +232,54 @@ ALTER TABLE `policy_meta`
 
 -- Role deletion soft-deletes relation rows by role_id.
 CREATE INDEX IF NOT EXISTS `group_role_rel_idx_role_id` ON `group_role_rel` (`role_id`);
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` CLOB NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`)
+) COMMENT='current semantic model dataset source associations';
+CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`semantic_model_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);
+
+-- Align the location and uri name widths with the MySQL and PostgreSQL schemas.
+ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default';
+ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL;
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` CLOB DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` CLOB NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` CLOB NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;

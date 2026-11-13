@@ -56,6 +56,7 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_DEFAULT_LOCATION_NAME;
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
+import static org.apache.gravitino.storage.GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
@@ -67,9 +68,11 @@ import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.Instant;
@@ -82,12 +85,14 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -186,6 +191,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -2604,6 +2610,41 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testInitializeReportsNamedLocationAccessDenied(boolean failOnExists) throws IOException {
+    Path path = new Path("s3a://test-bucket/private-prefix");
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    AccessDeniedException denied =
+        new AccessDeniedException(path.toString(), null, "backend request ID");
+    if (failOnExists) {
+      when(fileSystem.exists(path)).thenThrow(denied);
+    } else {
+      when(fileSystem.exists(path)).thenReturn(true);
+      when(fileSystem.getFileStatus(path)).thenThrow(denied);
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(fileSystem)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString());
+      ConnectionFailedException failure =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s3", path.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+
+      Assertions.assertEquals(
+          "Failed to check Fileset catalog storage at location-s3 (access denied)",
+          failure.getMessage());
+      Assertions.assertNull(failure.getCause());
+    }
+  }
+
   @Test
   public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
@@ -2624,6 +2665,103 @@ public class TestFilesetCatalogOperations {
           exception.getMessage().contains("location (location is not a directory)"));
       Assertions.assertFalse(exception.getMessage().contains(fileLocation.toURI().toString()));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetFileSystemUsesRequestUserOnPoolThread(boolean cached) throws Exception {
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      Path path = new Path(TEST_ROOT_PATH, "pool_thread_user");
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            if (cached) {
+              // ops.close() closes the cached file system.
+              ops.getFileSystemWithCache(path, ImmutableMap.of());
+            } else {
+              ops.getFileSystem(path, ImmutableMap.of()).close();
+            }
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
+    }
+  }
+
+  @Test
+  public void testTestConnectionUsesRequestUserOnPoolThread() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/pool-thread-user");
+    FileUtils.forceMkdir(location);
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, location.toURI().toString()),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            ops.testConnection(NameIdentifier.of("metalake", "catalog"));
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
+    }
+  }
+
+  @Test
+  public void testHdfsFileSystemProxyUsesGivenUser() throws Exception {
+    List<ImpersonationHDFSFileSystemProxy.ProxyUserHandler> handlers = new ArrayList<>();
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager);
+        MockedConstruction<ImpersonationHDFSFileSystemProxy> ignored =
+            Mockito.mockConstruction(
+                ImpersonationHDFSFileSystemProxy.class,
+                (proxy, context) ->
+                    handlers.add(
+                        (ImpersonationHDFSFileSystemProxy.ProxyUserHandler)
+                            context.arguments().get(2)))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Called directly: construction mocks only intercept on the current thread.
+      ops.createFileSystem(
+          new Path("hdfs://localhost:8020/proxy_user"), ImmutableMap.of(), "hdfs", null, "bob");
+
+      Assertions.assertEquals(1, handlers.size());
+      Assertions.assertEquals(
+          "bob", PrincipalUtils.doAs(new UserPrincipal("alice"), handlers.get(0)::getProxyUser));
+    }
+  }
+
+  private static List<String> recordFileSystemUsers(FilesetCatalogOperations ops)
+      throws IOException {
+    List<String> users = new CopyOnWriteArrayList<>();
+    Mockito.doAnswer(
+            invocation -> {
+              // The requested user, and the user whose Subject the pool thread carries.
+              users.add(invocation.getArgument(4) + " on " + PrincipalUtils.getCurrentUserName());
+              return invocation.callRealMethod();
+            })
+        .when(ops)
+        .createFileSystem(any(), any(), any(), any(), any());
+    return users;
+  }
+
+  // The tests rely on a thread started inside Subject.doAs keeping that Subject, as it does up to
+  // JDK 22. Revisit them when PrincipalUtils moves off Subject.getSubject, which later JDKs no
+  // longer support. Keep the threads alive so that bob's request does not start new ones.
+  private static void startPoolThreadsAs(FilesetCatalogOperations ops, String user)
+      throws Exception {
+    ops.fileSystemExecutor.allowCoreThreadTimeOut(false);
+    PrincipalUtils.doAs(
+        new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
   }
 
   @Test
@@ -2806,6 +2944,95 @@ public class TestFilesetCatalogOperations {
           properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
       Assertions.assertDoesNotThrow(
           () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+    }
+  }
+
+  @Test
+  void testTestConnectionReportsMissingGcsCredentialFile() throws IOException {
+    File credentialFile = new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-service-account.json");
+    Assertions.assertFalse(credentialFile.exists());
+    Map<String, String> properties =
+        ImmutableMap.of(
+            LOCATION,
+            "gs://test-connection-bucket/catalog",
+            GRAVITINO_GCS_SERVICE_ACCOUNT_FILE,
+            credentialFile.getAbsolutePath());
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (filesystem initialization failed; "
+              + "check credentials and configuration)",
+          exception.getMessage());
+      Assertions.assertFalse(exception.getMessage().contains(credentialFile.getAbsolutePath()));
+      Assertions.assertNull(exception.getCause());
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("fileSystemInitializationFailures")
+  void testTestConnectionClassifiesFileSystemInitializationFailure(
+      IOException failure, String expectedCategory) throws IOException, IllegalAccessException {
+    FileSystemProvider provider = Mockito.mock(FileSystemProvider.class);
+    when(provider.getFileSystem(any(), any())).thenThrow(failure);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, TEST_ROOT_PATH),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (" + expectedCategory + ")",
+          exception.getMessage());
+      Assertions.assertNull(exception.getCause());
+    }
+  }
+
+  @Test
+  void testTestConnectionPreservesLocationNotFoundAfterInitialization()
+      throws IOException, IllegalAccessException {
+    Path location = new Path(TEST_ROOT_PATH);
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    when(fileSystem.getUri()).thenReturn(location.toUri());
+    when(fileSystem.getWorkingDirectory()).thenReturn(new Path("/"));
+    when(fileSystem.listStatusIterator(any()))
+        .thenThrow(
+            new IOException("Cannot list location", new FileNotFoundException(TEST_ROOT_PATH)));
+    FileSystemProvider provider = Mockito.mock(FileSystemProvider.class);
+    when(provider.getFileSystem(any(), any())).thenReturn(fileSystem);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, TEST_ROOT_PATH),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Failed to test Fileset catalog connection: location (location not found)",
+          exception.getMessage());
+      Mockito.verify(fileSystem).close();
     }
   }
 
@@ -3341,7 +3568,7 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(any(), any()))
+      when(mockOps.getFileSystem(any(), any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
@@ -3354,6 +3581,7 @@ public class TestFilesetCatalogOperations {
       FileSystem fs2 =
           mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
+      Assertions.assertNotNull(fs1);
       Assertions.assertSame(fs1, fs2);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -3590,6 +3818,56 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testCreateFilesetRejectsInheritedTooLongLocationName() throws IOException {
+    String tooLongLocationName =
+        StringUtils.repeat("l", EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH + 1);
+    String locationPath = TEST_ROOT_PATH + "/inherited_long_location";
+    Map<String, String> catalogPaths =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + tooLongLocationName, locationPath + "_catalog");
+    Map<String, String> schemaPaths =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + tooLongLocationName, locationPath + "_schema");
+
+    // The location name is inherited from the catalog location.
+    createMultiLocationSchema("s_inherit_catalog", "comment", ImmutableMap.of(), ImmutableMap.of());
+    assertInheritedLocationRejected(
+        "s_inherit_catalog",
+        catalogPaths,
+        locationPath + "_catalog/s_inherit_catalog/fileset_inherit");
+
+    // The location name is inherited from the schema location.
+    createMultiLocationSchema("s_inherit_schema", "comment", ImmutableMap.of(), schemaPaths);
+    assertInheritedLocationRejected(
+        "s_inherit_schema", ImmutableMap.of(), locationPath + "_schema/fileset_inherit");
+  }
+
+  private void assertInheritedLocationRejected(
+      String schemaName, Map<String, String> catalogPaths, String filesetPath) throws IOException {
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                createMultiLocationFileset(
+                    "fileset_inherit",
+                    schemaName,
+                    null,
+                    Fileset.Type.MANAGED,
+                    catalogPaths,
+                    ImmutableMap.of(),
+                    null));
+    Assertions.assertEquals(
+        "The storage location name of the fileset must not exceed 256 characters",
+        exception.getMessage());
+
+    // No directory is left behind for the rejected fileset.
+    Path path = new Path(filesetPath);
+    try (FileSystem fs = path.getFileSystem(new Configuration())) {
+      Assertions.assertFalse(fs.exists(path));
+    }
+  }
+
+  @Test
   public void testCreateMultipleLocationsWithExceptions() throws IOException {
     // empty location name in catalog location
     Map<String, String> illegalLocations =
@@ -3683,6 +3961,25 @@ public class TestFilesetCatalogOperations {
                       ImmutableMap.of("", TEST_ROOT_PATH + "/fileset31"),
                       null));
       Assertions.assertEquals("Location name must not be blank", exception.getMessage());
+
+      // too long location name in storage location
+      String tooLongLocationName =
+          StringUtils.repeat("l", EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH + 1);
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  createMultiLocationFileset(
+                      "fileset_test",
+                      "s1",
+                      null,
+                      Fileset.Type.MANAGED,
+                      ImmutableMap.of(),
+                      ImmutableMap.of(tooLongLocationName, TEST_ROOT_PATH + "/fileset31"),
+                      null));
+      Assertions.assertEquals(
+          "The storage location name of the fileset must not exceed 256 characters",
+          exception.getMessage());
 
       // empty fileset storage location
       exception =
@@ -3796,6 +4093,38 @@ public class TestFilesetCatalogOperations {
               });
 
       Assertions.assertTrue(e.getMessage().contains("Failed to get FileSystem for path"));
+    }
+  }
+
+  @Test
+  void testGetFileSystemWithCacheErrorDoesNotExposeConfiguration() throws IOException {
+    String catalogPath = TEST_ROOT_PATH + "/catalog_fs_error_" + generateTestId();
+    Path path = new Path(catalogPath);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "s3-access-key-id", "DUMMY_ACCESS_KEY_ID",
+            "s3-secret-access-key", "DUMMY_SECRET_ACCESS_KEY");
+    IOException cause = new IOException("Failed to create file system");
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      ops.fileSystemCache.invalidateAll();
+      Mockito.doThrow(cause)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.eq(conf), Mockito.anyString());
+
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+
+      Assertions.assertSame(cause, e.getCause());
+      Assertions.assertTrue(e.getMessage().contains(catalogPath));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_ACCESS_KEY_ID"));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_SECRET_ACCESS_KEY"));
     }
   }
 
@@ -5341,6 +5670,22 @@ public class TestFilesetCatalogOperations {
                 Mockito.mock(EntityStore.class), Mockito.mock(SecretManager.class)));
     doReturn(fileset).when(operations).loadFileset(PATH_VALIDATION_FILESET);
     return operations;
+  }
+
+  private static Stream<Arguments> fileSystemInitializationFailures() {
+    String missingConfiguration =
+        "filesystem initialization failed; check credentials and configuration";
+    return Stream.of(
+        Arguments.of(new FileNotFoundException("/private/credential.json"), missingConfiguration),
+        Arguments.of(
+            new IOException(
+                "Cannot initialize filesystem",
+                new FileNotFoundException("/private/credential.json")),
+            missingConfiguration),
+        Arguments.of(new AccessDeniedException("/private/credential.json"), "access denied"),
+        Arguments.of(
+            new IOException("Cannot initialize filesystem", new TimeoutException()), "timeout"),
+        Arguments.of(new IOException("Cannot initialize filesystem"), "probe failed"));
   }
 
   private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {

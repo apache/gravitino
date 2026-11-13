@@ -92,7 +92,8 @@ public class CatalogOperations {
   public Response listCatalogs(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("details") @DefaultValue("false") boolean verbose) {
+      @QueryParam("details") @DefaultValue("false") boolean verbose,
+      @QueryParam("includeProperties") @DefaultValue("true") boolean includeProperties) {
     LOG.info(
         "Received list catalog {} request for metalake: {}, ",
         verbose ? "infos" : "names",
@@ -104,7 +105,7 @@ public class CatalogOperations {
             Namespace catalogNS = NamespaceUtil.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
-              Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
+              Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS, includeProperties);
               catalogs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
@@ -297,6 +298,12 @@ public class CatalogOperations {
     }
 
     LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    try {
+      request.validate();
+    } catch (IllegalArgumentException e) {
+      return ExceptionHandlers.handleCatalogException(OperationType.SET, catalogName, metalake, e);
+    }
+
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {

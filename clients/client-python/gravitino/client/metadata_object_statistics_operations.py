@@ -30,7 +30,7 @@ from gravitino.dto.responses.statistic_list_response import StatisticListRespons
 from gravitino.exceptions.handlers.statistics_error_handler import (
     STATISTICS_ERROR_HANDLER,
 )
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import encode_metadata_object_name, encode_string
 from gravitino.utils import HTTPClient
 from gravitino.utils.precondition import Precondition
 
@@ -51,11 +51,10 @@ class MetadataObjectStatisticsOperations(SupportsStatistics):
         rest_client: HTTPClient,
     ):
         metadata_object_type = metadata_object.type().value
-        metadata_object_fullname = metadata_object.full_name()
         self._rest_client = rest_client
         self.request_path = (
             f"api/metalakes/{encode_string(metalake_name)}/"
-            f"objects/{metadata_object_type}/{encode_string(metadata_object_fullname)}/"
+            f"objects/{metadata_object_type}/{encode_metadata_object_name(metadata_object)}/"
             "statistics"
         )
 

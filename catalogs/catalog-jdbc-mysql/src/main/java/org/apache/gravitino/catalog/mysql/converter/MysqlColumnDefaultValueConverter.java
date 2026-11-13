@@ -25,16 +25,61 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.UnparsedExpression;
+import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Decimal;
 import org.apache.gravitino.rel.types.Types;
 
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
+
+  // Only quoted temporal literals may be rendered from an unparsed default.
+  private static final Pattern QUOTED_TEMPORAL_LITERAL =
+      Pattern.compile(
+          "'(?:[0-9]{4}-[0-9]{2}-[0-9]{2}(?: [0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)?"
+              + "|-?[0-9]{2,3}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)'");
+
+  /**
+   * Renders preserved temporal defaults as quoted SQL literals and Boolean defaults as numeric 1 or
+   * 0. Gravitino maps BOOLEAN to MySQL BIT, which rejects the quoted 'true' and 'false' strings.
+   * The check uses the literal type, so a Boolean default that is loaded from BIT(1) and then
+   * re-rendered by MODIFY COLUMN keeps working after a type change to a numeric column. Other
+   * defaults use the shared JDBC rendering.
+   *
+   * @param defaultValue the Gravitino default expression
+   * @return the SQL expression, or null when no default is set
+   * @throws IllegalArgumentException if a Boolean default is not true, false, 1 or 0
+   */
+  @Override
+  @Nullable
+  public String fromGravitino(Expression defaultValue) {
+    if (defaultValue instanceof UnparsedExpression) {
+      String sql = ((UnparsedExpression) defaultValue).unparsedExpression();
+      if (QUOTED_TEMPORAL_LITERAL.matcher(sql).matches()) {
+        return sql;
+      }
+    }
+    if (defaultValue instanceof Literal
+        && ((Literal<?>) defaultValue).dataType() instanceof Types.BooleanType) {
+      String value = String.valueOf(((Literal<?>) defaultValue).value()).trim();
+      if ("true".equalsIgnoreCase(value) || "1".equals(value)) {
+        return "1";
+      }
+      if ("false".equalsIgnoreCase(value) || "0".equals(value)) {
+        return "0";
+      }
+      throw new IllegalArgumentException(
+          String.format(
+              "Invalid boolean column default value: %s; use true, false, 1 or 0", value));
+    }
+    return super.fromGravitino(defaultValue);
+  }
 
   @Override
   public Expression toGravitino(
@@ -60,6 +105,16 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
     }
 
     switch (type.getTypeName().toLowerCase()) {
+      case MysqlTypeConverter.BIT:
+        if (type.getColumnSize() == null || type.getColumnSize() == 1) {
+          if ("b'1'".equalsIgnoreCase(columnDefaultValue) || "1".equals(columnDefaultValue)) {
+            return Literals.booleanLiteral(true);
+          }
+          if ("b'0'".equalsIgnoreCase(columnDefaultValue) || "0".equals(columnDefaultValue)) {
+            return Literals.booleanLiteral(false);
+          }
+        }
+        return UnparsedExpression.of(columnDefaultValue);
       case MysqlTypeConverter.TINYINT:
         return Literals.byteLiteral(Byte.valueOf(columnDefaultValue));
       case MysqlTypeConverter.TINYINT_UNSIGNED:
@@ -85,9 +140,17 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+        try {
+          return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
+        }
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        try {
+          return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
+        }
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
         if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
@@ -97,8 +160,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
           return Literals.timestampLiteral(
               LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
         } catch (DateTimeParseException e) {
-          throw new IllegalArgumentException(
-              String.format("Unable to parse datetime value: %s", columnDefaultValue));
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
         }
       case JdbcTypeConverter.VARCHAR:
         return Literals.of(columnDefaultValue, Types.VarCharType.of(type.getColumnSize()));

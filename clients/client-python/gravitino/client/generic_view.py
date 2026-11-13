@@ -24,11 +24,20 @@ from gravitino.api.rel.column import Column
 from gravitino.api.rel.representation import Representation
 from gravitino.api.rel.view import View
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.supports_domains import SupportsDomains
+from gravitino.client.metadata_object_domain_operations import (
+    MetadataObjectDomainOperations,
+)
+from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
+)
+from gravitino.client.metadata_object_semantic_model_operations import (
+    MetadataObjectSemanticModelOperations,
 )
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.rel.view_dto import ViewDTO
@@ -36,7 +45,7 @@ from gravitino.namespace import Namespace
 from gravitino.utils.http_client import HTTPClient
 
 
-class GenericView(View, SupportsTags, SupportsSecrets):
+class GenericView(View, SupportsTags, SupportsDomains, SupportsSecrets):
     """A generic implementation of the View interface."""
 
     def __init__(
@@ -60,6 +69,12 @@ class GenericView(View, SupportsTags, SupportsSecrets):
                 view_dto.name(),
             ],
             MetadataObject.Type.VIEW,
+        )
+        self._object_domain_operations = MetadataObjectDomainOperations(
+            view_namespace.level(0), view_object, rest_client
+        )
+        self._object_semantic_model_operations = MetadataObjectSemanticModelOperations(
+            view_namespace.level(0), view_object, rest_client
         )
         self._object_tag_operations = MetadataObjectTagOperations(
             view_namespace.level(0),
@@ -126,6 +141,9 @@ class GenericView(View, SupportsTags, SupportsSecrets):
             tags_to_remove,
         )
 
+    def supports_semantic_models(self) -> SupportsSemanticModels:
+        return self._object_semantic_model_operations
+
     def supports_tags(self) -> SupportsTags:
         return self
 
@@ -134,3 +152,12 @@ class GenericView(View, SupportsTags, SupportsSecrets):
 
     def get_secrets(self) -> dict[str, str]:
         return self._object_secret_operations.get_secrets()
+
+    def supports_domains(self) -> SupportsDomains:
+        return self
+
+    def list_domains(self) -> list[str]:
+        return self._object_domain_operations.list_domains()
+
+    def list_domains_info(self) -> list[Domain]:
+        return self._object_domain_operations.list_domains_info()

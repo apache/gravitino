@@ -28,6 +28,7 @@ import java.util.Optional;
 import org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.Namespace;
@@ -37,6 +38,7 @@ import org.apache.iceberg.expressions.Expressions;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.types.Types;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -61,6 +63,8 @@ public class TestScanPlanCache {
     mockTable = mock(Table.class);
     when(mockTable.name()).thenReturn("test_table");
     when(mockTable.currentSnapshot()).thenReturn(mockSnapshot);
+    when(mockTable.schema())
+        .thenReturn(new Schema(0, Types.NestedField.optional(1, "id", Types.LongType.get())));
   }
 
   @AfterEach
@@ -261,6 +265,37 @@ public class TestScanPlanCache {
 
     Assertions.assertNotEquals(
         cached1.get(), cached2.get(), "Different requests should have different cache entries");
+  }
+
+  @Test
+  public void testCacheMissOnSchemaIdChange() {
+    PlanTableScanRequest scanRequest = PlanTableScanRequest.builder().withSnapshotId(1L).build();
+    PlanTableScanResponse response =
+        PlanTableScanResponse.builder()
+            .withPlanStatus(PlanStatus.COMPLETED)
+            .withFileScanTasks(Collections.emptyList())
+            .build();
+
+    scanPlanCache.put(ScanPlanCacheKey.create(tableIdentifier, mockTable, scanRequest), response);
+    Assertions.assertTrue(
+        scanPlanCache
+            .get(ScanPlanCacheKey.create(tableIdentifier, mockTable, scanRequest))
+            .isPresent());
+
+    Table evolvedTable = mock(Table.class);
+    when(evolvedTable.currentSnapshot()).thenReturn(mockSnapshot);
+    when(evolvedTable.schema())
+        .thenReturn(
+            new Schema(
+                1,
+                Types.NestedField.optional(1, "id", Types.LongType.get()),
+                Types.NestedField.optional(2, "a", Types.LongType.get())));
+
+    Assertions.assertFalse(
+        scanPlanCache
+            .get(ScanPlanCacheKey.create(tableIdentifier, evolvedTable, scanRequest))
+            .isPresent(),
+        "Schema-only evolution must miss the scan-plan cache");
   }
 
   @Test

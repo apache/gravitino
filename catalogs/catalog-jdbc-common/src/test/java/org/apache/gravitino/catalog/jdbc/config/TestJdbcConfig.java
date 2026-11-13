@@ -20,10 +20,23 @@ package org.apache.gravitino.catalog.jdbc.config;
 
 import com.google.common.collect.Maps;
 import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJdbcConfig {
+
+  /** Checks URL credential rejection does not expose the supplied password. */
+  @Test
+  public void testUrlCredentialsAreRejectedWithoutEchoingTheSecret() {
+    String password = "never-echo-this";
+    JdbcConfig config =
+        new JdbcConfig(Map.of("jdbc-url", "jdbc:postgresql://host/db?password=" + password));
+    IllegalArgumentException error =
+        Assertions.assertThrows(IllegalArgumentException.class, config::getJdbcUrl);
+    Assertions.assertFalse(error.getMessage().contains(password));
+    Assertions.assertTrue(error.getMessage().contains("jdbc-password"));
+  }
 
   @Test
   public void testCreateDataSourceConfig() {

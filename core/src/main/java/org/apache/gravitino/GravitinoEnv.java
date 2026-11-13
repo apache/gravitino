@@ -27,6 +27,8 @@ import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
+import org.apache.gravitino.authorization.OwnerNormalizeDispatcher;
+import org.apache.gravitino.authorization.OwnerPropertySyncDispatcher;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
@@ -60,9 +62,13 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.domain.DomainDispatcher;
+import org.apache.gravitino.domain.DomainManager;
+import org.apache.gravitino.domain.DomainNormalizeDispatcher;
 import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
+import org.apache.gravitino.hook.DomainHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
 import org.apache.gravitino.hook.FunctionHookDispatcher;
 import org.apache.gravitino.hook.JobHookDispatcher;
@@ -81,6 +87,7 @@ import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateValidationDispatcher;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.CatalogEventDispatcher;
+import org.apache.gravitino.listener.DomainEventDispatcher;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.EventListenerManager;
 import org.apache.gravitino.listener.FilesetEventDispatcher;
@@ -139,6 +146,8 @@ public class GravitinoEnv {
 
   private MetalakeManager metalakeManager;
 
+  private DomainManager domainManager;
+
   private SchemaDispatcher schemaDispatcher;
   private SchemaDispatcher internalSchemaDispatcher;
 
@@ -184,6 +193,9 @@ public class GravitinoEnv {
 
   private PolicyDispatcher policyDispatcher;
   private PolicyDispatcher internalPolicyDispatcher;
+
+  private DomainDispatcher domainDispatcher;
+  private DomainDispatcher internalDomainDispatcher;
 
   private AccessControlDispatcher accessControlDispatcher;
   private AccessControlDispatcher internalAccessControlDispatcher;
@@ -702,6 +714,25 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the DomainDispatcher associated with the Gravitino environment.
+   *
+   * @return The DomainDispatcher instance.
+   */
+  public DomainDispatcher domainDispatcher() {
+    return domainDispatcher;
+  }
+
+  /**
+   * Get the internal DomainDispatcher associated with the Gravitino environment. The internal
+   * dispatcher validates new domain names before delegating to the domain manager.
+   *
+   * @return The internal DomainDispatcher instance.
+   */
+  public DomainDispatcher internalDomainDispatcher() {
+    return internalDomainDispatcher;
+  }
+
+  /**
    * Get the Owner dispatcher associated with the Gravitino environment.
    *
    * @return The OwnerManager instance.
@@ -935,6 +966,8 @@ public class GravitinoEnv {
 
     this.internalTagDispatcher = new TagManager(idGenerator, entityStore);
     this.internalPolicyDispatcher = new PolicyManager(idGenerator, entityStore);
+    this.domainManager = new DomainManager(idGenerator, entityStore);
+    this.internalDomainDispatcher = new DomainNormalizeDispatcher(domainManager);
 
     return new MetadataOperations(
         filesetOperationDispatcher,
@@ -1173,7 +1206,15 @@ public class GravitinoEnv {
           new AccessControlHookDispatcher(internalAccessControlDispatcher);
       this.accessControlDispatcher =
           new AccessControlEventDispatcher(eventBus, accessControlHookDispatcher);
-      this.ownerDispatcher = new OwnerEventManager(eventBus, internalOwnerDispatcher);
+      // Transfers through the public dispatcher also update the owner property of Iceberg
+      // namespaces and tables. Internal callers, such as the Iceberg REST catalog's create hooks,
+      // set the first owner, which the property already names.
+      this.ownerDispatcher =
+          new OwnerEventManager(
+              eventBus,
+              new OwnerPropertySyncDispatcher(
+                  new OwnerNormalizeDispatcher(
+                      internalOwnerDispatcher, catalogManager, entityStore)));
     } else {
       this.accessControlDispatcher = null;
       this.ownerDispatcher = null;
@@ -1185,6 +1226,10 @@ public class GravitinoEnv {
 
     PolicyHookDispatcher policyHookDispatcher = new PolicyHookDispatcher(internalPolicyDispatcher);
     this.policyDispatcher = new PolicyEventDispatcher(eventBus, policyHookDispatcher);
+
+    DomainHookDispatcher domainHookDispatcher = new DomainHookDispatcher(domainManager);
+    this.domainDispatcher =
+        new DomainEventDispatcher(eventBus, new DomainNormalizeDispatcher(domainHookDispatcher));
   }
 
   private static final class MetadataOperations {

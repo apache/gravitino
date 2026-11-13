@@ -55,6 +55,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +72,7 @@ import org.slf4j.LoggerFactory;
  * {@code file://} warehouse, since cleanup jobs are keyed by catalog id and the files must be
  * visible on disk.
  */
+@Tag("gravitino-docker-test")
 public class IcebergRESTAsyncPurgeIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTAsyncPurgeIT.class);

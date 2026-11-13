@@ -54,7 +54,7 @@ class MetadataObjectStatisticsOperations implements SupportsStatistics {
             "api/metalakes/%s/objects/%s/%s/statistics",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override

@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.hook;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -27,10 +29,13 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -40,6 +45,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code TableHookDispatcher} is a decorator for {@link TableDispatcher} that not only delegates
@@ -47,6 +54,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * or after the underlying operations.
  */
 public class TableHookDispatcher implements TableDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(TableHookDispatcher.class);
+
   private final TableDispatcher dispatcher;
   private final Supplier<OwnerDispatcher> ownerDispatcher;
 
@@ -61,6 +70,12 @@ public class TableHookDispatcher implements TableDispatcher {
       TableDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
     this.ownerDispatcher = ownerDispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    return dispatcher.importTable(ident, auditInfo);
   }
 
   @Override
@@ -84,18 +99,34 @@ public class TableHookDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
-      ownerManager.setOwner(
-          ident.namespace().level(0),
-          NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
-          PrincipalUtils.getCurrentUserName(),
-          Owner.Type.USER);
+      Preconditions.checkState(
+          table instanceof EntityCombinedTable,
+          "Table %s was created, but the table dispatcher did not report whether this request "
+              + "created it, so no owner was set. Set the owner explicitly.",
+          ident);
+      OptionalLong createdId = ((EntityCombinedTable) table).createdTableId();
+      if (createdId.isEmpty()) {
+        return table;
+      }
+      try {
+        // Preserve the existing owner hook for actual creations. Identity-bound initialization
+        // and its transfer/drop-recreate races are outside this EXIST_OK fix.
+        ownerManager.setOwner(
+            ident.namespace().level(0),
+            NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),
+            PrincipalUtils.getCurrentUserName(),
+            Owner.Type.USER);
+      } catch (NoSuchMetadataObjectException e) {
+        // The create has already committed and a concurrent drop removed the table, so the create
+        // still succeeded. There is no table left to own.
+        LOG.warn("Table {} was dropped before its owner could be set", ident, e);
+      }
     }
     return table;
   }

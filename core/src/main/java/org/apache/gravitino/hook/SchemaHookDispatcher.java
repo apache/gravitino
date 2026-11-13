@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -55,6 +56,13 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
 
   public SchemaHookDispatcher(SchemaDispatcher dispatcher) {
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
+      throws NoSuchSchemaException {
+    return dispatcher.importSchema(ident, auditInfo);
   }
 
   @Override

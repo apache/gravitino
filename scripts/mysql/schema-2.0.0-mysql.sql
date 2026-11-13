@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `table_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'table id',
     `table_version` INT UNSIGNED NOT NULL COMMENT 'table version',
     `column_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'column id',
-    `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
+    `column_name` VARCHAR(300) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` TEXT NOT NULL COMMENT 'column type',
     `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
@@ -768,3 +768,51 @@ CREATE TABLE IF NOT EXISTS `table_snapshot_metrics` (
     KEY `idx_tsm_tid_pid_sid` (`table_id`, `policy_id`, `snapshot_id`),
     KEY `idx_tsm_created_at` (`created_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'table snapshot metrics metadata';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing metalake id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'containing semantic model id',
+    `dataset_name` MEDIUMTEXT NOT NULL COMMENT 'exact dataset name in the current definition',
+    `source_type` VARCHAR(64) NOT NULL COMMENT 'TABLE or VIEW',
+    `source_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'resolved source object id',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'association retired at',
+    PRIMARY KEY (`id`),
+    KEY `idx_smsr_model` (`semantic_model_id`, `deleted_at`),
+    KEY `idx_smsr_source` (`metalake_id`, `source_type`, `source_id`, `deleted_at`),
+    KEY `idx_smsr_deleted_at` (`deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
+  COMMENT 'current semantic model dataset source associations';
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain metadata';
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';

@@ -98,6 +98,7 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
+          MetadataObject.Type.DOMAIN,
           MetadataObject.Type.POLICY,
           MetadataObject.Type.VIEW,
           // Semantic models live only in Gravitino, underlying connectors know nothing about
@@ -129,7 +130,13 @@ public class AuthorizationUtils {
           Privilege.Name.USE_SEMANTIC_MODEL,
           Privilege.Name.MODIFY_SEMANTIC_MODEL);
 
-  private static final Set<Privilege.Name> SKIP_APPLY_PRIVILEGES = SEMANTIC_MODEL_PRIVILEGES;
+  private static final Set<Privilege.Name> SKIP_APPLY_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_SEMANTIC_MODEL,
+          Privilege.Name.USE_SEMANTIC_MODEL,
+          Privilege.Name.MODIFY_SEMANTIC_MODEL,
+          Privilege.Name.MANAGE_DOMAIN,
+          Privilege.Name.USE_DOMAIN);
 
   private AuthorizationUtils() {}
 
@@ -366,7 +373,7 @@ public class AuthorizationUtils {
     // authorization plugin.
     if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
-      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject metadataObject = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
       String metalake =
           type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);
 
@@ -427,7 +434,7 @@ public class AuthorizationUtils {
     // authorization plugin.
     if (GravitinoEnv.getInstance().internalAccessControlDispatcher() != null) {
       notifyEntityNameIdMappingChange(ident, type);
-      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
+      MetadataObject oldMetadataObject = NameIdentifierUtil.toMetadataObjectForRead(ident, type);
       MetadataObject newMetadataObject = NameIdentifierUtil.toMetadataObject(newIdent, type);
 
       MetadataObjectChange renameChange =
