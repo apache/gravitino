@@ -64,7 +64,7 @@ httpclient = "4.4.1"
 httpclient5 = "5.4.4"
 # Keep httpcore5 on the same 5.4 line as httpclient5: httpclient5 5.4.x expects httpcore5 5.4.x.
 httpcore5 = "5.4.4"
-micrometer-core = "1.12.2"
+micrometer-core = "1.15.12"
 mockserver = "5.15.0"
 # 7.3.x moves to Jackson 2.19, which isn't audited in dev/release/maven/dependencies.txt yet.
 fabric8-kubernetes = "7.2.0"
