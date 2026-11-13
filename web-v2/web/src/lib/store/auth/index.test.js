@@ -18,23 +18,11 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { configureStore } from '@reduxjs/toolkit'
+import authReducer, { getAuthMe, setAuthUser } from '@/lib/store/auth'
 
-import { loginApi } from '@/lib/api/auth'
-import authReducer, { getAuthMe, refreshToken, setAuthUser } from '@/lib/store/auth'
-
-// The store reaches `@/lib/utils/axios`, which imports the JSX provider in
-// `@/lib/provider/session.js`. Mock the request layer so these tests stay
-// independent of it.
-vi.mock('@/lib/api/auth', () => ({
-  getAuthConfigsApi: vi.fn(),
-  getAuthMeApi: vi.fn(),
-  loginApi: vi.fn(),
-  basicLoginApi: vi.fn()
-}))
-
-vi.mock('@/lib/store/sys', () => ({
-  initialVersion: vi.fn(() => ({ type: 'sys/initialVersion/mock' }))
+// Reducer tests do not need the HTTP client's React session provider dependencies.
+vi.mock('@/lib/utils/axios', () => ({
+  defHttp: { get: vi.fn(), post: vi.fn() }
 }))
 
 describe('auth store', () => {
