@@ -138,7 +138,7 @@ spec:
             - /bin/bash
             - -c
             - |
-              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -c "SELECT 1"; do
+              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1"; do
                 echo "Waiting for PostgreSQL to be ready..."
                 sleep 2
               done

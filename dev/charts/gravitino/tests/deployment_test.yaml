@@ -276,7 +276,7 @@ tests:
           any: true
       - matchRegex:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
-          pattern: "psql -h gravitino-postgresql"
+          pattern: "psql -h gravitino-postgresql -U \\$POSTGRES_USER -d \\$GRAVITINO_DB -c"
       - contains:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
           content:
@@ -368,7 +368,7 @@ tests:
     asserts:
       - matchRegex:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
-          pattern: "psql -h pg.example.ci.local"
+          pattern: "psql -h pg.example.ci.local -U \\$POSTGRES_USER -d \\$GRAVITINO_DB -c"
       - contains:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
           content:

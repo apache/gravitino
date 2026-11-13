@@ -136,6 +136,11 @@ true
 
 {{/*
 Authority segment (host[:port]) from entity.jdbcUrl for PostgreSQL.
+
+Only a single host:port is supported. The helpers split authority on the first
+colon and do not parse IPv6 bracket literals (e.g. [::1]:5432) or multi-host
+JDBC authorities (host1:5432,host2:5432). For those forms, set
+postgresql.init.host and postgresql.init.port explicitly.
 */}}
 {{- define "gravitino.entityJdbcAuthorityFromUrl" -}}
 {{- $url := .Values.entity.jdbcUrl | default "" -}}
@@ -147,6 +152,8 @@ Authority segment (host[:port]) from entity.jdbcUrl for PostgreSQL.
 
 {{/*
 Hostname from entity.jdbcUrl authority (external PostgreSQL).
+
+Supports a single hostname or IPv4 host only (see entityJdbcAuthorityFromUrl).
 */}}
 {{- define "gravitino.entityJdbcHostFromUrl" -}}
 {{- $auth := include "gravitino.entityJdbcAuthorityFromUrl" . | trim -}}
@@ -162,6 +169,8 @@ Hostname from entity.jdbcUrl authority (external PostgreSQL).
 
 {{/*
 Port from entity.jdbcUrl authority (defaults to 5432 when omitted).
+
+Supports a single host:port only (see entityJdbcAuthorityFromUrl).
 */}}
 {{- define "gravitino.entityJdbcPortFromUrl" -}}
 {{- $auth := include "gravitino.entityJdbcAuthorityFromUrl" . | trim -}}
