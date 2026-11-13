@@ -20,13 +20,22 @@ package org.apache.gravitino.catalog.hive;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.EnumSet;
+import java.util.Set;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion;
 import org.junit.jupiter.api.Test;
 
 public class TestHiveCatalogCapability {
+
+  private static final Set<Capability.Scope> CASE_INSENSITIVE_SCOPES =
+      EnumSet.of(Capability.Scope.SCHEMA, Capability.Scope.TABLE, Capability.Scope.COLUMN);
 
   @Test
   public void testColumnConstraintsOnHive2() {
@@ -62,5 +71,37 @@ public class TestHiveCatalogCapability {
     assertTrue(capability.columnNotNull().supported());
     assertTrue(capability.columnDefaultValue().supported());
     assertEquals(1, resolutions[0]);
+  }
+
+  @Test
+  public void testCaseSensitiveOnName() {
+    HiveCatalogCapability capability = new HiveCatalogCapability(() -> HiveVersion.HIVE3);
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      CapabilityResult result = capability.caseSensitiveOnName(scope);
+      if (CASE_INSENSITIVE_SCOPES.contains(scope)) {
+        assertFalse(result.supported(), "Hive is case-insensitive for " + scope + " names");
+        assertNotNull(result.unsupportedMessage());
+      } else {
+        assertTrue(result.supported(), "Hive is case-sensitive for " + scope + " names");
+      }
+    }
+  }
+
+  @Test
+  public void testCaseSensitiveOnNameRejectsNullScope() {
+    HiveCatalogCapability capability = new HiveCatalogCapability(() -> HiveVersion.HIVE3);
+    assertThrows(IllegalArgumentException.class, () -> capability.caseSensitiveOnName(null));
+  }
+
+  @Test
+  public void testNoSwitchOnEnumSyntheticClass() {
+    // An enum switch makes javac emit HiveCatalogCapability$1, a switch-map class that the catalog
+    // ClassLoader loads lazily on the first switch. If that ClassLoader is already closed, the load
+    // fails with NoClassDefFoundError, so the capability must not need any extra class.
+    String syntheticClassResource =
+        HiveCatalogCapability.class.getName().replace('.', '/') + "$1.class";
+    assertNull(
+        HiveCatalogCapability.class.getClassLoader().getResource(syntheticClassResource),
+        "HiveCatalogCapability must not compile into a $1 switch-map class");
   }
 }

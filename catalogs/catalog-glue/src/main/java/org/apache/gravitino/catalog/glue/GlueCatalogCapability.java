@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import com.google.common.base.Preconditions;
 import java.util.Locale;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -55,20 +56,20 @@ public class GlueCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult caseSensitiveOnName(Scope scope) {
-    switch (scope) {
-      case SCHEMA:
-      case TABLE:
-        // Glue folds database and table names to lowercase on storage.
-        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
-        // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
-        return CapabilityResult.unsupported(
-            "AWS Glue Data Catalog is case-insensitive for "
-                + scope.name().toLowerCase(Locale.ROOT)
-                + " names.");
-      default:
-        // Column names depend on the table format, which this check cannot see: Iceberg keeps their
-        // case in its metadata, and GlueCatalogOperations folds those of Hive-format tables.
-        return CapabilityResult.SUPPORTED;
+    Preconditions.checkArgument(scope != null, "scope cannot be null");
+    // Use if/else rather than a switch on the enum: javac compiles an enum switch into a
+    // synthetic switch-map class that is loaded lazily by this class's ClassLoader.
+    if (scope == Scope.SCHEMA || scope == Scope.TABLE) {
+      // Glue folds database and table names to lowercase on storage.
+      // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-databases.html
+      // See https://docs.aws.amazon.com/glue/latest/dg/aws-glue-api-catalog-tables.html
+      return CapabilityResult.unsupported(
+          "AWS Glue Data Catalog is case-insensitive for "
+              + scope.name().toLowerCase(Locale.ROOT)
+              + " names.");
     }
+    // Column names depend on the table format, which this check cannot see: Iceberg keeps their
+    // case in its metadata, and GlueCatalogOperations folds those of Hive-format tables.
+    return CapabilityResult.SUPPORTED;
   }
 }

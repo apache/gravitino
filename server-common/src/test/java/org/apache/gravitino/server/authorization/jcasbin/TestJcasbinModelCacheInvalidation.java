@@ -28,6 +28,7 @@ import static org.mockito.Mockito.when;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -87,8 +88,12 @@ public class TestJcasbinModelCacheInvalidation {
             mockStatic(MetadataIdConverter.class, CALLS_REAL_METHODS)) {
       environment.when(GravitinoEnv::getInstance).thenReturn(env);
       capabilities
-          .when(() -> CapabilityHelpers.getCapability(any(), eq(catalogManager)))
-          .thenReturn(Capability.DEFAULT);
+          .when(() -> CapabilityHelpers.withCapability(any(), eq(catalogManager), any()))
+          .thenAnswer(
+              invocation -> {
+                Function<Capability, Object> fn = invocation.getArgument(2);
+                return fn.apply(Capability.DEFAULT);
+              });
       converter
           .when(() -> MetadataIdConverter.getIdForNormalizedObject(MODEL, METALAKE))
           .thenReturn(Optional.of(10L), Optional.of(30L));

@@ -21,8 +21,8 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilitiesOnName;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -68,10 +68,11 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
     Preconditions.checkArgument(
         sourceType == Entity.EntityType.TABLE || sourceType == Entity.EntityType.VIEW,
         "Source must be a table or View");
-    Capability capability = getCapability(source, catalogManager);
     Capability.Scope scope =
         sourceType == Entity.EntityType.TABLE ? Capability.Scope.TABLE : Capability.Scope.VIEW;
-    NameIdentifier normalized = applyCaseSensitive(source, scope, capability);
+    NameIdentifier normalized =
+        withCapability(
+            source, catalogManager, capability -> applyCaseSensitive(source, scope, capability));
     if (sourceType == Entity.EntityType.TABLE) {
       normalized = resolvePhysicalTableName(normalized, catalogManager);
     }
@@ -151,8 +152,10 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   private Namespace normalizeParentForLookup(Namespace namespace) {
-    Capability capability = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.SEMANTIC_MODEL, capability);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capability -> applyCaseSensitive(namespace, Capability.Scope.SEMANTIC_MODEL, capability));
   }
 
   private NameIdentifier normalizeForLookup(NameIdentifier ident) {
@@ -160,9 +163,12 @@ public class SemanticModelNormalizeDispatcher implements SemanticModelDispatcher
   }
 
   private NameIdentifier normalizeForCreate(NameIdentifier ident) {
-    Capability capability = getCapability(ident, catalogManager);
     Namespace namespace =
-        applyCapabilities(ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability);
+        withCapability(
+            ident,
+            catalogManager,
+            capability ->
+                applyCapabilities(ident.namespace(), Capability.Scope.SEMANTIC_MODEL, capability));
     return NameIdentifier.of(namespace, normalizeSemanticModelName(ident.name()));
   }
 

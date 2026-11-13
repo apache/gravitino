@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -104,13 +104,17 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.TOPIC, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> applyCaseSensitive(namespace, Capability.Scope.TOPIC, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier topicIdent) {
-    Capability capabilities = getCapability(topicIdent, catalogManager);
-    return applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, capabilities);
+    return withCapability(
+        topicIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, capabilities));
   }
 
   private static void checkCommentLength(String comment) {
@@ -119,7 +123,9 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier topicIdent) {
-    Capability capability = getCapability(topicIdent, catalogManager);
-    return applyCapabilities(topicIdent, Capability.Scope.TOPIC, capability);
+    return withCapability(
+        topicIdent,
+        catalogManager,
+        capability -> applyCapabilities(topicIdent, Capability.Scope.TOPIC, capability));
   }
 }

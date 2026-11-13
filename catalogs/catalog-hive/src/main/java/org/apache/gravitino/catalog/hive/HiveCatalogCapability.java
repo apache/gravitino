@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.hive;
 
 import static org.apache.gravitino.hive.client.HiveClientClassLoader.HiveVersion.HIVE3;
 
+import com.google.common.base.Preconditions;
 import java.util.function.Supplier;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -59,16 +60,15 @@ public class HiveCatalogCapability implements Capability {
 
   @Override
   public CapabilityResult caseSensitiveOnName(Scope scope) {
-    switch (scope) {
-      case SCHEMA:
-      case TABLE:
-      case COLUMN:
-        // Hive is case insensitive, see
-        // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
-        return CapabilityResult.unsupported("Hive is case insensitive.");
-      default:
-        return CapabilityResult.SUPPORTED;
+    Preconditions.checkArgument(scope != null, "scope cannot be null");
+    // Use if/else rather than a switch on the enum: javac compiles an enum switch into a
+    // synthetic switch-map class that is loaded lazily by this class's ClassLoader.
+    if (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.COLUMN) {
+      // Hive is case insensitive, see
+      // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
+      return CapabilityResult.unsupported("Hive is case insensitive.");
     }
+    return CapabilityResult.SUPPORTED;
   }
 
   private CapabilityResult requireHive3(String constraint) {
