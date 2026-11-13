@@ -212,7 +212,6 @@ vulnerabilities:
   # com.nimbusds/nimbus-jose-jwt
   - id: CVE-2023-52428
     purls:
-      - pkg:maven/com.nimbusds/nimbus-jose-jwt@9.30.1
       - pkg:maven/com.nimbusds/nimbus-jose-jwt@9.8.1
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
