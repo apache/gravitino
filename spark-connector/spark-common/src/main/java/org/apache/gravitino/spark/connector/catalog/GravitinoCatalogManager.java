@@ -30,6 +30,9 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -59,7 +62,7 @@ public class GravitinoCatalogManager {
   private final String authType;
   private final List<String> principalFields;
   private final Function<GravitinoIdentity, GravitinoClient> clientBuilder;
-  private final Cache<GravitinoIdentity, GravitinoClient> clients;
+  private final Cache<GravitinoIdentity, CachedClient> clients;
   private final Cache<String, CachedCatalog> gravitinoCatalogs;
   private volatile Map<String, Catalog> applicationCatalogs = ImmutableMap.of();
 
@@ -70,7 +73,8 @@ public class GravitinoCatalogManager {
   private GravitinoCatalogManager(
       SparkConf sparkConf,
       Function<GravitinoIdentity, GravitinoClient> clientBuilder,
-      Ticker ticker) {
+      Ticker ticker,
+      Executor cacheExecutor) {
     this.sparkConf = sparkConf;
     this.clientBuilder = clientBuilder;
     this.authType =
@@ -97,8 +101,10 @@ public class GravitinoCatalogManager {
                     sparkConf.getLong(
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC,
                         GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT)))
-            // An evicted client still owns an HTTP connection pool, so it must be closed.
-            .<GravitinoIdentity, GravitinoClient>removalListener(
+            .executor(cacheExecutor)
+            // A removed client still owns an HTTP connection pool, so every removal closes it.
+            // CachedClient#close is a no-op if the drain in close() got there first.
+            .<GravitinoIdentity, CachedClient>removalListener(
                 (identity, client, cause) -> closeClient(identity, client))
             .build();
     this.gravitinoCatalogs =
@@ -136,9 +142,38 @@ public class GravitinoCatalogManager {
       String applicationUser,
       Function<GravitinoIdentity, GravitinoClient> clientBuilder,
       Ticker ticker) {
+    return create(sparkConf, applicationUser, clientBuilder, ticker, ForkJoinPool.commonPool());
+  }
+
+  /**
+   * Creates the singleton GravitinoCatalogManager with an explicit executor for the client cache's
+   * removal listener, so a test can observe the close-once contract without a background pool.
+   *
+   * @param sparkConf the application Spark configuration
+   * @param applicationUser the user the Spark application runs as, recorded for diagnostics only
+   * @param clientBuilder builds a Gravitino client for a given identity
+   * @param cacheExecutor the executor for the client cache's asynchronous work
+   * @return the created GravitinoCatalogManager
+   */
+  @VisibleForTesting
+  static GravitinoCatalogManager create(
+      SparkConf sparkConf,
+      String applicationUser,
+      Function<GravitinoIdentity, GravitinoClient> clientBuilder,
+      Executor cacheExecutor) {
+    return create(sparkConf, applicationUser, clientBuilder, Ticker.systemTicker(), cacheExecutor);
+  }
+
+  private static GravitinoCatalogManager create(
+      SparkConf sparkConf,
+      String applicationUser,
+      Function<GravitinoIdentity, GravitinoClient> clientBuilder,
+      Ticker ticker,
+      Executor cacheExecutor) {
     Preconditions.checkState(
         gravitinoCatalogManager == null, "Should not create duplicate GravitinoCatalogManager");
-    gravitinoCatalogManager = new GravitinoCatalogManager(sparkConf, clientBuilder, ticker);
+    gravitinoCatalogManager =
+        new GravitinoCatalogManager(sparkConf, clientBuilder, ticker, cacheExecutor);
     LOG.info(
         "Created GravitinoCatalogManager for Spark user {} with auth type {}.",
         applicationUser,
@@ -157,7 +192,8 @@ public class GravitinoCatalogManager {
   public void close() {
     Preconditions.checkState(!isClosed, "Gravitino Catalog is already closed");
     isClosed = true;
-    // Caffeine dispatches the removal listener asynchronously, so shutdown closes explicitly.
+    // The removal listener runs on cacheExecutor and may finish after close() returns, so close
+    // clients here. asMap() skips expired entries not yet evicted; the listener closes those.
     clients.asMap().forEach(GravitinoCatalogManager::closeClient);
     clients.invalidateAll();
     gravitinoCatalogs.invalidateAll();
@@ -257,7 +293,7 @@ public class GravitinoCatalogManager {
 
   @VisibleForTesting
   GravitinoClient getClient(GravitinoIdentity identity) {
-    return clients.get(identity, clientBuilder);
+    return clients.get(identity, id -> new CachedClient(clientBuilder.apply(id))).client();
   }
 
   private GravitinoIdentity applicationIdentity() {
@@ -300,7 +336,7 @@ public class GravitinoCatalogManager {
     return identity.key() + ":" + catalogName;
   }
 
-  private static void closeClient(GravitinoIdentity identity, GravitinoClient client) {
+  private static void closeClient(GravitinoIdentity identity, CachedClient client) {
     if (client == null) {
       return;
     }
@@ -308,6 +344,29 @@ public class GravitinoCatalogManager {
       client.close();
     } catch (Exception e) {
       LOG.warn("Failed to close the Gravitino client of {}.", identity, e);
+    }
+  }
+
+  /**
+   * Holds a cached client so that the shutdown drain and the removal listener can both try to close
+   * it while the underlying client is closed at most once.
+   */
+  private static class CachedClient {
+    private final GravitinoClient client;
+    private final AtomicBoolean closed = new AtomicBoolean(false);
+
+    private CachedClient(GravitinoClient client) {
+      this.client = client;
+    }
+
+    private GravitinoClient client() {
+      return client;
+    }
+
+    private void close() {
+      if (closed.compareAndSet(false, true)) {
+        client.close();
+      }
     }
   }
 

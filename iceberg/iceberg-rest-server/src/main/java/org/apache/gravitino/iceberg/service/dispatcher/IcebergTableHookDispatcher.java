@@ -256,15 +256,11 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
       IcebergRequestContext context, Namespace namespace, String tableName) {
     // Validate request metadata before the backend operation. An unexpected import failure must
     // propagate without deleting a table that another client may already have updated or recreated.
-    importTableEntity(context.catalogName(), namespace, tableName);
-    IcebergEntityAuditUtils.recordCreator(
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake,
-            context.catalogName(),
-            TableIdentifier.of(namespace, tableName),
-            HierarchicalSchemaUtil.schemaSeparator()),
-        Entity.EntityType.TABLE,
-        context.userName());
+    importTableEntity(
+        context.catalogName(),
+        namespace,
+        tableName,
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
     IcebergOwnershipUtils.setTableOwner(
         metalake,
         context.catalogName(),
@@ -275,14 +271,20 @@ public class IcebergTableHookDispatcher implements IcebergTableOperationDispatch
   }
 
   private void importTableEntity(String catalogName, Namespace namespace, String tableName) {
+    importTableEntity(catalogName, namespace, tableName, AuditInfo.EMPTY);
+  }
+
+  private void importTableEntity(
+      String catalogName, Namespace namespace, String tableName, AuditInfo auditInfo) {
     TableDispatcher tableDispatcher = GravitinoEnv.getInstance().internalTableDispatcher();
     if (tableDispatcher != null) {
-      tableDispatcher.loadTable(
+      tableDispatcher.importTable(
           IcebergIdentifierUtils.toGravitinoTableIdentifier(
               metalake,
               catalogName,
               TableIdentifier.of(namespace, tableName),
-              HierarchicalSchemaUtil.schemaSeparator()));
+              HierarchicalSchemaUtil.schemaSeparator()),
+          auditInfo);
     }
   }
 

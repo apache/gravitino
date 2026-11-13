@@ -70,6 +70,14 @@ paths:
       responses:
         "200":
           $ref: "#/components/responses/CatalogResponse"
+        "403":
+          description: >-
+            Forbidden - The caller cannot create catalogs in the metalake, or the backend refuses
+            the credentials configured for the catalog when it is validated at creation
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "409":
           description: Conflict - The target catalog already exists in the specified metalake
           content:

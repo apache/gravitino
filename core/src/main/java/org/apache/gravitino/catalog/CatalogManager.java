@@ -94,6 +94,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1938,7 +1939,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Validate opted-in catalogs so a misconfiguration fails at create rather than on
             // first use. The default validation eagerly initializes ops(); JDBC overrides it to
             // run a real backend probe. The backend translates failures into the caller-error vs
-            // dependency-unavailable taxonomy; both types are forwarded by the passthrough below.
+            // dependency-unavailable taxonomy; both types are forwarded by the passthrough below,
+            // as is ForbiddenException when the backend refuses the configured credentials.
             // The backend probe is gated by validateBackend so the standalone testConnection path
             // can keep property validation while running its own explicit probe instead.
             if (validateBackend && propsToValidate != null && catalog.shouldValidateOnCreate()) {
@@ -1947,7 +1949,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             return null;
           },
           IllegalArgumentException.class,
-          ConnectionFailedException.class);
+          ConnectionFailedException.class,
+          ForbiddenException.class);
     } catch (RuntimeException e) {
       // Close the partially-initialized catalog (which releases its authorizationPlugin and other
       // resources) before the caller tears down or releases the ClassLoader. Otherwise a creation

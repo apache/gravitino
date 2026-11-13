@@ -36,10 +36,11 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
@@ -187,7 +188,9 @@ public class TestGravitinoCatalogManager {
   @Test
   void testCloseClosesEveryCachedClient() {
     SparkConf sparkConf = tokenConf();
-    GravitinoCatalogManager manager = createManager(sparkConf);
+    // With the removal listener run inline, the drain and the listener both try to close every
+    // client before close() returns.
+    GravitinoCatalogManager manager = createManager(sparkConf, Runnable::run);
 
     for (String user : new String[] {"alice", "bob", "carol"}) {
       sparkConf.set(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE, jwt(user));
@@ -197,7 +200,10 @@ public class TestGravitinoCatalogManager {
 
     manager.close();
 
-    assertEquals(3, clientFactory.closedCount());
+    assertEquals(
+        List.of(1, 1, 1),
+        clientFactory.closeCounts(),
+        "each cached client must be closed exactly once");
   }
 
   @Test
@@ -307,6 +313,11 @@ public class TestGravitinoCatalogManager {
     return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory);
   }
 
+  private GravitinoCatalogManager createManager(SparkConf sparkConf, Executor cacheExecutor) {
+    clientFactory = new ClientFactory();
+    return GravitinoCatalogManager.create(sparkConf, "spark-user", clientFactory, cacheExecutor);
+  }
+
   private static SparkConf tokenConf() {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.TOKEN_AUTH_TYPE);
@@ -349,7 +360,7 @@ public class TestGravitinoCatalogManager {
   /** Hands out a distinct mock client per identity and counts what the manager asks of it. */
   private static class ClientFactory implements Function<GravitinoIdentity, GravitinoClient> {
 
-    private final List<AtomicBoolean> closedFlags = new ArrayList<>();
+    private final List<AtomicInteger> closeCounts = new ArrayList<>();
     private final AtomicInteger clients = new AtomicInteger();
     private final AtomicInteger loads = new AtomicInteger();
     private final AtomicInteger lists = new AtomicInteger();
@@ -376,15 +387,13 @@ public class TestGravitinoCatalogManager {
                 when(catalog.name()).thenReturn(invocation.getArgument(0));
                 return catalog;
               });
-      // Closing twice must not be counted twice: the shutdown path closes explicitly and the
-      // removal listener may then fire for the same client.
-      AtomicBoolean closed = new AtomicBoolean(false);
-      synchronized (closedFlags) {
-        closedFlags.add(closed);
+      AtomicInteger closes = new AtomicInteger();
+      synchronized (closeCounts) {
+        closeCounts.add(closes);
       }
       doAnswer(
               invocation -> {
-                closed.set(true);
+                closes.incrementAndGet();
                 return null;
               })
           .when(client)
@@ -409,8 +418,14 @@ public class TestGravitinoCatalogManager {
     }
 
     int closedCount() {
-      synchronized (closedFlags) {
-        return (int) closedFlags.stream().filter(AtomicBoolean::get).count();
+      synchronized (closeCounts) {
+        return (int) closeCounts.stream().filter(closes -> closes.get() > 0).count();
+      }
+    }
+
+    List<Integer> closeCounts() {
+      synchronized (closeCounts) {
+        return closeCounts.stream().map(AtomicInteger::get).collect(Collectors.toList());
       }
     }
   }

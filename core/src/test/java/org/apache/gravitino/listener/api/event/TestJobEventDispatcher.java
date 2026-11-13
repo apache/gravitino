@@ -500,6 +500,27 @@ public class TestJobEventDispatcher {
   }
 
   @Test
+  void testRunJobWithNullJobConfEmitsEmptyMapOnEvents() throws NoSuchJobTemplateException {
+    // Regression for #14775: maskSensitiveJobConf(null) must not NPE RunJob*Event constructors.
+    DummyEventListener listener = new DummyEventListener();
+    EventBus eventBus = new EventBus(Collections.singletonList(listener));
+    JobOperationDispatcher delegate = mock(JobOperationDispatcher.class);
+    when(delegate.runJob(any(String.class), any(String.class), any())).thenReturn(jobEntity);
+    JobEventDispatcher maskingDispatcher = new JobEventDispatcher(eventBus, delegate);
+
+    String templateName = jobTemplateEntity.name();
+    Assertions.assertDoesNotThrow(() -> maskingDispatcher.runJob("metalake", templateName, null));
+
+    verify(delegate).runJob(eq("metalake"), eq(templateName), eq(null));
+    Map<String, String> preJobConf = ((RunJobPreEvent) listener.popPreEvent()).jobConf();
+    Map<String, String> postJobConf = ((RunJobEvent) listener.popPostEvent()).jobConf();
+    Assertions.assertNotNull(preJobConf);
+    Assertions.assertTrue(preJobConf.isEmpty());
+    Assertions.assertNotNull(postJobConf);
+    Assertions.assertTrue(postJobConf.isEmpty());
+  }
+
+  @Test
   void testRunJobFailureEventMasksSensitiveJobConf() {
     DummyEventListener listener = new DummyEventListener();
     EventBus eventBus = new EventBus(Collections.singletonList(listener));
