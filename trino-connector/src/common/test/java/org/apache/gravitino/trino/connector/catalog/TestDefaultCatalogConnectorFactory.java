@@ -19,11 +19,34 @@
 package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.TrinoException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestDefaultCatalogConnectorFactory {
+
+  @Test
+  void testUnsupportedCatalogProviderThrowsException() {
+    DefaultCatalogConnectorFactory factory = new DefaultCatalogConnectorFactory(config());
+    GravitinoCatalog catalog = Mockito.mock(GravitinoCatalog.class);
+    Mockito.when(catalog.getProvider()).thenReturn("jdbc-clickhouse");
+    Mockito.when(catalog.isSameRegion(Mockito.any())).thenReturn(true);
+
+    TrinoException exception =
+        Assertions.assertThrows(
+            TrinoException.class, () -> factory.createCatalogConnectorContextBuilder(catalog));
+    Assertions.assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_CATALOG_PROVIDER.toErrorCode(),
+        exception.getErrorCode());
+    Assertions.assertTrue(
+        exception.getMessage().contains("Unsupported catalog provider jdbc-clickhouse."));
+    Assertions.assertTrue(
+        exception.getMessage().contains("It may be served by a separate extension jar."));
+  }
 
   @Test
   void testBuiltInProviders() {
