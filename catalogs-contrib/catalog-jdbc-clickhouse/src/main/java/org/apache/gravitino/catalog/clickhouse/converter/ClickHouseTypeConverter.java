@@ -212,7 +212,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.VarCharType) {
       throw new IllegalArgumentException(
           "ClickHouse does not support varchar(n) length limits; use string for unlimited text "
-              + "or fixedchar(n) for a fixed-length value");
+              + "or char(n) for a fixed-length value");
     } else if (type instanceof Types.FixedCharType fixedCharType) {
       return FIXEDSTRING + "(" + fixedCharType.length() + ")";
     } else if (type instanceof Types.BooleanType) {

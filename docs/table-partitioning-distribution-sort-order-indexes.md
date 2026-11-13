@@ -122,7 +122,7 @@ Note: If the direction value is `ascending`, the default ordering value is `null
 ```json
  {
   "direction": "asc",
-  "nullOrder": "NULLS_LAST",
+  "nullOrdering": "nulls_last",
   "sortTerm":  {
     "type": "field",
     "fieldName": ["score"]
@@ -203,7 +203,7 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "sortOrders": [
     {
       "direction": "asc",
-      "nullOrder": "NULLS_LAST",
+      "nullOrdering": "nulls_last",
       "sortTerm":  {
         "type": "field",
         "fieldName": ["name"]

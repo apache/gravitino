@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Map;
 import org.apache.gravitino.job.JobTemplateProvider;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRewriteManifestsJob {
@@ -197,7 +198,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(customFields.containsKey(JobTemplateProvider.PROPERTY_VERSION_KEY));
 
     String version = customFields.get(JobTemplateProvider.PROPERTY_VERSION_KEY);
-    assertEquals("v3", version);
+    assertEquals("v1", version);
     assertTrue(version.matches(JobTemplateProvider.VERSION_VALUE_PATTERN));
   }
 
@@ -444,5 +445,15 @@ public class TestIcebergRewriteManifestsJob {
 
     // Verify backticks are escaped and the whole identifier stays quoted
     assertTrue(sql.startsWith("CALL `catalog``; DROP TABLE users; --`.system.rewrite_manifests("));
+  }
+
+  @Test
+  public void testManifestMetricsSchemaForTms() {
+    assertEquals("custom-manifest-number", IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC);
+    assertEquals(
+        "custom-avg-manifest-size", IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC);
+    assertEquals(
+        "custom-rewritten-manifest-number",
+        IcebergRewriteManifestsContent.REWRITTEN_MANIFEST_NUMBER_METRIC);
   }
 }

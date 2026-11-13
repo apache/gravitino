@@ -33,6 +33,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEva
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
+import org.apache.gravitino.policy.IcebergRewriteManifestsContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,8 +42,8 @@ import org.slf4j.LoggerFactory;
  * In-Spark maintain-or-skip gate after S0 metrics (§5.2.2).
  *
  * <p>Evaluates enqueue-time policy rules locally with the same QL stack as the optimizer. Does not
- * call Gravitino. Expire / rewrite-manifests placeholders always maintain (optimizer-only {@code
- * trigger-expr=false} on those types).
+ * call Gravitino. Snapshot expiry always maintains (optimizer-only scheduling for that type).
+ * Compaction and manifest rewrite evaluate {@code trigger-expr} against S0 metrics.
  */
 final class MaintenanceTriggerGate {
 
@@ -62,7 +63,7 @@ final class MaintenanceTriggerGate {
    */
   static boolean shouldMaintain(
       MaintenanceType type, Map<String, String> argMap, @Nullable String metricsJson) {
-    if (type == MaintenanceType.EXPIRE_SNAPSHOTS || type == MaintenanceType.REWRITE_MANIFESTS) {
+    if (type == MaintenanceType.EXPIRE_SNAPSHOTS) {
       return true;
     }
 
@@ -73,6 +74,13 @@ final class MaintenanceTriggerGate {
             || !metrics.containsKey(IcebergDataCompactionContent.DATA_FILE_MSE_METRIC)
             || !metrics.containsKey(IcebergDataCompactionContent.DELETE_FILE_NUMBER_METRIC))) {
       LOG.warn("Compaction recommend skip: metrics JSON missing compaction fields");
+      return false;
+    }
+    if (type == MaintenanceType.REWRITE_MANIFESTS
+        && (metrics.isEmpty()
+            || !metrics.containsKey(IcebergRewriteManifestsContent.MANIFEST_NUMBER_METRIC)
+            || !metrics.containsKey(IcebergRewriteManifestsContent.AVG_MANIFEST_SIZE_METRIC))) {
+      LOG.warn("Manifest rewrite recommend skip: metrics JSON missing manifest fields");
       return false;
     }
 
@@ -137,6 +145,9 @@ final class MaintenanceTriggerGate {
     }
     if (type == MaintenanceType.REWRITE_DATA_FILES) {
       return new HashMap<>(PolicyContents.icebergDataCompaction().rules());
+    }
+    if (type == MaintenanceType.REWRITE_MANIFESTS) {
+      return new HashMap<>(PolicyContents.icebergRewriteManifests().rules());
     }
     if (type == MaintenanceType.REMOVE_ORPHAN_FILES) {
       return new HashMap<>(PolicyContents.icebergOrphanFileRemoval().rules());

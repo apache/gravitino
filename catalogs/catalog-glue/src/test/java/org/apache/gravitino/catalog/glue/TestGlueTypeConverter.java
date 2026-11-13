@@ -286,6 +286,49 @@ class TestGlueTypeConverter {
   }
 
   @Test
+  void testCharAndVarcharLengthsWithinHiveLimits() {
+    assertEquals("char(1)", CONVERTER.fromGravitino(Types.FixedCharType.of(1)));
+    assertEquals("char(255)", CONVERTER.fromGravitino(Types.FixedCharType.of(255)));
+    assertEquals("varchar(1)", CONVERTER.fromGravitino(Types.VarCharType.of(1)));
+    assertEquals("varchar(65535)", CONVERTER.fromGravitino(Types.VarCharType.of(65535)));
+  }
+
+  @Test
+  void testCharAndVarcharLengthsOutsideHiveLimitsAreRefused() {
+    for (Type type :
+        new Type[] {
+          Types.FixedCharType.of(0),
+          Types.FixedCharType.of(256),
+          Types.VarCharType.of(0),
+          Types.VarCharType.of(65536),
+          Types.ListType.nullable(Types.FixedCharType.of(256)),
+          Types.MapType.valueNullable(Types.StringType.get(), Types.VarCharType.of(65536)),
+          Types.StructType.of(Types.StructType.Field.nullableField("a", Types.VarCharType.of(0)))
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(type));
+      assertTrue(e.getMessage().contains("length must be in [1, "), e.getMessage());
+    }
+  }
+
+  @Test
+  void testNestedNotNullIsRefused() {
+    for (Type type :
+        new Type[] {
+          Types.ListType.notNull(Types.StringType.get()),
+          Types.MapType.valueNotNull(Types.StringType.get(), Types.LongType.get()),
+          Types.StructType.of(Types.StructType.Field.notNullField("a", Types.LongType.get())),
+          Types.ListType.nullable(
+              Types.StructType.of(Types.StructType.Field.notNullField("a", Types.LongType.get())))
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(type));
+      assertTrue(
+          e.getMessage().contains("does not support NOT NULL on nested fields"), e.getMessage());
+    }
+  }
+
+  @Test
   void testUnsupportedTypeMessageUsesTypeSyntax() {
     IllegalArgumentException e =
         assertThrows(

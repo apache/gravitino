@@ -17,8 +17,13 @@
  * under the License.
  */
 
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import authReducer, { getAuthMe, setAuthUser } from '@/lib/store/auth'
+
+// Reducer tests do not need the HTTP client's React session provider dependencies.
+vi.mock('@/lib/utils/axios', () => ({
+  defHttp: { get: vi.fn(), post: vi.fn() }
+}))
 
 describe('auth store', () => {
   beforeEach(() => {
@@ -49,5 +54,28 @@ describe('auth store', () => {
     state = authReducer(state, getAuthMe.fulfilled({ principal: 'admin', serviceAdmin: true }, 'request-id'))
     state = authReducer(state, setAuthUser(null))
     expect(state.isServiceAdmin).toBe(false)
+  })
+})
+
+describe('refreshToken', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    vi.clearAllMocks()
+  })
+
+  it('reads the token from the response body, as the login flow does', async () => {
+    // `loginApi` resolves to the response body, not to the Axios envelope.
+    loginApi.mockResolvedValue({ access_token: 'refreshed-token', expires_in: 499 })
+
+    const store = configureStore({ reducer: { auth: authReducer } })
+
+    const action = await store.dispatch(refreshToken())
+
+    expect(action.type).toBe(refreshToken.fulfilled.type)
+    expect(action.payload).toEqual({ token: 'refreshed-token', expiredIn: 499 })
+    expect(store.getState().auth.authToken).toBe('refreshed-token')
+    expect(localStorage.getItem('accessToken')).toBe('refreshed-token')
+    expect(localStorage.getItem('expiredIn')).toBe('499')
   })
 })

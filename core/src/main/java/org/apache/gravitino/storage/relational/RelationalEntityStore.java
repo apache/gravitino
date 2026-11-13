@@ -110,6 +110,25 @@ public class RelationalEntityStore
     return cache;
   }
 
+  /**
+   * Wraps a relational backend for offline migration without caches or background workers.
+   *
+   * <p>The caller initializes the SQL session factory and owns transaction boundaries. Closing the
+   * returned store also closes the backend. All servers sharing the database must be stopped.
+   *
+   * @param backend The backend using the caller's SQL session factory.
+   * @param config The configuration for the uncached store.
+   * @return A store that participates in the current thread's SQL transaction.
+   */
+  public static RelationalEntityStore forOfflineMigration(
+      RelationalBackend backend, Config config) {
+    RelationalEntityStore store = new RelationalEntityStore();
+    store.backend = backend;
+    store.cache = new NoOpsCache(config);
+    EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    return store;
+  }
+
   @Override
   public void initialize(Config config) throws RuntimeException {
     if (config.get(Configs.CACHE_ENABLED)) {

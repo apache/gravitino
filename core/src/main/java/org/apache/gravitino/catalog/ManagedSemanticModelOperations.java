@@ -41,15 +41,15 @@ import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.SemanticModel;
-import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** EntityStore-backed operations for Gravitino-managed Semantic Models. */
-public class ManagedSemanticModelOperations implements SemanticModelCatalog {
+public class ManagedSemanticModelOperations {
 
   private final EntityStore store;
   private final IdGenerator idGenerator;
@@ -74,7 +74,13 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     this.writeValidator = writeValidator;
   }
 
-  @Override
+  /**
+   * Lists current model identifiers.
+   *
+   * @param namespace The schema namespace.
+   * @return The model identifiers in the schema.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
   public NameIdentifier[] listSemanticModels(Namespace namespace) throws NoSuchSchemaException {
     try {
       List<SemanticModelEntity> models =
@@ -89,7 +95,13 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
+  /**
+   * Lists metric identifiers in structured name order.
+   *
+   * @param namespace The schema namespace.
+   * @return Metric identifiers ordered by model identifier and case-sensitive metric name.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
   public NameIdentifier[] listMetrics(Namespace namespace) throws NoSuchSchemaException {
     try {
       return store.listSemanticModelMetrics(namespace).stream()
@@ -106,7 +118,13 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
+  /**
+   * Lists complete metrics in structured name order.
+   *
+   * @param namespace The schema namespace.
+   * @return Metrics ordered by model identifier and case-sensitive metric name.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
   public SemanticModelMetric[] listMetricInfos(Namespace namespace) throws NoSuchSchemaException {
     try {
       return store.listSemanticModelMetricInfos(namespace).stream()
@@ -123,7 +141,13 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
+  /**
+   * Loads a current model.
+   *
+   * @param ident The model identifier.
+   * @return The loaded model.
+   * @throws NoSuchSemanticModelException If the model does not exist.
+   */
   public SemanticModel loadSemanticModel(NameIdentifier ident) throws NoSuchSemanticModelException {
     try {
       return store.get(ident, Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class);
@@ -134,17 +158,33 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
+  /**
+   * Creates a model with its validated source associations.
+   *
+   * @param ident The model identifier.
+   * @param comment The model comment, or {@code null}.
+   * @param definition The complete model definition.
+   * @param properties The model properties.
+   * @param sourceUpdate The resolved associations for every dataset in the definition.
+   * @return The created model.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws SemanticModelAlreadyExistsException If the model already exists.
+   * @throws IllegalSemanticModelException If the definition is invalid.
+   */
   public SemanticModel createSemanticModel(
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     Preconditions.checkArgument(properties != null, "Properties must not be null");
 
+    Preconditions.checkArgument(
+        sourceUpdate.replacesSources(), "Creation requires resolved source associations");
     writeValidator.accept(ident, definition);
+    sourceUpdate.validate(definition);
 
     Instant now = Instant.now();
     SemanticModelEntity entity =
@@ -154,6 +194,7 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
             .withNamespace(ident.namespace())
             .withComment(comment)
             .withDefinition(definition)
+            .withSourceUpdate(sourceUpdate)
             .withProperties(properties)
             .withAuditInfo(
                 AuditInfo.builder()
@@ -174,11 +215,25 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
-  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  /**
+   * Applies model changes and source association updates atomically.
+   *
+   * @param ident The model identifier.
+   * @param sourceUpdate A replacement set for definition writes, or preserve for metadata changes.
+   * @param changes The ordered changes to apply.
+   * @return The updated model.
+   * @throws NoSuchSemanticModelException If the model does not exist.
+   * @throws SemanticModelAlreadyExistsException If a rename conflicts with an existing model.
+   * @throws IllegalSemanticModelException If the changes or resulting definition are invalid.
+   */
+  public SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
     boolean validateForWrite = requiresWriteValidation(changes);
+    Preconditions.checkArgument(
+        validateForWrite == sourceUpdate.replacesSources(),
+        "Definition replacement must replace sources; metadata-only changes must preserve sources");
 
     try {
       return store.update(
@@ -186,12 +241,13 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
           SemanticModelEntity.class,
           Entity.EntityType.SEMANTIC_MODEL,
           oldEntity -> {
-            SemanticModelEntity candidate = applyChanges(oldEntity, changes);
+            SemanticModelEntity candidate = applyChanges(oldEntity, sourceUpdate, changes);
             if (validateForWrite) {
               writeValidator.accept(
                   NameIdentifier.of(candidate.namespace(), candidate.name()),
                   candidate.definition());
             }
+            sourceUpdate.validate(candidate.definition());
             return candidate;
           });
     } catch (NoSuchEntityException e) {
@@ -204,7 +260,12 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
     }
   }
 
-  @Override
+  /**
+   * Deletes a model and retires its source associations.
+   *
+   * @param ident The model identifier.
+   * @return Whether the model was deleted.
+   */
   public boolean dropSemanticModel(NameIdentifier ident) {
     try {
       return store.delete(ident, Entity.EntityType.SEMANTIC_MODEL);
@@ -242,7 +303,9 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
   }
 
   private static SemanticModelEntity applyChanges(
-      SemanticModelEntity oldEntity, SemanticModelChange[] changes) {
+      SemanticModelEntity oldEntity,
+      SemanticModelSourceUpdate sourceUpdate,
+      SemanticModelChange[] changes) {
     String newName = oldEntity.name();
     String newComment = oldEntity.comment();
     Map<String, String> newProperties = new HashMap<>(oldEntity.properties());
@@ -270,6 +333,7 @@ public class ManagedSemanticModelOperations implements SemanticModelCatalog {
         .withNamespace(oldEntity.namespace())
         .withComment(newComment)
         .withDefinition(newDefinition)
+        .withSourceUpdate(sourceUpdate)
         .withProperties(newProperties)
         .withAuditInfo(
             AuditInfo.builder()

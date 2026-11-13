@@ -677,6 +677,7 @@ fun excludePackagesForSparkConnector(project: Project) {
 }
 
 val commonsBeanutilsVersion: String = libs.versions.commons.beanutils.get()
+val httpcore5Version: String = libs.versions.httpcore5.get()
 
 subprojects {
   // Gravitino Python client project didn't need to apply the java plugin
@@ -698,9 +699,14 @@ subprojects {
   // Force upgrade commons-beanutils/snappy-java for all subprojects to resolve outdated transitive versions
   // commons-beanutils: pulled by Hadoop, Hive, Spark, Flink, etc.
   // snappy-java: pulled by Hadoop, Kafka, Iceberg, etc.
+  // httpcore5/httpcore5-h2: pulled by httpclient5 (directly and via Iceberg), whose POM still
+  // manages them on the 5.3/5.4.0 line; force the 5.4.4 patch so every module uses the same,
+  // latest 5.4 patch. It stays API-compatible with the httpclient5 versions on the classpath.
   configurations.all {
     resolutionStrategy.force("commons-beanutils:commons-beanutils:$commonsBeanutilsVersion")
     resolutionStrategy.force("org.xerial.snappy:snappy-java:$snappyJavaVersion")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5:$httpcore5Version")
+    resolutionStrategy.force("org.apache.httpcomponents.core5:httpcore5-h2:$httpcore5Version")
 
     // Exclude log4j 1.x (CVE-2020-9493, CVSS 9.8) pulled transitively by Hive and Hadoop.
     // The safe log4j-1.2-api bridge from Log4j 2.x is already included in the log4j bundle.

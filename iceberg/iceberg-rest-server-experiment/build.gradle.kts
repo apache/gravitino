@@ -121,6 +121,7 @@ dependencies {
   implementation(libs.bundles.iceberg)
 
   testImplementation(testFixturesSources.output)
+  testImplementation(project(":iceberg:iceberg-rest-server", "testArtifacts"))
   testImplementation(project(":server-common"))
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.junit.jupiter.api)

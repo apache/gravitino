@@ -190,7 +190,7 @@ class TestGlueCatalogTableOperations {
     Table icebergTable =
         Table.builder()
             .name("ice_tbl")
-            .parameters(Map.of(GlueConstants.TABLE_FORMAT, "ICEBERG"))
+            .parameters(Map.of(GlueConstants.TABLE_TYPE_PARAM, "ICEBERG"))
             .build();
     Table hiveTable = Table.builder().name("hive_tbl").parameters(Collections.emptyMap()).build();
 
@@ -252,18 +252,55 @@ class TestGlueCatalogTableOperations {
 
   @Test
   void testFormatFilterKeepsVisibleFormatUsable() {
-    ops.tableFormatFilter = Set.of("iceberg");
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "ice_tbl");
-    Table icebergTable =
+    ops.tableFormatFilter = Set.of("hive");
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb", "hive_tbl");
+    // table-format is not stored: a Glue parameter left by an older version does not change the
+    // format, which comes from table_type.
+    Table hiveTable =
         Table.builder()
-            .name("ice_tbl")
+            .name("hive_tbl")
             .parameters(Map.of(GlueConstants.TABLE_FORMAT, "ICEBERG"))
             .storageDescriptor(StorageDescriptor.builder().build())
             .build();
     when(mockClient.getTable(any(GetTableRequest.class)))
-        .thenReturn(GetTableResponse.builder().table(icebergTable).build());
+        .thenReturn(GetTableResponse.builder().table(hiveTable).build());
 
-    assertEquals("ice_tbl", ops.loadTable(ident).name());
+    GlueTable loaded = ops.loadTable(ident);
+    assertEquals("hive_tbl", loaded.name());
+    assertEquals("HIVE", loaded.properties().get(GlueConstants.TABLE_FORMAT));
+  }
+
+  @Test
+  void testCreateRefusesUnknownTableFormatAndDoesNotStoreIt() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                NameIdentifier.of("metalake", "catalog", "mydb", "t"),
+                new Column[] {
+                  GlueColumn.builder().withName("id").withType(Types.LongType.get()).build()
+                },
+                null,
+                Map.of(GlueConstants.TABLE_FORMAT, "delta"),
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                SortOrders.NONE,
+                Indexes.EMPTY_INDEXES));
+
+    useFakeGlueTable(null);
+    ops.createTable(
+        NameIdentifier.of("metalake", "catalog", "mydb", "t"),
+        new Column[] {GlueColumn.builder().withName("id").withType(Types.LongType.get()).build()},
+        null,
+        Map.of(GlueConstants.TABLE_FORMAT, "hive"),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE,
+        Indexes.EMPTY_INDEXES);
+    ArgumentCaptor<CreateTableRequest> captor = ArgumentCaptor.forClass(CreateTableRequest.class);
+    verify(mockClient).createTable(captor.capture());
+    assertFalse(
+        captor.getValue().tableInput().parameters().containsKey(GlueConstants.TABLE_FORMAT));
   }
 
   @Test
@@ -1074,6 +1111,45 @@ class TestGlueCatalogTableOperations {
   }
 
   @Test
+  void testCreateRefusesNotNullColumnOnHiveTable() {
+    Column notNull =
+        GlueColumn.builder()
+            .withName("id")
+            .withType(Types.LongType.get())
+            .withNullable(false)
+            .build();
+    assertCreateRefused(
+        "NOT NULL constraints on columns of Hive-format tables. Illegal column: id",
+        new Column[] {notNull},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesCharLengthOutsideHiveLimit() {
+    assertCreateRefused(
+        "Column c: Glue/Hive char length must be in [1, 255], got 256",
+        new Column[] {col("c", Types.FixedCharType.of(256))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
+  void testCreateRefusesNestedNotNullOnHiveTable() {
+    assertCreateRefused(
+        "Column tags: Glue/Hive does not support NOT NULL on nested fields, got list<string, NOT NULL>",
+        new Column[] {col("tags", Types.ListType.notNull(Types.StringType.get()))},
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        SortOrders.NONE);
+  }
+
+  @Test
   void testCreateUnsupportedTypeNamesColumn() {
     assertCreateRefused(
         "Column f",
@@ -1256,6 +1332,69 @@ class TestGlueCatalogTableOperations {
             () ->
                 ops.alterTable(ALTER_IDENT, TableChange.deleteColumn(new String[] {"id"}, false)));
     assertTrue(e.getMessage().contains("skewed"), e.getMessage());
+  }
+
+  @Test
+  void testAlterRefusesNotNullOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"c"}, Types.StringType.get(), false),
+          TableChange.updateColumnNullability(new String[] {"id"}, false),
+          TableChange.updateColumnNullability(new String[] {"dt"}, false)
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
+      assertTrue(e.getMessage().contains("NOT NULL"), e.getMessage());
+    }
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+  }
+
+  @Test
+  void testAlterColumnToNullableIsNoOpOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"id"}, true));
+    ops.alterTable(ALTER_IDENT, TableChange.updateColumnNullability(new String[] {"dt"}, true));
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.alterTable(
+                    ALTER_IDENT,
+                    TableChange.updateColumnNullability(new String[] {"missing"}, true)));
+    assertTrue(e.getMessage().contains("missing"), e.getMessage());
+  }
+
+  @Test
+  void testAlterColumnToNullableKeepsOtherChangesOnHiveTable() {
+    useFakeGlueTable(nativeTable());
+    ops.alterTable(
+        ALTER_IDENT,
+        TableChange.updateColumnNullability(new String[] {"id"}, true),
+        TableChange.updateColumnComment(new String[] {"id"}, "new comment"));
+
+    ArgumentCaptor<UpdateTableRequest> captor = ArgumentCaptor.forClass(UpdateTableRequest.class);
+    verify(mockClient).updateTable(captor.capture());
+    assertEquals(
+        "new comment",
+        captor.getValue().tableInput().storageDescriptor().columns().get(0).comment());
+  }
+
+  @Test
+  void testAlterRefusesVarcharLengthOutsideHiveLimit() {
+    useFakeGlueTable(nativeTable());
+    for (TableChange change :
+        new TableChange[] {
+          TableChange.addColumn(new String[] {"c"}, Types.VarCharType.of(65536)),
+          TableChange.updateColumnType(new String[] {"k"}, Types.VarCharType.of(0))
+        }) {
+      IllegalArgumentException e =
+          assertThrows(IllegalArgumentException.class, () -> ops.alterTable(ALTER_IDENT, change));
+      assertTrue(e.getMessage().contains("varchar length must be in [1, 65535]"), e.getMessage());
+    }
+    verify(mockClient, never()).updateTable(any(UpdateTableRequest.class));
   }
 
   @Test

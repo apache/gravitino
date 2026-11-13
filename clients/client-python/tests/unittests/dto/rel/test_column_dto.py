@@ -77,6 +77,30 @@ class TestColumnDTO(unittest.TestCase):
             for idx in range(3)
         ]
 
+    def test_positional_constructor_preserves_nullable_and_auto_increment(self):
+        # Pre-initialDefaultValue positional order must stay:
+        # name, type, comment, default, nullable, autoIncrement.
+        dto = ColumnDTO(
+            "id",
+            Types.IntegerType.get(),
+            None,
+            Column.DEFAULT_VALUE_NOT_SET,
+            False,
+            True,
+        )
+        self.assertEqual("id", dto.name())
+        self.assertEqual(Types.IntegerType.get(), dto.data_type())
+        self.assertIsNone(dto.comment())
+        self.assertIs(Column.DEFAULT_VALUE_NOT_SET, dto.default_value())
+        self.assertFalse(dto.nullable())
+        self.assertTrue(dto.auto_increment())
+        self.assertIs(Column.INITIAL_DEFAULT_VALUE_NOT_SET, dto.initial_default_value())
+        # Serialization must not see a bool where an Expression is expected.
+        parsed = json.loads(dto.to_json())
+        self.assertFalse(parsed["nullable"])
+        self.assertTrue(parsed["autoIncrement"])
+        self.assertNotIn("initialDefaultValue", parsed)
+
     def test_column_dto_equality(self):
         column_dto_1 = self._string_columns[1]
         column_dto_2 = self._string_columns[2]
