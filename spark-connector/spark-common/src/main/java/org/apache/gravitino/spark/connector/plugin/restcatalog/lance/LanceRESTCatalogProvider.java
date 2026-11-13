@@ -23,12 +23,19 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.plugin.restcatalog.LakehouseRESTCatalogProvider;
 import org.lance.namespace.client.apache.ApiClient;
 import org.lance.namespace.client.apache.ApiException;
@@ -42,6 +49,8 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
   static final String CATALOG_CLASS = "org.lance.spark.LanceNamespaceSparkCatalog";
   static final String SPARK_EXTENSIONS = "org.lance.spark.extensions.LanceSparkSessionExtensions";
 
+  private static final String HEADER_PREFIX = "headers.";
+  private static final String AUTHORIZATION_PROPERTY = HEADER_PREFIX + "Authorization";
   private static final String ROOT_NAMESPACE_ID = "$";
   private static final String NAMESPACE_DELIMITER = "$";
   static final String NAMESPACE_DELIMITER_PROPERTY = "namespaceDelimiter";
@@ -49,6 +58,48 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
   @Override
   public String format() {
     return FORMAT;
+  }
+
+  @Override
+  public void normalizeCatalogProperties(Map<String, String> properties) {
+    Map<String, String> headers = new LinkedHashMap<>();
+    properties.forEach(
+        (key, value) -> {
+          if (StringUtils.startsWithIgnoreCase(key, HEADER_PREFIX)) {
+            String headerName = key.substring(HEADER_PREFIX.length());
+            Preconditions.checkArgument(
+                headerName.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+"),
+                "Invalid Lance HTTP header name");
+            String canonicalKey =
+                AUTHORIZATION_PROPERTY.equalsIgnoreCase(key)
+                    ? AUTHORIZATION_PROPERTY
+                    : HEADER_PREFIX + headerName.toLowerCase(Locale.ROOT);
+            String previous = headers.putIfAbsent(canonicalKey, value);
+            Preconditions.checkArgument(
+                previous == null || previous.equals(value),
+                "Conflicting Lance HTTP header values for %s",
+                canonicalKey);
+          }
+        });
+    properties.keySet().removeIf(key -> StringUtils.startsWithIgnoreCase(key, HEADER_PREFIX));
+    properties.putAll(headers);
+  }
+
+  @Override
+  public void applyCatalogDefaults(
+      Map<String, String> properties, String authType, @Nullable String sparkUser) {
+    if (AuthProperties.isSimple(authType)
+        && StringUtils.isNotBlank(sparkUser)
+        && !properties.containsKey(AUTHORIZATION_PROPERTY)) {
+      Preconditions.checkArgument(
+          !sparkUser.contains(":"),
+          "Spark user for Lance simple authentication must not contain ':'");
+      String credentials =
+          Base64.getEncoder()
+              .encodeToString((sparkUser + ":unused").getBytes(StandardCharsets.UTF_8));
+      properties.put(
+          AUTHORIZATION_PROPERTY, AuthConstants.AUTHORIZATION_BASIC_HEADER + credentials);
+    }
   }
 
   @Override
@@ -61,12 +112,15 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
         StringUtils.isNotBlank(namespaceDelimiter), "Lance namespace delimiter must not be blank");
     String pageToken = null;
 
+    Map<String, String> requestProperties = new LinkedHashMap<>(catalogProperties);
+    normalizeCatalogProperties(requestProperties);
+
     ApiClient apiClient = new ApiClient().setBasePath(normalizeUri(uri));
     try (Closeable httpClient = getHttpClient(apiClient)) {
-      catalogProperties.forEach(
+      requestProperties.forEach(
           (key, value) -> {
-            if (StringUtils.startsWithIgnoreCase(key, "headers.")) {
-              apiClient.addDefaultHeader(key.substring("headers.".length()), value);
+            if (key.startsWith(HEADER_PREFIX)) {
+              apiClient.addDefaultHeader(key.substring(HEADER_PREFIX.length()), value);
             }
           });
       NamespaceApi namespaceApi = new NamespaceApi(apiClient);

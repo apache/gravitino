@@ -114,7 +114,7 @@ public class TestLanceRESTCatalogProvider {
     server.createContext(
         "/lance/v1/namespace/$/list",
         exchange -> {
-          authorizationHeaders.add(exchange.getRequestHeaders().getFirst("Authorization"));
+          authorizationHeaders.addAll(exchange.getRequestHeaders().get("Authorization"));
           customHeaders.add(exchange.getRequestHeaders().getFirst("X-Test-User"));
           if (authorizationHeaders.size() == 1) {
             respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"],\"page_token\":\"next\"}");
@@ -125,6 +125,7 @@ public class TestLanceRESTCatalogProvider {
     server.start();
     Map<String, String> properties = new LinkedHashMap<>();
     properties.put("headers.authorization", "Basic ZXR1c2VyOnVudXNlZA==");
+    properties.put("Headers.Authorization", "Basic ZXR1c2VyOnVudXNlZA==");
     properties.put("headers.X-Test-User", "etuser");
 
     List<String> catalogs = new LanceRESTCatalogProvider().listCatalogs(serverUri, properties);

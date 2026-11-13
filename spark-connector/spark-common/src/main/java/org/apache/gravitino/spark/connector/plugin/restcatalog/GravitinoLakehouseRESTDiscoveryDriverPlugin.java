@@ -24,10 +24,8 @@ import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.removeDup
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -116,18 +114,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
-          if ("lance".equals(format)
-              && AuthProperties.isSimple(
-                  userConf.get(
-                      GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE))
-              && StringUtils.isNotBlank(sparkUser)
-              && globalProperties.keySet().stream()
-                  .noneMatch("headers.Authorization"::equalsIgnoreCase)) {
-            String credentials =
-                Base64.getEncoder()
-                    .encodeToString((sparkUser + ":unused").getBytes(StandardCharsets.UTF_8));
-            globalProperties.put("headers.Authorization", "Basic " + credentials);
-          }
+          provider.normalizeCatalogProperties(globalProperties);
+          provider.applyCatalogDefaults(
+              globalProperties,
+              userConf.get(
+                  GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.SIMPLE_AUTH_TYPE),
+              sparkUser);
           List<String> discoveredCatalogs = listCatalogs(provider, format, uri, globalProperties);
           if (discoveredCatalogs.isEmpty()) {
             LOG.warn("Discovered no {} REST catalog from {}.", format, uri);
@@ -150,7 +142,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           extensions.addAll(Arrays.asList(provider.sparkExtensions()));
         });
 
-    applyRegistrations(sparkConf, userConf, registrations);
+    applyRegistrations(sparkConf, registrations);
     registerSqlExtensions(sparkConf, extensions);
   }
 
@@ -420,13 +412,24 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
           mergedProperties.put(key, value);
         });
 
+    String catalogPrefix = SPARK_CATALOG_PREFIX + registeredCatalogName + ".";
+    Map<String, String> overrides = new LinkedHashMap<>();
+    for (Tuple2<String, String> entry : userConf.getAllWithPrefix(catalogPrefix)) {
+      overrides.put(entry._1, entry._2);
+    }
+    Set<String> originalKeys = new LinkedHashSet<>(overrides.keySet());
+    provider.normalizeCatalogProperties(overrides);
+    originalKeys.removeAll(overrides.keySet());
+    mergedProperties.putAll(overrides);
+
     registrations.add(
         new CatalogRegistration(
             format,
             discoveredCatalogName,
             registeredCatalogName,
             provider.catalogClassName(),
-            mergedProperties));
+            mergedProperties,
+            originalKeys));
   }
 
   /**
@@ -454,21 +457,13 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   }
 
   private static void applyRegistrations(
-      SparkConf sparkConf, SparkConf userConf, List<CatalogRegistration> registrations) {
+      SparkConf sparkConf, List<CatalogRegistration> registrations) {
     for (CatalogRegistration registration : registrations) {
       String catalogPrefix = SPARK_CATALOG_PREFIX + registration.registeredCatalogName;
       sparkConf.set(catalogPrefix, registration.catalogClassName);
+      registration.removedProperties.forEach(key -> sparkConf.remove(catalogPrefix + "." + key));
       registration.properties.forEach(
-          (key, value) -> {
-            String sparkConfigKey = catalogPrefix + "." + key;
-            boolean explicitAuthorization =
-                "headers.Authorization".equalsIgnoreCase(key)
-                    && Arrays.stream(userConf.getAllWithPrefix(catalogPrefix + "."))
-                        .anyMatch(entry -> "headers.Authorization".equalsIgnoreCase(entry._1));
-            if (!userConf.contains(sparkConfigKey) && !explicitAuthorization) {
-              sparkConf.set(sparkConfigKey, value);
-            }
-          });
+          (key, value) -> sparkConf.set(catalogPrefix + "." + key, value));
       if (!registration.discoveredCatalogName.equals(registration.registeredCatalogName)) {
         LOG.info(
             "Register {} REST catalog {} as Spark catalog {}.",
@@ -514,18 +509,21 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     private final String registeredCatalogName;
     private final String catalogClassName;
     private final Map<String, String> properties;
+    private final Set<String> removedProperties;
 
     private CatalogRegistration(
         String format,
         String discoveredCatalogName,
         String registeredCatalogName,
         String catalogClassName,
-        Map<String, String> properties) {
+        Map<String, String> properties,
+        Set<String> removedProperties) {
       this.format = format;
       this.discoveredCatalogName = discoveredCatalogName;
       this.registeredCatalogName = registeredCatalogName;
       this.catalogClassName = catalogClassName;
       this.properties = properties;
+      this.removedProperties = removedProperties;
     }
   }
 }

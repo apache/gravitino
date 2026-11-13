@@ -81,22 +81,36 @@ discovery request and is also copied to each discovered catalog.
 
 ### User identity
 
-When `spark.sql.gravitino.authType` is `simple` (the default), the discovery plugin reuses
-`SparkContext.sparkUser()`, just like the existing Gravitino Spark connector, and automatically supplies
-`headers.Authorization` using HTTP Basic with the UTF-8 encoded value `<user>:unused`.
-Spark resolves this user from `SPARK_USER`, then `HADOOP_USER_NAME`, then the current login user.
-The same header is used for catalog discovery and copied to
-each automatically registered Lance catalog. No additional user variable or manually encoded header
-is required. The `unused` password is a placeholder; simple authentication does not validate it.
+When `spark.sql.gravitino.authType` is `simple` (the default), the discovery plugin uses
+`SparkContext.sparkUser()` as the Lance user. It sends an HTTP Basic header with the UTF-8 encoded
+value `<user>:unused` for discovery and copies it to each automatically registered Lance catalog.
+The password is a placeholder. Usernames containing a colon require explicit credentials because
+HTTP Basic uses the colon to separate the username from the password.
 
-An explicit `spark.sql.gravitino.lanceREST.catalogProperties.headers.Authorization` takes precedence
-over the environment-derived default. A per-catalog `spark.sql.catalog.<name>.headers.Authorization`
-overrides the header for that catalog's operations, but does not apply to catalog discovery.
-When `spark.sql.gravitino.authType` is not `simple`, no authentication header is generated. Other authentication mechanisms should use explicitly configured
-credentials. The shared `authType` setting describes Gravitino authentication; it does not discover
-the Lance REST server's authentication mechanism. If a standalone Lance REST server uses a different
-mechanism, configure its authentication header explicitly. User-defined catalogs that skip automatic
-registration must continue to configure their own authentication.
+Set `spark.sql.gravitino.lanceREST.catalogProperties.headers.Authorization` to use explicit
+credentials for discovery and as the default for registered catalogs. A per-catalog
+`spark.sql.catalog.<name>.headers.Authorization` overrides the global header for that catalog's
+operations. Header names are case-insensitive. Within each configuration scope, equivalent keys
+with identical values are collapsed and conflicting values are rejected.
+
+The plugin generates a header only when `authType` is `simple`. This setting selects the default
+for the Lance endpoint independently of Hadoop security, so a Kerberos-enabled Spark application
+can use it to access an independent simple-auth Lance REST server. Configure explicit credentials
+when the Lance endpoint uses a different authentication scheme. Manually registered catalogs
+require their own configuration.
+
+#### Upgrading existing jobs
+
+Default-simple jobs now send a Basic header even if they previously sent no authentication header.
+In auxiliary mode, requests that previously fell back to the Lance REST service user may now
+execute as the Spark user. Before upgrading, register that user and grant the permissions needed
+for discovery and subsequent operations. Missing grants can cause HTTP 403 responses, and objects
+created by the job may have a different creator or owner. Configure an explicit global
+Authorization header if the job needs to preserve its previous identity during migration.
+
+A standalone Lance REST server may reject the generated Basic header with HTTP 401 if it uses
+another scheme. Configure the server's expected Authorization header explicitly. Standalone
+servers continue to use their configured service credentials to access the Gravitino backend.
 
 ## Registration policy
 
