@@ -38,7 +38,6 @@ public class TestSchemaLocationContext {
     Assertions.assertEquals(SCHEMA, context.schemaIdentifier());
     Assertions.assertTrue(context.schemaProperties().isEmpty());
     Assertions.assertTrue(context.catalogProperties().isEmpty());
-    Assertions.assertFalse(context.cascade());
     Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
   }
 
@@ -84,14 +83,12 @@ public class TestSchemaLocationContext {
         SchemaLocationContext.builder()
             .withSchemaIdentifier(SCHEMA)
             .withSchemaProperties(properties)
-            .withCascade(true)
             .withTablesWithRetainedData(retained)
             .build();
     properties.clear();
     retained.clear();
 
     Assertions.assertEquals("s3://bucket/db/", context.schemaProperties().get("location"));
-    Assertions.assertTrue(context.cascade());
     Assertions.assertEquals(List.of(table), context.tablesWithRetainedData());
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> context.schemaProperties().put("k", "v"));

@@ -211,19 +211,17 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
                     .withSchemaProperties(properties)
                     .withCatalogProperties(catalogProperties)
                     .build());
-    if (location == null) {
-      return schemaOps.createSchema(ident, comment, properties);
+    Map<String, String> schemaProperties = properties;
+    if (location != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(location),
+          "Table location provider '%s' returned a blank location for schema %s",
+          provider.name(),
+          ident);
+      schemaProperties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
+      schemaProperties.put(Schema.PROPERTY_LOCATION, location);
     }
-
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(location),
-        "Table location provider '%s' returned a blank location for schema %s",
-        provider.name(),
-        ident);
-    Map<String, String> newProperties =
-        properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
-    newProperties.put(Schema.PROPERTY_LOCATION, location);
-    return schemaOps.createSchema(ident, comment, newProperties);
+    return schemaOps.createSchema(ident, comment, schemaProperties);
   }
 
   @Override
@@ -247,11 +245,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * retried. A {@link TableLocationProvider} failing to unprovision a location does not abort it,
    * because the table it belongs to is already gone.
    *
-   * <p>When the provider implements {@link SupportsSchemaLocations}, the schema is read before it
-   * is removed and the provider is told afterwards, together with the tables the cascade dropped
-   * without deleting their data. A provider failing to unprovision the schema location is logged
-   * and the drop still reports success. For any other provider an empty schema is dropped without
-   * being read.
+   * <p>When the provider implements {@link SupportsSchemaLocations}, it is asked to unprovision the
+   * schema location after the cascaded tables are dropped and before the schema itself is removed,
+   * together with the tables the cascade dropped without deleting their data. A provider failing to
+   * unprovision fails the drop and leaves the schema in place, so the call can be retried. For any
+   * other provider an empty schema is dropped without being read.
    *
    * @param ident the identifier of the schema to drop
    * @param cascade whether to drop the tables contained in the schema
@@ -277,14 +275,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
     TableLocationProvider provider = tableLocationProvider;
     boolean schemaHooks = provider instanceof SupportsSchemaLocations;
-    Schema schema = null;
-    if (schemaHooks || tableIdents.length > 0) {
-      try {
-        schema = loadSchema(ident);
-      } catch (NoSuchSchemaException e) {
-        return false;
-      }
-    }
+    Schema schema = schemaHooks || tableIdents.length > 0 ? loadSchema(ident) : null;
 
     // Drop all tables under the schema first if cascade is true. This goes through the same path
     // as the catalog level dropTable, so that the location of each table is unprovisioned and its
@@ -296,19 +287,17 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       dropOrPurgeTable(tableIdent, false /* purge */, schema, tablesWithRetainedData);
     }
 
-    boolean dropped = schemaOps.dropSchema(ident, cascade);
-    if (dropped && schemaHooks) {
-      unprovisionSchemaLocation(
-          provider,
-          SchemaLocationContext.builder()
-              .withSchemaIdentifier(ident)
-              .withSchemaProperties(schema.properties())
-              .withCatalogProperties(catalogProperties)
-              .withCascade(cascade)
-              .withTablesWithRetainedData(tablesWithRetainedData)
-              .build());
+    if (schemaHooks) {
+      ((SupportsSchemaLocations) provider)
+          .unprovisionSchemaLocation(
+              SchemaLocationContext.builder()
+                  .withSchemaIdentifier(ident)
+                  .withSchemaProperties(schema.properties())
+                  .withCatalogProperties(catalogProperties)
+                  .withTablesWithRetainedData(tablesWithRetainedData)
+                  .build());
     }
-    return dropped;
+    return schemaOps.dropSchema(ident, cascade);
   }
 
   @Override
@@ -554,21 +543,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     }
 
     return dropped;
-  }
-
-  private void unprovisionSchemaLocation(
-      TableLocationProvider provider, SchemaLocationContext context) {
-    try {
-      ((SupportsSchemaLocations) provider).unprovisionSchemaLocation(context);
-    } catch (Exception e) {
-      LOG.warn(
-          "Schema {} was already dropped, but table location provider '{}' failed to unprovision "
-              + "its location '{}'. The storage may be leaked and needs to be reclaimed manually.",
-          context.schemaIdentifier(),
-          provider.name(),
-          context.schemaProperties().get(Schema.PROPERTY_LOCATION),
-          e);
-    }
   }
 
   private ManagedTableOperations tableOps(NameIdentifier tableIdent) {

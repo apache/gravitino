@@ -50,9 +50,10 @@ import javax.annotation.Nullable;
  *       from a schema that exists. A schema that already exists is detected before the provider is
  *       consulted, so the cases that remain are the races.
  *   <li>{@code location} is a schema property, and altering it does not tell the provider.
- *   <li>{@link #unprovisionSchemaLocation(SchemaLocationContext)} is called after the schema is
- *       removed, and not at all if the server stops in between, so a provider reclaiming real
- *       storage needs its own reconciliation against the catalog.
+ *   <li>{@link #unprovisionSchemaLocation(SchemaLocationContext)} is called before the schema is
+ *       removed. A removal that fails afterwards, or a server that stops in between, leaves the
+ *       schema in place with its location already released; dropping it again calls the provider
+ *       again for the same schema.
  * </ul>
  */
 public interface SupportsSchemaLocations {
@@ -80,13 +81,13 @@ public interface SupportsSchemaLocations {
   String provisionSchemaLocation(SchemaLocationContext context);
 
   /**
-   * Releases what this provider allocated for a schema that has been dropped.
+   * Releases what this provider allocated for a schema that is being dropped.
    *
-   * <p>It is called only after the schema has been removed. With cascade, the tables of the schema
-   * are dropped first, through the same path as a single table drop, so their {@link
-   * TableLocationProvider#unprovisionTableLocation(TableLocationContext)} callbacks have already
-   * run. The context carries the stored properties of the schema, read right before it was removed,
-   * whether the drop cascaded, and which of the cascaded tables kept their data.
+   * <p>It is called after the tables of the schema are dropped and before the schema itself is
+   * removed. With cascade, the tables go through the same path as a single table drop, so their
+   * {@link TableLocationProvider#unprovisionTableLocation(TableLocationContext)} callbacks have
+   * already run. The context carries the stored properties of the schema and which of the cascaded
+   * tables kept their data.
    *
    * <p><b>The catalog reports; the provider decides.</b> A table that kept its data is an external
    * table that was dropped rather than purged: the table format left its dataset in place and its
@@ -99,10 +100,12 @@ public interface SupportsSchemaLocations {
    * container it created itself only once that container holds nothing but what the provider put
    * there.
    *
-   * <p>Throwing does not roll the drop back, because the schema is already gone. The failure is
-   * logged at WARN and the drop still reports success.
+   * <p>If this method throws, the drop fails and the schema stays in place, so the drop can be
+   * retried; tables the cascade already dropped stay dropped. Because the schema is removed only
+   * after this method returns, a retry can call it again for a schema whose location it already
+   * released, so it must be idempotent.
    *
-   * @param context the schema that was dropped and the outcome of the drop
+   * @param context the schema being dropped and the tables its cascade dropped without their data
    */
   void unprovisionSchemaLocation(SchemaLocationContext context);
 }
