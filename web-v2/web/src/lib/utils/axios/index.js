@@ -177,8 +177,8 @@ const transform = {
 
     if (config.url === '/configs') {
       config.headers.delete('Authorization')
-      
-return config
+
+      return config
     }
 
     // Skip token retrieval for GitHub API calls entirely
