@@ -27,6 +27,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.domain.SupportsDomains;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
@@ -266,6 +267,16 @@ public interface Fileset extends Auditable {
    */
   default SupportsDomains supportsDomains() {
     throw new UnsupportedOperationException("Fileset does not support domain operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this fileset.
+   *
+   * @return The {@link SupportsTerms} if the fileset supports glossary term operations.
+   * @throws UnsupportedOperationException If the fileset does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("Fileset does not support glossary term operations.");
   }
 
   /**

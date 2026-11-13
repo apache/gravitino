@@ -49,7 +49,8 @@ public class MetadataObjects {
           MetadataObject.Type.JOB,
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.POLICY,
-          MetadataObject.Type.DOMAIN);
+          MetadataObject.Type.DOMAIN,
+          MetadataObject.Type.GLOSSARY_TERM);
 
   private static final Set<MetadataObject.Type> VALID_TWO_LEVEL_NAME_TYPES =
       Sets.newHashSet(MetadataObject.Type.SCHEMA);

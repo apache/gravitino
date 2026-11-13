@@ -125,9 +125,15 @@ public class TestMetadataObjectUtil {
   public void testMetadataObjectEntityTypes() {
     Set<Entity.EntityType> entityTypes = MetadataObjectUtil.metadataObjectEntityTypes();
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      if (type == MetadataObject.Type.GLOSSARY_TERM) {
+        // GLOSSARY_TERM is not backed by an entity yet.
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> MetadataObjectUtil.toEntityType(type));
+        continue;
+      }
       Assertions.assertTrue(entityTypes.contains(MetadataObjectUtil.toEntityType(type)));
     }
-    Assertions.assertEquals(MetadataObject.Type.values().length, entityTypes.size());
+    Assertions.assertEquals(MetadataObject.Type.values().length - 1, entityTypes.size());
     Assertions.assertEquals(
         Entity.EntityType.DOMAIN, MetadataObjectUtil.toEntityType(MetadataObject.Type.DOMAIN));
     Assertions.assertThrows(

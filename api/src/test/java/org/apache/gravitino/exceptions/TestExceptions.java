@@ -56,4 +56,15 @@ public class TestExceptions {
     Assertions.assertEquals(
         "Tag t already backs d", ((BackingTagAlreadyBoundException) alreadyBound).getMessage());
   }
+
+  @Test
+  public void testGlossaryExceptionsHierarchy() {
+    // The parents drive the HTTP mapping: AlreadyExistsException to 409, NotFoundException to 404.
+    Object alreadyExists = new TermAlreadyExistsException("Term %s already exists", "Churn");
+    Object noSuchTerm = new NoSuchTermException("Term %s does not exist", "Churn");
+    Assertions.assertTrue(alreadyExists instanceof AlreadyExistsException);
+    Assertions.assertTrue(noSuchTerm instanceof NotFoundException);
+    Assertions.assertEquals(
+        "Term Churn does not exist", ((NoSuchTermException) noSuchTerm).getMessage());
+  }
 }
