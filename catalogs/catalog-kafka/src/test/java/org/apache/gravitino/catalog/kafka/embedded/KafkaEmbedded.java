@@ -21,7 +21,6 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import kafka.cluster.EndPoint;
 import kafka.server.KafkaConfig;
-import kafka.server.KafkaConfig$;
 import kafka.server.KafkaServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -106,14 +105,14 @@ public class KafkaEmbedded {
 
   private Properties effectiveConfigFrom(final Properties initialConfig) {
     final Properties effectiveConfig = new Properties();
-    effectiveConfig.put(KafkaConfig$.MODULE$.BrokerIdProp(), 0);
-    effectiveConfig.put(KafkaConfig$.MODULE$.NumPartitionsProp(), 1);
-    effectiveConfig.put(KafkaConfig$.MODULE$.AutoCreateTopicsEnableProp(), true);
-    effectiveConfig.put(KafkaConfig$.MODULE$.MessageMaxBytesProp(), 1000000);
-    effectiveConfig.put(KafkaConfig$.MODULE$.ControlledShutdownEnableProp(), true);
+    effectiveConfig.put("broker.id", 0);
+    effectiveConfig.put("num.partitions", 1);
+    effectiveConfig.put("auto.create.topics.enable", true);
+    effectiveConfig.put("message.max.bytes", 1000000);
+    effectiveConfig.put("controlled.shutdown.enable", true);
 
     effectiveConfig.putAll(initialConfig);
-    effectiveConfig.setProperty(KafkaConfig$.MODULE$.LogDirProp(), LOG_DIR);
+    effectiveConfig.setProperty("log.dir", LOG_DIR);
     return effectiveConfig;
   }
 }
