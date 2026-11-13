@@ -48,7 +48,7 @@
 
 ## General
 - **Brevity**: Write concise, efficient code. Avoid boilerplate where possible.
-- **Safety**: Always check for nulls and handle exceptions specifically (no generic `catch (Exception e)`).
+- **Safety**: Always check for nulls if it can be null, and handle exceptions specifically (no generic `catch (Exception e)`).
 
 ## Review Checklist (Keep It Short)
 - **License/Legal**: New files must include Apache License 2.0 header; dependency/license changes must update LICENSE/NOTICE as required.
