@@ -105,8 +105,10 @@ Default-simple jobs now send a Basic header even if they previously sent no auth
 In auxiliary mode, requests that previously fell back to the Lance REST service user may now
 execute as the Spark user. Before upgrading, register that user and grant the permissions needed
 for discovery and subsequent operations. Missing grants can cause HTTP 403 responses, and objects
-created by the job may have a different creator or owner. Configure an explicit global
-Authorization header if the job needs to preserve its previous identity during migration.
+created by the job may have a different creator or owner. To keep running as the previous
+service user, set the global Authorization header to credentials that the Lance endpoint accepts
+for that service user. For example, if the endpoint accepts Simple authentication, use a Basic
+header for the service user's name.
 
 A standalone Lance REST server may reject the generated Basic header with HTTP 401 if it uses
 another scheme. Configure the server's expected Authorization header explicitly. Standalone

@@ -108,15 +108,16 @@ public class TestLanceRESTCatalogProvider {
   }
 
   @Test
-  void testDiscoverySendsConfiguredHeadersOnEveryPage() {
+  void testDiscoverySendsOneAuthorizationValuePerPageForIdenticalHeaders() {
     List<String> authorizationHeaders = new CopyOnWriteArrayList<>();
     List<String> customHeaders = new CopyOnWriteArrayList<>();
+    AtomicInteger requests = new AtomicInteger();
     server.createContext(
         "/lance/v1/namespace/$/list",
         exchange -> {
           authorizationHeaders.addAll(exchange.getRequestHeaders().get("Authorization"));
           customHeaders.add(exchange.getRequestHeaders().getFirst("X-Test-User"));
-          if (authorizationHeaders.size() == 1) {
+          if (requests.getAndIncrement() == 0) {
             respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"],\"page_token\":\"next\"}");
           } else {
             respond(exchange, 200, "{\"namespaces\":[\"catalog_b\"]}");
@@ -135,6 +136,30 @@ public class TestLanceRESTCatalogProvider {
         Arrays.asList("Basic ZXR1c2VyOnVudXNlZA==", "Basic ZXR1c2VyOnVudXNlZA=="),
         authorizationHeaders);
     assertEquals(Arrays.asList("etuser", "etuser"), customHeaders);
+  }
+
+  @Test
+  void testDiscoveryRejectsConflictingAuthorizationHeadersBeforeSendingRequest() {
+    AtomicInteger requests = new AtomicInteger();
+    server.createContext(
+        "/lance/v1/namespace/$/list",
+        exchange -> {
+          requests.incrementAndGet();
+          respond(exchange, 200, "{\"namespaces\":[\"catalog_a\"]}");
+        });
+    server.start();
+    Map<String, String> properties = new LinkedHashMap<>();
+    properties.put("headers.Authorization", "Bearer first-test-token");
+    properties.put("headers.authorization", "Bearer second-test-token");
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> new LanceRESTCatalogProvider().listCatalogs(serverUri, properties));
+
+    assertEquals(
+        "Conflicting Lance HTTP header values for headers.Authorization", exception.getMessage());
+    assertEquals(0, requests.get());
   }
 
   @Test
