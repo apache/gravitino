@@ -73,12 +73,17 @@ before any non-trial deployment.
 
 NOTE: External PostgreSQL schema init is enabled (postgresql.init.enabled).
 The init-postgresql container requires postgresql.init.existingSecret
-(operator-managed Secret with the application user password). Host, port, and
-sslmode default from entity.jdbcUrl when postgresql.init.host/port/sslMode are
-empty. JDBC URL host/port parsing supports only a single host:port; IPv6
-bracket literals or multi-host authorities fail at render — set
-postgresql.init.host/port for those forms. Database name is taken from
-entity.jdbcUrl.
+(operator-managed Secret with the application user password). Host, port,
+sslmode, and currentSchema default from entity.jdbcUrl when the matching
+postgresql.init.* fields are empty. JDBC URL host/port parsing supports only a
+single host:port; IPv6 bracket literals or multi-host authorities fail at
+render — set postgresql.init.host/port for those forms. Database name is taken
+from entity.jdbcUrl. currentSchema is applied via PGOPTIONS search_path so
+schema SQL matches Gravitino's JDBC schema. Readiness waits up to
+postgresql.init.waitTimeoutSeconds (default 300) then fails with the psql
+error. sslmode=require needs no CA; verify-ca / verify-full require
+postgresql.init.ssl.existingSecret (mounted as PGSSLROOTCERT; JDBC sslrootcert
+is not inherited).
 {{- end }}
 
 To check pod status:
