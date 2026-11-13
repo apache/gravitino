@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.mysql.converter;
 
+import java.time.format.DateTimeParseException;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -36,8 +37,15 @@ class TestMysqlColumnDefaultValueConverter {
   @ParameterizedTest
   @CsvSource({
     "DATE, 0000-00-00",
+    "DATE, 2024-00-00",
+    "DATE, 2024-00-31",
+    "DATE, 2024-12-00",
     "TIMESTAMP, 0000-00-00 00:00:00",
     "DATETIME, 0000-00-00 00:00:00",
+    "DATETIME, 0000-00-00 12:34:56",
+    "DATETIME, 2024-00-00 12:34:56",
+    "DATETIME, 2024-00-31 23:59:59.123456",
+    "DATETIME, 2024-12-00 12:34:56.123",
     "TIMESTAMP, 0000-00-00 00:00:00.0",
     "DATETIME, 0000-00-00 00:00:00.000",
     "TIMESTAMP, 0000-00-00 00:00:00.000000",
@@ -49,6 +57,27 @@ class TestMysqlColumnDefaultValueConverter {
     String sql = "'" + value + "'";
     Assertions.assertEquals(UnparsedExpression.of(sql), result);
     Assertions.assertEquals(result, converter.toGravitino(type, value, false, true));
+  }
+
+  @Test
+  void testZeroDateWithInvalidMonthIsRejected() {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean("DATE");
+    Assertions.assertThrows(
+        DateTimeParseException.class,
+        () -> converter.toGravitino(type, "2024-13-00", false, false));
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "DATETIME, 2024-00-32 12:34:56",
+    "DATETIME, 0000-00-00 25:00:00",
+    "TIMESTAMP, 2024-00-00 00:00:00",
+    "TIMESTAMP, 0000-00-00 12:34:56"
+  })
+  void testInvalidZeroDateDefaultsAreRejected(String typeName, String value) {
+    JdbcTypeConverter.JdbcTypeBean type = new JdbcTypeConverter.JdbcTypeBean(typeName);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> converter.toGravitino(type, value, false, false));
   }
 
   @ParameterizedTest
