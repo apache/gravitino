@@ -200,6 +200,29 @@ class TestDomainMembershipAuthorization {
   }
 
   @Test
+  void containerTaggedOnlyByHiddenChildIsRemoved() {
+    MetadataObject schema = MetadataObjects.parse("cat.db", MetadataObject.Type.SCHEMA);
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    when(dispatcher.listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), any()))
+        .thenReturn(
+            new DomainMember[] {
+              new DomainMemberInfo(
+                  schema, new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}),
+              new DomainMemberInfo(
+                  catalog,
+                  new DomainRelation[] {
+                    DomainRelation.direct(), DomainRelation.viaSubdomain("Trading")
+                  })
+            });
+    DomainMember[] members =
+        DomainAuthzHelper.listMembers(
+            dispatcher, "lake", "Finance", DomainMemberFilter.builder().build());
+    assertEquals(1, members.length);
+    assertEquals(catalog, members[0].object());
+    assertArrayEquals(new DomainRelation[] {DomainRelation.direct()}, members[0].relations());
+  }
+
+  @Test
   void objectAccessIsCheckedWithoutTagPrivileges() {
     when(dispatcher.listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), any()))
         .thenReturn(

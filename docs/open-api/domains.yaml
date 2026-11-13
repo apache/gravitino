@@ -543,7 +543,7 @@ paths:
       - name: type
         in: path
         required: true
-        description: Leaf metadata object type, case-insensitive. Catalogs and schemas are not members.
+        description: Leaf metadata object type, case-insensitive. Catalogs and schemas are not supported for object-to-domain lookup.
         schema:
           $ref: "#/components/schemas/MemberType"
       - name: fullName
@@ -746,17 +746,21 @@ components:
             $ref: "#/components/schemas/DomainRelation"
 
     DomainMemberListResponse:
+      description: >-
+        The example is a default (direct) listing. With expand=true, the schema is replaced by its
+        leaves, which report inherited relations.
       example:
         code: 0
         members:
           - object:
+              fullName: cat.schema
+              type: schema
+            relations:
+              - relation: direct
+          - object:
               fullName: cat.schema.table
               type: table
             relations:
-              - relation: inherited
-                source:
-                  fullName: cat.schema
-                  type: schema
               - relation: via_subdomain
                 source:
                   fullName: Finance_US

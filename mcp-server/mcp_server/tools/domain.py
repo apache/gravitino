@@ -51,7 +51,9 @@ def load_domain_tools(mcp: FastMCP):
         Authorization and errors are enforced by the Gravitino server.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_domain_operation().get_domain_by_name(domain_name)
+        return await client.as_domain_operation().get_domain_by_name(
+            domain_name
+        )
 
     @mcp.tool(
         tags={"domain"},
@@ -66,7 +68,9 @@ def load_domain_tools(mcp: FastMCP):
         Authorization and errors are enforced by the Gravitino server.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_domain_operation().list_subdomains(domain_name, details)
+        return await client.as_domain_operation().list_subdomains(
+            domain_name, details
+        )
 
     @mcp.tool(
         tags={"domain"},

@@ -52,7 +52,9 @@ class PlainRESTClientDomainOperation(DomainOperation):
         )
         return extract_content_from_response(response, "domain", {})
 
-    async def list_subdomains(self, domain_name: str, details: bool = True) -> str:
+    async def list_subdomains(
+        self, domain_name: str, details: bool = True
+    ) -> str:
         return await self._list(
             f"{self._metalake_path}/domains/{encode_path_segment(domain_name)}/subdomains",
             details,

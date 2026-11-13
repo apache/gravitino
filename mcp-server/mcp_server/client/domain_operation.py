@@ -30,7 +30,9 @@ class DomainOperation(ABC):
         """Load a domain snapshot by name."""
 
     @abstractmethod
-    async def list_subdomains(self, domain_name: str, details: bool = True) -> str:
+    async def list_subdomains(
+        self, domain_name: str, details: bool = True
+    ) -> str:
         """List immediate subdomains, as names or complete snapshots."""
 
     @abstractmethod

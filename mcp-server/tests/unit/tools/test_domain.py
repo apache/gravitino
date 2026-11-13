@@ -410,7 +410,9 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
                 "mcp_server.core.context._get_request_authorization",
                 return_value="",
             ),
-            patch("mcp_server.core.context._in_http_request", return_value=True),
+            patch(
+                "mcp_server.core.context._in_http_request", return_value=True
+            ),
         ):
             with self.assertRaisesRegex(
                 ToolError, "HTTP request omitted Authorization"
@@ -419,8 +421,12 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.requests)
 
     async def test_mock_client_implements_domain_facet(self):
-        with patch.object(RESTClientFactory, "_rest_client_class", MockOperation):
-            self.mcp = GravitinoMCPServer(Setting("test_metalake", tags={"domain"})).mcp
+        with patch.object(
+            RESTClientFactory, "_rest_client_class", MockOperation
+        ):
+            self.mcp = GravitinoMCPServer(
+                Setting("test_metalake", tags={"domain"})
+            ).mcp
             for name, args in (
                 ("list_of_domains", {}),
                 ("get_domain_by_name", {"domain_name": "sales"}),
