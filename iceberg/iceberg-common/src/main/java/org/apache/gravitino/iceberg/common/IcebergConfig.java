@@ -496,7 +496,8 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
       new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_MAX_ENTRIES)
           .doc(
               "The maximum number of idempotency records retained by the in-memory store, records "
-                  + "beyond it are evicted before their reuse window elapses")
+                  + "beyond it are evicted before their reuse window elapses. Eviction can include "
+                  + "in-flight reservations, allowing retries to execute the mutation concurrently")
           .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)

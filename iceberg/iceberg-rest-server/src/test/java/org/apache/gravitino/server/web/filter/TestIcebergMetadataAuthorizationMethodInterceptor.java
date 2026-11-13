@@ -26,13 +26,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.reflect.Method;
-import javax.ws.rs.core.UriInfo;
 import java.lang.reflect.Parameter;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -152,15 +152,26 @@ public class TestIcebergMetadataAuthorizationMethodInterceptor {
     Method method;
     Object[] args;
     if (update) {
-      method = IcebergNamespaceOperations.class.getMethod(
-          operation, String.class, String.class, UpdateNamespacePropertiesRequest.class,
-          String.class, UriInfo.class);
-      args = new Object[] {
-        TEST_CATALOG + "/", namespace, Mockito.mock(UpdateNamespacePropertiesRequest.class), null, null
-      };
+      method =
+          IcebergNamespaceOperations.class.getMethod(
+              operation,
+              String.class,
+              String.class,
+              UpdateNamespacePropertiesRequest.class,
+              String.class,
+              UriInfo.class);
+      args =
+          new Object[] {
+            TEST_CATALOG + "/",
+            namespace,
+            Mockito.mock(UpdateNamespacePropertiesRequest.class),
+            null,
+            null
+          };
     } else if (operation.equals("dropNamespace")) {
-      method = IcebergNamespaceOperations.class.getMethod(
-          operation, String.class, String.class, String.class, UriInfo.class);
+      method =
+          IcebergNamespaceOperations.class.getMethod(
+              operation, String.class, String.class, String.class, UriInfo.class);
       args = new Object[] {TEST_CATALOG + "/", namespace, null, null};
     } else {
       method = IcebergNamespaceOperations.class.getMethod(operation, String.class, String.class);

@@ -41,8 +41,13 @@ import org.slf4j.LoggerFactory;
  * <p>This store is best-effort and intended for single-node deployments, development, and tests. It
  * is not durable, and it is not shared between replicas: a retry routed to another node, or to a
  * node that restarted, finds no record and re-executes the mutation. Its size bound can also evict
- * a record before its reuse window elapses. Production deployments that run more than one replica
- * should use a shared, durable store instead.
+ * a record before its reuse window elapses, including an in-flight reservation. A retry can then
+ * reserve the same key and run the mutation concurrently with the original request. At-most-once
+ * execution therefore depends on the reservation remaining cached; claim fencing prevents stale
+ * writes to a replacement record but cannot prevent duplicate mutations after eviction. Size the
+ * cache for all keys within the reuse window, including in-flight requests. Production deployments
+ * that need durable deduplication or run more than one replica should use a shared, durable store
+ * instead.
  *
  * <p>Each record's own {@code expiresAtMs} decides whether it still counts, so a record past its
  * deadline reads as absent whether or not the cache has reclaimed it yet. Caffeine's expiry only
@@ -180,7 +185,7 @@ public class InMemoryIdempotencyStore implements IdempotencyStore {
     Iterator<Map.Entry<String, IdempotencyRecord>> entries = cache.asMap().entrySet().iterator();
     while (entries.hasNext()) {
       Map.Entry<String, IdempotencyRecord> entry = entries.next();
-      if (entry.getValue().expiresAtMs() < beforeMs
+      if (entry.getValue().expiresAtMs() <= beforeMs
           && cache.asMap().remove(entry.getKey(), entry.getValue())) {
         purged += 1;
       }

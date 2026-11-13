@@ -26,6 +26,8 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestIdempotencyStoreFactory {
 
@@ -72,6 +74,48 @@ public class TestIdempotencyStoreFactory {
     Assertions.assertTrue(exception.getMessage().contains("com.example.NoSuchStore"));
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testInitializationFailureClosesStoreAndPreservesCause(boolean failClose) {
+    FailingIdempotencyStore.closed = false;
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE,
+                FailingIdempotencyStore.class.getName(),
+                "fail-close",
+                Boolean.toString(failClose)));
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> IdempotencyStoreFactory.create(config));
+    Assertions.assertTrue(FailingIdempotencyStore.closed);
+    Assertions.assertEquals("initialization failed", failure.getCause().getMessage());
+    Assertions.assertEquals(failClose ? 1 : 0, failure.getCause().getSuppressed().length);
+    if (failClose) {
+      Assertions.assertEquals("close failed", failure.getCause().getSuppressed()[0].getMessage());
+    }
+  }
+
+  /** Custom store that allocates resources before failing to initialize. */
+  public static class FailingIdempotencyStore extends RecordingIdempotencyStore {
+    private static boolean closed;
+    private boolean failClose;
+
+    @Override
+    public void initialize(Map<String, String> properties) {
+      failClose = Boolean.parseBoolean(properties.get("fail-close"));
+      throw new IllegalStateException("initialization failed");
+    }
+
+    @Override
+    public void close() throws IOException {
+      closed = true;
+      if (failClose) {
+        throw new IOException("close failed");
+      }
+    }
+  }
+
   /** Store loaded by class name, asserting the factory initializes what it constructs. */
   public static class RecordingIdempotencyStore implements IdempotencyStore {
 
@@ -106,6 +150,6 @@ public class TestIdempotencyStoreFactory {
     }
 
     @Override
-    public void close() {}
+    public void close() throws IOException {}
   }
 }

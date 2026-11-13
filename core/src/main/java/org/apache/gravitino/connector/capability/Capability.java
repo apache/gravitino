@@ -126,6 +126,12 @@ public interface Capability {
    * data. For example, if a catalog storage is managed, when the catalog is dropped, Gravitino will
    * also delete all underlying data associated with the catalog.
    *
+   * <p>For managed table storage, creating a new table must persist the server-supplied {@code
+   * gravitino.identifier} as its entity ID. If creation returns an existing table, its stored ID
+   * must be retained instead. Core uses these identities to distinguish creation from reuse before
+   * assigning ownership. A connector may omit the reserved identifier from the returned table
+   * properties if it is preserved in the entity store; core reads the stored ID in that case.
+   *
    * @param scope The scope of the capability.
    * @return The capability of the managed storage.
    */

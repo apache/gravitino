@@ -86,8 +86,9 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   and [1.0.90 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v1.0.90/LICENSE)
   respectively. Jackson 2.18.3 also needs the Boost text identified by its parser
   NOTICE. Existing fast_float and bigint texts are preserved.
-  Versions 2.9.2/2.13.5 contain neither parser; 2.21.3 already includes their full
-  license texts. These audited versions require no supplements.
+  Versions 2.9.2/2.13.5 contain neither parser; 2.18.12, 2.21.3 and 2.21.8 already
+  include their full license texts (identical in all three). These audited versions
+  require no supplements.
 - Reactive Streams 1.0.4: [MIT-0 LICENSE](https://github.com/reactive-streams/reactive-streams-jvm/blob/v1.0.4/LICENSE).
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
   embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD

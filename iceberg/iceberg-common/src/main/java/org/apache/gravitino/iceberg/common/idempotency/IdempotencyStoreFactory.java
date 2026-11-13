@@ -48,12 +48,20 @@ public class IdempotencyStoreFactory {
     String storeType = icebergConfig.get(IcebergConfig.ICEBERG_IDEMPOTENCY_STORE_TYPE);
     String storeClassName = STORE_CLASS_NAMES.getOrDefault(storeType, storeType);
     LOG.info("Load Iceberg idempotency store: {}.", storeClassName);
+    IdempotencyStore store = null;
     try {
-      IdempotencyStore store =
+      store =
           (IdempotencyStore) Class.forName(storeClassName).getDeclaredConstructor().newInstance();
       store.initialize(icebergConfig.getAllConfig());
       return store;
     } catch (Exception e) {
+      if (store != null) {
+        try {
+          store.close();
+        } catch (Exception closeFailure) {
+          e.addSuppressed(closeFailure);
+        }
+      }
       throw new RuntimeException(
           "Failed to create Iceberg idempotency store by name " + storeType, e);
     }

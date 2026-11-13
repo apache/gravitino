@@ -23,11 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.reflect.Method;
-import javax.ws.rs.core.UriInfo;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Stream;
+import javax.ws.rs.core.UriInfo;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.rest.IcebergNamespaceOperations;
@@ -91,7 +91,11 @@ public class TestIcebergRequestBodyAuthzHandlers {
   void testCreateRejectsDottedLevelsBeforeResolvingParent(Namespace namespace) throws Exception {
     Method method =
         IcebergNamespaceOperations.class.getMethod(
-            "createNamespace", String.class, CreateNamespaceRequest.class, String.class, UriInfo.class);
+            "createNamespace",
+            String.class,
+            CreateNamespaceRequest.class,
+            String.class,
+            UriInfo.class);
     CreateNamespaceRequest request =
         CreateNamespaceRequest.builder().withNamespace(namespace).build();
     NameIdentifier catalog = NameIdentifier.of("metalake", "catalog");

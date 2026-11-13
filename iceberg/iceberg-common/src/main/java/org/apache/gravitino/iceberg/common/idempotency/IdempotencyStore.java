@@ -126,7 +126,8 @@ public interface IdempotencyStore extends Closeable {
   /**
    * Purges records whose reuse window has elapsed.
    *
-   * @param beforeMs cutoff in unix epoch millis; records expiring before this time are removed
+   * @param beforeMs cutoff in unix epoch millis; records expiring at or before this time are
+   *     removed
    * @return the number of records purged
    */
   int purgeExpired(long beforeMs);

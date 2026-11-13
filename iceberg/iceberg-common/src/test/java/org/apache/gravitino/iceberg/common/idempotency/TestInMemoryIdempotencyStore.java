@@ -208,7 +208,7 @@ public class TestInMemoryIdempotencyStore {
       clockedStore.reserve(OTHER_KEY, BINDING, CLAIM, now.get() + 60_000L);
 
       // Only the first record's window has elapsed.
-      now.addAndGet(1_001L);
+      now.addAndGet(1_000L);
       Assertions.assertEquals(1, clockedStore.purgeExpired(now.get()));
 
       Assertions.assertEquals(
