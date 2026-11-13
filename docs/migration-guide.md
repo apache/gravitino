@@ -28,6 +28,26 @@ existing deployments. For database backup, schema scripts, and rollback commands
   whole Kubernetes pod CIDR, lets those clients choose the recorded address again. See
   [HTTP Server](./gravitino-server-config.md#http-server).
 
+### Kafka catalog client upgrade
+- The Kafka catalog now ships the Kafka client 3.9.2 instead of 3.4.0. The `gravitino.bypass.`
+  properties are passed to this client, so check them against the
+  [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs).
+- The Kafka catalog rejects `gravitino.bypass.config.providers` and `gravitino.bypass.config.providers.*`
+  (for example `.class` and `.param.*`), including when they come from
+  `catalogs/kafka/conf/kafka.conf`. Kafka 3.9 adds an environment variable provider, and any
+  provider can read the Gravitino server's own environment or files. A catalog that still sets
+  them fails on schema and topic operations and on `testConnection`, with an error that names the
+  rejected properties. In 1.3, the file and directory providers could be used this way.
+- Before upgrading, find Kafka catalogs and `kafka.conf` entries that use these properties or
+  `${file:...}`, `${directory:...}`, or `${env:...}` references. Remove the provider properties and
+  set the resolved value directly, for example with `alterCatalog`. Direct values in
+  `gravitino.bypass.` properties can be returned in plaintext by the REST API, see
+  [Catalog properties](./gravitino-server-config.md#catalog-properties).
+- The Kafka 3.9 client rejects `com.sun.security.auth.module.JndiLoginModule` and
+  `com.sun.security.auth.module.LdapLoginModule` in `sasl.jaas.config` by default. Catalogs that
+  use either module fail to connect after the upgrade. Switch to another login module. If you
+  cannot, set the JVM system property `org.apache.kafka.disallowed.login.modules` on the Gravitino
+  server to the modules you still want to block; see the Kafka documentation for its semantics.
 ### Policies are selected through tags
 
 - Direct policy associations with metadata objects are no longer read or written at runtime.

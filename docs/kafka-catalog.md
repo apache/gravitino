@@ -20,8 +20,17 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | Property Name       | Description                                                                                                                                                                                                   | Default Value | Required |
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
-| `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
+| `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
 
+The Kafka catalog does not accept the Kafka config provider properties `gravitino.bypass.config.providers`
+and `gravitino.bypass.config.providers.*` (for example `gravitino.bypass.config.providers.file.class`).
+They would let a catalog resolve `${env:...}`, `${file:...}`, or `${directory:...}` references from the
+Gravitino server's own environment and files. A catalog that sets them, whether in the create-catalog
+request or in `catalogs/kafka/conf/kafka.conf`, fails to connect and `testConnection` returns an
+error naming the rejected properties. Put the literal value in the catalog property instead.
+The Kafka client also rejects `JndiLoginModule` and `LdapLoginModule` in `sasl.jaas.config` by default.
+See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for the
+migration steps.
 ### Catalog Operations
 
 Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#catalog-operations) for more details.
@@ -76,7 +85,7 @@ workaround.
 | `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partitions` property in the broker.              | No       |
 | `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       |
 
-Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/39/documentation.html#topicconfigs) for more details.
 
 ### Topic Operations
 
