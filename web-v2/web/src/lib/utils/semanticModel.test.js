@@ -254,6 +254,7 @@ describe('validateSemanticModelDefinition', () => {
 
 describe('nested Semantic Model contract validation', () => {
   const expression = { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] }
+
   const relationship = {
     name: 'self',
     from: 'orders',

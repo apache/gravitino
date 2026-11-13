@@ -314,6 +314,7 @@ export const validateSemanticModelDefinition = definition => {
   validateMetadata(definition, 'definition', errors)
 
   const datasetNames = new Set(datasets.map(dataset => dataset?.name).filter(isNonBlankString))
+
   const datasetFields = new Map(
     datasets
       .filter(dataset => isPlainObject(dataset) && isNonBlankString(dataset?.name))
