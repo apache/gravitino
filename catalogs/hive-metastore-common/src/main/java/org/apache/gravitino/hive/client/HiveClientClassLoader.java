@@ -204,11 +204,11 @@ public final class HiveClientClassLoader extends URLClassLoader {
     }
     try {
       URLConnection connection = resource.openConnection();
-      // A catalog replacement may close another loader's cached handle to the same jar.
-      // Keep this read independent of those handles and of the base loader's tracked streams.
+      // Another catalog loader can close the same cached JarFile during catalog replacement.
+      // Keep this read independent, and release its JAR handle when the stream closes.
       connection.setUseCaches(false);
-      try (InputStream input = connection.getInputStream()) {
-        byte[] bytes = input.readAllBytes();
+      try (InputStream is = connection.getInputStream()) {
+        byte[] bytes = is.readAllBytes();
         return defineClass(name, bytes, 0, bytes.length);
       }
     } catch (IOException e) {

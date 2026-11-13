@@ -139,34 +139,14 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    */
   @Override
   public View loadView(NameIdentifier ident) throws NoSuchViewException {
-    LOG.info("Loading view: {}", ident);
+    return loadAndImportView(ident, AuditInfo.EMPTY);
+  }
 
-    EntityCombinedView entityCombinedView =
-        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-
-    if (!entityCombinedView.imported()) {
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      try {
-        entityCombinedView =
-            TreeLockUtils.doWithTreeLock(schemaIdent, LockType.WRITE, () -> importView(ident));
-      } catch (EntityAlreadyExistsException e) {
-        // A create-only import can conflict either because another Gravitino node won an HA race,
-        // or because the external identifier is already stored under another Gravitino path.
-        // Reload to distinguish a successful concurrent import from an identity conflict.
-        LOG.info(
-            "View {} import conflicted with existing metadata; reloading from store.", ident, e);
-        entityCombinedView =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
-        if (!entityCombinedView.imported()) {
-          throw retainedExternalIdentifierConflictException(ident, VIEW);
-        }
-      }
-    }
-
-    return entityCombinedView;
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportView(ident, auditInfo);
   }
 
   /**
@@ -551,7 +531,64 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         .withImported(viewEntity != null);
   }
 
-  private EntityCombinedView importView(NameIdentifier ident) throws NoSuchViewException {
+  private View loadAndImportView(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
+    LOG.info("Loading view: {}", ident);
+
+    EntityCombinedView entityCombinedView =
+        TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+
+    if (!entityCombinedView.imported()) {
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      try {
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(
+                schemaIdent, LockType.WRITE, () -> importViewFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info(
+            "View {} import conflicted with existing metadata; reloading from store.", ident, e);
+        entityCombinedView =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadView(ident));
+        if (!entityCombinedView.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, VIEW);
+        }
+      }
+    }
+
+    ViewEntity entity =
+        fillMissingCreationAudit(
+            entityCombinedView.viewEntity(),
+            ViewEntity.class,
+            entityCombinedView.viewFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                ViewEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withColumns(current.columns())
+                    .withRepresentations(current.representations())
+                    .withDefaultCatalog(current.defaultCatalog())
+                    .withDefaultSchema(current.defaultSchema())
+                    .withProperties(current.properties())
+                    .withAuditInfo(audit)
+                    .build());
+    return EntityCombinedView.of(entityCombinedView.viewFromCatalog(), entity)
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
+        .withImported(
+            entityCombinedView.imported()
+                && (entityCombinedView.viewEntity() == null || entity != null));
+  }
+
+  private EntityCombinedView importViewFromCatalog(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchViewException {
     EntityCombinedView entityCombinedView = internalLoadView(ident);
 
     if (entityCombinedView.imported()) {
@@ -588,6 +625,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             .withLastModifier(catalogView.auditInfo().lastModifier())
             .withLastModifiedTime(catalogView.auditInfo().lastModifiedTime())
             .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     ViewEntity viewEntity =
         ViewEntity.builder()
             .withId(uid)
@@ -620,11 +660,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
     }
 
     return EntityCombinedView.of(catalogView, viewEntity)
-        .withHiddenProperties(
-            getMaskAndOmitKeys(
-                getCatalogIdentifier(ident),
-                HasPropertyMetadata::tablePropertiesMetadata,
-                catalogView.properties()))
+        .withHiddenProperties(entityCombinedView.hiddenProperties())
         .withImported(true);
   }
 

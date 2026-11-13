@@ -2600,6 +2600,39 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testInitializeReportsNamedLocationAccessDenied(boolean failOnExists) throws IOException {
+    Path path = new Path("s3a://test-bucket/private-prefix");
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    AccessDeniedException denied =
+        new AccessDeniedException(path.toString(), null, "backend request ID");
+    if (failOnExists) {
+      when(fileSystem.exists(path)).thenThrow(denied);
+    } else {
+      when(fileSystem.exists(path)).thenReturn(true);
+      when(fileSystem.getFileStatus(path)).thenThrow(denied);
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(fileSystem).when(ops).getFileSystem(Mockito.eq(path), Mockito.anyMap());
+      ConnectionFailedException failure =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s3", path.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+
+      Assertions.assertEquals(
+          "Failed to check Fileset catalog storage at location-s3 (access denied)",
+          failure.getMessage());
+      Assertions.assertNull(failure.getCause());
+    }
+  }
+
   @Test
   public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
@@ -3899,6 +3932,36 @@ public class TestFilesetCatalogOperations {
               });
 
       Assertions.assertTrue(e.getMessage().contains("Failed to get FileSystem for path"));
+    }
+  }
+
+  @Test
+  void testGetFileSystemWithCacheErrorDoesNotExposeConfiguration() throws IOException {
+    String catalogPath = TEST_ROOT_PATH + "/catalog_fs_error_" + generateTestId();
+    Path path = new Path(catalogPath);
+    Map<String, String> conf =
+        ImmutableMap.of(
+            "s3-access-key-id", "DUMMY_ACCESS_KEY_ID",
+            "s3-secret-access-key", "DUMMY_SECRET_ACCESS_KEY");
+    IOException cause = new IOException("Failed to create file system");
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      ops.fileSystemCache.invalidateAll();
+      Mockito.doThrow(cause).when(ops).getFileSystem(Mockito.eq(path), Mockito.eq(conf));
+
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+
+      Assertions.assertSame(cause, e.getCause());
+      Assertions.assertTrue(e.getMessage().contains(catalogPath));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_ACCESS_KEY_ID"));
+      Assertions.assertFalse(e.getMessage().contains("DUMMY_SECRET_ACCESS_KEY"));
     }
   }
 

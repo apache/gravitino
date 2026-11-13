@@ -26,6 +26,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.meta.AuditInfo;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -75,6 +76,19 @@ public class TestSchemaNormalizeDispatcher extends TestOperationDispatcher {
     TestSchemaOperationDispatcher.initialize();
     schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(TestSchemaOperationDispatcher.dispatcher, catalogManager);
+  }
+
+  /** Explicit imports normalize names while preserving their audit arguments. */
+  @Test
+  public void testImportNormalizesIdentifierAndPassesAudit() {
+    SchemaDispatcher delegate = Mockito.mock(SchemaDispatcher.class);
+    SchemaNormalizeDispatcher normalizer = new SchemaNormalizeDispatcher(delegate, catalogManager);
+    AuditInfo audit = AuditInfo.builder().withCreator("creator").build();
+    NameIdentifier requested = NameIdentifier.of(metalake, catalog, "MiXeD");
+    normalizer.importSchema(requested, audit);
+    Mockito.verify(delegate)
+        .importSchema(
+            Mockito.eq(NameIdentifier.of(metalake, catalog, "mixed")), Mockito.same(audit));
   }
 
   @Test

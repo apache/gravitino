@@ -57,6 +57,8 @@ paths:
                 $ref: "#/components/examples/FilesetCreateRequest"
               MultipleLocationsFilesetCreateRequest:
                 $ref: "#/components/examples/MultipleLocationsFilesetCreateRequest"
+              MixedLocationsFilesetCreateRequest:
+                $ref: "#/components/examples/MixedLocationsFilesetCreateRequest"
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
@@ -401,20 +403,18 @@ components:
         storageLocation:
           type: string
           description: >-
-            The location of the fileset. When omitted for a managed fileset, the location is
-            derived from its schema, which may inherit locations from the catalog. External
-            filesets must specify a storage location.
+            When non-null, this field sets the reserved "unknown" location and takes precedence
+            over storageLocations["unknown"]. All other named locations are retained. A managed
+            fileset may inherit all its locations. An external fileset must supply at least one
+            location through storageLocation or storageLocations.
           nullable: true
         storageLocations:
           type: object
           description: >-
-            The named storage locations of the fileset. Locations are resolved by name:
-            request locations override schema locations, which override catalog locations
-            with the same name. Other inherited location names are retained. Managed filesets
-            may omit storageLocations and use locations derived from their schema and catalog.
-            External filesets must specify storage locations. When the resulting fileset has
-            more than one location, including inherited locations, properties must include
-            default-location-name with a value matching one of the resolved location keys.
+            Locations are resolved by name. Request locations override schema locations, which
+            override catalog locations with the same name. Omitted names are inherited. When
+            there is more than one resolved name, properties must include default-location-name
+            with a value matching one of those names.
           nullable: true
           default: { }
           additionalProperties:
@@ -791,6 +791,18 @@ components:
           secondary: s3://other-bucket/path
         properties:
           default-location-name: primary
+
+    MixedLocationsFilesetCreateRequest:
+      summary: Use both location fields and select a named default
+      value:
+        name: raw_events
+        type: MANAGED
+        storageLocation: s3a://example-bucket/imports/raw_events
+        storageLocations:
+          unknown: s3a://example-bucket/staging/raw_events
+          us: s3a://example-us/landing/raw_events
+        properties:
+          default-location-name: us
 
     FilesetResponse:
       value: {

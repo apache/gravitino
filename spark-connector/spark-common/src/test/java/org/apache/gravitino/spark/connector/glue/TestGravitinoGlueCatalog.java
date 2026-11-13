@@ -329,8 +329,12 @@ public class TestGravitinoGlueCatalog {
     GravitinoGlueCatalog catalog =
         new GravitinoGlueCatalog() {
           {
-            gravitinoCatalogClient = client;
             sparkCatalog = mockSparkCatalog;
+          }
+
+          @Override
+          protected Catalog gravitinoCatalog() {
+            return client;
           }
 
           @Override

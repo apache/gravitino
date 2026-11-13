@@ -23,6 +23,10 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.function.BiFunction;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -38,6 +42,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.model.ModelChange;
 import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -123,6 +128,75 @@ public abstract class OperationDispatcher {
                 + "are retained. Their existing external identifiers can be imported again after "
                 + "the conflicting catalog registration has been dropped.",
             entityName, ident, entityName, entityName));
+  }
+
+  /**
+   * Fills missing creation fields when another node imported the same object first. The cold import
+   * already carries these fields in its initial write and needs no additional update. Ordinary
+   * loads pass an empty requested audit, leaving an unknown source creator unknown.
+   *
+   * @param entity the imported registration, or null for a managed object
+   * @param type the entity class
+   * @param reported the audit reported by the source catalog
+   * @param requested the creation audit supplied by the create operation, or empty for ordinary
+   *     loads
+   * @param withAudit copies the current entity with the new audit
+   * @param <E> the auditable entity type
+   * @return the current registration, with missing creation fields filled if it still matches, or
+   *     null if the registration disappeared during recovery; callers then return the source
+   *     snapshot as not imported
+   */
+  @Nullable
+  protected <E extends Entity & HasIdentifier & Auditable> E fillMissingCreationAudit(
+      @Nullable E entity,
+      Class<E> type,
+      Audit reported,
+      AuditInfo requested,
+      BiFunction<E, AuditInfo, E> withAudit) {
+    if (entity == null || entity.auditInfo().creator() != null || requested.creator() == null) {
+      return entity;
+    }
+    try {
+      return store.update(
+          entity.nameIdentifier(),
+          type,
+          entity.type(),
+          current -> {
+            // Recheck inside the store's optimistic update, including identity: the name may
+            // have been dropped and recreated since the source snapshot was read.
+            if (!current.id().equals(entity.id())) {
+              throw new OptimisticLockException("Entity identity changed during audit import");
+            }
+            Audit audit = current.auditInfo();
+            if (audit.creator() != null) {
+              return current;
+            }
+            AuditInfo filled =
+                AuditInfo.builder()
+                    .withCreator(
+                        reported.creator() == null ? requested.creator() : reported.creator())
+                    .withCreateTime(
+                        audit.createTime() != null
+                            ? audit.createTime()
+                            : reported.createTime() != null
+                                ? reported.createTime()
+                                : requested.createTime())
+                    .withLastModifier(audit.lastModifier())
+                    .withLastModifiedTime(audit.lastModifiedTime())
+                    .build();
+            return withAudit.apply(current, filled);
+          });
+    } catch (NoSuchEntityException e) {
+      // A rename or drop can remove the observed registration before the store read or CAS.
+      // Return the source snapshot without a registration; never resurrect it with the old audit.
+      return null;
+    } catch (OptimisticLockException e) {
+      LOG.warn("Failed to import creation audit for {}", entity.nameIdentifier(), e);
+      return getEntity(entity.nameIdentifier(), entity.type(), type);
+    } catch (Exception e) {
+      LOG.warn("Failed to import creation audit for {}", entity.nameIdentifier(), e);
+      return entity;
+    }
   }
 
   protected <R, E extends Throwable> R doWithTable(

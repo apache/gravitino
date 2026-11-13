@@ -68,8 +68,7 @@ public class TestBaseCatalogDropNamespace {
     Catalog gravitinoCatalog = mock(Catalog.class);
     schemas = mock(SupportsSchemas.class);
     when(gravitinoCatalog.asSchemas()).thenReturn(schemas);
-    catalog = new DropNamespaceTestCatalog();
-    catalog.gravitinoCatalogClient = gravitinoCatalog;
+    catalog = new DropNamespaceTestCatalog(gravitinoCatalog);
   }
 
   @Test
@@ -96,6 +95,17 @@ public class TestBaseCatalogDropNamespace {
   }
 
   private static class DropNamespaceTestCatalog extends BaseCatalog {
+    private final Catalog catalog;
+
+    private DropNamespaceTestCatalog(Catalog catalog) {
+      this.catalog = catalog;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return catalog;
+    }
+
     @Override
     protected TableCatalog createAndInitSparkCatalog(
         String name, CaseInsensitiveStringMap options, Map<String, String> properties) {

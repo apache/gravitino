@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.ClientResponse;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -40,6 +41,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.AfterEach;
@@ -97,7 +99,7 @@ public class TestRangerClientExtension {
           }
         });
     server.createContext(
-        "/public/v2/api/service/name/",
+        "/service/public/v2/api/service/name/",
         exchange -> respond(exchange, 404, "{\"statusCode\":1,\"msgDesc\":\"not found\"}"));
     server.createContext(
         "/service/public/v2/api/policy",
@@ -177,6 +179,38 @@ public class TestRangerClientExtension {
     Assertions.assertEquals(updateTime, policy.getUpdateTime());
     Assertions.assertEquals(createTime, updated.getCreateTime());
     Assertions.assertEquals(11L, created.getId());
+  }
+
+  /** Non-JSON responses are contextualized without changing service-not-found errors. */
+  @Test
+  public void testNonJsonServiceResponseIsActionable() throws Exception {
+    for (int status : new int[] {200, 404}) {
+      server.removeContext("/service/public/v2/api/service/name/");
+      server.createContext(
+          "/service/public/v2/api/service/name/",
+          exchange -> {
+            byte[] body = "upstream unavailable".getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().set("Content-Type", "text/plain");
+            exchange.sendResponseHeaders(status, body.length);
+            try (OutputStream out = exchange.getResponseBody()) {
+              out.write(body);
+            }
+          });
+      if (status == 200) {
+        AuthorizationPluginException error =
+            Assertions.assertThrows(
+                AuthorizationPluginException.class, () -> client.getService("hive-service"));
+        Assertions.assertTrue(error.getMessage().contains("hive-service"));
+        Assertions.assertTrue(error.getMessage().contains("must return JSON"));
+        Assertions.assertInstanceOf(ClientHandlerException.class, error.getCause());
+      } else {
+        RangerServiceException error =
+            Assertions.assertThrows(
+                RangerServiceException.class, () -> client.getService("hive-service"));
+        Assertions.assertEquals(status, error.getStatus().getStatusCode());
+        Assertions.assertTrue(error.getMessage().contains("upstream unavailable"));
+      }
+    }
   }
 
   @Test
