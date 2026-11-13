@@ -17,8 +17,8 @@
 # under the License.
 
 """Run ``tests/integration/test_lance_ray.py`` against multiple lance-ray
-versions to validate the supported range advertised in the Compatibility
-Matrix (``docs/lance-rest-integration.md``).
+versions against the candidate Gravitino server. The published compatibility
+matrix in ``docs/lance-rest-integration.md`` records released server versions.
 
 For each version we provision a dedicated venv under
 ``clients/client-python/build/lance-ray-matrix/.venv-<version>/`` and install
@@ -49,15 +49,19 @@ from __future__ import annotations
 import argparse
 import hashlib
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
 
-# Default version set tracks what the Compatibility Matrix in
-# docs/lance-rest-integration.md claims to support. Keep these in sync.
-DEFAULT_VERSIONS = ["0.4.2", "0.3.0"]
+# Include the current candidate alongside versions verified for the 1.3 release.
+DEFAULT_VERSIONS = ["0.5.0", "0.4.2", "0.3.0"]
+DEFAULT_DEPENDENCIES = {
+    "0.5.0": ("ray==2.59.0", "lance-namespace==0.13.0"),
+}
+RELEASE_DEPENDENCIES = ("ray==2.55.1", "lance-namespace==0.7.5")
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -108,18 +112,19 @@ def parse_args() -> argparse.Namespace:
     )
     p.add_argument(
         "--ray-spec",
-        default="ray==2.55.1",
+        default=None,
         help="Pip spec for ray. Pinned by default so the matrix is "
         "reproducible across runs and does not drift with PyPI. Override "
         "(e.g. 'ray') to let pip pick a compatible version per lance-ray. "
-        "Default: %(default)s",
+        "The default follows the selected lance-ray version.",
     )
     p.add_argument(
         "--lance-namespace-spec",
-        default="lance-namespace==0.7.5",
+        default=None,
         help="Pip spec for lance-namespace. Pinned by default so the "
         "matrix is reproducible and does not drift with PyPI. Override "
-        "(e.g. 'lance-namespace') for latest. Default: %(default)s",
+        "(e.g. 'lance-namespace') for latest. The default follows the selected "
+        "lance-ray version.",
     )
     p.add_argument(
         "--keep-going",
@@ -144,6 +149,14 @@ def ensure_venv(python: str, venv_dir: Path) -> Path:
         if rc != 0:
             raise RuntimeError(f"Failed to create venv at {venv_dir}")
     return venv_python
+
+
+def dependency_specs(version: str, ray_spec: str | None, namespace_spec: str | None):
+    """Choose verified defaults while honoring explicit dependency overrides."""
+    default_ray, default_namespace = DEFAULT_DEPENDENCIES.get(
+        version, RELEASE_DEPENDENCIES
+    )
+    return ray_spec or default_ray, namespace_spec or default_namespace
 
 
 def _deps_sentinel(
@@ -250,9 +263,24 @@ def run_unittest(venv_python: Path, gravitino_home: Path) -> int:
         "tests.integration.test_lance_ray",
     ]
     print(f"[matrix] $ PYTHONPATH=... GRAVITINO_HOME=... {' '.join(cmd)}")
-    return subprocess.run(
-        cmd, cwd=str(PYTHON_CLIENT_DIR), env=env, check=False
-    ).returncode
+    result = subprocess.run(
+        cmd,
+        cwd=str(PYTHON_CLIENT_DIR),
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    print(result.stdout, end="")
+    print(result.stderr, end="", file=sys.stderr)
+    if re.search(
+        r"^Ran 0 tests\b|^OK \([^\n]*\bskipped=\d+", result.stderr, re.MULTILINE
+    ):
+        print(
+            "[matrix] Lance REST tests were skipped or not collected", file=sys.stderr
+        )
+        return 1
+    return result.returncode
 
 
 def count_lance_rest_binding(conf_path: Path) -> int:
@@ -323,8 +351,9 @@ def main() -> int:
                     venv_python,
                     venv_dir,
                     version,
-                    args.ray_spec,
-                    args.lance_namespace_spec,
+                    *dependency_specs(
+                        version, args.ray_spec, args.lance_namespace_spec
+                    ),
                 )
                 generate_version_ini(venv_python)
             except Exception as e:  # pylint: disable=broad-exception-caught

@@ -30,6 +30,8 @@ Test Coverage:
 """
 
 import os
+import shutil
+import tempfile
 import threading
 import time
 import unittest
@@ -59,18 +61,13 @@ class TestFileSystemCache(unittest.TestCase):
     _catalog_name: str = "fileset_catalog"
     _schema_name: str = "tmp"
     _server_uri: str = "http://localhost:8090"
-    _fileset_dir: str = "/tmp/test_gvfs_cache"
 
     def setUp(self):
         """Set up test fixtures."""
+        temporary = tempfile.mkdtemp(prefix="gravitino-gvfs-cache-")
+        self.addCleanup(shutil.rmtree, temporary)
+        self._fileset_dir = temporary
         self.local_fs = LocalFileSystem()
-        if not self.local_fs.exists(self._fileset_dir):
-            self.local_fs.mkdir(self._fileset_dir, create_parents=True)
-
-    def tearDown(self):
-        """Clean up test artifacts."""
-        if self.local_fs.exists(self._fileset_dir):
-            self.local_fs.rm(self._fileset_dir, recursive=True)
 
     def test_filesystem_shared_across_filesets(self, *mock_methods):
         """
@@ -98,7 +95,9 @@ class TestFileSystemCache(unittest.TestCase):
                 )
             ),
             get_file_location=MagicMock(
-                side_effect=lambda fileset_id, sub_path, location_name: f"{storage_location}/{sub_path}"
+                side_effect=lambda fileset_id,
+                sub_path,
+                location_name: f"{storage_location}/{sub_path}"
             ),
         ):
             fs = gvfs.GravitinoVirtualFileSystem(

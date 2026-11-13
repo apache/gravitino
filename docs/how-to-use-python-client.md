@@ -79,6 +79,30 @@ error responses, and bypasses custom error handlers for empty or invalid error r
 Connection failures and timeouts before an HTTP error response retain their existing behavior.
 The client does not retry requests as part of this error handling.
 
+### Runtime dependency ranges
+
+The metadata client and optional storage or Lance integrations use these runtime
+requirements. Development and standard integration-test dependencies are pinned separately.
+
+| Installation | Runtime requirements |
+| --- | --- |
+| Core | `dataclasses-json>=0.6.7,<0.7`, `simplejson>=3.20.1,<5` |
+| GVFS shared | `cachetools>=7.1.4,<8`, `fsspec>=2023.12.1`, `readerwriterlock>=1.0.9,<2` |
+| HDFS | `pyarrow>=17.0.0,<27` |
+| S3 | `s3fs>=2023.12.1` |
+| GCS | `gcsfs>=2023.12.1` |
+| OSS | `ossfs>=2025.5.0` |
+| Azure | `adlfs>=2026.2.0` |
+| Lance | `ray>=2.55.1`, `lance-ray>=0.3.0,<1` |
+
+Backend libraries also constrain their dependencies. For example, s3fs and gcsfs
+2023.12.1 both require fsspec 2023.12.1. The installer selects a compatible combination
+when multiple extras or `[storage]` are requested. The storage profile does not include
+`[lance]`; request both extras when both features are needed.
+
+Python package compatibility also applies. For example, PyArrow 26 requires Python 3.11
+or later. The allowed ranges do not imply that every version combination has been tested.
+
 ### Semantic Model Ossie Import and Export
 
 Use `as_semantic_model_catalog()` on a loaded relational catalog to manage Semantic Models.

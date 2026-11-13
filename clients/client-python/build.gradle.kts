@@ -316,8 +316,7 @@ tasks {
     group = "verification"
     description =
       "Run tests/integration/test_lance_ray.py against multiple lance-ray " +
-        "versions. Override with -PlanceRayVersions=<csv> (default: " +
-        "tracks docs/lance-rest-integration.md Compatibility Matrix)."
+        "versions. Override with -PlanceRayVersions=<csv>."
 
     val versions = project.findProperty("lanceRayVersions") as? String
     val keepGoing = project.hasProperty("lanceRayKeepGoing")
@@ -353,7 +352,7 @@ tasks {
     doLast {
       gravitinoServer("start")
       try {
-        val args = mutableListOf(
+        val matrixArgs = mutableListOf(
           pythonExecutable,
           script.absolutePath,
           "--python",
@@ -362,15 +361,15 @@ tasks {
           gravitinoHome.absolutePath,
         )
         if (!versions.isNullOrBlank()) {
-          args += listOf("--versions", versions)
+          matrixArgs += listOf("--versions", versions)
         }
         if (keepGoing) {
-          args += "--keep-going"
+          matrixArgs += "--keep-going"
         }
-        val proc = ProcessBuilder(args)
-          .inheritIO()
-          .start()
-        val exit = proc.waitFor()
+        val exit = project.exec {
+          commandLine(matrixArgs)
+          isIgnoreExitValue = true
+        }.exitValue
         if (exit != 0) {
           throw GradleException("lance-ray matrix failed with exit code $exit")
         }
@@ -420,6 +419,64 @@ tasks {
 
     doLast {
       delete("README.md")
+    }
+  }
+
+  register("coreCompatibilityTest") {
+    group = "verification"
+    description = "Verify installed core SDK artifacts in isolated Ray dependency environments."
+    dependsOn(distribution)
+    val serverHome = rootDir.resolve("distribution/package")
+    val serverHomeAll = rootDir.resolve("distribution/package-all")
+    // compileDistribution cleans both directories, which may contain existing data.
+    if (!serverHome.exists() && !serverHomeAll.exists()) {
+      dependsOn(":compileDistribution")
+    }
+
+    fun interpreter(version: String, property: String): String {
+      val explicit = (project.findProperty(property) as? String)?.takeIf { it.isNotBlank() }
+      if (explicit != null) {
+        return explicit
+      }
+      val osDir = if (org.gradle.internal.os.OperatingSystem.current().isMacOsX) {
+        "MacOSX"
+      } else {
+        "Linux"
+      }
+      val conda = file("${project.rootDir}/.gradle/python/$osDir/Miniforge3/envs/python-$version/bin/python")
+      return if (conda.exists()) conda.absolutePath else "python$version"
+    }
+
+    doLast {
+      if (!serverHome.resolve("bin/gravitino.sh").isFile ||
+          !serverHome.resolve("libs").isDirectory) {
+        throw GradleException(
+          "Gravitino server distribution is incomplete; protect existing distribution data " +
+            "before rebuilding with ./gradlew compileDistribution -PskipWeb=true -x test"
+        )
+      }
+      val artifacts = projectDir.resolve("dist").listFiles { file ->
+        file.name.startsWith("apache-gravitino-") || file.name.startsWith("apache_gravitino-")
+      }?.filter { it.name.endsWith(".tar.gz") } ?: emptyList()
+      if (artifacts.size != 1) {
+        throw GradleException("Expected one Python client source distribution")
+      }
+      val args = mutableListOf(
+        interpreter("3.12", "coreCompatibilityPython"),
+        projectDir.resolve("scripts/run_core_compatibility_matrix.py").absolutePath,
+        "--artifact", artifacts.single().absolutePath,
+        "--python", interpreter("3.12", "coreCompatibilityPython"),
+        "--minimum-python", interpreter("3.10", "coreCompatibilityMinimumPython"),
+        "--gravitino-uri", "http://localhost:8090",
+        "--gravitino-home", serverHome.absolutePath,
+      )
+      (project.findProperty("coreCompatibilityCases") as? String)?.let {
+        args += listOf("--cases", it)
+      }
+      val process = ProcessBuilder(args).inheritIO().start()
+      if (process.waitFor() != 0) {
+        throw GradleException("Core SDK compatibility matrix failed")
+      }
     }
   }
 

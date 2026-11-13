@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+import shutil
+import tempfile
 import unittest
 from typing import Optional, Dict, List, Union, Any
 from unittest import mock
@@ -30,7 +32,6 @@ from tests.unittests.test_gvfs_with_local import generate_unique_random_string
 
 
 class MockGVFSHook(GravitinoVirtualFileSystemHook):
-
     # pylint: disable=too-many-instance-attributes
 
     def __init__(self):
@@ -339,20 +340,14 @@ class MockGVFSHook(GravitinoVirtualFileSystemHook):
 )
 @mock_base.mock_data
 class TestGVFSHook(unittest.TestCase):
-    _local_base_dir_path: str = "file:/tmp/fileset"
-    _fileset_dir: str = (
-        f"{_local_base_dir_path}/{generate_unique_random_string(10)}/fileset_catalog_with_hook/tmp"
-    )
-
     def setUp(self):
+        temporary = tempfile.mkdtemp(prefix="gravitino-gvfs-hook-")
+        self.addCleanup(shutil.rmtree, temporary)
+        self._local_base_dir_path = f"file:{temporary}"
+        self._fileset_dir = f"{self._local_base_dir_path}/fileset_catalog_with_hook/tmp"
         local_fs = LocalFileSystem()
         if not local_fs.exists(self._fileset_dir):
             local_fs.mkdir(self._fileset_dir)
-
-    def tearDown(self):
-        local_fs = LocalFileSystem()
-        if local_fs.exists(self._local_base_dir_path):
-            local_fs.rm(self._local_base_dir_path, recursive=True)
 
     def test_hook(self, *mock_method):
         # pylint: disable-msg=too-many-locals
