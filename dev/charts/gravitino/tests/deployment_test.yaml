@@ -555,6 +555,9 @@ tests:
           existingSecret: gravitino-pg-secret
           port: 15432
           sslMode: verify-full
+          ssl:
+            existingSecret: gravitino-pg-ca
+            caCert: ca.crt
       entity:
         jdbcUrl: jdbc:postgresql://pg.example.ci.local:5433/gravitino?sslmode=require
         jdbcDriver: org.postgresql.Driver
@@ -571,6 +574,172 @@ tests:
           content:
             name: PGSSLMODE
             value: verify-full
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGSSLROOTCERT
+            value: /db-ssl/ca.crt
+          any: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: postgresql-init-ssl
+          any: true
+
+
+  - it: derives currentSchema from entity.jdbcUrl into PGOPTIONS search_path
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=gravitino&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: gravitino
+          any: true
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=gravitino"
+          any: true
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "CREATE SCHEMA IF NOT EXISTS"
+
+  - it: overrides JDBC currentSchema with postgresql.init.currentSchema
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          currentSchema: custom_schema
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=custom_schema"
+          any: true
+
+  - it: fails when sslmode is verify-full without postgresql.init.ssl.existingSecret
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          sslMode: verify-full
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorPattern: "postgresql.init.ssl.existingSecret .* verify-ca or verify-full"
+
+  - it: fails when entity.jdbcUrl sslmode is verify-ca without CA Secret
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino?sslmode=verify-ca
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorPattern: "postgresql.init.ssl.existingSecret .* verify-ca or verify-full"
+
+
+  - it: fails when currentSchema is not a simple identifier
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          currentSchema: 'bad;schema'
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorPattern: "must be a simple PostgreSQL identifier"
+
+  - it: renders wait timeout in init-postgresql readiness loop
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          waitTimeoutSeconds: 120
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "timeout=120"
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: "timed out after"
+
+  - it: evaluates postgresql.auth.existingSecret as a template for Bitnami init
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+        auth:
+          existingSecret: "{{ .Release.Name }}-pg-credentials"
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-pg-credentials
+                key: password
           any: true
 
   - it: renders topologySpreadConstraints when set

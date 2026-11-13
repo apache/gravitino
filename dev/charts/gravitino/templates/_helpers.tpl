@@ -199,6 +199,17 @@ sslmode query parameter from entity.jdbcUrl.
 {{- end -}}
 
 {{/*
+currentSchema query parameter from entity.jdbcUrl.
+*/}}
+{{- define "gravitino.entityJdbcCurrentSchemaFromUrl" -}}
+{{- $url := .Values.entity.jdbcUrl | default "" -}}
+{{- $match := regexFind "currentSchema=([^&]+)" $url -}}
+{{- if $match -}}
+{{- trimPrefix "currentSchema=" $match -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Hostname for init-postgresql psql (-h).
 */}}
 {{- define "gravitino.postgresqlInitHost" -}}
@@ -241,13 +252,66 @@ sslmode for init-postgresql (PGSSLMODE).
 {{- end -}}
 
 {{/*
+PostgreSQL search_path / currentSchema for init-postgresql (PGOPTIONS).
+
+Prefer postgresql.init.currentSchema; otherwise currentSchema from entity.jdbcUrl.
+Empty means libpq default (typically public).
+*/}}
+{{- define "gravitino.postgresqlInitCurrentSchema" -}}
+{{- $schema := "" -}}
+{{- if .Values.postgresql.init.currentSchema -}}
+{{- $schema = .Values.postgresql.init.currentSchema | toString | trim -}}
+{{- else -}}
+{{- $schema = include "gravitino.entityJdbcCurrentSchemaFromUrl" . | trim -}}
+{{- end -}}
+{{- if $schema -}}
+{{- if not (regexMatch "^[A-Za-z_][A-Za-z0-9_]*$" $schema) -}}
+{{- fail (printf "postgresql.init.currentSchema / entity.jdbcUrl currentSchema %q must be a simple PostgreSQL identifier (letters, digits, underscore); set postgresql.init.currentSchema explicitly if needed" $schema) -}}
+{{- end -}}
+{{- $schema -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+CA Secret name for init-postgresql when sslmode needs a root cert.
+*/}}
+{{- define "gravitino.postgresqlInitSslCaSecretName" -}}
+{{- $ssl := .Values.postgresql.init.ssl | default dict -}}
+{{- $secret := $ssl.existingSecret | default "" | toString | trim -}}
+{{- if $secret -}}
+{{- $secret -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+CA Secret key for the root certificate mounted into init-postgresql.
+*/}}
+{{- define "gravitino.postgresqlInitSslCaKey" -}}
+{{- $ssl := .Values.postgresql.init.ssl | default dict -}}
+{{- $ssl.caCert | default "ca.crt" | toString | trim -}}
+{{- end -}}
+
+{{/*
+Fail when verify-ca / verify-full is set without a CA Secret for init-postgresql.
+JDBC sslrootcert is not carried into the init container; operators must mount a CA
+via postgresql.init.ssl.existingSecret (PGSSLROOTCERT). sslmode=require needs no CA.
+*/}}
+{{- define "gravitino.postgresqlInitSslValidate" -}}
+{{- $mode := include "gravitino.postgresqlInitSslMode" . | trim | lower -}}
+{{- $caSecret := include "gravitino.postgresqlInitSslCaSecretName" . | trim -}}
+{{- if and (or (eq $mode "verify-ca") (eq $mode "verify-full")) (not $caSecret) -}}
+{{- fail "postgresql.init.ssl.existingSecret (and caCert) is required when sslmode is verify-ca or verify-full; the init container does not inherit JDBC sslrootcert. Use sslmode=require without a CA, or mount a CA Secret and set PGSSLROOTCERT via init.ssl" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 Secret name for init-postgresql POSTGRES_PASSWORD secretKeyRef.
 */}}
 {{- define "gravitino.postgresqlInitSecretName" -}}
 {{- if .Values.postgresql.init.existingSecret -}}
 {{- .Values.postgresql.init.existingSecret -}}
 {{- else if and .Values.postgresql.enabled .Values.postgresql.auth.existingSecret -}}
-{{- .Values.postgresql.auth.existingSecret -}}
+{{- tpl (.Values.postgresql.auth.existingSecret | toString) . -}}
 {{- else if .Values.postgresql.enabled -}}
 {{- printf "%s-postgresql" .Release.Name -}}
 {{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}

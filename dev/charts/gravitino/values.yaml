@@ -132,8 +132,30 @@ postgresql:
     ##
     port: ""
     ## @param init.sslMode libpq sslmode (PGSSLMODE), for example require. Defaults to sslmode from entity.jdbcUrl when set.
+    ## sslmode=require does not need a CA. verify-ca and verify-full require init.ssl.existingSecret
+    ## (JDBC sslrootcert is not copied into the init container).
     ##
     sslMode: ""
+    ## @param init.currentSchema PostgreSQL schema for search_path (PGOPTIONS). Defaults to currentSchema from entity.jdbcUrl.
+    ## Aligns psql CREATE TABLE with Gravitino's JDBC currentSchema (docs: jdbc:postgresql://host:5432/db?currentSchema=schema).
+    ## When set, the init container also runs CREATE SCHEMA IF NOT EXISTS before applying SQL.
+    ##
+    currentSchema: ""
+    ## @param init.waitTimeoutSeconds Max seconds to wait for PostgreSQL readiness before failing the init container.
+    ## On timeout the last psql error is printed. Avoids hanging forever on wrong password, missing DB, or TLS failures.
+    ##
+    waitTimeoutSeconds: 300
+    ## TLS CA for init-postgresql when sslmode is verify-ca or verify-full.
+    ## Mounted at /db-ssl/ca.crt and exported as PGSSLROOTCERT.
+    ##
+    ssl:
+      ## @param init.ssl.existingSecret Secret holding the PostgreSQL server CA (and optional client material unused by psql here).
+      ## Required when sslmode is verify-ca or verify-full.
+      ##
+      existingSecret: ""
+      ## @param init.ssl.caCert Key within existingSecret for the CA certificate file.
+      ##
+      caCert: ca.crt
     ## @param init.existingSecret Kubernetes Secret name for the init container POSTGRES_PASSWORD.
     ## When postgresql.enabled is true and this is empty, defaults to postgresql.auth.existingSecret
     ## if set, otherwise {{ .Release.Name }}-postgresql.
