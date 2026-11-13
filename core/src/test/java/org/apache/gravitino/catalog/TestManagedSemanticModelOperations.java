@@ -383,6 +383,49 @@ public class TestManagedSemanticModelOperations {
   }
 
   @Test
+  public void testEveryDefinitionReplacementIsValidatedBeforePersistence() {
+    AtomicInteger writeValidationCount = new AtomicInteger();
+    ManagedSemanticModelOperations operations =
+        new ManagedSemanticModelOperations(
+            new InMemoryEntityStore(),
+            new RandomIdGenerator(),
+            (ident, definition) -> {
+              SemanticModelValidator.validateDefinition(definition);
+              writeValidationCount.incrementAndGet();
+            });
+    operations.createSemanticModel(
+        IDENT, "Original", definition("orders"), Map.of(), sources(definition("orders")));
+
+    SemanticModelDefinition first = definition("invoices");
+    SemanticModelDefinition second = definition("payments");
+    SemanticModel altered =
+        operations.alterSemanticModel(
+            IDENT,
+            sources(second),
+            SemanticModelChange.replaceDefinition(first),
+            SemanticModelChange.replaceDefinition(second));
+    assertEquals(second, altered.definition());
+    assertEquals(3, writeValidationCount.get());
+
+    // An invalid intermediate replacement aborts the batch even when a later
+    // replacement is valid.
+    SemanticModelDefinition invalid =
+        SemanticModelDefinition.builder()
+            .withDatasets(new Dataset[] {dataset("duplicate"), dataset("duplicate")})
+            .build();
+    assertThrows(
+        IllegalSemanticModelException.class,
+        () ->
+            operations.alterSemanticModel(
+                IDENT,
+                sources(second),
+                SemanticModelChange.replaceDefinition(invalid),
+                SemanticModelChange.replaceDefinition(definition("orders"))));
+    assertEquals(3, writeValidationCount.get());
+    assertEquals(second, operations.loadSemanticModel(IDENT).definition());
+  }
+
+  @Test
   public void testLaterMetadataChangesDoNotSkipDefinitionReplacementValidation() {
     AtomicInteger writeValidationCount = new AtomicInteger();
     AtomicReference<NameIdentifier> validatedIdent = new AtomicReference<>();

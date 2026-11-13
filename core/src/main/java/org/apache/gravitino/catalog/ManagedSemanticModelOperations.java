@@ -243,9 +243,17 @@ public class ManagedSemanticModelOperations {
           oldEntity -> {
             SemanticModelEntity candidate = applyChanges(oldEntity, sourceUpdate, changes);
             if (validateForWrite) {
-              writeValidator.accept(
-                  NameIdentifier.of(candidate.namespace(), candidate.name()),
-                  candidate.definition());
+              NameIdentifier candidateIdent =
+                  NameIdentifier.of(candidate.namespace(), candidate.name());
+              // Every replacement is validated, even when a later change replaces the
+              // definition again before the update is persisted.
+              for (SemanticModelChange change : changes) {
+                if (change instanceof SemanticModelChange.ReplaceDefinition) {
+                  writeValidator.accept(
+                      candidateIdent,
+                      ((SemanticModelChange.ReplaceDefinition) change).getDefinition());
+                }
+              }
             }
             sourceUpdate.validate(candidate.definition());
             return candidate;
