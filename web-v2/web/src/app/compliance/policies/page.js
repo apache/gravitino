@@ -46,6 +46,7 @@ import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
 import AssociatedTable from '@/components/AssociatedTable'
 import CreatePolicyDialog from './CreatePolicyDialog'
+import { accessControlPrivilegeOptions } from './constants'
 import { formatToDateTime } from '@/lib/utils'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { use } from 'react'
@@ -296,13 +297,29 @@ export default function PoliciesPage() {
               <Switch checked={currentPolicy?.enabled} disabled size='small' />
             </Descriptions.Item>
             <Descriptions.Item label='Policy Type'>{currentPolicy?.policyType}</Descriptions.Item>
-            <Descriptions.Item label='Supported Object Types'>
-              {currentPolicy?.content?.supportedObjectTypes?.length === 1
-                ? currentPolicy?.content?.supportedObjectTypes[0]
-                : currentPolicy?.content?.supportedObjectTypes?.length
-                  ? currentPolicy?.content?.supportedObjectTypes.join(', ')
-                  : '-'}
-            </Descriptions.Item>
+            {currentPolicy?.policyType === 'system_access_control' ? (
+              <>
+                <Descriptions.Item label='Applicable Roles'>
+                  {currentPolicy.content?.applicableRoles?.join(', ') || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label='Privileges'>
+                  {currentPolicy.content?.privileges
+                    ?.map(
+                      privilege =>
+                        accessControlPrivilegeOptions.find(option => option.value === privilege)?.label || privilege
+                    )
+                    .join(', ') || '-'}
+                </Descriptions.Item>
+              </>
+            ) : (
+              <Descriptions.Item label='Supported Object Types'>
+                {currentPolicy?.content?.supportedObjectTypes?.length === 1
+                  ? currentPolicy?.content?.supportedObjectTypes[0]
+                  : currentPolicy?.content?.supportedObjectTypes?.length
+                    ? currentPolicy?.content?.supportedObjectTypes.join(', ')
+                    : '-'}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label='Comment'>{currentPolicy?.comment || '-'}</Descriptions.Item>
             <Descriptions.Item label='Creator'>{currentPolicy?.audit?.creator || '-'}</Descriptions.Item>
             <Descriptions.Item label='Created At'>
@@ -313,68 +330,72 @@ export default function PoliciesPage() {
             </Descriptions.Item>
             <Descriptions.Item label='Last Modifier'>{currentPolicy?.audit?.lastModifier || '-'}</Descriptions.Item>
           </Descriptions>
-          <Title level={5} className='mt-4 mb-2'>
-            Rule(s)
-          </Title>
-          <Table
-            size='small'
-            pagination={false}
-            rowKey='name'
-            dataSource={
-              currentPolicy?.content?.customRules && Object.keys(currentPolicy.content.customRules).length > 0
-                ? Object.entries(currentPolicy.content.customRules).map(([name, content]) => ({
-                    name,
-                    content
-                  }))
-                : []
-            }
-            columns={[
-              {
-                title: 'Rule Name',
-                dataIndex: 'name',
-                key: 'name',
-                ellipsis: true
-              },
-              {
-                title: 'Rule Content',
-                dataIndex: 'content',
-                key: 'content',
-                ellipsis: true,
-                render: value => value || '-'
-              }
-            ]}
-          />
-          <Title level={5} className='mt-4 mb-2'>
-            Properties
-          </Title>
-          <Table
-            size='small'
-            pagination={false}
-            rowKey='key'
-            dataSource={
-              currentPolicy?.content?.properties && Object.keys(currentPolicy.content.properties).length > 0
-                ? Object.entries(currentPolicy.content.properties).map(([key, value]) => ({
-                    key,
-                    value
-                  }))
-                : []
-            }
-            columns={[
-              {
-                title: 'Key',
-                dataIndex: 'key',
-                key: 'key',
-                ellipsis: true
-              },
-              {
-                title: 'Value',
-                dataIndex: 'value',
-                key: 'value',
-                ellipsis: true,
-                render: value => value || '-'
-              }
-            ]}
-          />
+          {currentPolicy?.policyType !== 'system_access_control' && (
+            <>
+              <Title level={5} className='mt-4 mb-2'>
+                Rule(s)
+              </Title>
+              <Table
+                size='small'
+                pagination={false}
+                rowKey='name'
+                dataSource={
+                  currentPolicy?.content?.customRules && Object.keys(currentPolicy.content.customRules).length > 0
+                    ? Object.entries(currentPolicy.content.customRules).map(([name, content]) => ({
+                        name,
+                        content
+                      }))
+                    : []
+                }
+                columns={[
+                  {
+                    title: 'Rule Name',
+                    dataIndex: 'name',
+                    key: 'name',
+                    ellipsis: true
+                  },
+                  {
+                    title: 'Rule Content',
+                    dataIndex: 'content',
+                    key: 'content',
+                    ellipsis: true,
+                    render: value => value || '-'
+                  }
+                ]}
+              />
+              <Title level={5} className='mt-4 mb-2'>
+                Properties
+              </Title>
+              <Table
+                size='small'
+                pagination={false}
+                rowKey='key'
+                dataSource={
+                  currentPolicy?.content?.properties && Object.keys(currentPolicy.content.properties).length > 0
+                    ? Object.entries(currentPolicy.content.properties).map(([key, value]) => ({
+                        key,
+                        value
+                      }))
+                    : []
+                }
+                columns={[
+                  {
+                    title: 'Key',
+                    dataIndex: 'key',
+                    key: 'key',
+                    ellipsis: true
+                  },
+                  {
+                    title: 'Value',
+                    dataIndex: 'value',
+                    key: 'value',
+                    ellipsis: true,
+                    render: value => value || '-'
+                  }
+                ]}
+              />
+            </>
+          )}
           {anthEnable && (
             <>
               <Title level={5} className='mt-4 mb-2'>
