@@ -25,6 +25,7 @@ from gravitino.exceptions.base import (
 )
 from gravitino.filesystem.gvfs_config import GVFSConfig
 from gravitino.filesystem.gvfs_default_operations import DefaultGVFSOperations
+from gravitino.filesystem.gvfs_storage_handler import S3StorageHandler
 from gravitino.name_identifier import NameIdentifier
 
 
@@ -130,6 +131,56 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(catalog.get_secrets.call_count, 2)
         self.assertEqual(schema.get_secrets.call_count, 2)
         self.assertEqual(fileset.get_secrets.call_count, 2)
+
+    def test_removed_fileset_secret_falls_back_to_catalog_secret_with_cache(self):
+        operations = DefaultGVFSOperations(
+            server_uri="http://localhost:8090",
+            metalake_name="ml",
+            options={GVFSConfig.GVFS_FILESYSTEM_ENABLE_FILESET_METADATA_CACHE: True},
+        )
+
+        catalog = MagicMock()
+        schema = MagicMock()
+        fileset = MagicMock()
+        catalog.properties.return_value = {
+            "s3_access_key_id": "******",
+            "s3_secret_access_key": "******",
+        }
+        catalog.get_secrets.return_value = {
+            "s3_access_key_id": "catalog-key-id",
+            "s3_secret_access_key": "catalog-secret",
+        }
+        catalog.support_credentials.return_value.get_credentials.return_value = []
+        catalog.as_schemas.return_value.load_schema.return_value = schema
+        schema.properties.return_value = {}
+        schema.get_secrets.return_value = {}
+        catalog.as_fileset_catalog.return_value.load_fileset.return_value = fileset
+        # The cached fileset keeps the masked override after it is removed on the server.
+        fileset.properties.return_value = {"s3_secret_access_key": "******"}
+        fileset.get_secrets.return_value = {"s3_secret_access_key": "fileset-secret"}
+
+        client = MagicMock()
+        client.load_catalog.return_value = catalog
+        fileset_ident = NameIdentifier.of("ml", "catalog", "schema", "fs")
+
+        with patch.object(operations, "_get_gravitino_client", return_value=client):
+            with patch.object(operations, "_get_user_defined_configs", return_value={}):
+                first = operations._merge_fileset_properties(
+                    fileset_ident, "s3://bucket/data"
+                )
+                fileset.get_secrets.return_value = {}
+                second = operations._merge_fileset_properties(
+                    fileset_ident, "s3://bucket/data"
+                )
+
+        catalog.as_fileset_catalog.return_value.load_fileset.assert_called_once()
+        self.assertEqual(first["s3_secret_access_key"], "fileset-secret")
+        handler = S3StorageHandler()
+        with patch.object(handler, "get_filesystem") as get_filesystem:
+            handler.get_filesystem_with_expiration([], second, "s3://bucket/data")
+        get_filesystem.assert_called_once()
+        self.assertEqual(get_filesystem.call_args.kwargs["key"], "catalog-key-id")
+        self.assertEqual(get_filesystem.call_args.kwargs["secret"], "catalog-secret")
 
     def test_secret_override(self):
         operations = DefaultGVFSOperations(
