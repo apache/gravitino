@@ -61,6 +61,9 @@ public interface SupportsCatalogs {
    * defaulting to {@code "true"} when absent. Other properties are omitted, and catalog wrappers
    * are not initialized. Name, type, provider, comment, and audit information are still populated.
    *
+   * <p>Use lightweight descriptors for discovery only. Call {@link #loadCatalog(String)} before
+   * reading, comparing, or altering catalog properties.
+   *
    * <p>The default implementation throws {@link UnsupportedOperationException}.
    *
    * @param includeProperties whether to include resolved catalog properties

@@ -226,8 +226,8 @@ descriptors without resolving properties or initializing server-side catalog wra
 `list_catalogs_info(include_properties=False)` in Python. Descriptors retain
 the name, type, provider, comment, and audit information. Their properties retain only `in-use`,
 read directly from stored metadata and defaulting to `"true"` when absent, so enabled and disabled
-catalogs remain distinguishable without initializing catalog wrappers. Load a catalog to retrieve
-its complete information when needed.
+catalogs remain distinguishable without initializing catalog wrappers. Use descriptors for discovery
+only. Load a catalog before reading, comparing, or altering its properties.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

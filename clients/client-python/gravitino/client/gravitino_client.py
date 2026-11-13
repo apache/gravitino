@@ -107,7 +107,8 @@ class GravitinoClient(
         Args:
             include_properties: Whether to resolve catalog properties. Defaults to True.
                 False returns lightweight descriptors retaining only the in-use property and
-                name, type, provider, comment, and audit information.
+                name, type, provider, comment, and audit information. Use them for discovery
+                only. Call load_catalog before reading, comparing, or altering properties.
 
         Returns:
             A list of catalogs under the current metalake.

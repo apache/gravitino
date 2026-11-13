@@ -235,8 +235,8 @@ class GravitinoMetalake(
                 False returns lightweight descriptors without initializing server-side
                 catalog wrappers. Their properties retain only in-use, read from stored
                 metadata and defaulting to "true" when absent; name, type, provider,
-                comment, and audit information
-                remain populated. Load a catalog to retrieve its full information.
+                comment, and audit information remain populated. Use descriptors for discovery
+                only. Call load_catalog before reading, comparing, or altering properties.
 
         Raises:
             NoSuchMetalakeException if the metalake with specified namespace does not exist.

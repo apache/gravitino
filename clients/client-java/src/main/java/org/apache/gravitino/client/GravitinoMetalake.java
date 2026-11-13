@@ -224,6 +224,7 @@ public class GravitinoMetalake extends MetalakeDTO
     return listCatalogsInfo(params);
   }
 
+  /** {@inheritDoc} */
   @Override
   public Catalog[] listCatalogsInfo(boolean includeProperties) throws NoSuchMetalakeException {
     Map<String, String> params = new HashMap<>();

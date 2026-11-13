@@ -149,6 +149,7 @@ public class GravitinoClient extends GravitinoClientBase
     return getMetalake().listCatalogsInfo();
   }
 
+  /** {@inheritDoc} */
   @Override
   public Catalog[] listCatalogsInfo(boolean includeProperties) throws NoSuchMetalakeException {
     return getMetalake().listCatalogsInfo(includeProperties);
