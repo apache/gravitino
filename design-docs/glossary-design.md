@@ -56,9 +56,9 @@ history and grants on domains. Implementation Steps lists what each step contain
    created. In Step 1, domains group and filter terms. They do not change who can see or manage a
    term.
 5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`. New terms are `APPROVED`. Anyone who can edit a
-   term can set its status, in the create or update call. There are no transition rules. Agents
-   only see `APPROVED` terms they can read. Step 1 has no approval decision; `APPROVED` means
-   available for agent use.
+   term can set its status, in the create or update call. There are no transition rules. Glossary
+   queries for agents return only readable `APPROVED` terms. Step 1 has no approval decision;
+   `APPROVED` means available for agent use.
 6. **Privileges**: `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, granted on the
    metalake. CREATE permits creation and maintenance of own terms; MANAGE permits reading,
    editing and deleting any term, without an approval role in Step 1. Drafts are visible only to
@@ -83,8 +83,8 @@ history and grants on domains. Implementation Steps lists what each step contain
    `FUZZY` or `SEMANTIC`) and a score, and `resolve_business_term` keeps the same input and output.
 4. **Access through terms**: a term or a binding never gives or blocks access to data. Terms have
    no policies.
-5. **Agent writes and the UI itself**: the MCP tools are read-only. The UI uses the REST API. Web UI
-   support lists the calls for each part of the page.
+5. **Agent writes and the UI itself**: the new glossary MCP tools are read-only. The UI uses the
+   REST API. Web UI support lists the calls for each part of the page.
 
 ## Delivery Scope and Tracking
 
@@ -384,8 +384,8 @@ Both can write bindings. The server checks each term in the request separately:
 - Binding a missing object or metric fails with 404. Binding any other object type fails with 400.
   The status restriction on the object-admin path applies only after term visibility is checked
   and only when the term-editor path does not allow the operation.
-- When a term is deprecated later, it keeps its bindings. It no longer shows in lookups or MCP
-  results.
+- When a term is deprecated later, it keeps its bindings. It no longer shows in lookups or
+  glossary MCP results.
 
 **Reads**
 
@@ -473,14 +473,14 @@ pending-content rules are specified separately below.
   with CREATE never permits deletion, even after changing a term back to `DRAFT`. Deprecation
   before deletion is optional. MANAGE is an administration privilege in Step 1, not an approval
   privilege.
-- **Why three states**: each term is used on its own. `DRAFT` keeps a term away from agents while
-  it is written. Bindings and people keep using a term after it is replaced, so `DEPRECATED` keeps
-  it readable, which a delete cannot do. In Step 2, `APPROVED` also records that a reviewer
+- **Why three states**: each term is used on its own. `DRAFT` keeps a term out of approved-only
+  glossary queries while it is written. Bindings and people keep using a term after it is
+  replaced, so `DEPRECATED` keeps it readable, which a delete cannot do. In Step 2, `APPROVED` also records that a reviewer
   accepted the term. A domain or an ontology (#14310) is published as a whole and has no review per
   item, so `DRAFT` / `PUBLISHED` is enough there.
-- **Every API applies the same term-read authorization** (REST, clients, MCP); MCP additionally
-  excludes non-`APPROVED` terms. If the caller cannot see a term, lists leave it out and get
-  returns 404. The same rule applies inside responses. The `broader`,
+- **Every API applies the same term-read authorization** (REST, clients, MCP); the new glossary
+  MCP tools additionally exclude non-`APPROVED` terms. If the caller cannot see a term, lists leave
+  it out and get returns 404. The same rule applies inside responses. The `broader`,
   `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
   leave out terms the caller cannot see. So a hidden draft never shows up as a relation.
 - **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
@@ -902,6 +902,13 @@ terms; service-identity modes limit results to the service principal's authorize
 Do not claim end-user impersonation in service or unauthenticated modes. Reuse the existing audit
 attribution and client isolation by identity and metalake.
 
+The APPROVED-only restriction applies to the glossary semantic queries defined below, not to
+every existing MCP tool. For example, generic `list_metadata_by_tag` can enumerate a DRAFT or
+DEPRECATED term's name/type when ordinary term-read authorization permits it. Such discovery
+does not make that term a published business definition. An agent must resolve/get it through
+the glossary tools before using its definition or bindings; those tools still reject an
+unapproved root. Generic tag APIs retain their existing authorization and response shapes.
+
 **End-to-end flow**
 
 Example question: "net revenue from VIP active users last month".
@@ -1034,8 +1041,10 @@ User question
 
 1. Pass each business phrase whole and in the singular form. Leave out time ranges, numbers and
    query words.
-2. Only `APPROVED` terms are returned. A word in `unmatched` has no authorized approved exact
-   match in this query. Ask for clarification rather than asserting no business meaning exists.
+2. These glossary tools return only `APPROVED` terms. Discovery through a generic metadata tool
+   does not establish that a term is published; resolve/get it here before using it. A word in
+   `unmatched` has no authorized approved exact match in this query. Ask for clarification rather
+   than asserting no business meaning exists.
    A lookup error is not `unmatched`; follow the definition-only/narrowed-query fallback above.
 3. If a word matches several terms, use the domains to pick one, or ask the user.
 4. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
@@ -1680,8 +1689,8 @@ The users for these cases:
 - T16.1 With the fixture of the example in Agent integration, `resolve_business_term` returns the
   JSON in that example. The test compares it with a stored JSON file.
 - T16.2 25 words send two REST calls (20 and 5). The results keep the order of the words.
-- T16.3 No successful tool result contains a DRAFT or DEPRECATED term, including root names,
-  name-only relations, hierarchy nodes and reverse object results. Run every tool as MANAGE
+- T16.3 No successful glossary tool result contains a DRAFT or DEPRECATED term, including root names,
+  name-only relations, hierarchy nodes and reverse object results. Run every glossary tool as MANAGE
   and as the draft owner, who can read the drafts through unfiltered REST. Direct draft or
   deprecated roots fail with 404; a hierarchy walk from an APPROVED root through a DRAFT
   toward another APPROVED node stops before the draft and all nodes reached only through it.
@@ -1710,6 +1719,9 @@ The users for these cases:
 - T16.10 With batched words, one REST batch succeeds and another fails its budget. The tool must
   not present the first batch as a complete successful lookup or classify unprocessed words as
   unmatched. Return the typed tool error; a later definition-only request is a new operation.
+- T16.11 As MANAGE, discover a readable DRAFT/DEPRECATED term's name/type through the generic
+  tag tool, then pass it to the glossary tools: get/binding reads return 404 and semantic lookup
+  omits it. Generic discovery is not a publication signal and triggers no unfiltered retry.
 
 **T17. CUJ integration tests**: the cases are the CUJs in Critical user journeys below.
 
