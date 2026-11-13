@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -165,12 +166,42 @@ public class TestNameIdentifierUtil {
             NameIdentifierUtil.ofTag("metalake1", "tag1"), Entity.EntityType.TAG);
     assertEquals(expectedTagObject, tagObject);
 
+    // Test a domain identifier.
+    NameIdentifier domain = NameIdentifierUtil.ofDomain("metalake1", "Finance_Trading");
+    assertEquals(NamespaceUtil.ofDomain("metalake1"), domain.namespace());
+    assertEquals(
+        MetadataObjects.parse("Finance_Trading", MetadataObject.Type.DOMAIN),
+        NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
+    assertEquals(
+        domain,
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.DOMAIN,
+            "Finance_Trading",
+            ImmutableMap.of(Entity.EntityType.METALAKE, "metalake1")));
+    assertEquals(
+        NameIdentifier.of("metalake1"),
+        NameIdentifierUtil.parentNameIdentifier(domain, Entity.EntityType.DOMAIN));
+    assertThrows(
+        IllegalNamespaceException.class,
+        () ->
+            NameIdentifierUtil.toMetadataObject(
+                NameIdentifier.of("metalake1", "Finance"), Entity.EntityType.DOMAIN));
+
     // test model version is not convertible to MetadataObject
     NameIdentifier modelVersion =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "model1", "0");
     assertThrows(
         IllegalArgumentException.class,
         () -> NameIdentifierUtil.toMetadataObject(modelVersion, Entity.EntityType.MODEL_VERSION));
+  }
+
+  /** Domain names use the same identifier rules as catalogs. */
+  @Test
+  public void testRejectDottedDomainMetadataObjectName() {
+    NameIdentifier domain = NameIdentifier.of("metalake1", "Finance.Trading");
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> NameIdentifierUtil.toMetadataObject(domain, Entity.EntityType.DOMAIN));
   }
 
   @Test

@@ -9,7 +9,8 @@ license: "This software is licensed under the Apache License version 2."
 
 A metalake is the top of the Gravitino hierarchy and the boundary everything else lives inside.
 Catalogs, schemas, tables, filesets, topics, models, and functions all sit beneath one, and so do the
-users, groups, roles, tags, policies, and jobs that apply to them.
+users, groups, roles, tags, policies, domains, and jobs that apply to them.
+[Domains](./domains.md) group metadata from catalogs within this same metalake using backing tags.
 
 Nothing crosses that boundary:
 

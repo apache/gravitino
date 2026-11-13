@@ -287,6 +287,7 @@ Add or update tests in your PR. Test open PRs locally to help maintainers.
 * Avoid unnecessary dependencies
 * Prefer well-maintained libraries
 * Discuss major additions on dev@
+* Known vulnerabilities in shipped artifacts are scanned weekly with Trivy; see [.github/trivy/README.md](.github/trivy/README.md) for how to run the scan locally and how to add an exemption
 
 ## 🛡️ Performing Compliance and Legal Checks
 

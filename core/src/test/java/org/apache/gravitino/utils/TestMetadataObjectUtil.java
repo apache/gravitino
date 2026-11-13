@@ -134,6 +134,8 @@ public class TestMetadataObjectUtil {
       Assertions.assertTrue(entityTypes.contains(MetadataObjectUtil.toEntityType(type)));
     }
     Assertions.assertEquals(MetadataObject.Type.values().length - 1, entityTypes.size());
+    Assertions.assertEquals(
+        Entity.EntityType.DOMAIN, MetadataObjectUtil.toEntityType(MetadataObject.Type.DOMAIN));
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> entityTypes.add(Entity.EntityType.USER));
   }
@@ -203,6 +205,17 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            MetadataObjectUtil.toEntityIdent(
+                "metalake", MetadataObjects.parse("bad.name", MetadataObject.Type.DOMAIN)));
+
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofDomain("metalake", "Finance_Trading"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake", MetadataObjects.of(null, "Finance_Trading", MetadataObject.Type.DOMAIN)));
 
     Assertions.assertEquals(
         NameIdentifier.of("metalake", "catalog", "schema", "function"),

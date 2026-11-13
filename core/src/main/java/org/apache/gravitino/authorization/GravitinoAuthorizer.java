@@ -55,6 +55,24 @@ public interface GravitinoAuthorizer extends Closeable {
       Privilege.Name privilege,
       AuthorizationRequestContext requestContext);
 
+  /**
+   * Checks domain visibility for generic metadata access expressions. Implementations evaluate the
+   * current parent and status; the default fails closed.
+   *
+   * @param principal The caller.
+   * @param metalake The metalake name.
+   * @param object The metadata object.
+   * @param requestContext The request context.
+   * @return Whether the object can be read.
+   */
+  default boolean canAccessDomain(
+      Principal principal,
+      String metalake,
+      MetadataObject object,
+      AuthorizationRequestContext requestContext) {
+    return false;
+  }
+
   boolean deny(
       Principal principal,
       String metalake,

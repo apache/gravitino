@@ -39,7 +39,7 @@ import org.apache.gravitino.file.FilesetCatalog;
 public class FilesetMetadataCache implements Closeable {
 
   private final GravitinoClient client;
-  private final Cache<NameIdentifier, FilesetCatalog> catalogCache;
+  private final Cache<NameIdentifier, Catalog> catalogCache;
   private final Cache<NameIdentifier, Fileset> filesetCache;
   private final Cache<NameIdentifier, Schema> schemaCache;
 
@@ -56,19 +56,35 @@ public class FilesetMetadataCache implements Closeable {
   }
 
   /**
+   * Gets the fileset catalog by the given catalog identifier as a {@link Catalog}.
+   *
+   * @param catalogIdent the catalog identifier.
+   * @return the catalog.
+   */
+  public Catalog getCatalog(NameIdentifier catalogIdent) {
+    Catalog catalog =
+        catalogCache.get(
+            catalogIdent,
+            ident -> {
+              Catalog loaded = client.loadCatalog(ident.name());
+              // Throw inside the loader so that a non-fileset catalog is not cached.
+              loaded.asFilesetCatalog();
+              return loaded;
+            });
+
+    Preconditions.checkArgument(
+        catalog != null, String.format("Loaded catalog: %s is null.", catalogIdent));
+    return catalog;
+  }
+
+  /**
    * Gets the fileset catalog by the given catalog identifier.
    *
    * @param catalogIdent the catalog identifier.
    * @return the fileset catalog.
    */
   public FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    FilesetCatalog filesetCatalog =
-        catalogCache.get(
-            catalogIdent, ident -> client.loadCatalog(catalogIdent.name()).asFilesetCatalog());
-
-    Preconditions.checkArgument(
-        filesetCatalog != null, String.format("Loaded fileset catalog: %s is null.", catalogIdent));
-    return filesetCatalog;
+    return getCatalog(catalogIdent).asFilesetCatalog();
   }
 
   /**
@@ -98,14 +114,10 @@ public class FilesetMetadataCache implements Closeable {
     NameIdentifier catalogIdent =
         NameIdentifier.of(schemaIdent.namespace().level(0), schemaIdent.namespace().level(1));
     return schemaCache.get(
-        schemaIdent,
-        ident -> {
-          Catalog c = client.loadCatalog(catalogIdent.name());
-          return c.asSchemas().loadSchema(schemaIdent.name());
-        });
+        schemaIdent, ident -> getCatalog(catalogIdent).asSchemas().loadSchema(schemaIdent.name()));
   }
 
-  private Cache<NameIdentifier, FilesetCatalog> newCatalogCache() {
+  private Cache<NameIdentifier, Catalog> newCatalogCache() {
     // In most scenarios, it will not read so many catalog filesets at the same time, so we can just
     // set a default value for this cache.
     return Caffeine.newBuilder()

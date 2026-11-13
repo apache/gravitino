@@ -45,6 +45,19 @@ public class TestExceptions {
   }
 
   @Test
+  public void testDomainExceptionsHierarchy() {
+    // The parents drive the HTTP mapping: AlreadyExistsException to 409, NotFoundException to 404.
+    Object alreadyBound = new BackingTagAlreadyBoundException("Tag %s already backs %s", "t", "d");
+    Object alreadyExists = new DomainAlreadyExistsException("Domain %s already exists", "d");
+    Object noSuchDomain = new NoSuchDomainException("Domain %s does not exist", "d");
+    Assertions.assertTrue(alreadyBound instanceof AlreadyExistsException);
+    Assertions.assertTrue(alreadyExists instanceof AlreadyExistsException);
+    Assertions.assertTrue(noSuchDomain instanceof NotFoundException);
+    Assertions.assertEquals(
+        "Tag t already backs d", ((BackingTagAlreadyBoundException) alreadyBound).getMessage());
+  }
+
+  @Test
   public void testGlossaryExceptionsHierarchy() {
     // The parents drive the HTTP mapping: AlreadyExistsException to 409, NotFoundException to 404.
     Object alreadyExists = new TermAlreadyExistsException("Term %s already exists", "Churn");

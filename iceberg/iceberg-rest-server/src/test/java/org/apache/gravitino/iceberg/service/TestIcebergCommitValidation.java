@@ -210,6 +210,43 @@ public class TestIcebergCommitValidation {
                 catalog, staged, IcebergCommitValidation.withValidation(request)));
   }
 
+  /** A staged create cannot change a table created by another client before the commit. */
+  @Test
+  public void testStagedCreateCannotReplaceExistingTable() {
+    TableIdentifier identifier = TableIdentifier.of("db", "concurrent_create");
+    UpdateTableRequest create = stagedCreateRequest(identifier);
+    UpdateTableRequest request =
+        new UpdateTableRequest(
+            create.requirements(),
+            ImmutableList.<MetadataUpdate>builder()
+                .addAll(create.updates())
+                .add(new MetadataUpdate.SetProperties(ImmutableMap.of("owner", "staged_creator")))
+                .add(new MetadataUpdate.SetLocation("/data/staged_create"))
+                .build());
+
+    // Another client creates the table after staging and before the first client's commit.
+    Table existing =
+        catalog
+            .buildTable(identifier, SCHEMA)
+            .withProperty("owner", "other_creator")
+            .withLocation("/data/concurrent_create")
+            .create();
+    TableMetadata before = ((HasTableOperations) existing).operations().current();
+
+    Assertions.assertThrows(
+        CommitFailedException.class,
+        () ->
+            CatalogHandlers.updateTable(
+                catalog, identifier, IcebergCommitValidation.withValidation(request)));
+
+    TableMetadata after =
+        ((HasTableOperations) catalog.loadTable(identifier)).operations().current();
+    Assertions.assertEquals(before.metadataFileLocation(), after.metadataFileLocation());
+    Assertions.assertEquals(before.uuid(), after.uuid());
+    Assertions.assertEquals(before.properties(), after.properties());
+    Assertions.assertEquals(before.location(), after.location());
+  }
+
   @Test
   public void testStagedCreateIsValidatedBeforeCommit() {
     TableIdentifier staged = TableIdentifier.of("db", "invalid_staged");

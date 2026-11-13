@@ -79,6 +79,12 @@ public interface MetadataObject {
     /** A function represents a user-defined function registered in Gravitino. */
     FUNCTION,
     /**
+     * A domain groups metadata objects from any catalog under a business name. A leaf object, such
+     * as a table, belongs to a domain when its effective tags, its own or those inherited from its
+     * schema and catalog, match the domain's backing tag. A domain cannot be tagged itself.
+     */
+    DOMAIN,
+    /**
      * A glossary term defines a business word in a metalake, and can be bound to the metadata
      * objects and metrics behind it.
      */
