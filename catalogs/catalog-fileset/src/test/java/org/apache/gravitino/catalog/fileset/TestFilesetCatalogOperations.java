@@ -2816,6 +2816,38 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testFileSystemCacheSeparatesResolvedLoginSettings() throws Exception {
+    File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/shared-site.xml");
+    FileUtils.writeStringToFile(
+        resource,
+        "<configuration><property><name>"
+            + HADOOP_SECURITY_PRINCIPAL
+            + "</name><value>svc@${tenant.realm}</value></property></configuration>",
+        StandardCharsets.UTF_8);
+    Map<String, String> first =
+        ImmutableMap.of(
+            CONFIG_RESOURCES,
+            resource.getAbsolutePath(),
+            GRAVITINO_BYPASS + "tenant.realm",
+            "A.COM");
+    Map<String, String> second =
+        ImmutableMap.of(
+            CONFIG_RESOURCES,
+            resource.getAbsolutePath(),
+            GRAVITINO_BYPASS + "tenant.realm",
+            "B.COM");
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      for (Path path :
+          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
+        Assertions.assertNotSame(
+            ops.getFileSystemWithCache(path, first), ops.getFileSystemWithCache(path, second));
+      }
+    }
+  }
+
+  @Test
   public void testTestConnectionWithoutCatalogLocation() throws IOException {
     try (FilesetCatalogOperations catalogOperations =
         new FilesetCatalogOperations(store, secretManager)) {

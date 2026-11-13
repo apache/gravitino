@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_K
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
 import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
+import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -33,7 +34,6 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_LOCATION_PLACEHOLDER_PR
 import static org.apache.gravitino.file.Fileset.PROPERTY_MULTIPLE_LOCATIONS_PREFIX;
 import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import static org.apache.gravitino.metrics.MetricNames.FILESYSTEM_CACHE;
-import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
 import com.codahale.metrics.caffeine.MetricsStatsCounter;
 import com.github.benmanes.caffeine.cache.Cache;
@@ -41,7 +41,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
@@ -228,24 +227,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   static class FileSystemCacheKey {
-    // The settings that decide how an HDFS file system logs in. The authority carries the principal
-    // only without its realm, and a location without a scheme has no authority at all.
-    private static final List<String> AUTHENTICATION_KEYS =
-        ImmutableList.of(
-            AuthenticationConfig.AUTH_TYPE_KEY,
-            AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-            KerberosConfig.PRINCIPAL_KEY,
-            KerberosConfig.KEY_TAB_URI_KEY,
-            HADOOP_SECURITY_AUTHENTICATION,
-            GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION,
-            HADOOP_SECURITY_PRINCIPAL,
-            GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL,
-            HADOOP_SECURITY_KEYTAB,
-            GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB,
-            HADOOP_KRB5_CONF,
-            GRAVITINO_BYPASS + HADOOP_KRB5_CONF,
-            CONFIG_RESOURCES);
-
     /**
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
@@ -264,13 +245,38 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.scheme = scheme;
       this.authority = authority;
       this.currentUser = PrincipalUtils.getCurrentUserName();
+      this.authenticationSettings = resolveAuthenticationSettings(conf);
+    }
+
+    /**
+     * Resolves the settings that decide how an HDFS file system logs in from the Hadoop
+     * configuration that {@code HDFSFileSystemProxy} builds, so that values from {@code
+     * config.resources} files and variable expansion count. The authority carries the principal
+     * only without its realm, and a location without a scheme has no authority at all.
+     */
+    private static Map<String, String> resolveAuthenticationSettings(Map<String, String> conf) {
+      Configuration configuration =
+          FileSystemUtils.createCompatibleConfiguration(
+              GRAVITINO_BYPASS, additionalHDFSConfig(conf));
+      AuthenticationConfig authenticationConfig = new AuthenticationConfig(conf, configuration);
       Map<String, String> settings = new HashMap<>();
-      for (String key : AUTHENTICATION_KEYS) {
-        if (conf.containsKey(key)) {
-          settings.put(key, conf.get(key));
-        }
-      }
-      this.authenticationSettings = Collections.unmodifiableMap(settings);
+      settings.put(AuthenticationConfig.AUTH_TYPE_KEY, authenticationConfig.getAuthType());
+      settings.put(
+          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
+          String.valueOf(authenticationConfig.isImpersonationEnabled()));
+      // A catalog, schema or fileset property overrides the Hadoop value, as in KerberosConfig.
+      settings.put(
+          KerberosConfig.PRINCIPAL_KEY,
+          conf.getOrDefault(
+              KerberosConfig.PRINCIPAL_KEY, configuration.get(HADOOP_SECURITY_PRINCIPAL, "")));
+      settings.put(
+          KerberosConfig.KEY_TAB_URI_KEY,
+          conf.getOrDefault(
+              KerberosConfig.KEY_TAB_URI_KEY, configuration.get(HADOOP_SECURITY_KEYTAB, "")));
+      settings.put(HADOOP_KRB5_CONF, configuration.get(HADOOP_KRB5_CONF, ""));
+      // Other settings in these files, such as HA name services, decide which cluster is reached.
+      settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
+      return Collections.unmodifiableMap(settings);
     }
 
     @Override
