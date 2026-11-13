@@ -75,9 +75,10 @@ NOTE: External PostgreSQL schema init is enabled (postgresql.init.enabled).
 The init-postgresql container requires postgresql.init.existingSecret
 (operator-managed Secret with the application user password). Host, port, and
 sslmode default from entity.jdbcUrl when postgresql.init.host/port/sslMode are
-empty. JDBC URL host/port parsing supports only a single host:port (not IPv6
-bracket literals or multi-host authorities); set postgresql.init.host/port for
-those forms. Database name is taken from entity.jdbcUrl.
+empty. JDBC URL host/port parsing supports only a single host:port; IPv6
+bracket literals or multi-host authorities fail at render — set
+postgresql.init.host/port for those forms. Database name is taken from
+entity.jdbcUrl.
 {{- end }}
 
 To check pod status:
