@@ -82,23 +82,10 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   expect(directTag.textContent).toBe('direct')
   expect(inheritedTag.textContent).toBe('inherited')
   expect(inheritedTag.querySelector('.ant-tag-close-icon')).toBeNull()
-  expect(container.textContent.includes('Associate Policy')).toBe(!readOnly)
+  expect(container.textContent.includes('Associate Policy')).toBe(false)
 
   const close = directTag.querySelector('.ant-tag-close-icon')
-  if (readOnly) {
-    expect(close).toBeNull()
-  } else {
-    expect(close).not.toBeNull()
-    defHttp.post.mockResolvedValue({ code: 0 })
-    defHttp.get.mockResolvedValue({ policies: [inheritedPolicy] })
-    await act(async () => close.click())
-    expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
-      url: '/api/metalakes/demo/objects/table/sales.mart.orders/policies',
-      data: { policiesToRemove: ['direct'] }
-    })
-    expect(container.textContent).not.toContain('direct')
-    expect(navigation.push).not.toHaveBeenCalled()
-  }
+  expect(close).toBeNull()
 
   const policyLink = [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'inherited')
   await act(async () => policyLink.click())

@@ -29,7 +29,6 @@ import {
   updatePolicyApi,
   enableOrDisablePolicyApi,
   getPolicyDetailsApi,
-  associatePolicyApi,
   getPoliciesForTagApi,
   addPolicyForTagApi,
   removePolicyFromTagApi
@@ -108,19 +107,6 @@ export const deletePolicy = createAsyncThunk('policies/deletePolicy', async ({ m
 
   return res
 })
-
-export const associatePolicy = createAsyncThunk(
-  'policies/associatePolicy',
-  async ({ metalake, metadataObjectType, metadataObjectFullName, data }) => {
-    const [err, res] = await to(associatePolicyApi({ metalake, metadataObjectType, metadataObjectFullName, data }))
-
-    if (err || !res) {
-      throw new Error(err)
-    }
-
-    return res
-  }
-)
 
 export const getPoliciesForTag = createAsyncThunk('policies/getPoliciesForTag', async ({ metalake, tag }) => {
   const [err, res] = await to(getPoliciesForTagApi({ metalake, tag }))
@@ -204,11 +190,6 @@ const policiesSlice = createSlice({
         }
       })
       .addCase(deletePolicy.rejected, (state, action) => {
-        if (!action.error.message.includes('CanceledError')) {
-          toast.error(action.error.message)
-        }
-      })
-      .addCase(associatePolicy.rejected, (state, action) => {
         if (!action.error.message.includes('CanceledError')) {
           toast.error(action.error.message)
         }

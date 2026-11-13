@@ -22,7 +22,7 @@ import { useRouter } from 'next/navigation'
 import { LockOutlined, PlusOutlined } from '@ant-design/icons'
 import { Flex, Select, Space, Tag, Tooltip, theme } from 'antd'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { addPolicyForTag, associatePolicy, getPoliciesForTag, removePolicyFromTag } from '@/lib/store/policies'
+import { addPolicyForTag, getPoliciesForTag, removePolicyFromTag } from '@/lib/store/policies'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
 
@@ -122,21 +122,9 @@ export default function PolicyTag({ ...props }) {
 
   const handleChange = async value => {
     if (value && !policiesForObject?.map(policy => policy.name)?.includes(value)) {
-      let result
-      if (isTag) {
-        result = await dispatch(
-          addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value })
-        )
-      } else {
-        result = await dispatch(
-          associatePolicy({
-            metalake: currentMetalake,
-            metadataObjectType,
-            metadataObjectFullName,
-            data: { policiesToAdd: [value] }
-          })
-        )
-      }
+      const result = await dispatch(
+        addPolicyForTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: value })
+      )
       if (result.meta.requestStatus === 'fulfilled') {
         const policies = await getPolicies()
         if (policies) setPoliciesForObject(policies)
@@ -145,22 +133,12 @@ export default function PolicyTag({ ...props }) {
     setInputVisible(false)
   }
 
-  const handleClose = async removedPolicy => {
-    let result
-    if (isTag) {
-      result = await dispatch(
-        removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
-      )
-    } else {
-      result = await dispatch(
-        associatePolicy({
-          metalake: currentMetalake,
-          metadataObjectType,
-          metadataObjectFullName,
-          data: { policiesToRemove: [removedPolicy] }
-        })
-      )
-    }
+  const handleClose = async (removedPolicy, event) => {
+    event.preventDefault()
+
+    const result = await dispatch(
+      removePolicyFromTag({ metalake: currentMetalake, tag: metadataObjectFullName, policy: removedPolicy })
+    )
     if (result.meta.requestStatus === 'fulfilled') {
       const policies = await getPolicies()
       if (policies) setPoliciesForObject(policies)
@@ -191,12 +169,12 @@ export default function PolicyTag({ ...props }) {
           <Tag
             key={policy.name + index}
             color={color}
-            closable={!readOnly && !policy.inherited}
+            closable={isTag && !readOnly && !policy.inherited}
             icon={policy.inherited ? <LockOutlined /> : null}
             onClick={handleClick(policy.name)}
             className='cursor-pointer'
             style={{ userSelect: 'none' }}
-            onClose={() => handleClose(policy.name)}
+            onClose={event => handleClose(policy.name, event)}
           >
             <span>{isLongPolicy ? `${policy.name.slice(0, 20)}...` : policy.name}</span>
           </Tag>
@@ -211,7 +189,7 @@ export default function PolicyTag({ ...props }) {
         )
       })}
       {policiesForObject?.length === 0 && <span>No Policies</span>}
-      {inputVisible && !readOnly && (
+      {inputVisible && isTag && !readOnly && (
         <Select
           size='small'
           tagRender={tagRender}
@@ -233,7 +211,7 @@ export default function PolicyTag({ ...props }) {
           ))}
         </Select>
       )}
-      {!inputVisible && !readOnly && (
+      {!inputVisible && isTag && !readOnly && (
         <Tag style={tagPlusStyle} icon={<PlusOutlined />} onClick={showInput}>
           Associate Policy
         </Tag>
