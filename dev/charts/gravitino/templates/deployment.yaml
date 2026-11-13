@@ -125,7 +125,16 @@ spec:
             - mountPath: /scripts
               name: scripts-emptydir
       {{- end }}
-      {{- if .Values.postgresql.enabled }}
+      {{- if eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true" }}
+        {{- $_ := include "gravitino.postgresqlInitSslValidate" . }}
+        {{- $pgInitHost := include "gravitino.postgresqlInitHost" . | trim }}
+        {{- $pgInitSecret := include "gravitino.postgresqlInitSecretName" . | trim }}
+        {{- $pgInitSecretKey := .Values.postgresql.init.existingSecretPasswordKey | default "password" }}
+        {{- $pgInitPort := include "gravitino.postgresqlInitPort" . | trim }}
+        {{- $pgInitSslMode := include "gravitino.postgresqlInitSslMode" . | trim }}
+        {{- $pgInitCurrentSchema := include "gravitino.postgresqlInitCurrentSchema" . | trim }}
+        {{- $pgInitSslCaSecret := include "gravitino.postgresqlInitSslCaSecretName" . | trim }}
+        {{- $pgInitWaitTimeout := .Values.postgresql.init.waitTimeoutSeconds | default 300 }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -133,10 +142,35 @@ spec:
             - /bin/bash
             - -c
             - |
-              while ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -c "SELECT 1"; do
+              set -e
+              timeout={{ $pgInitWaitTimeout }}
+              case "$timeout" in
+                ''|*[!0-9]*) echo "ERROR: waitTimeoutSeconds must be a positive integer" >&2; exit 1 ;;
+              esac
+              if [ "$timeout" -lt 1 ]; then
+                echo "ERROR: waitTimeoutSeconds must be a positive integer" >&2
+                exit 1
+              fi
+              deadline=$((SECONDS + timeout))
+              while true; do
+                set +e
+                err=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
+                rc=$?
+                set -e
+                if [ "$rc" -eq 0 ]; then
+                  break
+                fi
+                if [ "$SECONDS" -ge "$deadline" ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for PostgreSQL at {{ $pgInitHost }}:$PGPORT/$GRAVITINO_DB" >&2
+                  echo "$err" >&2
+                  exit 1
+                fi
                 echo "Waiting for PostgreSQL to be ready..."
                 sleep 2
               done
+              if [ -n "${PG_CURRENT_SCHEMA:-}" ]; then
+                PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS \"${PG_CURRENT_SCHEMA}\""
+              fi
               VERSION=$(cat /scripts/version.txt)
               if [ -z "$VERSION" ]; then
                 echo "ERROR:Please set VERSION"
@@ -155,29 +189,50 @@ spec:
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2 
               fi
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ .Release.Name }}-postgresql -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
             - name: POSTGRES_USER
-              value: {{ .Values.postgresql.auth.username }}
+              value: {{ include "gravitino.postgresqlInitUsername" . }}
             - name: GRAVITINO_DB
-              value: {{ .Values.postgresql.auth.database }}
+              value: {{ include "gravitino.postgresqlInitDatabase" . }}
+            - name: PGPORT
+              value: {{ $pgInitPort | quote }}
+            {{- if $pgInitSslMode }}
+            - name: PGSSLMODE
+              value: {{ $pgInitSslMode | quote }}
+            {{- end }}
+            {{- if $pgInitCurrentSchema }}
+            - name: PG_CURRENT_SCHEMA
+              value: {{ $pgInitCurrentSchema | quote }}
+            - name: PGOPTIONS
+              value: {{ printf "-c search_path=%s" $pgInitCurrentSchema | quote }}
+            {{- end }}
+            {{- if $pgInitSslCaSecret }}
+            - name: PGSSLROOTCERT
+              value: /db-ssl/ca.crt
+            {{- end }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-postgresql
-                  key: password
+                  name: {{ $pgInitSecret }}
+                  key: {{ $pgInitSecretKey }}
           volumeMounts:
             - mountPath: /scripts
               name: scripts-emptydir
-        {{- end }}
+            {{- if $pgInitSslCaSecret }}
+            - name: postgresql-init-ssl
+              mountPath: /db-ssl
+              readOnly: true
+            {{- end }}
+      {{- end }}
       containers:
         - name: {{ include "gravitino.name" . }}
           image: {{ include "gravitino.image" . }}
@@ -241,7 +296,15 @@ spec:
           configMap:
             name: {{ include "gravitino.fullname" . }}
         - emptyDir: {}
-          name: scripts-emptydir    
+          name: scripts-emptydir
+        {{- if and (eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true") (include "gravitino.postgresqlInitSslCaSecretName" . | trim) }}
+        - name: postgresql-init-ssl
+          secret:
+            secretName: {{ include "gravitino.postgresqlInitSslCaSecretName" . | trim }}
+            items:
+              - key: {{ include "gravitino.postgresqlInitSslCaKey" . | trim }}
+                path: ca.crt
+        {{- end }}
         {{- if not .Values.persistence.enabled }}
         - name: storage
           emptyDir: {}
