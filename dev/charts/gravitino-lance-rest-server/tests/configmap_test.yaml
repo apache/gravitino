@@ -50,7 +50,7 @@ tests:
           path: data["gravitino-lance-rest-log4j2.properties"]
       - matchRegex:
           path: data["init.sh"]
-          pattern: "start-lance-rest-server\\.sh"
+          pattern: "exec /bin/bash .*/start-lance-rest-server\\.sh"
       - matchRegex:
           path: data["gravitino-lance-rest-server.conf"]
           pattern: "gravitino\\.lance-rest\\.httpPort = 9101"
