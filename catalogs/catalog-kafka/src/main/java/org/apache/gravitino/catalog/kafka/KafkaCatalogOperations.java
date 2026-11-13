@@ -148,17 +148,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
                 Collectors.toMap(
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
-    List<String> disallowedKeys =
-        bypassConfigs.keySet().stream()
-            .filter(KafkaCatalogOperations::isConfigProviderKey)
-            .sorted()
-            .collect(Collectors.toList());
-    Preconditions.checkArgument(
-        disallowedKeys.isEmpty(),
-        "Kafka config providers are not supported, please remove the properties: %s",
-        disallowedKeys.stream()
-            .map(key -> CATALOG_BYPASS_PREFIX + key)
-            .collect(Collectors.joining(", ")));
+    checkNoConfigProviders(config);
     adminClientConfig.putAll(bypassConfigs);
     adminClientConfig.put(
         AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -657,7 +647,27 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     }
   }
 
+  /**
+   * Rejects Kafka config provider properties passed through the bypass prefix.
+   *
+   * @param config the catalog configuration
+   * @throws IllegalArgumentException if any {@code gravitino.bypass.config.providers} property is
+   *     set
+   */
+  static void checkNoConfigProviders(Map<String, String> config) {
+    String disallowedKeys =
+        config.keySet().stream()
+            .filter(KafkaCatalogOperations::isConfigProviderKey)
+            .sorted()
+            .collect(Collectors.joining(", "));
+    Preconditions.checkArgument(
+        disallowedKeys.isEmpty(),
+        "Kafka config providers are not supported, please remove the properties: %s",
+        disallowedKeys);
+  }
+
   private static boolean isConfigProviderKey(String key) {
-    return key.equals(CONFIG_PROVIDERS_KEY) || key.startsWith(CONFIG_PROVIDERS_KEY + ".");
+    String providersKey = CATALOG_BYPASS_PREFIX + CONFIG_PROVIDERS_KEY;
+    return key.equals(providersKey) || key.startsWith(providersKey + ".");
   }
 }

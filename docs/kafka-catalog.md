@@ -22,19 +22,25 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
 | `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
 
-The Kafka catalog does not accept the Kafka config provider properties `gravitino.bypass.config.providers`
-and `gravitino.bypass.config.providers.*` (for example `gravitino.bypass.config.providers.file.class`).
-They would let a catalog resolve `${env:...}`, `${file:...}`, or `${directory:...}` references from the
-Gravitino server's own environment and files. A catalog that sets them, whether in the create-catalog
-request or in `catalogs/kafka/conf/kafka.conf`, fails to connect and `testConnection` returns an
-error naming the rejected properties. For non-sensitive settings, put the literal value in the
-catalog property instead. Do not put credentials, such as a SASL password in
-`gravitino.bypass.sasl.jaas.config`, as plaintext: the catalog REST API returns bypass properties
-unmasked. If a Gravitino secret provider is configured, bind such a property with
-`CatalogChange.setSecretBinding`.
-The Kafka client also rejects `LdapLoginModule` in the JAAS configuration by default, see
-[Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for the
-migration steps.
+The Kafka catalog rejects the Kafka config provider properties `gravitino.bypass.config.providers`
+and `gravitino.bypass.config.providers.*` (for example `gravitino.bypass.config.providers.file.class`),
+because a provider can read the Gravitino server's own environment and files. Creating a catalog,
+testing a connection, or altering a catalog with these properties fails with an error naming them.
+A catalog that still has them, such as one created before upgrading or one affected by
+`catalogs/kafka/conf/kafka.conf`, fails on schema and topic operations until they are removed.
+
+:::caution Credentials in bypass properties
+Bypass properties can be returned in plaintext by the catalog REST API. Gravitino masks only keys
+whose names match [sensitive key keywords](./gravitino-server-config.md#sensitive-property-key-matching),
+so `gravitino.bypass.ssl.truststore.password` is masked but a password inside
+`gravitino.bypass.sasl.jaas.config` is returned unchanged. Do not put credentials in such properties
+as plaintext. If a Gravitino secret provider is configured, bind the whole property with
+`CatalogChange.setSecretBinding` (REST update type `setSecretBinding`).
+:::
+
+See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for how to
+migrate catalogs that used config providers or `LdapLoginModule`.
+
 ### Catalog Operations
 
 Refer to [Catalog operations](./manage-messaging-metadata-using-gravitino.md#catalog-operations) for more details.

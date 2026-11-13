@@ -53,6 +53,18 @@ public class KafkaCatalog extends BaseCatalog<KafkaCatalog> {
     return ops;
   }
 
+  /**
+   * Rejects the Kafka config provider properties, so that a catalog using them cannot be created or
+   * altered.
+   *
+   * @param configuration the complete proposed catalog configuration
+   * @throws IllegalArgumentException if the configuration sets a config provider property
+   */
+  @Override
+  public void validateConfiguration(Map<String, String> configuration) {
+    KafkaCatalogOperations.checkNoConfigProviders(configuration);
+  }
+
   @Override
   protected Capability newCapability() {
     return new KafkaCatalogCapability();

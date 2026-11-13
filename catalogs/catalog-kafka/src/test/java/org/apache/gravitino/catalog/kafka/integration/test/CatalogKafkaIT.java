@@ -225,6 +225,40 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   @Test
+  public void testCreateAndAlterCatalogRejectConfigProviders() {
+    String catalogName = GravitinoITUtils.genRandomName("test_catalog");
+    String providersKey = "gravitino.bypass.config.providers";
+    Map<String, String> properties =
+        ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers, providersKey, "env");
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> createCatalog(catalogName, "comment", properties));
+    Assertions.assertTrue(exception.getMessage().contains(providersKey), exception.getMessage());
+    Assertions.assertFalse(metalake.catalogExists(catalogName));
+
+    Catalog catalog =
+        createCatalog(
+            catalogName, "comment", ImmutableMap.of(BOOTSTRAP_SERVERS, kafkaBootstrapServers));
+    try {
+      exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  metalake.alterCatalog(
+                      catalogName, CatalogChange.setProperty(providersKey + ".env.class", "x")));
+      Assertions.assertTrue(
+          exception.getMessage().contains(providersKey + ".env.class"), exception.getMessage());
+      Assertions.assertFalse(
+          metalake.loadCatalog(catalogName).properties().containsKey(providersKey + ".env.class"));
+      Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalog.name()));
+    } finally {
+      metalake.dropCatalog(catalogName, true);
+    }
+  }
+
+  @Test
   public void testCatalogException() {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =

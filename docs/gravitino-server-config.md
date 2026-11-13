@@ -740,9 +740,10 @@ catalog configuration file supplies defaults for every catalog of that provider,
 wins. Neither affects schema or table properties.
 
 A catalog property is one of three kinds. Gravitino defines some itself, as the settings a catalog
-needs to work. Anything prefixed `gravitino.bypass.` passes straight through to the underlying
-system untouched, except where a catalog documents rejected properties, such as the Kafka config
-provider properties listed in the [Kafka catalog properties](kafka-catalog.md#catalog-properties). Anything else Gravitino simply stores for you to use as you like.
+needs to work. Gravitino forwards `gravitino.bypass.` properties to the underlying system unless
+the catalog rejects them. Anything else Gravitino simply stores for you to use as you like. For
+example, the Kafka catalog rejects the Kafka config provider properties, see
+[Kafka catalog properties](kafka-catalog.md#catalog-properties).
 
 Passing credentials, tokens, or access keys through `gravitino.bypass.` exposes them: bypassed
 properties are not managed by Gravitino and can come back in plaintext from the REST API. Where an
