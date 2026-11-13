@@ -27,9 +27,13 @@ and `gravitino.bypass.config.providers.*` (for example `gravitino.bypass.config.
 They would let a catalog resolve `${env:...}`, `${file:...}`, or `${directory:...}` references from the
 Gravitino server's own environment and files. A catalog that sets them, whether in the create-catalog
 request or in `catalogs/kafka/conf/kafka.conf`, fails to connect and `testConnection` returns an
-error naming the rejected properties. Put the literal value in the catalog property instead.
-The Kafka client also rejects `JndiLoginModule` and `LdapLoginModule` in `sasl.jaas.config` by default.
-See [Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for the
+error naming the rejected properties. For non-sensitive settings, put the literal value in the
+catalog property instead. Do not put credentials, such as a SASL password in
+`gravitino.bypass.sasl.jaas.config`, as plaintext: the catalog REST API returns bypass properties
+unmasked. If a Gravitino secret provider is configured, bind such a property with
+`CatalogChange.setSecretBinding`.
+The Kafka client also rejects `LdapLoginModule` in the JAAS configuration by default, see
+[Kafka catalog client upgrade](./migration-guide.md#kafka-catalog-client-upgrade) for the
 migration steps.
 ### Catalog Operations
 

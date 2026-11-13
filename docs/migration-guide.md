@@ -34,20 +34,26 @@ existing deployments. For database backup, schema scripts, and rollback commands
   [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs).
 - The Kafka catalog rejects `gravitino.bypass.config.providers` and `gravitino.bypass.config.providers.*`
   (for example `.class` and `.param.*`), including when they come from
-  `catalogs/kafka/conf/kafka.conf`. Kafka 3.9 adds an environment variable provider, and any
-  provider can read the Gravitino server's own environment or files. A catalog that still sets
+  `catalogs/kafka/conf/kafka.conf`. Kafka 3.5 added an environment variable config provider, and
+  any provider can read the Gravitino server's own environment or files. A catalog that still sets
   them fails on schema and topic operations and on `testConnection`, with an error that names the
   rejected properties. In 1.3, the file and directory providers could be used this way.
 - Before upgrading, find Kafka catalogs and `kafka.conf` entries that use these properties or
   `${file:...}`, `${directory:...}`, or `${env:...}` references. Remove the provider properties and
-  set the resolved value directly, for example with `alterCatalog`. Direct values in
-  `gravitino.bypass.` properties can be returned in plaintext by the REST API, see
+  set the resolved value directly, for example with `alterCatalog`. This is only suitable for
+  non-sensitive settings: the REST API returns `gravitino.bypass.` properties unmasked, so do not
+  put a password, such as in `gravitino.bypass.sasl.jaas.config`, in as plaintext. If a Gravitino
+  secret provider is configured, bind such a property with `CatalogChange.setSecretBinding`. See
   [Catalog properties](./gravitino-server-config.md#catalog-properties).
-- The Kafka 3.9 client rejects `com.sun.security.auth.module.JndiLoginModule` and
-  `com.sun.security.auth.module.LdapLoginModule` in `sasl.jaas.config` by default. Catalogs that
-  use either module fail to connect after the upgrade. Switch to another login module. If you
-  cannot, set the JVM system property `org.apache.kafka.disallowed.login.modules` on the Gravitino
-  server to the modules you still want to block; see the Kafka documentation for its semantics.
+- The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
+  configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
+  the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the
+  Gravitino JVM property `java.security.auth.login.config`, because a catalog without
+  `sasl.jaas.config` falls back to that entry. Catalogs that use `LdapLoginModule` fail to connect
+  after the upgrade, so switch them to another login module. Do not override the
+  `org.apache.kafka.disallowed.login.modules` JVM property to re-enable it: the override replaces
+  the default blocklist for every Kafka catalog in the Gravitino JVM, and everyone who can supply
+  Kafka JAAS settings could then select the module.
 ### Policies are selected through tags
 
 - Direct policy associations with metadata objects are no longer read or written at runtime.

@@ -113,6 +113,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
   private static final String METALAKE_NAME = "metalake";
   private static final String CATALOG_NAME = "test_kafka_catalog";
   private static final String DEFAULT_SCHEMA_NAME = "default";
+  private static final String ENV_PLACEHOLDER = "${env:GRAVITINO_KAFKA_TEST_ENV_MARKER}";
   private static final Map<String, String> MOCK_CATALOG_PROPERTIES =
       ImmutableMap.of(BOOTSTRAP_SERVERS, brokerList(), ID_KEY, "gravitino.v1.uid33220758755757000");
   private static final HasPropertyMetadata KAFKA_PROPERTIES_METADATA =
@@ -344,7 +345,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
           ImmutableMap.<String, String>builder()
               .putAll(MOCK_CATALOG_PROPERTIES)
               .put("gravitino.bypass." + key, "env")
-              .put("gravitino.bypass.request.timeout.ms", "${env:PATH}")
+              .put("gravitino.bypass.request.timeout.ms", ENV_PLACEHOLDER)
               .build();
       KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
       IllegalArgumentException exception =
@@ -357,7 +358,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
           exception.getMessage().contains("gravitino.bypass." + key), exception.getMessage());
       // The AdminClient must not be created, and no placeholder may be resolved or echoed.
       Assertions.assertNull(ops.adminClientConfig.get("request.timeout.ms"));
-      Assertions.assertFalse(exception.getMessage().contains(System.getenv("PATH")));
+      Assertions.assertFalse(exception.getMessage().contains(ENV_PLACEHOLDER));
     }
   }
 
