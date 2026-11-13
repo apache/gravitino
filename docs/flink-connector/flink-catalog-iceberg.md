@@ -31,6 +31,7 @@ To enable the Flink connector, you must download the Iceberg Flink runtime JAR a
 - `UPDATE` clause
 - `DELETE` clause
 - `CREATE TABLE LIKE` clause
+- Computed columns, metadata columns and watermarks
 
 ## Getting Started
 
