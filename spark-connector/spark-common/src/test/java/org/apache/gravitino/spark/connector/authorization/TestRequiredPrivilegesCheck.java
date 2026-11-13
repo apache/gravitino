@@ -34,7 +34,6 @@ import org.apache.spark.sql.connector.catalog.SupportsRead;
 import org.apache.spark.sql.connector.catalog.SupportsWrite;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation;
-import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
 import scala.collection.JavaConverters;
 
@@ -51,8 +50,9 @@ public class TestRequiredPrivilegesCheck {
   }
 
   private static LogicalPlan relation(Table table) {
-    return DataSourceV2Relation.create(
-        table, scala.Option.empty(), scala.Option.empty(), CaseInsensitiveStringMap.empty());
+    // The three-argument overload passes empty options and exists on every supported Spark line;
+    // Spark 4.1 added a defaulted fifth parameter to the overload that takes options.
+    return DataSourceV2Relation.create(table, scala.Option.empty(), scala.Option.empty());
   }
 
   @Test

@@ -18,13 +18,13 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Requirement
 
-* Spark 3.5 or 4.0
+* Spark 3.5, 4.0 or 4.1
 * Scala 2.12 or 2.13 on Spark 3.5; Spark 4 is Scala 2.13 only
 * JDK 8, 11 or 17 on Spark 3.5; Spark 4 requires JDK 17
 
 ## Usage
 
-1. [Build](../how-to-build.md) or download the package matching your Spark minor version and Scala version ([gravitino-spark-connector-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.12), [gravitino-spark-connector-runtime-3.5_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.13), [gravitino-spark-connector-runtime-4.0_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.0_2.13)), and place it to the classpath of Spark.
+1. [Build](../how-to-build.md) or download the package matching your Spark minor version and Scala version ([gravitino-spark-connector-runtime-3.5_2.12](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.12), [gravitino-spark-connector-runtime-3.5_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5_2.13), [gravitino-spark-connector-runtime-4.0_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.0_2.13), [gravitino-spark-connector-runtime-4.1_2.13](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-4.1_2.13)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
 | Property                                         | Type    | Default Value | Description                                                                                                                                                              | Required |
@@ -170,7 +170,7 @@ could return different results:
 - Date parts other than year, quarter, month, day, hour, and minute, such as `second()` or
   `weekofyear()`. The source can compute them differently.
 - Filters with a `TIMESTAMP_NTZ` literal, when the JDBC dialect cannot write it in SQL. The
-  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4.0 does not.
+  PostgreSQL dialect in Spark 3.5 has this limit. Spark 4 does not.
 - Value-dependent aggregates on timestamp columns whose JDBC reader type differs from the type Spark shows. An
   example is PostgreSQL `timestamptz` on Spark 3.5 with `preferTimestampNTZ=true`.
 

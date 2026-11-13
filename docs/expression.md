@@ -61,7 +61,7 @@ An LTZ literal assigned to an NTZ column keeps the local fields produced by Spar
 an NTZ literal assigned to an LTZ column is interpreted in the Spark session zone before it is sent
 as an instant. DATE defaults assigned to timestamp columns become midnight in the Spark session
 zone for LTZ targets, or local midnight for NTZ targets. String defaults for timestamp columns are
-explicitly rejected in both Spark 3.5 and 4.0; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
+explicitly rejected in Spark 3.5, 4.0 and 4.1; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
 of relying on implicit database conversion. Date and string defaults for non-timestamp columns
 retain their literal values and types.
 

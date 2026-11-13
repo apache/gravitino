@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.jdbc;
 
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -146,11 +147,7 @@ public class TestSparkJdbcPushDownPolicy {
                 .updated("driver", "org.postgresql.Driver")
                 .updated("pushDownPredicate", "true")
                 .updated("pushDownLimit", "true"));
-    SparkJdbcScanBuilder builder =
-        new SparkJdbcScanBuilder(
-            new JDBCScanBuilder(
-                mock(SparkSession.class, RETURNS_DEEP_STUBS), sparkSchema(), options),
-            policy);
+    SparkJdbcScanBuilder builder = new SparkJdbcScanBuilder(jdbcScanBuilder(options), policy);
     Predicate safe = eq(col("id"), lit(1, DataTypes.IntegerType));
     Predicate unsafe = eq(col("s"), lit("a", DataTypes.StringType));
 
@@ -224,11 +221,7 @@ public class TestSparkJdbcPushDownPolicy {
                 .updated("dbtable", "t")
                 .updated("driver", "org.postgresql.Driver")
                 .updated("pushDownPredicate", "false"));
-    SparkJdbcScanBuilder builder =
-        new SparkJdbcScanBuilder(
-            new JDBCScanBuilder(
-                mock(SparkSession.class, RETURNS_DEEP_STUBS), sparkSchema(), options),
-            policy());
+    SparkJdbcScanBuilder builder = new SparkJdbcScanBuilder(jdbcScanBuilder(options), policy());
     Predicate prefilter = eq(col("s"), lit("a", DataTypes.StringType));
     Predicate numeric = eq(col("id"), lit(1, DataTypes.IntegerType));
     Predicate[] residual = builder.pushPredicates(new Predicate[] {prefilter, numeric});
@@ -314,6 +307,17 @@ public class TestSparkJdbcPushDownPolicy {
       Assertions.assertTrue(policy.canPushAggregate(new Max(col("ts"))));
       Assertions.assertTrue(policy.canPushAggregate(new Max(col("TS"))));
     }
+  }
+
+  // JDBCScanBuilder's constructor gained a parameter in Spark 4.1, so stub the accessors that
+  // SparkJdbcScanBuilder copies from its delegate instead of calling the constructor here.
+  private static JDBCScanBuilder jdbcScanBuilder(JDBCOptions options) {
+    JDBCScanBuilder delegate = mock(JDBCScanBuilder.class);
+    SparkSession session = mock(SparkSession.class, RETURNS_DEEP_STUBS);
+    when(delegate.session()).thenReturn(session);
+    when(delegate.schema()).thenReturn(sparkSchema());
+    when(delegate.jdbcOptions()).thenReturn(options);
+    return delegate;
   }
 
   private static SparkJdbcPushDownPolicy policy() {
