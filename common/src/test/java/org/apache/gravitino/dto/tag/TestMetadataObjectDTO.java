@@ -147,4 +147,43 @@ public class TestMetadataObjectDTO {
         JsonUtils.objectMapper().readValue(serJson, MetadataObjectDTO.class);
     Assertions.assertEquals(filesetDTO, deserFilesetDTO);
   }
+
+  @Test
+  void testPreservesInvalidDottedDomainNameWithEitherFieldOrder() throws JsonProcessingException {
+    MetadataObjectDTO expected =
+        MetadataObjectDTO.builder()
+            .withName("Finance.US")
+            .withType(MetadataObject.Type.DOMAIN)
+            .build();
+    for (String json :
+        new String[] {
+          "{\"fullName\":\"Finance.US\",\"type\":\"domain\"}",
+          "{\"type\":\"domain\",\"fullName\":\"Finance.US\"}"
+        }) {
+      MetadataObjectDTO decoded = JsonUtils.objectMapper().readValue(json, MetadataObjectDTO.class);
+      Assertions.assertEquals(expected, decoded);
+      Assertions.assertEquals("Finance.US", decoded.name());
+      Assertions.assertEquals("Finance.US", decoded.fullName());
+      Assertions.assertNull(decoded.parent());
+    }
+  }
+
+  @Test
+  void testMissingOrNullFullName() throws JsonProcessingException {
+    for (MetadataObject.Type type : MetadataObject.Type.values()) {
+      for (String fields : new String[] {"", ",\"fullName\":null"}) {
+        MetadataObjectDTO dto =
+            JsonUtils.objectMapper()
+                .readValue(
+                    "{\"type\":\"" + type.name() + "\"" + fields + "}", MetadataObjectDTO.class);
+        Assertions.assertEquals(type, dto.type());
+        Assertions.assertNull(dto.name());
+        Assertions.assertNull(dto.parent());
+        Assertions.assertNull(dto.fullName());
+      }
+    }
+    MetadataObjectDTO empty = JsonUtils.objectMapper().readValue("{}", MetadataObjectDTO.class);
+    Assertions.assertNull(empty.type());
+    Assertions.assertNull(empty.fullName());
+  }
 }

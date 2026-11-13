@@ -1,0 +1,845 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+# Trivy ignore file for the CVE Scan workflow (passed with --ignorefile).
+# See .github/trivy/README.md for the exemption policy.
+#
+# Every entry below is a pre-existing finding that has not been analysed yet (category B):
+# it is pinned to the exact package versions that were found, expires 90 days after it was
+# added and points to the issue that tracks it. When an entry expires its finding fails the
+# scan again. Renew an entry only after the finding has been re-triaged.
+vulnerabilities:
+  # authlib
+  - id: CVE-2026-114615
+    purls:
+      - pkg:pypi/authlib@1.7.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-114616
+    purls:
+      - pkg:pypi/authlib@1.7.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-116672
+    purls:
+      - pkg:pypi/authlib@1.7.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-96760
+    purls:
+      - pkg:pypi/authlib@1.7.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.fasterxml.jackson.core/jackson-core
+  - id: CVE-2025-52999
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.12.7
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-68494
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-68494
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.12.7
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.4.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-89407
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-89407
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.4.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-89425
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-89425
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.12.7
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.18.4.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-core@2.22.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.fasterxml.jackson.core/jackson-databind
+  - id: CVE-2026-54512
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-54512
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-54513
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-54513
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-68497
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-68497
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-91776
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-91776
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-91777
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.21.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14712."
+  - id: CVE-2026-91777
+    purls:
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.12.7.1
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.14.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.15.2
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.3
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.18.4
+      - pkg:maven/com.fasterxml.jackson.core/jackson-databind@2.22.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.google.guava/guava
+  - id: CVE-2026-102554
+    purls:
+      - pkg:maven/com.google.guava/guava@30.1.1-jre
+      - pkg:maven/com.google.guava/guava@32.1.3-jre
+      - pkg:maven/com.google.guava/guava@33.3.1-jre
+      - pkg:maven/com.google.guava/guava@33.5.0-jre
+      - pkg:maven/com.google.guava/guava@33.6.0-jre
+      - pkg:maven/com.google.guava/guava@33.7.1-jre
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.google.protobuf/protobuf-java
+  - id: CVE-2021-22569
+    purls:
+      - pkg:maven/com.google.protobuf/protobuf-java@2.5.0
+      - pkg:maven/com.google.protobuf/protobuf-java@3.7.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2022-3509
+    purls:
+      - pkg:maven/com.google.protobuf/protobuf-java@3.7.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2022-3510
+    purls:
+      - pkg:maven/com.google.protobuf/protobuf-java@3.7.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2024-7254
+    purls:
+      - pkg:maven/com.google.protobuf/protobuf-java@2.5.0
+      - pkg:maven/com.google.protobuf/protobuf-java@3.19.6
+      - pkg:maven/com.google.protobuf/protobuf-java@3.7.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.nimbusds/nimbus-jose-jwt
+  - id: CVE-2023-52428
+    purls:
+      - pkg:maven/com.nimbusds/nimbus-jose-jwt@9.30.1
+      - pkg:maven/com.nimbusds/nimbus-jose-jwt@9.8.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # com.squareup.okhttp3/okhttp
+  - id: CVE-2021-0341
+    purls:
+      - pkg:maven/com.squareup.okhttp3/okhttp@3.12.13
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # commons-beanutils/commons-beanutils
+  - id: CVE-2025-48734
+    purls:
+      - pkg:maven/commons-beanutils/commons-beanutils@1.9.4
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # commons-io/commons-io
+  - id: CVE-2024-47554
+    purls:
+      - pkg:maven/commons-io/commons-io@2.8.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # dnsjava/dnsjava
+  - id: CVE-2024-25638
+    purls:
+      - pkg:maven/dnsjava/dnsjava@2.1.7
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # dnspython
+  - id: CVE-2026-114605
+    purls:
+      - pkg:pypi/dnspython@2.7.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # fsspec
+  - id: CVE-2026-104851
+    purls:
+      - pkg:pypi/fsspec@2026.2.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.airlift/aircompressor
+  - id: CVE-2024-36114
+    purls:
+      - pkg:maven/io.airlift/aircompressor@0.10
+      - pkg:maven/io.airlift/aircompressor@0.8
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2025-67721
+    purls:
+      - pkg:maven/io.airlift/aircompressor@0.10
+      - pkg:maven/io.airlift/aircompressor@0.27
+      - pkg:maven/io.airlift/aircompressor@0.8
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.micrometer/micrometer-core
+  - id: CVE-2026-40984
+    purls:
+      - pkg:maven/io.micrometer/micrometer-core@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec
+  - id: CVE-2026-42583
+    purls:
+      - pkg:maven/io.netty/netty-codec@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec@4.1.86.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec, io.netty/netty-codec-compression
+  - id: CVE-2026-59901
+    purls:
+      - pkg:maven/io.netty/netty-codec-compression@4.2.13.Final
+      - pkg:maven/io.netty/netty-codec@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec@4.1.86.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec-dns
+  - id: CVE-2026-42579
+    purls:
+      - pkg:maven/io.netty/netty-codec-dns@4.1.109.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec-http
+  - id: CVE-2026-33870
+    purls:
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-42584
+    purls:
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-55831
+    purls:
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+      - pkg:maven/io.netty/netty-codec-http@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-55833
+    purls:
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+      - pkg:maven/io.netty/netty-codec-http@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-56745
+    purls:
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+      - pkg:maven/io.netty/netty-codec-http@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec-http, io.netty/netty-codec-http2
+  - id: CVE-2026-42587
+    purls:
+      - pkg:maven/io.netty/netty-codec-http2@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http2@4.1.118.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http@4.1.86.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-codec-http2
+  - id: CVE-2025-55163
+    purls:
+      - pkg:maven/io.netty/netty-codec-http2@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http2@4.1.118.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-33871
+    purls:
+      - pkg:maven/io.netty/netty-codec-http2@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http2@4.1.118.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-56819
+    purls:
+      - pkg:maven/io.netty/netty-codec-http2@4.1.110.Final
+      - pkg:maven/io.netty/netty-codec-http2@4.1.118.Final
+      - pkg:maven/io.netty/netty-codec-http2@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-handler
+  - id: CVE-2025-24970
+    purls:
+      - pkg:maven/io.netty/netty-handler@4.1.110.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44249
+    purls:
+      - pkg:maven/io.netty/netty-handler@4.1.110.Final
+      - pkg:maven/io.netty/netty-handler@4.1.86.Final
+      - pkg:maven/io.netty/netty-handler@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-45416
+    purls:
+      - pkg:maven/io.netty/netty-handler@4.1.110.Final
+      - pkg:maven/io.netty/netty-handler@4.1.86.Final
+      - pkg:maven/io.netty/netty-handler@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-50010
+    purls:
+      - pkg:maven/io.netty/netty-handler@4.1.110.Final
+      - pkg:maven/io.netty/netty-handler@4.1.86.Final
+      - pkg:maven/io.netty/netty-handler@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-75595
+    purls:
+      - pkg:maven/io.netty/netty-handler@4.1.110.Final
+      - pkg:maven/io.netty/netty-handler@4.1.86.Final
+      - pkg:maven/io.netty/netty-handler@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # io.netty/netty-resolver-dns
+  - id: CVE-2026-45674
+    purls:
+      - pkg:maven/io.netty/netty-resolver-dns@4.1.109.Final
+      - pkg:maven/io.netty/netty-resolver-dns@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-47691
+    purls:
+      - pkg:maven/io.netty/netty-resolver-dns@4.1.109.Final
+      - pkg:maven/io.netty/netty-resolver-dns@4.2.13.Final
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # joserfc
+  - id: CVE-2026-119283
+    purls:
+      - pkg:pypi/joserfc@1.7.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # net.minidev/json-smart
+  - id: CVE-2021-31684
+    purls:
+      - pkg:maven/net.minidev/json-smart@1.3.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2023-1370
+    purls:
+      - pkg:maven/net.minidev/json-smart@1.3.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/axios
+  - id: CVE-2026-101898
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-101901
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-101903
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-101905
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-101906
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-101909
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-25639
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-42033
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-42035
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-42043
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-42264
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44486
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44487
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44488
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44494
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44495
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44496
+    purls:
+      - pkg:npm/axios@1.12.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-67320
+    purls:
+      - pkg:npm/axios@1.16.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/browserslist
+  - id: CVE-2026-73088
+    purls:
+      - pkg:npm/browserslist@4.26.1
+      - pkg:npm/browserslist@4.28.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-73089
+    purls:
+      - pkg:npm/browserslist@4.26.1
+      - pkg:npm/browserslist@4.28.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/follow-redirects
+  - id: CVE-2026-111755
+    purls:
+      - pkg:npm/follow-redirects@1.16.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-111756
+    purls:
+      - pkg:npm/follow-redirects@1.16.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-116689
+    purls:
+      - pkg:npm/follow-redirects@1.16.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/form-data
+  - id: CVE-2026-12143
+    purls:
+      - pkg:npm/form-data@4.0.4
+      - pkg:npm/form-data@4.0.5
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/js-cookie
+  - id: CVE-2026-46625
+    purls:
+      - pkg:npm/js-cookie@2.2.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/js-yaml
+  - id: CVE-2026-59869
+    purls:
+      - pkg:npm/js-yaml@4.1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-84375
+    purls:
+      - pkg:npm/js-yaml@4.1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-5p4m-2wfm-xmqj
+    purls:
+      - pkg:npm/js-yaml@4.1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/lodash-es
+  - id: CVE-2026-4800
+    purls:
+      - pkg:npm/lodash-es@4.17.21
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/nanoid
+  - id: CVE-2026-67213
+    purls:
+      - pkg:npm/nanoid@3.3.11
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-67214
+    purls:
+      - pkg:npm/nanoid@3.3.11
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-73086
+    purls:
+      - pkg:npm/nanoid@3.3.11
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/next
+  - id: CVE-2026-44573
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-44578
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-64641
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-64645
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-64649
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-75604
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-94482
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-2464-fhr4-w9xw
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-2xp9-vwfh-vxw4
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-5j59-xgg2-r9c4
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-8h8q-6873-q5fj
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-h25m-26qc-wcjf
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-mwv6-3258-q52c
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: GHSA-q4gf-8mx6-v5v3
+    purls:
+      - pkg:npm/next@14.2.32
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/postcss
+  - id: CVE-2026-45623
+    purls:
+      - pkg:npm/postcss@8.4.31
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-73646
+    purls:
+      - pkg:npm/postcss@8.4.31
+      - pkg:npm/postcss@8.5.14
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # npm/source-map-js
+  - id: CVE-2026-93749
+    purls:
+      - pkg:npm/source-map-js@1.2.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.apache.avro/avro
+  - id: CVE-2023-39410
+    purls:
+      - pkg:maven/org.apache.avro/avro@1.7.7
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2024-47561
+    purls:
+      - pkg:maven/org.apache.avro/avro@1.7.7
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.apache.kafka/kafka-clients
+  - id: CVE-2026-35554
+    purls:
+      - pkg:maven/org.apache.kafka/kafka-clients@3.4.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.apache.kerby/kerb-server
+  - id: CVE-2026-57915
+    purls:
+      - pkg:maven/org.apache.kerby/kerb-server@1.0.1
+      - pkg:maven/org.apache.kerby/kerb-server@2.0.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.apache.thrift/libthrift
+  - id: CVE-2019-0205
+    purls:
+      - pkg:maven/org.apache.thrift/libthrift@0.12.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2020-13949
+    purls:
+      - pkg:maven/org.apache.thrift/libthrift@0.12.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-43869
+    purls:
+      - pkg:maven/org.apache.thrift/libthrift@0.12.0
+      - pkg:maven/org.apache.thrift/libthrift@0.14.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-43871
+    purls:
+      - pkg:maven/org.apache.thrift/libthrift@0.12.0
+      - pkg:maven/org.apache.thrift/libthrift@0.14.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.codehaus.jettison/jettison
+  - id: CVE-2022-40150
+    purls:
+      - pkg:maven/org.codehaus.jettison/jettison@1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2022-45685
+    purls:
+      - pkg:maven/org.codehaus.jettison/jettison@1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2022-45693
+    purls:
+      - pkg:maven/org.codehaus.jettison/jettison@1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2023-1436
+    purls:
+      - pkg:maven/org.codehaus.jettison/jettison@1.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.eclipse.jetty/jetty-http
+  - id: CVE-2026-2332
+    purls:
+      - pkg:maven/org.eclipse.jetty/jetty-http@9.4.51.v20230217
+      - pkg:maven/org.eclipse.jetty/jetty-http@9.4.58.v20250814
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.eclipse.jetty/jetty-security
+  - id: CVE-2026-10050
+    purls:
+      - pkg:maven/org.eclipse.jetty/jetty-security@9.4.58.v20250814
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.ini4j/ini4j
+  - id: CVE-2022-41404
+    purls:
+      - pkg:maven/org.ini4j/ini4j@0.5.4
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.jline/jline-builtins
+  - id: CVE-2026-77422
+    purls:
+      - pkg:maven/org.jline/jline-builtins@3.22.0
+      - pkg:maven/org.jline/jline-builtins@3.9.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.jline/jline-remote-telnet
+  - id: CVE-2026-56740
+    purls:
+      - pkg:maven/org.jline/jline-remote-telnet@3.22.0
+      - pkg:maven/org.jline/jline-remote-telnet@3.9.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-56741
+    purls:
+      - pkg:maven/org.jline/jline-remote-telnet@3.22.0
+      - pkg:maven/org.jline/jline-remote-telnet@3.9.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.json/json
+  - id: CVE-2022-45688
+    purls:
+      - pkg:maven/org.json/json@20180130
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2023-5072
+    purls:
+      - pkg:maven/org.json/json@20180130
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.lz4/lz4-java
+  - id: CVE-2025-12183
+    purls:
+      - pkg:maven/org.lz4/lz4-java@1.8.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2025-66566
+    purls:
+      - pkg:maven/org.lz4/lz4-java@1.8.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-106451
+    purls:
+      - pkg:maven/org.lz4/lz4-java@1.8.0
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.postgresql/postgresql
+  - id: CVE-2026-42198
+    purls:
+      - pkg:maven/org.postgresql/postgresql@42.7.3
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # org.xerial.snappy/snappy-java
+  - id: CVE-2026-108106
+    purls:
+      - pkg:maven/org.xerial.snappy/snappy-java@1.1.10.8
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  - id: CVE-2026-93451
+    purls:
+      - pkg:maven/org.xerial.snappy/snappy-java@1.1.10.8
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # ray
+  - id: CVE-2026-57516
+    purls:
+      - pkg:pypi/ray@2.55.1
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
+  # software.amazon.ion/ion-java
+  - id: CVE-2024-21634
+    purls:
+      - pkg:maven/software.amazon.ion/ion-java@1.0.2
+    expired_at: 2027-02-07
+    statement: "Pre-existing finding, tracked in apache/gravitino#14777."

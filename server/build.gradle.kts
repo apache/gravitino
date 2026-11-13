@@ -70,25 +70,6 @@ dependencies {
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
-fun getGitCommitId(): String {
-  var gitCommitId: String
-  try {
-    val gitFolder = rootDir.path + "/.git/"
-    val head = File(gitFolder + "HEAD").readText().split(":")
-    val isCommit = head.size == 1
-    gitCommitId = if (isCommit) {
-      head[0].trim()
-    } else {
-      val refHead = File(gitFolder + head[1].trim())
-      refHead.readText().trim()
-    }
-  } catch (e: Exception) {
-    println("WARN: Unable to get Git commit id : ${e.message}")
-    gitCommitId = ""
-  }
-  return gitCommitId
-}
-
 tasks {
   test {
     environment("GRAVITINO_HOME", rootDir.path)

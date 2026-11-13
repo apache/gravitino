@@ -61,7 +61,7 @@ class MetadataObjectDTO(MetadataObject):
         Args:
             full_name (str): The full name of the metadata object.
         """
-        index = full_name.rfind(".")
+        index = -1 if self._type == MetadataObject.Type.DOMAIN else full_name.rfind(".")
         self._parent, self._name = (
             (None, full_name)
             if index == -1

@@ -392,3 +392,36 @@ WHERE r.deleted_at = 0 AND EXISTS (
 -- Align the location and uri name widths with the MySQL and PostgreSQL schemas.
 ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default';
 ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL;
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` CLOB DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` CLOB NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` CLOB NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;

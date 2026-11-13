@@ -18,6 +18,7 @@
 from abc import ABC, abstractmethod
 
 from mcp_server.client.catalog_operation import CatalogOperation
+from mcp_server.client.domain_operation import DomainOperation
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.metalake_operation import MetalakeOperation
@@ -170,4 +171,9 @@ class GravitinoOperation(ABC):
         Returns:
             MetalakeOperation: Interface for metalake-level operations
         """
+        pass
+
+    @abstractmethod
+    def as_domain_operation(self) -> DomainOperation:
+        """Access the read-only domain operation interface."""
         pass

@@ -139,6 +139,18 @@ public class SchemaMetaService {
   }
 
   /**
+   * Lists recorded descendant schemas using the existing hierarchy prefix lookup.
+   *
+   * @param identifier The logical schema identifier.
+   * @return Descendant schemas in logical form, excluding the requested schema.
+   * @throws NoSuchEntityException If the schema does not exist.
+   */
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) {
+    SchemaPO schema = getSchemaPOByIdentifier(identifier);
+    return POConverters.fromSchemaPOs(listDescendantSchemaPOs(schema), identifier.namespace());
+  }
+
+  /**
    * Registers a schema without replacing another active identity at the same name.
    *
    * @param schemaEntity the schema to register

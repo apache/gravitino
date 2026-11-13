@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -140,6 +141,32 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
         + " AND te.tag_value = #{tagValue}"
         + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
+  /**
+   * Builds a lookup of live assignments by stable tag ID within a metalake.
+   *
+   * @param metalakeName The metalake of the tag.
+   * @param tagId The stable tag ID.
+   * @param tagValue The value, or null to match every value.
+   * @return The lookup SQL.
+   */
+  public String listTagMetadataObjectRelsByTagId(
+      String metalakeName, Long tagId, @Nullable String tagValue) {
+    return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.audit_info as auditInfo,"
+        + " te.current_version as currentVersion, te.last_version as lastVersion,"
+        + " te.deleted_at as deletedAt FROM "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " te JOIN "
+        + TagMetaMapper.TAG_TABLE_NAME
+        + " tm ON te.tag_id = tm.tag_id JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON tm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_id = #{tagId}"
+        + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0"
+        + (tagValue == null ? "" : " AND te.tag_value = #{tagValue}");
   }
 
   public String batchInsertTagMetadataObjectRels(

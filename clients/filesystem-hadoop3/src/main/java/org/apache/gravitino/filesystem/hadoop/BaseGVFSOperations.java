@@ -43,7 +43,6 @@ import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -97,9 +96,12 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.permission.FsPermission;
+import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.token.Token;
+import org.apache.hadoop.security.token.TokenIdentifier;
+import org.apache.hadoop.security.token.delegation.AbstractDelegationTokenIdentifier;
 import org.apache.hadoop.util.Progressable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -455,22 +457,54 @@ public abstract class BaseGVFSOperations implements Closeable {
   public abstract Token<?>[] addDelegationTokens(String renewer, Credentials credentials);
 
   /**
-   * Add delegation tokens for all file systems in the cache.
+   * Add delegation tokens for all file systems in the cache and for the filesets listed in {@link
+   * GravitinoVirtualFileSystemConfiguration#FS_GRAVITINO_KERBEROS_ACCESS_FILESETS}. Token requests
+   * carry no path, so filesets outside {@code fs.defaultFS} must be listed there.
+   *
+   * <p>Only tokens owned by the current user are added. A fileset configured with its own Kerberos
+   * principal is accessed as that principal, and its token must not be handed to the caller's job.
    *
    * @param renewer the renewer.
    * @param credentials the credentials.
    * @return the array of tokens.
    */
-  protected Token<?>[] addDelegationTokensForAllFS(String renewer, Credentials credentials) {
+  protected Token<?>[] addDelegationTokensForAllFS(
+      String renewer, @Nullable Credentials credentials) {
+    // Hadoop accepts null credentials and returns the new tokens only.
+    if (credentials == null) {
+      credentials = new Credentials();
+    }
+
+    String currentUser;
+    try {
+      currentUser = UserGroupInformation.getCurrentUser().getShortUserName();
+    } catch (IOException e) {
+      LOG.warn("Failed to get the current user, skipping delegation tokens", e);
+      return new Token<?>[0];
+    }
+
     List<Token<?>> tokenList = Lists.newArrayList();
     for (FileSystem fileSystem : fileSystemCache.asMap().values()) {
-      try {
-        tokenList.addAll(Arrays.asList(fileSystem.addDelegationTokens(renewer, credentials)));
-      } catch (IOException e) {
-        LOG.warn("Failed to add delegation tokens for filesystem: {}", fileSystem.getUri(), e);
-      }
+      addDelegationTokens(fileSystem, renewer, credentials, currentUser, tokenList);
     }
-    return tokenList.stream().distinct().toArray(Token[]::new);
+    for (String path :
+        conf.getTrimmedStrings(
+            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_KERBEROS_ACCESS_FILESETS)) {
+      FileSystem fileSystem;
+      try {
+        // Token collection must not write, so the fileset location is never created here.
+        fileSystem =
+            getActualFileSystemByLocationName(
+                extractIdentifier(metalakeName, path), currentLocationName(), false);
+      } catch (Exception e) {
+        // Never fail token collection: an unresolvable fileset simply yields no token.
+        LOG.warn("Failed to resolve {} while collecting delegation tokens", path, e);
+        continue;
+      }
+      // Collect right after resolving, as the bounded cache may already have evicted it.
+      addDelegationTokens(fileSystem, renewer, credentials, currentUser, tokenList);
+    }
+    return tokenList.toArray(new Token<?>[0]);
   }
 
   /**
@@ -717,6 +751,12 @@ public abstract class BaseGVFSOperations implements Closeable {
    */
   protected FileSystem getActualFileSystemByLocationName(
       NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
+    return getActualFileSystemByLocationName(filesetIdent, locationName, true);
+  }
+
+  private FileSystem getActualFileSystemByLocationName(
+      NameIdentifier filesetIdent, String locationName, boolean createLocation)
+      throws FileNotFoundException {
     NameIdentifier catalogIdent =
         NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
     try {
@@ -747,7 +787,9 @@ public abstract class BaseGVFSOperations implements Closeable {
       }
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
-      createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
+      if (createLocation) {
+        createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
+      }
       return actualFileSystem;
     } catch (RuntimeException e) {
       Throwable cause = e.getCause();
@@ -972,10 +1014,31 @@ public abstract class BaseGVFSOperations implements Closeable {
   Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);
-    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
-    Schema schema = catalog.asSchemas().loadSchema(schemaName);
+    // Go through the metadata cache when it is enabled, so that an operation does not reload the
+    // catalog, schema and fileset. Secrets are not cached and are still fetched on every call.
+    NameIdentifier catalogIdent =
+        NameIdentifier.of(filesetIdent.namespace().level(0), filesetIdent.namespace().level(1));
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(
+            filesetIdent.namespace().level(0),
+            filesetIdent.namespace().level(1),
+            filesetIdent.namespace().level(2));
+    Catalog catalog =
+        getFilesetMetadataCache()
+            .map(cache -> cache.getCatalog(catalogIdent))
+            .orElseGet(() -> getGravitinoClient().loadCatalog(catalogName));
+    Schema schema =
+        getFilesetMetadataCache()
+            .map(cache -> cache.getSchema(schemaIdent))
+            .orElseGet(() -> catalog.asSchemas().loadSchema(schemaName));
     Fileset fileset =
-        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
+        getFilesetMetadataCache()
+            .map(cache -> cache.getFileset(filesetIdent))
+            .orElseGet(
+                () ->
+                    catalog
+                        .asFilesetCatalog()
+                        .loadFileset(NameIdentifier.of(schemaName, filesetIdent.name())));
 
     Map<String, String> all = new HashMap<>();
     putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
@@ -1139,5 +1202,52 @@ public abstract class BaseGVFSOperations implements Closeable {
     // if both are not set, return null which means use the default location
     return Optional.ofNullable(configuration.get(FS_GRAVITINO_CURRENT_LOCATION_NAME))
         .orElse(System.getenv(currentLocationEnvVar));
+  }
+
+  private void addDelegationTokens(
+      FileSystem fileSystem,
+      String renewer,
+      Credentials credentials,
+      String currentUser,
+      List<Token<?>> tokenList) {
+    // Collect into a copy, so a token owned by another user never reaches the caller.
+    Credentials fetched = new Credentials(credentials);
+    try {
+      fileSystem.addDelegationTokens(renewer, fetched);
+    } catch (IOException e) {
+      LOG.warn("Failed to add delegation tokens for filesystem: {}", fileSystem.getUri(), e);
+      return;
+    }
+    for (Map.Entry<Text, Token<? extends TokenIdentifier>> entry :
+        fetched.getTokenMap().entrySet()) {
+      Token<?> token = entry.getValue();
+      if (credentials.getToken(entry.getKey()) != null) {
+        continue;
+      }
+      if (!isOwnedBy(token, currentUser)) {
+        LOG.warn(
+            "Skipping delegation token for {} owned by another user than {}",
+            entry.getKey(),
+            currentUser);
+        continue;
+      }
+      credentials.addToken(entry.getKey(), token);
+      tokenList.add(token);
+    }
+  }
+
+  private static boolean isOwnedBy(Token<?> token, String user) {
+    TokenIdentifier identifier;
+    try {
+      identifier = token.decodeIdentifier();
+    } catch (IOException e) {
+      return false;
+    }
+    // Tokens without an owner, such as those of some object stores, are not tied to a user.
+    if (!(identifier instanceof AbstractDelegationTokenIdentifier)) {
+      return true;
+    }
+    return user.equals(
+        ((AbstractDelegationTokenIdentifier) identifier).getUser().getShortUserName());
   }
 }
