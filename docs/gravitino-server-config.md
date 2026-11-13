@@ -732,6 +732,39 @@ That configuration builds three clients: two instances of one custom AWS factory
 Azure factory. Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed
 schema; each factory documents the keys it accepts.
 
+### Seal Providers
+
+A seal wraps and unwraps key material: the server uses it to protect the Gravitino master key under
+an external KMS (envelope encryption), contacting the backend once per process start. Unlike the
+read-only `KmsClient`, a `SealClient` performs cryptographic operations. Each name in
+`gravitino.seal.providers` is one configured instance. To add one, implement `SealClientFactory`
+with a public no-arg constructor, put the jar on the server classpath, and set
+`gravitino.seal.provider.<name>.className` to that class.
+
+| Configuration Item                          | Description                                                                                                                                                          | Default Value |
+|---------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.seal.providers`                  | Comma-separated seal instance names; whitespace around each name is ignored. Each name must match `[A-Za-z0-9][A-Za-z0-9_-]*` and cannot contain `.`. Duplicates fail startup. | (empty)       |
+| `gravitino.seal.provider.<name>.className`  | Required factory class name for that instance. The class must have a no-arg constructor and implement `SealClientFactory`.                                          | (none)        |
+| `gravitino.seal.provider.<name>.<key>`      | Any other property under that name is passed to that factory. Nested dots in `<key>` are allowed, as in `endpoint.region`.                                           | (none)        |
+
+Every name in `providers` needs a matching `.className`. A `gravitino.seal.provider.<name>.*` key
+for a name that is not in the list, or any other `gravitino.seal.*` key, fails startup. The list is
+empty by default, and then the server has no seal clients and behaves exactly as before.
+
+Gravitino ships a `local` implementation backed by a symmetric AES key file, intended for
+development and tests only: file permissions are the only protection for the key, so it provides no
+trust boundary separate from the data it protects.
+
+```text
+# conf/gravitino.conf
+gravitino.seal.providers = local
+gravitino.seal.provider.local.className = org.apache.gravitino.encryption.seal.local.LocalSealClientFactory
+gravitino.seal.provider.local.keyFile = /path/to/key.b64
+```
+
+The `keyFile` property names a file holding the Base64 encoding of a 128, 192, or 256-bit AES key;
+surrounding and embedded whitespace is ignored.
+
 ## Catalog Properties
 
 Catalog properties configure one catalog rather than the server. They come from two places: a
