@@ -73,12 +73,15 @@ public class TestSQLScripts extends TestJDBCBackend {
             "(?:iceberg|optimizer)-metrics-schema-([\\d.]+)-"
                 + backendType.toLowerCase()
                 + "\\.sql");
+    Pattern icebergJdbcPattern =
+        Pattern.compile("iceberg-jdbc-schema-([\\d.]+)-" + backendType.toLowerCase() + "\\.sql");
 
     Map<String, List<File>> versionScrips = new HashMap<>();
     for (File scriptFile : scriptFiles) {
       Matcher schemaMatcher = schemaPattern.matcher(scriptFile.getName());
       Matcher upgradeMatcher = upgradePattern.matcher(scriptFile.getName());
       Matcher metricsMatcher = metricsPattern.matcher(scriptFile.getName());
+      Matcher icebergJdbcMatcher = icebergJdbcPattern.matcher(scriptFile.getName());
 
       if (schemaMatcher.matches()) {
         String version = schemaMatcher.group(1);
@@ -91,6 +94,10 @@ public class TestSQLScripts extends TestJDBCBackend {
 
       } else if (metricsMatcher.matches()) {
         String version = metricsMatcher.group(1);
+        versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
+
+      } else if (icebergJdbcMatcher.matches()) {
+        String version = icebergJdbcMatcher.group(1);
         versionScrips.computeIfAbsent(version, k -> new ArrayList<>()).add(scriptFile);
 
       } else {
