@@ -27,7 +27,7 @@ Each artifact is a separate target, so a finding is attributed to the artifact u
 | Job | Built with | Targets |
 | --- | --- | --- |
 | Server packages | `compileDistribution`, `compileIcebergRESTServer`, `compileLanceRESTServer` | `server-distribution`, `iceberg-rest-server`, `lance-rest-server` |
-| Shaded jars | `shadowJar` of each module | the nine `*-bundle` jars, `client-java-runtime`, `filesystem-hadoop3-runtime`, `jobs`, `flink-runtime-{1.19,1.20,2.1,2.2}`, `spark-runtime-3.5_2.12`, `spark-runtime-3.5_2.13`, `spark-runtime-4.0` |
+| Shaded jars | `shadowJar` of each module | the nine `*-bundle` jars, `client-java-runtime`, `filesystem-hadoop3-runtime`, `jobs`, `flink-runtime-{1.19,1.20,2.1,2.2}`, `spark-runtime-3.5_2.12`, `spark-runtime-3.5_2.13`, `spark-runtime-4.0`, `spark-runtime-4.1` |
 | Trino connectors | `copyRuntimeLibs` of each version range | `trino-connector-{469-472,473-477,478-479,480,481,482-483}` |
 | Lock files | none | `mcp-server` (`mcp-server/uv.lock`), `web` (`web/web/pnpm-lock.yaml`), `web-v2` (`web-v2/web/pnpm-lock.yaml`), `client-python` (see below) |
 
