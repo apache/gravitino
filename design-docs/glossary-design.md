@@ -139,7 +139,7 @@ GlossaryTerm { id, name, definition, synonyms[], status: DRAFT | APPROVED | DEPR
                // tags: the existing tag relation tables
 TermRelation { fromTermId, toTermId, type: BROADER | RELATED, audit_info }
 TermDomain   { termId, domainId, audit_info }                // Option A in Domain membership
-TermBinding  { termId, objectId, objectType, metricName?, audit_info }
+TermBinding  { termId, targetId, targetType, audit_info }
 TermVersion  { termId, version, state, snapshot, audit_info }   // created now; rows from Step 2
 ```
 
@@ -149,7 +149,7 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
 | `glossary_term_synonym`      | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
 | `glossary_term_rel`          | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
 | `glossary_term_domain_rel`   | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
-| `glossary_term_binding`      | `(term_id, object_type, object_id, metric_name, deleted_at)`                   | `(object_type, object_id)`               |
+| `glossary_term_binding`      | `(term_id, target_type, target_id, deleted_at)`                                | `(target_type, target_id)`               |
 | `glossary_term_version_info` | `(term_id, version, deleted_at)`                                               | `(term_id, state)`                       |
 
 - The tables are added to the H2, MySQL and PostgreSQL schemas and to the `upgrade-1.3.0-to-2.0.0`
@@ -287,7 +287,7 @@ page shows the terms linked to the object.
 | Kind               | Meaning                                        | Targets                                                                     | Example                                                                                        |
 | ------------------ | ---------------------------------------------- | --------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | **Implemented by** | The object stores or computes the term         | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
-| **Used by**        | A semantic-model metric is built from the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
+| **Used by**        | A semantic-model metric is built from the term | `METRIC`, identified by its existing `metric_id`                            | metric `net_revenue` uses `Net revenue` and `Order`                                            |
 
 **Column scope in Step 1**: `COLUMN` means a table column. Resolve its identity as
 `catalog.schema.table.column`, using the table and column IDs, and authorize through that table.
@@ -297,13 +297,23 @@ table/column renames preserve the IDs and bindings. A COLUMN lookup whose parent
 as a view returns 404; do not reinterpret a view as a table. View-column bindings are outside
 Step 1. Binding a view itself remains supported, but `children=true` on a view returns 400.
 
-Both kinds are stored in `glossary_term_binding`. In storage, `metric_name` is `NOT NULL`: it is
-the empty string for Implemented by and the non-empty metric name for Used by. Empty metric names
-are invalid, so the empty string is reserved for ordinary asset bindings. The other columns of
-the unique key are also `NOT NULL`, with `deleted_at = 0` for a live row. This makes the unique key
-enforce duplicate prevention on H2, MySQL and PostgreSQL without depending on how they compare
-NULLs. DTOs still omit `metricName` for Implemented by. A binding is direct only: binding a table
-does not bind its columns.
+Both kinds are stored in `glossary_term_binding`, using the target's own stable ID:
+
+- `target_type` identifies one of the eight Implemented by asset types, or `METRIC` for Used by.
+  This is a binding-specific type; it does not add `METRIC` to `MetadataObject.Type`.
+- `target_id` is the asset's ID, the stable column ID for `COLUMN` (not a version-row ID), or the
+  existing `semantic_model_metric_meta.metric_id` for `METRIC`. It is never the containing
+  semantic-model ID for a metric binding. The containing table or semantic model is resolved
+  from the target identity for authorization, endpoint locking and cleanup.
+- All columns of `(term_id, target_type, target_id, deleted_at)` are `NOT NULL`, with
+  `deleted_at = 0` for a live row. This key prevents duplicate bindings on H2, MySQL and PostgreSQL
+  without nullable fields, empty-string markers or metric names in the key.
+- REST and client inputs still identify a metric by semantic model and exact metric name. The
+  server resolves that input to a live metric ID before binding. Responses resolve the ID back
+  to its current model/name; the existing `TermBindingDTO` and MCP argument shapes are unchanged.
+
+A binding is direct only: binding a table does not bind its columns. `glossary_term_rel` stores
+term-to-term relations; `glossary_term_binding` stores term-to-asset and term-to-metric bindings.
 
 - There is no semantic view type in Gravitino. A semantic view from another system (for example
   Snowflake) is stored as a semantic model, so its metrics use Used by.
@@ -363,8 +373,10 @@ Both can write bindings. The server checks each term in the request separately:
 - `?children=true` on a table or semantic model also returns the terms of each table column or
   metric that has readable terms. A schema tab or a metric table then loads in one call, not one
   call per column. On the server it is one query on `glossary_term_binding`, by the table and its
-  column IDs (or by `object_id` for metrics). Other types, including VIEW, reject `children=true`
-  with 400. Views still support listing their own terms with no children.
+  column IDs. For a semantic model, resolve its live metric IDs in a batch and query bindings
+  with `target_type = METRIC` and those IDs; do not query one metric at a time. Other types,
+  including VIEW, reject `children=true` with 400. Views still support listing their own terms
+  with no children.
 
 **Cleanup**
 
@@ -373,12 +385,15 @@ Both can write bindings. The server checks each term in the request separately:
   bindings use IDs.
 - Dropping a column in `alterTable` soft-deletes the bindings of the column, in the same
   transaction.
-- Metrics have no IDs. When a semantic model is altered, the bindings of removed metrics are
-  soft-deleted. A renamed metric is treated as removal of the old name and addition of the new
-  name: it loses its bindings and must be linked again. The cleanup writes one audit record per
-  affected term, listing its ID and name, the semantic-model ID and name, the removed metric
-  names, the triggering alter operation and the resulting term revision. This also applies to
-  metric removal without a rename; bindings are never silently transferred to a new name.
+- Metrics already have internal IDs. When a semantic model is altered, clean up bindings by
+  `target_type = METRIC` and the retired metric IDs. Reuse the existing metric identity lifecycle:
+  content edits and semantic-model renames preserve a metric ID; removing a metric retires its ID.
+  A metric rename is currently removal of the old name and addition of the new name, with a new
+  ID: its old bindings are removed and must be linked again. Reintroducing a removed name also
+  gets a new ID and must not revive old bindings. The cleanup writes one audit record per
+  affected term, listing its ID and name, the semantic-model ID and name, the retired metric IDs
+  and names, the triggering alter operation and the resulting term revision. This also applies
+  to metric removal without a rename; bindings are never silently transferred to a new identity.
 - Every surviving term that loses bindings gets one revision increment in the same transaction
   as the object change and binding cleanup, even if it loses several bindings. Unaffected terms
   do not change. The transaction locks all affected term rows in ID order before deleting the
@@ -975,9 +990,9 @@ For one metalake, it reads the glossary tables directly and checks the live rows
 4. The `BROADER` links have no cycle. The longest chain has at most the depth limit of links.
 5. No `RELATED` pair has one term as an ancestor of the other. Each `RELATED` row has
    `from_term_id < to_term_id`.
-6. Every binding has a non-NULL `metric_name`: non-empty exactly when its object type is
-   `SEMANTIC_MODEL`, and the empty string otherwise. No two live bindings have the same
-   `(term_id, object_type, object_id, metric_name)`.
+6. Every binding has non-NULL `term_id`, `target_type` and `target_id`, and resolves to a live
+   target of that type. `METRIC` uses the metric's own ID, not the containing model's ID. No two
+   live bindings have the same `(term_id, target_type, target_id)`.
 7. `glossary_term_version_info` has no rows.
 8. `glossary_hierarchy_lock` has at most one row for the metalake.
 
@@ -1299,10 +1314,11 @@ The users for these cases:
   when several metrics bound to it are removed in one alter. Unaffected terms keep their revisions.
 - T11.11 Race: one thread binds a term to a table while another drops the table. No live binding
   to the dropped table is left.
-- T11.12 At the storage layer, insert the same live ordinary asset binding twice using
-  `metric_name = ''`: the unique key rejects the second insert. Repeat for a metric binding.
-  Different metric names on the same model work. A NULL `metric_name` fails, and a soft-deleted
-  binding does not block a new live one. Run on H2, MySQL and PostgreSQL. **(guard)**
+- T11.12 At the storage layer, insert the same live `(term_id, target_type, target_id)` twice:
+  the unique key rejects the second insert. Repeat for TABLE, COLUMN and METRIC, using each
+  target's own ID. Different metric IDs on the same model work. A NULL in any key column fails,
+  and a soft-deleted binding does not block a new live binding to a still-live target. Run on
+  H2, MySQL and PostgreSQL. **(guard)**
 - T11.13 Drop a table with several bound columns and a table binding to the same term. That term
   gets exactly one revision increment and one audit record listing the lost bindings. Repeat
   for schema and catalog drop. A metalake drop leaves no surviving terms. Inject failure during
@@ -1312,13 +1328,18 @@ The users for these cases:
   locks exclude new bindings before affected terms are collected; all affected term rows are
   then locked in ID order. No deadlock, dangling binding or lost revision increment occurs.
 - T11.15 Rename a metric bound to two terms. Each term gets one audit entry with its ID and name,
-  the semantic-model ID and name, the removed metric name, the triggering alter operation and
-  its new revision. Removing multiple metrics in one alter groups the losses per term. A failed
-  alter leaves no successful cleanup entry.
+  the semantic-model ID and name, the retired metric ID and name, the triggering alter operation
+  and its new revision. Removing multiple metrics in one alter groups the losses per term. A
+  failed alter leaves no successful cleanup entry.
 - T11.16 Bind a term to a view itself: it works. A COLUMN request under a view-only parent name
   returns 404 and writes nothing. A table-column request resolves table and column IDs and
   authorizes and locks the table chain. Verify its rename/drop behavior through T11.8 and
   T11.9; do not resolve a view as a table or create a view-column binding. **(guard)**
+- T11.17 Bind metrics with long names, including two names sharing a long prefix, through their
+  model/name API inputs. Stored bindings use their distinct metric IDs; responses return the
+  correct model/name without truncation. Content edits and a semantic-model rename preserve
+  bindings. Remove a metric and reintroduce the same name: it has a new ID and no old bindings.
+  Explicitly binding it again does not conflict with the retired identity. **(guard)**
 
 **T12. Binding reads**
 
@@ -1328,7 +1349,8 @@ The users for these cases:
 - T12.2 `GET /objects/.../terms` requires target read access and leaves out terms the caller
   cannot see. The metric endpoint checks semantic-model read access and metric existence.
 - T12.3 `children=true` on a table with 3 columns, where 2 have terms, returns 2 entries in
-  `children`. It sends one query to `glossary_term_binding`.
+  `children`. Repeat for a semantic model with 3 metrics, where 2 have terms. Each case sends
+  one query to `glossary_term_binding`; metric IDs are resolved in a batch, not per metric.
 - T12.4 `children=true` on a type other than table or semantic model, including VIEW, fails
   with 400. A view's own terms can still be listed without children.
 - T12.5 A glossary viewer guesses a restricted table or model name. Reverse reads, including
@@ -1550,8 +1572,9 @@ parallel once the tasks they depend on are merged.
 
 - [ ] **T11. Add term bindings** (`core/`). `glossary_term_binding` storage; bind and unbind on all
       supported objects and on metrics, with both privilege paths; COLUMN means table columns
-      only, with table identity, authorization and fencing; non-NULL binding keys and
-      storage-level duplicate tests on all backends; cleanup on object drop, column drop and
+      only, with table identity, authorization and fencing; binding-specific target types and
+      target IDs, reusing existing metric IDs; non-NULL unique keys and storage-level duplicate
+      tests on all backends; cleanup on object drop, column drop and
       metric removal, with surviving-term revisions and audit details for metric rename and
       removal. Depends on: T6, T10.
 - [ ] **T12. Add binding REST APIs and reads** (`server/`). Bind and unbind endpoints; objects of a
