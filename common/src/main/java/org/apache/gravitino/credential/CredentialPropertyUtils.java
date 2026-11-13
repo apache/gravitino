@@ -115,6 +115,9 @@ public class CredentialPropertyUtils {
           .put(AwsIrsaCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
           .put(AwsIrsaCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
           .put(AwsIrsaCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
+          .put(AwsPodIdentityCredential.ACCESS_KEY_ID, ICEBERG_S3_ACCESS_KEY_ID)
+          .put(AwsPodIdentityCredential.SECRET_ACCESS_KEY, ICEBERG_S3_SECRET_ACCESS_KEY)
+          .put(AwsPodIdentityCredential.SESSION_TOKEN, ICEBERG_S3_TOKEN)
           .build();
 
   /**
@@ -218,7 +221,9 @@ public class CredentialPropertyUtils {
 
     Map<String, String> icebergProperties =
         transformProperties(credential.credentialInfo(), icebergCredentialPropertyMap);
-    if (credential instanceof S3TokenCredential || credential instanceof AwsIrsaCredential) {
+    if (credential instanceof S3TokenCredential
+        || credential instanceof AwsIrsaCredential
+        || credential instanceof AwsPodIdentityCredential) {
       icebergProperties.put(
           ICEBERG_S3_TOKEN_EXPIRES_AT_MS, String.valueOf(credential.expireTimeInMs()));
       return icebergProperties;
