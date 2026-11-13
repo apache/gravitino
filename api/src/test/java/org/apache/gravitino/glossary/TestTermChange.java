@@ -20,6 +20,8 @@ package org.apache.gravitino.glossary;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -109,6 +111,54 @@ public class TestTermChange {
     Assertions.assertEquals(
         TermChange.setProperty("owner_team", "sales").hashCode(), change.hashCode());
     Assertions.assertNotEquals(TermChange.setProperty("owner_team", "finance"), change);
+    Assertions.assertEquals(
+        "", ((TermChange.SetProperty) TermChange.setProperty("description", "")).getValue());
+  }
+
+  /** Rejects invalid names consistently across all name-bearing change factories. */
+  @Test
+  public void testInvalidNames() {
+    Map<String, Function<String, TermChange>> factories =
+        Map.of(
+            "rename", TermChange::rename,
+            "addSynonym", TermChange::addSynonym,
+            "removeSynonym", TermChange::removeSynonym,
+            "addDomain", TermChange::addDomain,
+            "removeDomain", TermChange::removeDomain,
+            "addBroader", TermChange::addBroader,
+            "removeBroader", TermChange::removeBroader,
+            "addRelated", TermChange::addRelated,
+            "removeRelated", TermChange::removeRelated,
+            "removeProperty", TermChange::removeProperty);
+    for (Map.Entry<String, Function<String, TermChange>> factory : factories.entrySet()) {
+      for (String invalid : Arrays.asList(null, "", " ", "\t")) {
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> factory.getValue().apply(invalid),
+            factory.getKey() + " must reject invalid name: " + invalid);
+      }
+    }
+  }
+
+  /** Rejects a missing status while preserving every explicit status value. */
+  @Test
+  public void testNullStatus() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> TermChange.setStatus(null));
+    for (GlossaryTerm.Status status : GlossaryTerm.Status.values()) {
+      Assertions.assertEquals(
+          status, ((TermChange.SetStatus) TermChange.setStatus(status)).getNewStatus());
+    }
+  }
+
+  /** Rejects malformed property updates at construction. */
+  @Test
+  public void testInvalidProperties() {
+    for (String invalid : Arrays.asList(null, "", " ", "\t")) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> TermChange.setProperty(invalid, "value"));
+    }
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> TermChange.setProperty("owner_team", null));
   }
 
   @Test
@@ -131,6 +181,9 @@ public class TestTermChange {
         Arrays.asList(updateLinks.getLinks()));
 
     Assertions.assertThrows(IllegalArgumentException.class, () -> TermChange.updateLinks(null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> TermChange.updateLinks(new TermLink[] {TermLink.of("Wiki", "https://x"), null}));
   }
 
   private static void assertChange(TermChange change, TermChange other, String expectedString) {

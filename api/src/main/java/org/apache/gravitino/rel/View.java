@@ -137,7 +137,8 @@ public interface View extends Auditable {
   }
 
   /**
-   * Returns the glossary term operations for this view.
+   * Returns the glossary term operations for this view itself. This does not support bindings on
+   * view output columns or {@link SupportsTerms#listColumnTerms()}.
    *
    * @return The {@link SupportsTerms} if the view supports glossary term operations.
    * @throws UnsupportedOperationException If the view does not support glossary term operations.

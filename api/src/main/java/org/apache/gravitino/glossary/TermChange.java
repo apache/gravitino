@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -39,8 +40,10 @@ public interface TermChange {
    *
    * @param newName The new name of the term.
    * @return The term change.
+   * @throws IllegalArgumentException If the new name is null or blank.
    */
   static TermChange rename(String newName) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(newName), "Term name cannot be blank");
     return new RenameTerm(newName);
   }
 
@@ -55,13 +58,16 @@ public interface TermChange {
   }
 
   /**
-   * Creates a change to set the status of the term. There are no transition rules: a term can move
-   * from any status to any other.
+   * Creates a change to set the status of the term. In Step 1, an authorized editor can move a term
+   * from any status to any other without approval. This is not an approval decision: Step 2
+   * publication requires its review workflow and cannot be bypassed with this change.
    *
    * @param newStatus The new status.
    * @return The term change.
+   * @throws IllegalArgumentException If the new status is null.
    */
   static TermChange setStatus(GlossaryTerm.Status newStatus) {
+    Preconditions.checkArgument(newStatus != null, "Term status cannot be null");
     return new SetStatus(newStatus);
   }
 
@@ -71,8 +77,10 @@ public interface TermChange {
    *
    * @param synonym The synonym to add.
    * @return The term change.
+   * @throws IllegalArgumentException If the synonym is null or blank.
    */
   static TermChange addSynonym(String synonym) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(synonym), "Synonym cannot be blank");
     return new AddSynonym(synonym);
   }
 
@@ -81,8 +89,10 @@ public interface TermChange {
    *
    * @param synonym The synonym to remove.
    * @return The term change.
+   * @throws IllegalArgumentException If the synonym is null or blank.
    */
   static TermChange removeSynonym(String synonym) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(synonym), "Synonym cannot be blank");
     return new RemoveSynonym(synonym);
   }
 
@@ -91,8 +101,10 @@ public interface TermChange {
    *
    * @param domain The name of the domain.
    * @return The term change.
+   * @throws IllegalArgumentException If the domain name is null or blank.
    */
   static TermChange addDomain(String domain) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(domain), "Domain name cannot be blank");
     return new AddDomain(domain);
   }
 
@@ -101,8 +113,10 @@ public interface TermChange {
    *
    * @param domain The name of the domain.
    * @return The term change.
+   * @throws IllegalArgumentException If the domain name is null or blank.
    */
   static TermChange removeDomain(String domain) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(domain), "Domain name cannot be blank");
     return new RemoveDomain(domain);
   }
 
@@ -113,8 +127,11 @@ public interface TermChange {
    *
    * @param broader The name of the broader term.
    * @return The term change.
+   * @throws IllegalArgumentException If the broader term name is null or blank.
    */
   static TermChange addBroader(String broader) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(broader), "Broader term name cannot be blank");
     return new AddBroader(broader);
   }
 
@@ -123,8 +140,11 @@ public interface TermChange {
    *
    * @param broader The name of the broader term.
    * @return The term change.
+   * @throws IllegalArgumentException If the broader term name is null or blank.
    */
   static TermChange removeBroader(String broader) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(broader), "Broader term name cannot be blank");
     return new RemoveBroader(broader);
   }
 
@@ -134,8 +154,11 @@ public interface TermChange {
    *
    * @param related The name of the related term.
    * @return The term change.
+   * @throws IllegalArgumentException If the related term name is null or blank.
    */
   static TermChange addRelated(String related) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(related), "Related term name cannot be blank");
     return new AddRelated(related);
   }
 
@@ -144,8 +167,11 @@ public interface TermChange {
    *
    * @param related The name of the related term.
    * @return The term change.
+   * @throws IllegalArgumentException If the related term name is null or blank.
    */
   static TermChange removeRelated(String related) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(related), "Related term name cannot be blank");
     return new RemoveRelated(related);
   }
 
@@ -154,9 +180,12 @@ public interface TermChange {
    *
    * @param links The new links, which replace all current links.
    * @return The term change.
+   * @throws IllegalArgumentException If the array or one of its links is null.
    */
   static TermChange updateLinks(TermLink[] links) {
     Preconditions.checkArgument(links != null, "Links cannot be null");
+    Preconditions.checkArgument(
+        Arrays.stream(links).allMatch(Objects::nonNull), "A link cannot be null");
     return new UpdateLinks(links.clone());
   }
 
@@ -176,8 +205,11 @@ public interface TermChange {
    * @param property The property name.
    * @param value The property value.
    * @return The term change.
+   * @throws IllegalArgumentException If the property name is null or blank, or the value is null.
    */
   static TermChange setProperty(String property, String value) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "Property name cannot be blank");
+    Preconditions.checkArgument(value != null, "Property value cannot be null");
     return new SetProperty(property, value);
   }
 
@@ -186,8 +218,10 @@ public interface TermChange {
    *
    * @param property The property name.
    * @return The term change.
+   * @throws IllegalArgumentException If the property name is null or blank.
    */
   static TermChange removeProperty(String property) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "Property name cannot be blank");
     return new RemoveProperty(property);
   }
 

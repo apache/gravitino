@@ -123,7 +123,8 @@ public interface Column {
   }
 
   /**
-   * Returns the glossary term operations for this column.
+   * Returns the glossary term operations for this table column. Glossary bindings on view output
+   * columns are outside Step 1 and are not supported by this capability.
    *
    * @return The {@link SupportsTerms} if the column supports glossary term operations.
    * @throws UnsupportedOperationException If the column does not support glossary term operations.

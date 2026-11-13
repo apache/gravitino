@@ -28,8 +28,15 @@ import org.apache.gravitino.exceptions.NoSuchTermException;
  * uses the bound terms ({@link TermBinding.Kind#USED_BY}). A semantic model itself has no terms;
  * only its metrics do.
  *
- * <p>Metrics are bound by name. A renamed metric loses its bindings, and the bindings of a removed
- * metric are removed.
+ * <p>API inputs identify metrics by their exact name within this semantic model. The server
+ * resolves them to existing live metric IDs for storage; model/name is not the physical binding
+ * key. Content edits and semantic-model renames preserve metric IDs and bindings. A metric rename
+ * currently retires the old identity and creates a new one, so it loses its bindings. Removing and
+ * later reintroducing the same name must not revive the retired identity's bindings.
+ *
+ * <p>Reads authorize semantic-model read access before checking metrics or listing their terms.
+ * Glossary view or management privileges grant no semantic-model access. Returned terms, including
+ * their domains and nested relations, follow {@link GlossaryTerm}'s visibility rules.
  */
 @Evolving
 public interface SupportsMetricTerms {
@@ -39,6 +46,7 @@ public interface SupportsMetricTerms {
    *
    * @param metric The name of the metric.
    * @return The names of the terms.
+   * @throws ForbiddenException If the caller cannot read the semantic model.
    * @throws NoSuchMetadataObjectException If the semantic model has no metric with this name.
    */
   String[] listMetricTerms(String metric) throws NoSuchMetadataObjectException;
@@ -48,6 +56,7 @@ public interface SupportsMetricTerms {
    *
    * @param metric The name of the metric.
    * @return The terms.
+   * @throws ForbiddenException If the caller cannot read the semantic model.
    * @throws NoSuchMetadataObjectException If the semantic model has no metric with this name.
    */
   GlossaryTerm[] listMetricTermsInfo(String metric) throws NoSuchMetadataObjectException;
@@ -59,6 +68,13 @@ public interface SupportsMetricTerms {
    * <p>Each term is checked on its own. The caller needs either the admin privilege on the semantic
    * model and read access to the term, or the edit privilege on the term and read access to the
    * semantic model. Otherwise the call fails with a {@link ForbiddenException}.
+   *
+   * <p>In Step 1, edit access means effective {@code MANAGE_DEFINITIONS}, or current ownership
+   * (including group membership) with effective {@code CREATE_DEFINITION}. A hidden or missing term
+   * fails with {@link NoSuchTermException} before checking its status. The term-editor path permits
+   * any status and takes precedence over the object-admin-only path, which requires approved terms.
+   * These checks apply to additions and removals. Step 1 applies changes immediately; Step 2
+   * binding proposals require review.
    *
    * @param metric The name of the metric.
    * @param termsToAdd The names of the terms to bind.

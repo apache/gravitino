@@ -102,7 +102,10 @@ public final class TermSpec {
   /**
    * Returns the status of the term.
    *
-   * @return The status, or empty to use the default status {@link GlossaryTerm.Status#APPROVED}.
+   * @return The requested status, or empty to let the server choose its creation default. Step 1
+   *     defaults to {@link GlossaryTerm.Status#APPROVED} without review. Step 2 defaults to {@link
+   *     GlossaryTerm.Status#DRAFT} and rejects another initial status. Omission is preserved in
+   *     this value rather than replaced by a client-side default.
    */
   public Optional<GlossaryTerm.Status> status() {
     return Optional.ofNullable(status);
@@ -254,9 +257,10 @@ public final class TermSpec {
     }
 
     /**
-     * Sets the status of the term. Without it, the term is {@link GlossaryTerm.Status#APPROVED}.
+     * Sets the requested initial status. A null value preserves omission so that the server chooses
+     * its default as described by {@link TermSpec#status()}.
      *
-     * @param status The status, or null for the default status.
+     * @param status The requested status, or null to use the server default.
      * @return This builder.
      */
     public Builder withStatus(@Nullable GlossaryTerm.Status status) {

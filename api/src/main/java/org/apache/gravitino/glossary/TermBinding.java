@@ -31,6 +31,11 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * A binding links a glossary term to the data behind it. A binding is direct only: binding a table
  * does not bind its columns.
+ *
+ * <p>This public value identifies targets by their names. The server resolves each target to its
+ * own stable ID for persistence, including a metric ID rather than its containing model's ID. The
+ * storage key does not include the metric name. A binding grants no access to its target, and a
+ * {@link Kind#USED_BY} binding does not by itself establish that the metric computes the term.
  */
 @Evolving
 public final class TermBinding {
@@ -68,7 +73,9 @@ public final class TermBinding {
   /**
    * Creates a binding to an object that implements the term.
    *
-   * @param object The object, of a type in {@link #IMPLEMENTED_BY_TYPES}.
+   * @param object The object, of a type in {@link #IMPLEMENTED_BY_TYPES}. In Step 1, {@code COLUMN}
+   *     means a table column; view output columns are not supported. The server validates the
+   *     containing table, which cannot be determined from this name-only value.
    * @return The binding.
    * @throws IllegalArgumentException If the object is null or of another type.
    */

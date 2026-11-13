@@ -37,16 +37,25 @@ import org.apache.gravitino.exceptions.NoSuchTermException;
  * and a synonym cannot be the name of another term or of its own term.
  *
  * <p>A {@code GlossaryTerm} is a snapshot. The relation lists hold the names of the terms that are
- * visible to the caller; hidden terms are left out.
+ * visible to the caller; hidden terms are left out. All projections, including mutation responses,
+ * omit domains the caller cannot read. Lookup results additionally omit non-approved relation
+ * names, as specified by {@link GlossaryOperations#matchTerms(String[], String)}.
  */
 @Evolving
 public interface GlossaryTerm extends Auditable {
 
   /** The status of a term. */
   enum Status {
-    /** The term is being written. It is visible only to the users who can create terms. */
+    /**
+     * The term is being written. In Step 1, only its current owner with effective {@code
+     * CREATE_DEFINITION}, including group members, or a caller with effective {@code
+     * MANAGE_DEFINITIONS} can read it. Create access alone does not expose another owner's draft.
+     */
     DRAFT,
-    /** The term can be used, including by agents. This is the default status of a new term. */
+    /**
+     * The term is available to authorized readers and agents. This is the Step 1 creation default,
+     * not evidence of human review. Step 2 defaults new terms to draft and requires approval.
+     */
     APPROVED,
     /** The term is replaced. It stays readable, but lookups for agents leave it out. */
     DEPRECATED
@@ -83,9 +92,11 @@ public interface GlossaryTerm extends Auditable {
   Status status();
 
   /**
-   * Returns the names of the domains the term belongs to.
+   * Returns the names of the domains the term belongs to that the caller can read. Hidden domain
+   * names, IDs and counts are not exposed. Filtering does not change stored membership or the
+   * revision, and a term can remain readable even if all its domains are hidden.
    *
-   * @return The names of the domains, or an empty array if the term belongs to no domain.
+   * @return The visible domain names, or an empty array if none are visible.
    */
   String[] domains();
 
@@ -138,6 +149,12 @@ public interface GlossaryTerm extends Auditable {
    * increases it by one, however many changes the call holds, and so does each bind or unbind call
    * that changes the bindings of the term. Owner and tag changes do not increase it. A client can
    * use it to see that a term changed after it read it. A revision is not an approved version.
+   *
+   * <p>Cleanup also increases the revision of each surviving term that loses a broader parent,
+   * related relation or binding, exactly once per cleanup transaction regardless of the number of
+   * losses. Unaffected terms, no-op cleanup and changes only to a derived narrower list do not
+   * increase it. In Step 2, pending changes do not alter the live revision or content; the previous
+   * approved state remains available to readers and agents until approval.
    *
    * @return The revision of the term.
    */
