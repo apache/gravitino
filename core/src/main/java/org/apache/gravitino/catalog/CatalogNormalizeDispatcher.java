@@ -70,6 +70,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, boolean includeProperties)
+      throws NoSuchMetalakeException {
+    return dispatcher.listCatalogsInfo(namespace, includeProperties);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return dispatcher.loadCatalog(ident);
   }

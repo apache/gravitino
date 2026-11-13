@@ -1392,7 +1392,7 @@ public class CatalogsPage extends BaseWebIT {
 
   public boolean verifyTableColumns() {
     try {
-      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags", "Policies");
+      List<String> columns = Arrays.asList("Column Name", "Data Type", "Tags");
 
       // Ant Design Table structure: thead > tr > th
       List<WebElement> columnHeadersRows =

@@ -206,7 +206,7 @@ public class GravitinoCatalogManager {
       return getGravitinoCatalogInfo(currentIdentity(), name);
     } catch (Exception e) {
       LOG.error(String.format("Load catalog %s failed", name), e);
-      throw new RuntimeException(e);
+      throw new RuntimeException(String.format("Failed to load catalog %s", name), e);
     }
   }
 
@@ -254,23 +254,22 @@ public class GravitinoCatalogManager {
   public void loadRelationalCatalogs() {
     GravitinoIdentity identity = applicationIdentity();
     GravitinoClient client = getClient(identity);
-    Catalog[] catalogs = client.listCatalogsInfo();
+    Catalog[] catalogs = client.listCatalogsInfo(false);
     Map<String, Catalog> relationalCatalogs =
         Arrays.stream(catalogs)
             .filter(catalog -> Catalog.Type.RELATIONAL.equals(catalog.type()))
             .collect(
                 Collectors.toMap(Catalog::name, catalog -> catalog, (first, second) -> second));
-    relationalCatalogs.forEach(
-        (name, catalog) ->
-            gravitinoCatalogs.put(cacheKey(identity, name), new CachedCatalog(client, catalog)));
     this.applicationCatalogs = ImmutableMap.copyOf(relationalCatalogs);
   }
 
   /**
-   * Returns the catalogs loaded by {@link #loadRelationalCatalogs()}, that is, the catalogs the
-   * application identity can see.
+   * Returns lightweight descriptors loaded by {@link #loadRelationalCatalogs()} for the catalogs
+   * the application identity can see. These descriptors retain only the {@code in-use} property;
+   * complete catalog information is loaded through {@link #getGravitinoCatalogInfo(String)} on
+   * first use.
    *
-   * @return the catalogs registered at driver startup, keyed by catalog name
+   * @return the lightweight catalog descriptors registered at driver startup, keyed by catalog name
    */
   public Map<String, Catalog> getCatalogs() {
     return applicationCatalogs;

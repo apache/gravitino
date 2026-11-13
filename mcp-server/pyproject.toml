@@ -20,7 +20,7 @@ name = "gravitino_mcp_server"
 version = "2.0.0.dev0"
 description = "Gravitino MCP server"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     # Pin FastMCP so breaking API changes are handled explicitly during dependency upgrades.
     "fastmcp==3.4.5",
