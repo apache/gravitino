@@ -21,7 +21,7 @@
 
 | Version | Author | Date       | Status |
 | ------- | ------ | ---------- | ------ |
-| 0.6     | Qi Yu  | 2026-11-09 | Draft  |
+| 0.7     | Qi Yu  | 2026-11-13 | Draft  |
 
 ## Background
 
@@ -140,17 +140,16 @@ GlossaryTerm { id, name, definition, synonyms[], status: DRAFT | APPROVED | DEPR
 TermRelation { fromTermId, toTermId, type: BROADER | RELATED, audit_info }
 TermDomain   { termId, domainId, audit_info }                // Option A in Domain membership
 TermBinding  { termId, targetId, targetType, audit_info }
-TermVersion  { termId, version, state, snapshot, audit_info }   // created now; rows from Step 2
+TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; schema defined then
 ```
 
-| Table                        | Unique key                                                                     | Other index                              |
-| ---------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
-| `glossary_term_meta`         | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
-| `glossary_term_synonym`      | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
-| `glossary_term_rel`          | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
-| `glossary_term_domain_rel`   | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
-| `glossary_term_binding`      | `(term_id, target_type, target_id, deleted_at)`                                | `(target_type, target_id)`               |
-| `glossary_term_version_info` | `(term_id, version, deleted_at)`                                               | `(term_id, state)`                       |
+| Table                      | Unique key                                                                     | Other index                              |
+| -------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
+| `glossary_term_meta`       | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
+| `glossary_term_synonym`    | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
+| `glossary_term_rel`        | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
+| `glossary_term_domain_rel` | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
+| `glossary_term_binding`    | `(term_id, target_type, target_id, deleted_at)`                                | `(target_type, target_id)`               |
 
 - The tables are added to the H2, MySQL and PostgreSQL schemas and to the `upgrade-1.3.0-to-2.0.0`
   scripts.
@@ -158,21 +157,38 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
   it (`Locale.ROOT`). Names, synonyms and lookups all use `key()`, so they compare the same way.
 - **Names** are unique in a metalake by `name_key = key(name)`. So `Churn` and `churn` are the same
   name on every database. Responses return the name as the user typed it. Names follow the tag and
-  domain rules: up to 128 characters, and `/` is allowed (URL-encoded in paths).
+  domain rules: up to 128 Unicode code points, and `.` and `/` are allowed (`/` URL-encoded in
+  paths). Add `GLOSSARY_TERM` to `MetadataObjects`' single-level name types, so `a.b` remains one
+  term name in the owner and tag APIs rather than becoming parent `a` and name `b`.
 - **Synonyms** are stored one per row, with `synonym_key = key(synonym)`. Two terms can share a
   synonym. A synonym cannot be the name of another term. The server checks this in both
   directions: when a synonym is added, and when a term is created or renamed (400). Create, rename
   and synonym changes take the same per-metalake hierarchy lock before checking (see Locking).
-- **Documentation links** (a label and a URL) are shown on the term page. They are stored in a JSON
-  column of `glossary_term_meta`. No query reads inside them.
+- **Documentation links** (a label and a URL) are shown on the term page. URLs must be absolute
+  `http` or `https` URLs with a host, with the scheme compared without regard to case. Reject
+  malformed URLs and other schemes, including `javascript:`, `data:` and `file:`, with 400.
+  Validate the parsed URI rather than a text prefix, on create and `updateLinks`; the UI also
+  escapes labels and URL attributes when rendering. Links are stored in a JSON column of
+  `glossary_term_meta`; no query reads inside them.
 - **Source reference** is optional. When set, it is unique in the metalake. It records where an
   imported term came from, in the form `<system>:<id>`, for example
   `datahub:urn:li:glossaryTerm:Customer`. A new import can then update the term instead of creating
   a copy. A term without a source reference was created in Gravitino.
+- **Input bounds**: a synonym has at most 128 Unicode code points and a term has at most 100
+  synonyms. A definition has at most 16,384 UTF-8 bytes. A non-null `sourceRef` has at most 128
+  Unicode code points. Reject over-limit values with 400 before writing; never truncate them.
+  Apply the same bounds to create, alter and future imports. Store `source_ref` as nullable
+  `VARCHAR(128)` with exact, case-sensitive comparison. Under utf8mb4 its maximum key payload
+  is 512 bytes; with two BIGINT key columns the composite payload is 528 bytes, avoiding a
+  prefix index or a dependency on the 3072-byte MySQL index limit.
 - `MetadataObject.Type.GLOSSARY_TERM` is added for owners, tags, events and audit. Privileges
   **cannot be granted on a single term**: the role APIs reject them.
-- Terms, relations and bindings are not cached. Every request reads the store, the same as for
-  domains.
+- Terms, relations and bindings are not cached. Owner-based glossary authorization also resolves
+  the current term ID, owner and relevant group membership from the authoritative store for each
+  request; it does not reuse the shared name-to-ID or owner cache for that decision. Request-local
+  deduplication is allowed. Other role/grant checks retain the platform's existing consistency.
+  The same uncached ownership decision applies to generic owner-transfer authorization for
+  `GLOSSARY_TERM`; a former owner cannot regain ownership through a stale cache on that route.
 
 ### Relations
 
@@ -223,9 +239,9 @@ any depth. That is why this design needs the cycle check and the hierarchy lock.
 A term belongs to zero or more domains. In Step 1 the definition privileges are granted on the
 metalake only, so a domain groups and filters terms but does not change who can see or manage them.
 In Step 2, domains also become the scope of grants (see Implementation Steps). Then membership
-decides who manages a term. **Decision: Option A, explicit relations.** Jerry selected it in the
-[November 9 review](https://github.com/apache/gravitino/pull/14239#discussion_r4512415347), and
-the author acknowledged the choice. Step 1 and Step 2 use this single membership source.
+decides who manages a term. **Decision: Option A, explicit relations**, decided in
+[review](https://github.com/apache/gravitino/pull/14239#discussion_r4512415347).
+Step 1 and Step 2 use this single membership source.
 Backing tags (Option B) are retained under [Alternatives Considered](#alternatives-considered),
 not as an implementation prerequisite.
 
@@ -247,6 +263,14 @@ not as an implementation prerequisite.
 - Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`. This is the same
   as a domain with subdomains. Removing the terms silently would change how they are grouped, and in
   Step 2 who manages them. The change is one more check in `DomainManager#dropDomain`.
+- **Clearing a non-empty domain**: the caller dropping it may not be able to see every member
+  term. A current term owner with effective CREATE and the required domain access can remove
+  its own membership; a caller with MANAGE and domain access can clear the remaining terms.
+  The metalake owner can coordinate both operations. A domain admin without glossary rights
+  must ask such a caller to clear membership. The 409 message gives this remedy without term
+  names or counts. It reveals that at least one member exists, as documented in Known leaks.
+  `MANAGE_DOMAIN` alone does not grant term editing or silent detachment. In Step 2, proposed
+  membership removals must be approved before dropping the domain succeeds.
 - **Descriptive tags** on terms use the existing tag APIs and `APPLY_TAG`. A tag on a term never
   changes its domains, even when the tag backs a domain.
 
@@ -436,12 +460,22 @@ pending-content rules are specified separately below.
   `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
   leave out terms the caller cannot see. So a hidden draft never shows up as a relation.
 - **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
-  in two ways: creating a term with the same name returns 409, and adding a synonym equal to its
-  name returns 400.
+  through a same-name create (409), a synonym equal to its name (400), or dropping a domain that
+  contains hidden member terms (409). The last response discloses non-emptiness, not member names
+  or counts; clearing the membership requires the authorized callers described in Domain membership.
+  Lookup-work errors expose a coarse cost limit being reached, but return no exact candidate or
+  hidden counts. This is not a claim that errors or timing reveal nothing about query complexity.
 - **Revision**: each change to the name, definition, synonyms, links, properties, relations,
   domains, bindings or status increases `current_version` by one, in the same transaction.
   Responses return it as `version`, so a client can see that a term changed after it read it.
   Owner and tag changes are only audited.
+- **No effective change**: a successful alter, bind/unbind or cleanup that leaves the effective
+  term state unchanged does not increase its revision and does not emit a change-success event
+  claiming a new revision. Compare persisted field values and normalized synonym keys, treating
+  relation/membership sets and property maps without regard to order. A rename also compares its
+  stored display name: a case-only display change is effective even when `name_key` is unchanged.
+  Documentation-link order is preserved. A mixed alter with effective changes increments
+  once; repeated add/remove operations and setting a field to its current value increment zero.
 - **Cleanup revisions**: deleting a term, object, column or metric also increments each surviving
   term that loses a broader relation, a `RELATED` relation or a binding. Each affected term gets
   exactly one increment per cleanup transaction, regardless of the number of removed rows, and
@@ -452,8 +486,8 @@ pending-content rules are specified separately below.
   are required cleanup effects, applied with the endpoint deletion rather than left pending for
   review in Step 2.
 - **No snapshots in Step 1**: the audit log holds the change record. There is no history API.
-  `glossary_term_version_info` is created with the other tables, but Step 1 writes no rows to it.
-  Term reads and writes do not need it. A revision is not an approved version.
+  Do not create `glossary_term_version_info` in Step 1. Step 2 designs its snapshot format and
+  creates it through that release's upgrade scripts. A revision is not an approved version.
 - **Workflow hook**: `GlossaryManager` sends every change to a `TermChangeHandler`: content, status,
   relations, domains, and both binding paths. The default handler applies the change at once. In
   Step 2, a review handler keeps the proposed change apart from the live tables until it is
@@ -470,8 +504,9 @@ pending-content rules are specified separately below.
   an authorized MANAGE reviewer. Being a former owner or the submitter does not independently
   grant continued read access. Proposal status is separate from the
   live term's status. Rejection leaves the approved version unchanged; approval replaces it.
-- Dropping a term soft-deletes its synonyms, relations, domain links, bindings and version rows, in
-  the same transaction. Dropping a metalake soft-deletes all its glossary rows in
+- Dropping a term soft-deletes its synonyms, relations, domain links and bindings in the same
+  transaction; Step 2 also cleans up its version rows once that storage exists. Dropping a
+  metalake soft-deletes all its glossary rows in
   `MetalakeMetaService#deleteMetalake`, next to the tag cleanup.
 
 ### Access control
@@ -498,6 +533,12 @@ In Step 1, the three privileges are granted on the metalake:
   owner, including group members, not necessarily the original creator. Changing status is an
   ordinary edit in Step 1; CREATE and MANAGE have no separate approval capability. Step 2 adds
   submission and review, including reviewer authorization and no self-approval.
+- **Ownership transfer**: new requests that begin after an owner transfer commits must use the
+  new owner on every server. The glossary owner path bypasses shared ownership/name caches and
+  reads current ownership and group membership from the store. Writes recheck that ownership
+  in their write transaction. A request already authorized before the transfer commits may
+  complete; the transfer does not cancel in-flight work. This defines the ownership boundary
+  without promising that unrelated platform role/grant caches are immediately consistent.
 - **Read privilege on a term**: `VIEW_DEFINITION` for `APPROVED` and `DEPRECATED`; for `DRAFT`,
   `MANAGE_DEFINITIONS`, or being the owner with `CREATE_DEFINITION`. CREATE alone gives no access
   to another owner's draft. Apply this rule to direct gets, lists and every nested term result.
@@ -517,8 +558,9 @@ In Step 1, the three privileges are granted on the metalake:
 - **Bindings** are written on the object, by the object admin (`APPROVED` terms only) or by the
   term editor. See Bindings.
 - **Owner** (a user or a group), set through `/owners/glossary_term/{term}`. When a group owns a
-  term, all its members count as the owner. To change the owner, the caller must be the current
-  owner, or have `MANAGE_GRANTS` on the metalake.
+  term, all its members count as the owner. Transfers retain the existing owner API's current-owner
+  or metalake-owner checks. MANAGE_DEFINITIONS and MANAGE_GRANTS do not replace that check.
+  For glossary terms, resolve ownership from the store rather than shared owner/name caches.
 - **Create** needs `CREATE_DEFINITION` on the metalake, and `USE_DOMAIN` on each domain in the
   request. The creator becomes the owner.
 - **Implementation**: add shared glossary authorization checks for effective VIEW, CREATE and
@@ -606,6 +648,11 @@ writes. A metalake drop deletes all its terms, so there are no surviving terms t
   takes this lock. Every create, rename and synonym change also takes it, so checking names in
   `glossary_term_meta` and synonyms in `glossary_term_synonym` cannot race. These writes run one
   at a time per metalake; other content edits do not take this lock.
+- **Throughput trade-off**: creates, renames and synonym changes serialize per metalake even
+  when they concern unrelated names. Step 1 accepts this simple invariant-preserving protocol.
+  S2.6 imports must use bounded batches rather than assuming parallel creates scale within one
+  metalake. T18 measures contention as well as hierarchy checks. A per-key lock is deferred;
+  introducing it would need a common ordering across every affected old/new name and synonym.
 - Name/synonym checks and hierarchy walks run after the lock is taken and read the latest
   committed state, including a transaction that committed while this request waited for the
   lock. They must not reuse an earlier transaction snapshot or a MyBatis cached result. If a term
@@ -644,7 +691,7 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 ```
 TermCreateRequest     { name, definition, synonyms, status?, domains, broader, related, links,
                         sourceRef, properties }
-TermUpdatesRequest    { updates: [rename, updateDefinition, setStatus, addSynonym, removeSynonym,
+TermUpdatesRequest    { expectedVersion?, updates: [rename, updateDefinition, setStatus, addSynonym, removeSynonym,
                         addDomain, removeDomain, addBroader, removeBroader, addRelated,
                         removeRelated, updateLinks, setSourceRef, setProperty, removeProperty] }
 TermDTO               { name, definition, synonyms, status, domains, broader, narrower, related,
@@ -680,41 +727,70 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
   - `bindings=true` adds at most 20 authorized bindings per term. Apply target-read authorization
     before the limit: collect up to 21 visible bindings, return the first 20, and set
     `bindingsTruncated` only when a 21st visible binding exists. Hidden bindings do not consume
-    the limit or affect the flag. A query may fetch candidates in batches, but must continue
-    through hidden rows until it finds 21 visible bindings or exhausts the candidates. It only
-    works together with `match` and `details=true`. A lookup then needs only one REST call. A word
-    usually matches one to three terms.
+    the result limit or affect the flag. Candidate scanning is nevertheless bounded: examine at
+    most 1,000 binding candidates per term and 10,000 authorization candidates across a lookup
+    request, including matched terms and their projected relations/domains/bindings. Fetch in
+    bounded batches. Hidden candidates consume this work budget, but no response exposes their
+    count. If the budget ends before proving exhaustion or finding 21 visible bindings, fail the
+    request with 400 `LookupTooBroadException`; return no partial success or fabricated
+    `bindingsTruncated` value. The error contains no scanned/hidden counts, term name or target
+    identity and suggests omitting embedded bindings or narrowing the query. Within the budget,
+    continue past hidden rows rather than treating a candidate batch as the visible limit.
+    `bindings=true` requires `match` and `details=true`; with `bindings=false`, return matched
+    definitions and omit the optional binding fields. A normal lookup needs one REST call.
   - Why not a separate path like `/terms/resolve`? It would clash with a term named `resolve`. So
     lookup is a filter of the list.
-- **Alter** applies all updates in one transaction and increases the revision once. `narrower` is
+- **Alter** applies all updates in one transaction and increases the revision once only if the
+  effective state changes. `narrower` is
   computed and cannot be set. `version` is the current revision. `updateLinks` replaces the whole
   link list. `status` defaults to `APPROVED` on create.
 - **Terms of an object**: `children=true` works on `table` and `semantic_model` after target-read
   authorization. It adds one entry to `children` for each table column or metric with terms
   passing the authorization and optional status filter. A semantic model itself has no terms;
   only its metrics do. A view supports its own terms, without `children=true`.
+- **Binding-list work budget**: `GET /terms/{term}/objects` also examines at most 1,000 candidates
+  after applying its `kind`/`types` filters. A completed result contains every authorized binding
+  within those filters; a budget hit before completion returns `LookupTooBroadException`, not a
+  partial list. `list_metadata_by_term` passes these optional filters through. Callers can narrow
+  kind/types or explain that the broad query cannot be completed; they must not claim no bindings.
 - **Bind / unbind** use the same request format as tag association. The response is the object's
   terms after the change.
 - **Errors**:
   - 404: `NoSuchTermException` (missing, hidden, or a named root excluded by the status filter),
     `NoSuchMetadataObjectException`;
-  - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`;
+  - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`,
+    `TermVersionConflictException` (a visible, authorized edit has a stale expected revision);
   - 400: a cycle, a term as its own parent, binding an unsupported object type, a synonym equal to
     another term's name, an object admin binding a visible non-`APPROVED` term without the
     term-editor path, invalid `status`, `children=true` on an unsupported type, or more than 20
-    `match` values;
+    `match` values, invalid links or exceeded input bounds; `LookupTooBroadException` for the
+    explicit lookup-work limits;
   - 403: `ForbiddenException`.
-- **Concurrency**: changes apply to the current state, and the last write wins, the same as other
-  Gravitino metadata. Writes do not check the version. Responses include `version`, so a client
-  can see that a term changed after it read it.
+- **Concurrency**: `expectedVersion` is optional on `PUT /terms/{term}` and must be a positive
+  integer. If omitted, apply changes to the current state with last-write-wins behavior. If
+  supplied, authorize the caller, lock the term, and compare its current revision before applying
+  any update or deciding that the request is a no-op. A mismatch returns 409
+  `TermVersionConflictException` with no changes, revision increment or success event. Hidden
+  terms still return 404 before any version disclosure. Clients must reload, reconcile their
+  edits and explicitly resubmit; they must not blindly retry a stale replacement list.
+  A matching no-op succeeds without increasing the revision. Java/Python clients expose a
+  conditional-alter overload; an implementation that does not support it fails before writes
+  rather than silently delegating to unconditional alter. Step 2 proposals require their base
+  revision, but the optional Step 1 field does not implement approval.
+- **Error consumers**: REST uses the existing `ErrorResponse` code/type/message shape. Java and
+  Python clients preserve the two new typed errors; MCP reports a lookup-work failure as a tool
+  error, never as `unmatched` or an empty binding list. No client automatically retries the same
+  expensive or conflicting request. Core/REST/client tasks add the exception mappings and tests.
 - **Paging**: none, the same as the other core list APIs. It can come later with the paging of the
   Domain design.
 - **Encoding**: a term name can contain `/`. In `{term}` it must be URL-encoded as `%2F`, the same
   as domain and tag names.
 - **Clients** (Java, Python):
   - `GlossaryOperations` on `GravitinoMetalake`: `listTerms`, `listTermsInfo`, `getTerm`,
-    `createTerm`, `alterTerm` (also sets the status), `dropTerm`, and `matchTerms(words, domain)`.
-    `matchTerms` returns approved terms with their bindings. It is for agents that do not use MCP.
+    `createTerm`, `alterTerm` (also sets the status), its optional-expected-version overload,
+    `dropTerm`, and `matchTerms(words, domain)` with an optional `includeBindings` variant.
+    Lookup returns approved terms with bindings by default; callers can request definitions
+    without binding expansion. It is also usable by agents that do not use MCP.
   - On a `Term`: `broader()`, `narrower()`, `listBindings(kind)`.
   - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
     views, table columns, filesets, topics and models. Tables also have `listColumnTerms()`;
@@ -835,7 +911,10 @@ User question
 
 **`resolve_business_term`**
 
-- Input: `words` (the business phrases from step 1), and an optional `domain`.
+- Input: `words` (the business phrases from step 1), an optional `domain`, and
+  `include_bindings` (default true). False still uses approved-only matching but skips binding
+  expansion and omits binding fields from the result. This provides a definition-only fallback
+  when a broad lookup exceeds its work budget, without adding a new endpoint or paging protocol.
 - Output for the example above:
 
 ```json
@@ -887,25 +966,32 @@ User question
 - The binding fields are the same arguments that `get_table_metadata_details` and
   `load_semantic_model` take. The agent can make the next call directly, with no parsing and no
   extra lookup.
-- If `bindings_truncated` is true, the agent calls `list_metadata_by_term` for the full list.
+- If `bindings_truncated` is true, the agent calls `list_metadata_by_term` for a complete list
+  within the binding-read budget, narrowing kind/types if necessary.
+- A lookup-work error is not a successful partial result or an unmatched word. The agent may
+  retry with `include_bindings=false` to identify terms, then request a narrower binding kind/type.
+  If the narrower binding read also exceeds its budget, report that limitation rather than
+  guessing a target or repeatedly replaying the same request. With bindings disabled, omitted
+  fields mean not requested, not that the term has no bindings.
 
 **Rules in the tool descriptions**, so all agents use the result the same way:
 
 1. Pass each business phrase whole and in the singular form. Leave out time ranges, numbers and
    query words.
-2. Only `APPROVED` terms are returned. A word in `unmatched` has no agreed meaning. Tell the user,
-   and do not guess a column.
+2. Only `APPROVED` terms are returned. A word in `unmatched` has no authorized approved exact
+   match in this query. Ask for clarification rather than asserting no business meaning exists.
+   A lookup error is not `unmatched`; follow the definition-only/narrowed-query fallback above.
 3. If a word matches several terms, use the domains to pick one, or ask the user.
 4. A binding shows where a meaning is stored. It never gives access. Reading the data still needs
    the normal privileges.
 
 | Tool                      | REST calls                                                                                                                | Use                                                              |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`                                                            | Map the words of a question to terms and their data              |
+| `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings={include_bindings}`                                              | Map the words of a question to terms and their data              |
 | `get_term`                | `GET /terms/{term}?status=APPROVED`                                                                                       | Definition, synonyms, authorized domains and approved relations  |
 | `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`)                                                   | Browse the terms of a domain                                     |
 | `get_term_hierarchy`      | `GET /terms/{term}/hierarchy?status=APPROVED`                                                                             | Find approved wider or narrower terms                            |
-| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED`                                                                               | All authorized bindings of an approved term                      |
+| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED&kind=&types=`                                                                  | Authorized bindings within the requested filters and work budget |
 | `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&status=APPROVED`; add `children=true` only for table or semantic model | Explain an authorized object, its table columns or model metrics |
 
 Every tool passes `status=APPROVED` to the server. The server applies the read contract in REST
@@ -928,6 +1014,9 @@ then to the data.
   per surviving term. A metric rename records the old metric names and affected terms as specified
   in Bindings. Successful cleanup records are committed with the cleanup; rollback must not leave
   a record claiming that bindings or relations were removed.
+- A successful no-op may record an operation outcome with its unchanged revision, but must not
+  report a new content change or a fabricated revision. Failed version checks emit no change
+  success. This applies equally to alter, binding writes and cleanup.
 
 ## Alternatives Considered
 
@@ -992,8 +1081,8 @@ tag. The second case cannot be blocked without changing how tags work.
 
 ## Testing
 
-AI agents will write most of the Step 1 code and tests, and few people will read the tests. So
-this chapter is the test spec. It says where each test goes, how to run it, and what it must check.
+This chapter defines the acceptance cases for Step 1, their invariants and release checks.
+General contributor workflow and test-execution policies remain in the project guidelines.
 
 - A task is done when every case listed for it has a test, all of them pass, and the rules below
   hold.
@@ -1027,11 +1116,6 @@ this chapter is the test spec. It says where each test goes, how to run it, and 
 9. **All three databases.** Database tests extend `TestJDBCBackend` (`@CoreBackend.All`) and pass
    on H2, MySQL and PostgreSQL. Integration tests pass with `-PjdbcBackend=h2`, `mysql` and
    `postgresql`.
-10. **Show the results.** The PR description lists each command it ran and, for each backend, the
-    number of tests run and passed, from the JUnit XML files in `build/test-results/`. A class that
-    ran 0 tests counts as a failure.
-11. **Run only what changed.** Use `--tests` filters. Never run a whole module suite such as
-    `:core:test`.
 
 ### Invariants
 
@@ -1050,8 +1134,7 @@ For one metalake, it reads the glossary tables directly and checks the live rows
 6. Every binding has non-NULL `term_id`, `target_type` and `target_id`, and resolves to a live
    target of that type. `METRIC` uses the metric's own ID, not the containing model's ID. No two
    live bindings have the same `(term_id, target_type, target_id)`.
-7. `glossary_term_version_info` has no rows.
-8. `glossary_hierarchy_lock` has at most one row for the metalake.
+7. `glossary_hierarchy_lock` has at most one row for the metalake. Step 1 creates no version table.
 
 Integration tests cannot read the tables. They use the REST form of the helper. It reads all terms
 and their hierarchies as the metalake owner, and checks rules 2, 4 and 5.
@@ -1067,14 +1150,15 @@ different answer, change it here first.
    change breaks a rule, 400 or 409. Binding uses the two-path checks in Bindings: a hidden draft
    gets 404; a visible `DEPRECATED` term gets 400 through the object-admin-only path, but a term
    editor with object read access can bind it.
-2. **Revision**: a new term has `version` 1. Each successful alter call adds exactly 1, even when
-   it has several updates. A bind or unbind call adds 1 to each term whose bindings changed. Owner
+2. **Revision**: a new term has `version` 1. An alter adds exactly 1 only if its final effective
+   state differs, even when it has several updates. A bind or unbind call adds 1 to each term whose bindings changed. Owner
    and tag changes add nothing. A cleanup transaction adds 1 to each surviving term that loses
    bindings, broader relations or `RELATED` relations, once per term rather than per removed
    row. Derived `narrower` changes alone add nothing. No-op and failed cleanup add nothing.
 3. **Repeats are ignored**: adding a synonym, link, domain or binding that already exists, or
-   removing one that does not exist, is not an error and writes nothing. It still counts as a
-   successful call for the revision of an alter.
+   removing one that does not exist, is not an error and adds no revision. Setting a field to its
+   stored value or an alter whose updates cancel out also adds no revision. A changed display name
+   or reordered documentation links is effective; set/map serialization order alone is not.
 4. **Depth** is the number of `BROADER` links on the longest chain. With loaded limit `L`, a
    chain of `L + 1` terms has `L` links and is allowed; `L + 1` links exceed the limit. A link
    joining two chains counts the links above and below it.
@@ -1086,7 +1170,9 @@ different answer, change it here first.
 7. **`key()`** treats every whitespace character (space, tab, new line) as a space.
 8. **`nameContains`** treats `%`, `_` and `\` as plain characters.
 9. **`bindings=true`** without `match` and `details=true` fails with 400. Its 20-binding limit
-   and `bindingsTruncated` count authorized bindings only, after filtering target access.
+   and `bindingsTruncated` count authorized bindings only, after filtering target access. The
+   independent work budget counts examined candidates, including hidden ones. Exhausting it
+   before a complete result is known is a typed error, not a successful truncated or empty result.
 10. **The depth limit** is a constant in `GlossaryManager`. Manager tests can inject a test limit
     and run boundary cases at 10, 20 and 50. CUJ 6 reads the actual release limit without overriding
     it. Users cannot configure the limit.
@@ -1118,7 +1204,9 @@ also need `-PskipDockerTests=false` and a running Docker.
 **T1. API**
 
 - T1.1 Each new enum, privilege and type has a `fromString` / name round trip.
-- T1.2 `MetadataObject.Type.GLOSSARY_TERM` parses a full name that contains `/`.
+- T1.2 `MetadataObject.Type.GLOSSARY_TERM` parses names containing `.`, `/` and both as a single
+  name with no parent. Include `a.b` and `v1.2/Churn`, and exercise the owner/tag path conversions
+  when their REST implementations are added.
 - T1.3 The three new privileges accept `METALAKE` in `canBindTo` and reject every other type.
   **(guard)**
 - T1.4 The existing tests of `Privilege` and `MetadataObject` still pass without change.
@@ -1146,6 +1234,8 @@ also need `-PskipDockerTests=false` and a running Docker.
 - T2.12 Garbage collection removes soft-deleted glossary rows after the retention time.
 - T2.13 `TestSQLScripts`: the 2.0.0 schema and the result of the `upgrade-1.3.0-to-2.0.0` scripts
   have the same glossary tables, columns and keys. Running the MySQL upgrade script twice works.
+- T2.14 Fresh and upgraded Step 1 schemas contain no `glossary_term_version_info`; ordinary
+  create/read/alter/drop and GC do not query that future table. **(guard)**
 
 **T3. Relation storage**
 
@@ -1164,8 +1254,8 @@ also need `-PskipDockerTests=false` and a running Docker.
 - T4.1 Create with only a name and a definition. Status is `APPROVED`, `version` is 1, and the
   owner is the caller.
 - T4.2 Create with status `DRAFT` and with `DEPRECATED`. The status is stored as given.
-- T4.3 Each update type changes only its field and adds 1 to `version`. An alter with three
-  updates adds 1 in total.
+- T4.3 Each effective update type changes only its field and adds 1 to `version`. An alter with
+  three effective updates adds 1 in total. No effective change adds zero.
 - T4.4 An alter where one update fails (for example, a rename to a taken name) changes nothing.
   **(guard)**
 - T4.5 B has synonym `client`. Creating term `Client`, or renaming A to `client`, fails with 400.
@@ -1173,12 +1263,15 @@ also need `-PskipDockerTests=false` and a running Docker.
 - T4.6 Term `Client` exists. Adding synonym ` CLIENT ` to another term fails with 400. **(guard)**
 - T4.7 Adding synonym `Customer` to term `Customer` fails with 400.
 - T4.8 Empty name, a name of only spaces, and a name of 129 characters fail with 400.
-- T4.9 `updateLinks` replaces the whole list. A link with an empty label or URL fails with 400.
+- T4.9 `updateLinks` replaces the whole list. A blank URL, malformed/relative URI or scheme other
+  than http/https fails with 400; include mixed-case allowed schemes, `javascript:`, `data:` and
+  `file:`. A missing label may display the URL. Run the same validation on create. **(guard)**
 - T4.10 Rename keeps the ID, synonyms, relations, domains and bindings.
 - T4.11 Race: two threads add different synonyms to the same term at the same time. Both synonyms
   are stored and `version` grows by 2.
-- T4.12 `TermChangeHandler`: a test handler records each change. Every write sends exactly one
-  change of the right kind. A test handler that rejects the change leaves the store unchanged.
+- T4.12 `TermChangeHandler`: a test handler records each effective change. Every effective write
+  sends exactly one change of the right kind. A no-op creates no proposed content or new revision.
+  A test handler that rejects the change leaves the store unchanged.
 - T4.13 As MANAGE, drop a `DRAFT` term. Its synonyms, relations, domain links and bindings are
   soft-deleted in the same transaction.
 - T4.14 As MANAGE, drop an `APPROVED` term without first changing its status. It succeeds and
@@ -1191,6 +1284,20 @@ also need `-PskipDockerTests=false` and a running Docker.
   **(guard: removing the hierarchy lock from either write lets both checks pass.)**
 - T4.16 Repeat T4.15 with a rename to `X` instead of a create. A rejected rename keeps the old
   name and revision. **(guard)**
+- T4.17 Create and alter at each input bound and one unit over it: 128-code-point synonyms and
+  source references, 100 synonyms, and a 16,384-byte UTF-8 definition. Include multi-byte and
+  supplementary characters. Over-limit calls return 400 with unchanged rows/revision and no
+  silent truncation. Assert the three-backend source-reference key uses full values. **(guard)**
+- T4.18 Two editors read version N and replace documentation links with different lists, both
+  using `expectedVersion=N`. One succeeds; the other gets `TermVersionConflictException` and
+  cannot overwrite it. Repeat with mixed updates, a hidden term, invalid expected versions and
+  a stale request that would otherwise be a no-op. Omitting the optional value retains
+  unconditional editing. Failed checks change no rows/revisions or change-success events.
+- T4.19 Re-add an existing normalized synonym/domain/relation, remove an absent member, set a
+  field to its current value, and apply updates that cancel out. All return the unchanged
+  revision; a case-only display rename and reordered links do increase it. Property-map order
+  alone does not. Mixed effective/no-op updates increase once. Repeat no-op binding and cleanup
+  assertions; none reports a fabricated change revision. **(guard)**
 
 **T5. Relations in the manager**
 
@@ -1293,7 +1400,16 @@ The users for these cases:
   before checking the required denies.)**
 - T6.12 Transfer a draft from `writer` to `writer2` through the existing owner API. `writer2`
   gains owner-based read and edit access; `writer` gets 404 for that draft and cannot edit it.
-  Neither can delete it. `admin` retains read, edit and delete access throughout.
+  Neither can delete it. `admin` retains read, edit and delete access throughout. Run with two
+  servers: prewarm server B's generic name/owner caches with the old ownership, hold B's owner
+  invalidation poller with a controllable barrier, transfer on A, wait for commit, then issue
+  fresh get/alter requests on B before releasing the poller. The old
+  owner gets 404; the new owner succeeds. Repeat after renaming and reusing the old name, so a
+  stale name-to-ID mapping cannot authorize the wrong draft. On B's generic owner endpoint, the
+  former owner also cannot transfer the term back using stale ownership. **(guard)**
+- T6.13 Repeat the owner path with group ownership and non-overlapping group members. Remove a
+  member while keeping that user's separate CREATE grant unchanged; fresh requests on either
+  server must not retain owner-based draft access through stale group membership.
 
 **T7. Domain membership**
 
@@ -1315,6 +1431,11 @@ The users for these cases:
   the term stays readable and its domain list is empty. Returned data contains no hidden-domain
   name, ID or count; stored membership stays intact, and reads do not change the revision.
   Endpoint wiring is covered by T8.8, T12.8 and T13.12. **(guard)**
+- T7.9 A domain admin with no glossary privileges drops a domain containing a hidden draft.
+  It gets 409 with the documented remedy and no term names/counts, and cannot clear membership
+  through MANAGE_DOMAIN alone. An authorized term owner or glossary manager with domain access
+  removes the membership; the admin's retry succeeds. Verify every hidden term still exists
+  independently and was not silently deleted or detached. **(guard)**
 
 **T8. REST**
 
@@ -1340,7 +1461,8 @@ The users for these cases:
 
 **T10. Events and audit**
 
-- T10.1 Each write sends a pre event and a success event with the term name and the new `version`.
+- T10.1 Each effective write sends a pre event and a success event with the term name and new
+  `version`. A no-op outcome retains the version and does not claim a content change.
 - T10.2 A failed write sends a pre event and a failure event, and no success event.
 - T10.3 Dropping a term with two children writes one audit entry for each child, including its
   lost parent and new revision. A surviving `RELATED` neighbor also gets a cleanup entry.
@@ -1446,11 +1568,20 @@ The users for these cases:
   with `bindingsTruncated=false`. With all bindings hidden, return an empty list and false.
   Hidden rows neither consume the limit nor affect the flag. **(guard)**
 - T13.11 Put hidden bindings across candidate-batch boundaries before, between and after
-  visible ones. With 21 visible bindings return 20 and true; with 20 visible bindings and any
-  number of hidden ones return 20 and false. The query continues until it finds a 21st visible
-  binding or exhausts candidates, rather than stopping after a fixed number of raw rows.
+  visible ones, within the scan budget. With 21 visible bindings return 20 and true; with 20
+  visible bindings and exhaustion proved within budget return 20 and false. Candidate batches
+  do not act as the visible-result limit.
 - T13.12 Exercise T7.8 through lookup and match responses, including embedded bindings. Hidden
   domains are filtered without removing a readable matching term or changing stored membership.
+- T13.13 Exceed the 1,000-candidate per-term work budget with mostly hidden bindings, and the
+  10,000-candidate request budget across several matches. Each returns 400
+  `LookupTooBroadException` and no successful partial result. Assert that scanning stops at the
+  budget; neither errors nor logs returned to clients expose hidden/scanned counts or object
+  identities. The same error type/message is used regardless of the triggering term. **(guard)**
+- T13.14 Repeat with `bindings=false`: matched definitions remain available without binding
+  expansion and the optional binding fields are absent. Narrowed kind/types binding reads
+  either complete within budget or return the same typed work-limit error; no silent partial
+  list is returned. Test both paths and exact budget-boundary behavior.
 
 **T14 and T15. Clients**
 
@@ -1487,6 +1618,13 @@ The users for these cases:
   including root-bindings and hierarchy calls. An error never triggers an unfiltered retry.
   `list_terms_for_metadata` uses `children=true` for tables and semantic models, and lists a
   view's own terms without it. **(guard)**
+- T16.9 A lookup-work error is a tool error, not unmatched words or an empty binding list. Retry
+  explicitly with `include_bindings=false`, retaining identity, domain and APPROVED filtering;
+  assert no binding expansion and absent binding fields. Pass kind/types to a narrowed metadata
+  read. An additional budget error is reported without an automatic retry loop. **(guard)**
+- T16.10 With batched words, one REST batch succeeds and another fails its budget. The tool must
+  not present the first batch as a complete successful lookup or classify unprocessed words as
+  unmatched. Return the typed tool error; a later definition-only request is a new operation.
 
 **T17. CUJ integration tests**: the cases are the CUJs in Critical user journeys below.
 
@@ -1505,6 +1643,9 @@ The users for these cases:
 - T18.4 After choosing the release constant, rerun T5.4, T5.5 and CUJ 6 using that value on
   H2, MySQL and PostgreSQL. Record the selected limit and results. The release check must prove
   that `L` links work and `L + 1` links fail; a fixed 21-link fixture is insufficient.
+- T18.5 Measure competing creates/renames/synonym changes within one metalake and across two
+  metalakes, and lookup work near both scan limits. Report wait time, throughput and candidate
+  checks as well as latency. Do not claim parallel-create scaling within the serialized scope.
 
 **T19. User documentation**
 
@@ -1562,7 +1703,10 @@ and PostgreSQL.
    removed metric and term. After the metalake drop, no glossary data of the metalake can be read.
 8. **Edit on one server, read on another.** Start two servers on the same database. Edit, rename,
    relate and bind a term on server 1, and read it on server 2 right after each change. Expected:
-   server 2 returns the new data each time (nothing is cached). If the test framework can start
+   server 2 returns current term data. Also prewarm owner/name caches on server 2 and transfer
+   a draft's ownership on server 1. After commit and before poller refresh, new requests on
+   server 2 deny the old owner and allow the new owner, as in T6.12/T6.13. Already authorized
+   in-flight requests are outside that revocation guarantee. If the test framework can start
    only one server, T17 adds a way to start a second one. It must not replace this CUJ with a
    single-server test.
 
@@ -1582,11 +1726,13 @@ parallel once the tasks they depend on are merged.
 
 - [ ] **T1. Add the Glossary API** (`api/`). `GlossaryTerm` with `Status`, `TermChange`,
       `GlossaryOperations` on the metalake, the relation and binding types, `GLOSSARY_TERM` in
-      `MetadataObject.Type`, the three definition privileges (metalake only), and the exceptions.
+      `MetadataObject.Type`, the three definition privileges (metalake only), and the exceptions,
+      including `TermVersionConflictException` and `LookupTooBroadException`. Expose optional
+      expected-version alter and definition-only lookup without silently ignoring either option.
       Depends on: none.
 - [ ] **T2. Add term entity and storage** (`core/`). `EntityType.GLOSSARY_TERM`,
-      `GlossaryTermEntity`, and the tables `glossary_term_meta`, `glossary_term_synonym` and
-      `glossary_term_version_info` (created, no rows) on H2, MySQL and PostgreSQL with upgrade
+      `GlossaryTermEntity`, and the tables `glossary_term_meta` and `glossary_term_synonym`
+      on H2, MySQL and PostgreSQL with upgrade
       scripts. POs, mappers, SQL providers and `GlossaryTermMetaService`: insert, get, list,
       update, soft delete, GC, and cleanup on metalake drop. Depends on: T1.
 - [ ] **T3. Add term relation storage** (`core/`). `glossary_term_rel` and `glossary_hierarchy_lock`;
@@ -1672,14 +1818,17 @@ are not issue numbers, and no follow-up issues have been created by this documen
       authorization and rejection of self-approval, including content, status, relations,
       membership, both binding paths and requested deletion. Ordinary MANAGE writes cannot
       bypass review; its own submissions need another authorized MANAGE reviewer.
-- [ ] **S2.2. Version snapshots and history**: snapshots in `glossary_term_version_info`, the
-      history and diff APIs, and atomic commit with the approved live change.
+- [ ] **S2.2. Version snapshots and history**: design the snapshot format and add
+      `glossary_term_version_info` in the Step 2 upgrade, plus history/diff APIs and atomic commit
+      with the approved live change. Step 1 creates no placeholder version table.
 - [ ] **S2.3. Domain grants**: grants on domains, inherited by subdomains, with deny handling
       and revalidation when membership changes.
 - [ ] **S2.4. Creation defaults and upgrade behavior**: default new terms to DRAFT and reject
       direct publication through create/update, including for MANAGE. No initial-status setting
       bypasses review. Preserve existing term IDs and statuses when enabling Step 2; an existing
       Step 1 APPROVED term is not relabeled as human-reviewed or given a fabricated decision.
+      Document the changed creation default in the upgrade notes; do not add a compatibility
+      mode, request-contract version or capability-negotiation mechanism for this change.
 - [ ] **S2.5. Web UI**: term pages, hierarchy, binding drawers, review queue and history.
 - [ ] **S2.6. CSV import/export**: define the CSV schema and validation,
       permission-filtered exports, repeat-import identity using `sourceRef`, batch failure
@@ -1700,12 +1849,24 @@ are not issue numbers, and no follow-up issues have been created by this documen
   approval exposes the new state. A requested deletion remains pending until approval.
 - Enabling Step 2 preserves existing IDs/statuses and records no invented reviewer decisions;
   newly created terms default to DRAFT, regardless of the caller's management privileges.
+- An existing client omitting status gets a successful create response with `status=DRAFT`
+  after the upgrade. It must not interpret object creation as publication. Verify the response
+  shape remains stable; no extra compatibility parameter or automatic APPROVED setting is used.
 
 ## Implementation Steps
 
 The glossary is built in two steps. Step 1 is this design. Step 2 adds review, history and grants
-on domains on top of it. Both steps use the same term IDs, relations and storage, so Step 2 needs
-no data migration.
+on domains on top of it. Both steps preserve existing term IDs, relations, bindings and statuses.
+Step 2 adds its own proposal/version storage through upgrade scripts.
+
+**Creation default after upgrade**: Step 1 creates APPROVED terms by default; Step 2 creates
+DRAFT terms by default and publishes only after review. This is the intended behavior change
+when introducing approval, not a reason to keep automatic publication enabled. Existing terms
+retain their statuses, and subsequent changes use the review workflow. Creation responses
+continue to report the actual status: a successful create does not mean the object is published.
+The upgrade notes explain this change to users of scripts and clients. No compatibility mode,
+write-contract version or capability negotiation is introduced solely to preserve immediate
+publication. Public request/response shapes remain reusable; write behavior intentionally changes.
 
 | Area                 | Step 1 (this design)                                                                                                      | Step 2                                                                                   |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
@@ -1721,13 +1882,14 @@ no data migration.
 | APIs and clients     | REST, Java and Python clients, OpenAPI                                                                                    | Proposal, decision and history APIs                                                      |
 | CSV import/export    | Not delivered; APIs and source references support future importers                                                        | Planned as S2.6, with permissions and review                                             |
 | Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                                     | Same lookup on the current approved state while proposed changes await review            |
-| Audit and events     | Create, edit, status, relation, membership, binding and delete                                                            | Submit, approve, reject, and changes of the metalake setting                             |
+| Audit and events     | Create, edit, status, relation, membership, binding and delete                                                            | Submit, approve and reject                                                               |
 | UI                   | None; the REST calls behind each page are listed in Web UI support                                                        | Term pages, hierarchy, binding drawers, review queue and history                         |
 
 ### Storage for Step 2
 
-- `glossary_term_version_info` is in the Step 1 schema, but Step 1 writes no rows to it. Step 2
-  writes a snapshot there for each approved change.
+- Step 2 defines and creates `glossary_term_version_info`; its upgrade includes the selected
+  snapshot schema. The table is absent from Step 1. Snapshot identity is per term and approved
+  version; format and indexes are specified with S2.2 rather than frozen in an unused table now.
 - Step 2 keeps term IDs, relation keys and existing data. It adds storage for proposed changes.
 - The write hook covers content, status, relations, membership and both binding paths. So Step 2
   can review every change.
