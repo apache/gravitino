@@ -136,76 +136,67 @@ fun getGitCommitId(): String {
   }
 }
 
-val propertiesFile = "src/main/resources/gravitino-build-info.properties"
-fun writeProjectPropertiesFile() {
-  val propertiesFile = file(propertiesFile)
-  if (propertiesFile.exists()) {
-    propertiesFile.delete()
-  }
+// The build info file is generated into the build directory by a dedicated task. Its inputs are
+// the project version and the git commit id, so it (and everything downstream, including the
+// jar and the build cache) is only redone when the commit changes.
+val gitCommitIdValue: String by lazy { getGitCommitId() }
+val buildInfoFileName = "gravitino-build-info.properties"
+val buildInfoDir = layout.buildDirectory.dir("generated/build-info")
 
-  val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
-
-  val compileDate = dateFormat.format(Date())
+val generateBuildInfo by tasks.registering {
   val projectVersion = project.version.toString()
-  val commitId = getGitCommitId()
+  val outputFile = buildInfoDir.map { it.file(buildInfoFileName) }
 
-  propertiesFile.parentFile.mkdirs()
-  propertiesFile.createNewFile()
-  propertiesFile.writer().use { writer ->
-    writer.write(
-      "#\n" +
-        "# Licensed to the Apache Software Foundation (ASF) under one\n" +
-        "# or more contributor license agreements.  See the NOTICE file\n" +
-        "# distributed with this work for additional information\n" +
-        "# regarding copyright ownership.  The ASF licenses this file\n" +
-        "# to you under the Apache License, Version 2.0 (the\n" +
-        "# \"License\"); you may not use this file except in compliance\n" +
-        "# with the License.  You may obtain a copy of the License at\n" +
+  inputs.property("projectVersion", projectVersion)
+  inputs.property("gitCommitId", providers.provider { gitCommitIdValue })
+  outputs.file(outputFile)
+
+  doLast {
+    val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm:ss")
+    val file = outputFile.get().asFile
+    file.parentFile.mkdirs()
+    file.writer().use { writer ->
+      writer.write(
         "#\n" +
-        "#  http://www.apache.org/licenses/LICENSE-2.0\n" +
-        "#\n" +
-        "# Unless required by applicable law or agreed to in writing,\n" +
-        "# software distributed under the License is distributed on an\n" +
-        "# \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\n" +
-        "# KIND, either express or implied.  See the License for the\n" +
-        "# specific language governing permissions and limitations\n" +
-        "# under the License.\n" +
-        "#\n"
-    )
-    writer.write("project.version=$projectVersion\n")
-    writer.write("compile.date=$compileDate\n")
-    writer.write("git.commit.id=$commitId\n")
+          "# Licensed to the Apache Software Foundation (ASF) under one\n" +
+          "# or more contributor license agreements.  See the NOTICE file\n" +
+          "# distributed with this work for additional information\n" +
+          "# regarding copyright ownership.  The ASF licenses this file\n" +
+          "# to you under the Apache License, Version 2.0 (the\n" +
+          "# \"License\"); you may not use this file except in compliance\n" +
+          "# with the License.  You may obtain a copy of the License at\n" +
+          "#\n" +
+          "#  http://www.apache.org/licenses/LICENSE-2.0\n" +
+          "#\n" +
+          "# Unless required by applicable law or agreed to in writing,\n" +
+          "# software distributed under the License is distributed on an\n" +
+          "# \"AS IS\" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY\n" +
+          "# KIND, either express or implied.  See the License for the\n" +
+          "# specific language governing permissions and limitations\n" +
+          "# under the License.\n" +
+          "#\n"
+      )
+      writer.write("project.version=$projectVersion\n")
+      writer.write("compile.date=${dateFormat.format(Date())}\n")
+      writer.write("git.commit.id=$gitCommitIdValue\n")
+    }
+  }
+}
+
+sourceSets {
+  main {
+    // Ignore a stale copy generated into src/main/resources by older builds.
+    resources.exclude(buildInfoFileName)
   }
 }
 
 tasks {
-  jar {
-    // The build info (commit id, compile date) is regenerated on every run, so never skip the jar.
-    outputs.upToDateWhen { false }
-    // The properties file is written in doFirst, after the cache key is computed, so a cached
-    // jar from another commit with identical sources would carry a wrong commit id.
-    outputs.cacheIf { false }
-
-    doFirst() {
-      writeProjectPropertiesFile()
-      if (!file(propertiesFile).exists()) {
-        throw GradleException("Failed to generate $propertiesFile.")
-      }
-      // processResources may have copied a stale file (e.g. empty commit id) into the main
-      // resources output, which wins over the fresh one below; refresh it.
-      val processed = layout.buildDirectory.file("resources/main/gravitino-build-info.properties")
-        .get().asFile
-      if (processed.parentFile.exists()) {
-        file(propertiesFile).copyTo(processed, overwrite = true)
-      }
-    }
-
-    from("src/main/resources") {
-      include("gravitino-build-info.properties").duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    }
+  processResources {
+    from(generateBuildInfo)
   }
 
   clean {
-    delete("$propertiesFile")
+    // Remove the stale copy generated into src/main/resources by older builds.
+    delete("src/main/resources/$buildInfoFileName")
   }
 }
