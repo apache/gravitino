@@ -266,15 +266,22 @@ public interface Domain extends Auditable {
   /**
    * Lists the members in the scope of this domain that match the filter. The scope of a top-level
    * domain is its own members plus the members of its sub-domains visible to the caller; the scope
-   * of a sub-domain is its own members. Only objects of the {@link DomainMember#SUPPORTED_TYPES
-   * supported types} are members, and only the members the caller can access are returned.
+   * of a sub-domain is its own members. Only the members the caller can access are returned, and an
+   * object is listed once, with all its {@link DomainMember#relations() relations} to this domain.
    *
-   * <p>A catalog or schema that carries a backing tag is expanded to the leaf objects under it that
-   * Gravitino has recorded, and the catalog or schema itself is not listed. Objects of an external
-   * catalog that Gravitino has not recorded yet are not listed. An object is listed once, with all
-   * its {@link DomainMember#relations() relations} to this domain. The members of this domain
-   * itself are the listed members whose relations include {@link DomainRelation.Type#DIRECT} or
-   * {@link DomainRelation.Type#INHERITED}.
+   * <p>By default the direct members are listed: the objects that carry a backing tag in the scope
+   * themselves, which are leaf objects of the {@link DomainMember#SUPPORTED_TYPES supported types},
+   * catalogs and schemas. A catalog or schema member includes its children and is listed once,
+   * without listing the objects under it. The relations are {@link DomainRelation.Type#DIRECT} for
+   * this domain's own assignments and {@link DomainRelation.Type#VIA_SUBDOMAIN} for those of its
+   * sub-domains.
+   *
+   * <p>When the filter {@link DomainMemberFilter#expand() expands} the listing, a catalog or schema
+   * that carries a backing tag is expanded to the leaf objects under it that Gravitino has
+   * recorded, and the catalog or schema itself is not listed. Objects of an external catalog that
+   * Gravitino has not recorded yet are not listed. The members of this domain itself are the listed
+   * members whose relations include {@link DomainRelation.Type#DIRECT} or {@link
+   * DomainRelation.Type#INHERITED}.
    *
    * @param filter The filter of the members. {@code DomainMemberFilter.builder().build()} lists the
    *     whole scope of this domain.

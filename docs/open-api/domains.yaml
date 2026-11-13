@@ -461,12 +461,16 @@ paths:
       - $ref: "#/components/parameters/domain"
     get:
       tags: [domain]
-      summary: List recorded domain members
+      summary: List domain members
       operationId: listDomainMembers
       description: >-
-        Lists recorded leaf objects in the domain's scope, including subdomains, once each with
-        all applicable relations. Tagged catalogs and schemas expand to recorded leaves; an empty
-        result does not imply that unrecorded external objects are not members. Filters intersect.
+        Lists members in the domain's scope, including subdomains, once each with all applicable
+        relations. By default, lists the objects that directly carry the backing tag of the domain
+        or a visible subdomain, including catalogs and schemas; a catalog or schema member includes
+        its children and is listed once, with DIRECT or VIA_SUBDOMAIN relations only. With
+        expand=true, tagged catalogs and schemas expand to the recorded leaves that inherit the tag,
+        with INHERITED relations where they apply; an empty result does not imply that unrecorded
+        external objects are not members. Filters intersect.
         No paging or counts are provided. Only visible domains and objects accessible to the caller are returned. Hidden drafts return 404, and hidden subdomain relations are omitted. No tag privilege is required.
       parameters:
         - name: domains
@@ -484,22 +488,28 @@ paths:
               $ref: "#/components/schemas/DomainName"
         - name: types
           in: query
-          description: Comma-separated leaf types, case-insensitive, with whitespace around each token trimmed. Omit to include all supported types. Blank tokens and unsupported types return 400.
+          description: Comma-separated member types, case-insensitive, with whitespace around each token trimmed. Omit to include all types. Blank tokens, unsupported types, and CATALOG or SCHEMA with expand=true return 400.
           style: form
           explode: false
           schema:
             type: array
             items:
-              $ref: "#/components/schemas/MemberType"
+              $ref: "#/components/schemas/ListedMemberType"
         - name: nameContains
           in: query
           description: Nonblank substring of the member's complete full name, matched case-insensitively; no wildcard or regex interpretation. Omit for any name. Blank text returns 400.
           schema:
             type: string
             minLength: 1
+        - name: expand
+          in: query
+          description: Whether to expand tagged catalogs and schemas into the recorded leaves under them that inherit the backing tag. Defaults to false, which lists the objects that carry the backing tag themselves.
+          schema:
+            type: boolean
+            default: false
       responses:
         "200":
-          description: The matching recorded members.
+          description: The matching members.
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -637,6 +647,11 @@ components:
       description: A supported leaf domain member type.
       enum: [TABLE, VIEW, FILESET, TOPIC, MODEL, SEMANTIC_MODEL]
 
+    ListedMemberType:
+      type: string
+      description: A type of listed domain member. CATALOG and SCHEMA are listed only without expand.
+      enum: [CATALOG, SCHEMA, TABLE, VIEW, FILESET, TOPIC, MODEL, SEMANTIC_MODEL]
+
     DomainRelation:
       type: object
       description: One applicable membership relation relative to the queried domain, with no precedence over other relations. All applicable relations are returned; a direct assignment masks inheritance of the same tag.
@@ -664,14 +679,14 @@ components:
 
     MemberObject:
       type: object
-      description: A leaf metadata object serialized by the server.
+      description: A member metadata object serialized by the server. A catalog or schema member, listed only without expand, includes its children.
       required: [fullName, type]
       properties:
         fullName:
           type: string
         type:
           type: string
-          enum: [table, view, fileset, topic, model, semantic_model]
+          enum: [catalog, schema, table, view, fileset, topic, model, semantic_model]
 
     DomainMember:
       type: object

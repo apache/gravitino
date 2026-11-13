@@ -134,5 +134,10 @@ class Domain(Auditable):
 
     @abstractmethod
     def list_members(self, member_filter: DomainMemberFilter) -> list[DomainMember]:
-        """List accessible leaf objects and their relations in the selected scope."""
+        """List accessible members and their relations in the selected scope.
+
+        By default, members are the objects that carry a backing tag themselves,
+        including catalogs and schemas, which include their children. Set
+        ``member_filter.expand`` to expand catalogs and schemas into leaf objects.
+        """
         raise NotImplementedError

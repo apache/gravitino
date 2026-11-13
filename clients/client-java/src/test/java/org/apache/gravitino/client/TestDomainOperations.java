@@ -245,6 +245,83 @@ public class TestDomainOperations extends TestBase {
   }
 
   /**
+   * Verifies that direct catalog and schema members deserialize and that expand is sent only when
+   * set.
+   *
+   * @throws Exception if HTTP mock setup fails
+   */
+  @Test
+  public void testDirectContainerMembersAndExpand() throws Exception {
+    Domain domain = domain();
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("cat.db", MetadataObject.Type.SCHEMA);
+    MetadataObject table = MetadataObjects.parse("cat.db.table", MetadataObject.Type.TABLE);
+    DomainMemberListResponse containers =
+        new DomainMemberListResponse(
+            new DomainMemberDTO[] {
+              memberDTO(catalog, DomainRelation.direct()),
+              memberDTO(schema, DomainRelation.viaSubdomain("Tax"))
+            });
+    DomainMemberListResponse leaves =
+        new DomainMemberListResponse(
+            new DomainMemberDTO[] {memberDTO(table, DomainRelation.inherited(catalog))});
+    mockServer
+        .when(
+            HttpRequest.request(PATH + "/objects")
+                .withMethod("GET")
+                .withQueryStringParameters(
+                    new Parameter("types", "TABLE"), new Parameter("expand", "true")),
+            Times.exactly(1))
+        .respond(
+            HttpResponse.response()
+                .withStatusCode(200)
+                .withBody(MAPPER.writeValueAsString(leaves)));
+    mockServer
+        .when(
+            HttpRequest.request(PATH + "/objects")
+                .withMethod("GET")
+                .withQueryStringParameters(new Parameter("types", "CATALOG,SCHEMA")),
+            Times.exactly(1))
+        .respond(
+            HttpResponse.response()
+                .withStatusCode(200)
+                .withBody(MAPPER.writeValueAsString(containers)));
+
+    DomainMember[] expanded =
+        domain.listMembers(
+            DomainMemberFilter.builder()
+                .withTypes(MetadataObject.Type.TABLE)
+                .withExpand(true)
+                .build());
+    Assertions.assertEquals(1, expanded.length);
+    Assertions.assertEquals(table, expanded[0].object());
+    Assertions.assertArrayEquals(
+        new DomainRelation[] {DomainRelation.inherited(catalog)}, expanded[0].relations());
+
+    DomainMember[] members =
+        domain.listMembers(
+            DomainMemberFilter.builder()
+                .withTypes(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA)
+                .build());
+    Assertions.assertEquals(2, members.length);
+    Assertions.assertEquals(catalog, members[0].object());
+    Assertions.assertTrue(DomainMember.CONTAINER_TYPES.contains(members[0].object().type()));
+    Assertions.assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct()}, members[0].relations());
+    Assertions.assertEquals(schema, members[1].object());
+    Assertions.assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain("Tax")}, members[1].relations());
+
+    HttpRequest[] recorded =
+        mockServer.retrieveRecordedRequests(
+            HttpRequest.request(PATH + "/objects")
+                .withMethod("GET")
+                .withQueryStringParameter("types", "CATALOG,SCHEMA"));
+    Assertions.assertEquals(1, recorded.length);
+    Assertions.assertFalse(recorded[0].getQueryStringParameters().containsEntry("expand", "true"));
+  }
+
+  /**
    * Verifies domain client behavior.
    *
    * @throws Exception if HTTP mock setup fails
@@ -449,5 +526,20 @@ public class TestDomainOperations extends TestBase {
         actual.backingTag().orElse(null));
     Assertions.assertEquals(expected.getAudit(), actual.auditInfo());
     Assertions.assertEquals(0, actual.relations().length);
+  }
+
+  private static DomainMemberDTO memberDTO(MetadataObject object, DomainRelation... relations) {
+    return DomainMemberDTO.from(
+        new DomainMember() {
+          @Override
+          public MetadataObject object() {
+            return object;
+          }
+
+          @Override
+          public DomainRelation[] relations() {
+            return relations;
+          }
+        });
   }
 }

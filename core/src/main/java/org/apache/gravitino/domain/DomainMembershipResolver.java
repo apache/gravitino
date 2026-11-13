@@ -19,10 +19,12 @@
 package org.apache.gravitino.domain;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -62,6 +64,8 @@ import org.slf4j.LoggerFactory;
 /** Resolves domain scope from effective tag assignments without authorization filtering. */
 final class DomainMembershipResolver {
   private static final Logger LOG = LoggerFactory.getLogger(DomainMembershipResolver.class);
+  private static final Set<MetadataObject.Type> DIRECT_MEMBER_TYPES =
+      Sets.immutableEnumSet(Sets.union(DomainMember.SUPPORTED_TYPES, DomainMember.CONTAINER_TYPES));
 
   private final EntityStore store;
   private final EffectiveTagResolver tags;
@@ -89,6 +93,81 @@ final class DomainMembershipResolver {
                         || filter.domains().contains(d.name()))
             .collect(Collectors.toList());
 
+    List<DomainMember> members =
+        filter.expand()
+            ? listExpandedMembers(metalake, queriedDomain, scopeDomains, selectedDomains, filter)
+            : listDirectMembers(metalake, queriedDomain, scopeDomains, selectedDomains, filter);
+
+    members.sort(
+        Comparator.comparing((DomainMember m) -> m.object().type().name())
+            .thenComparing(m -> m.object().fullName()));
+    return members.toArray(new DomainMember[0]);
+  }
+
+  /**
+   * Lists the objects that carry a backing tag themselves, including catalogs and schemas, without
+   * expanding them or resolving effective tags.
+   */
+  private List<DomainMember> listDirectMembers(
+      String metalake,
+      DomainEntity queriedDomain,
+      List<DomainEntity> scopeDomains,
+      List<DomainEntity> selectedDomains,
+      DomainMemberFilter filter) {
+    if (selectedDomains.isEmpty()) {
+      return new ArrayList<>();
+    }
+
+    Set<Long> selectedIds =
+        selectedDomains.stream().map(DomainEntity::id).collect(Collectors.toSet());
+    Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
+    Set<MetadataObject> selected = new HashSet<>();
+    try {
+      // Read every scope domain so a selected member still reports all its relations.
+      for (DomainEntity scopeDomain : scopeDomains) {
+        if (scopeDomain.backingTagId() == null) {
+          continue;
+        }
+
+        DomainRelation relation =
+            Objects.equals(queriedDomain.id(), scopeDomain.id())
+                ? DomainRelation.direct()
+                : DomainRelation.viaSubdomain(scopeDomain.name());
+        for (MetadataObject object : listAssignedObjects(metalake, scopeDomain)) {
+          if (!DIRECT_MEMBER_TYPES.contains(object.type()) || !matchesFilter(object, filter)) {
+            continue;
+          }
+
+          relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
+          if (selectedIds.contains(scopeDomain.id())) {
+            selected.add(object);
+          }
+        }
+      }
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list members of domain " + queriedDomain.name(), e);
+    }
+
+    List<DomainMember> members = new ArrayList<>();
+    for (Map.Entry<MetadataObject, Set<DomainRelation>> entry : relations.entrySet()) {
+      if (selected.contains(entry.getKey())) {
+        members.add(
+            new DomainMemberInfo(entry.getKey(), entry.getValue().toArray(new DomainRelation[0])));
+      }
+    }
+    return members;
+  }
+
+  /**
+   * Expands catalogs and schemas that carry a backing tag into the recorded leaf objects under
+   * them, and keeps the leaf objects whose effective tags make them members.
+   */
+  private List<DomainMember> listExpandedMembers(
+      String metalake,
+      DomainEntity queriedDomain,
+      List<DomainEntity> scopeDomains,
+      List<DomainEntity> selectedDomains,
+      DomainMemberFilter filter) {
     // Expand explicit tag assignments into recorded leaf objects that may inherit the tag.
     Set<MetadataObject> candidates = new LinkedHashSet<>();
     try {
@@ -97,20 +176,8 @@ final class DomainMembershipResolver {
           continue;
         }
 
-        // Query by stable ID so a recreated tag with the same name cannot take over the binding.
-        List<GenericEntity> assigned =
-            store
-                .relationOperations()
-                .listEntitiesByRelation(
-                    RelationQuery.forTagId(
-                        metalake, selectedDomain.backingTagId(), selectedDomain.backingTagValue()));
-        for (GenericEntity assignment : assigned) {
-          collectCandidates(
-              metalake,
-              MetadataObjects.parse(
-                  assignment.name(), MetadataObject.Type.valueOf(assignment.type().name())),
-              filter,
-              candidates);
+        for (MetadataObject assigned : listAssignedObjects(metalake, selectedDomain)) {
+          collectCandidates(metalake, assigned, filter, candidates);
         }
       }
     } catch (IOException e) {
@@ -139,10 +206,7 @@ final class DomainMembershipResolver {
       }
     }
 
-    members.sort(
-        Comparator.comparing((DomainMember m) -> m.object().type().name())
-            .thenComparing(m -> m.object().fullName()));
-    return members.toArray(new DomainMember[0]);
+    return members;
   }
 
   DomainEntity[] listDomains(String metalake, MetadataObject object) {
@@ -274,6 +338,36 @@ final class DomainMembershipResolver {
     return null;
   }
 
+  private List<MetadataObject> listAssignedObjects(String metalake, DomainEntity domain)
+      throws IOException {
+    // Query by stable ID so a recreated tag with the same name cannot take over the binding.
+    // The store matches a binding value exactly and returns only live objects.
+    List<GenericEntity> assigned =
+        store
+            .relationOperations()
+            .listEntitiesByRelation(
+                RelationQuery.forTagId(metalake, domain.backingTagId(), domain.backingTagValue()));
+    return assigned.stream()
+        .map(
+            assignment ->
+                MetadataObjects.parse(
+                    assignment.name(), MetadataObject.Type.valueOf(assignment.type().name())))
+        .collect(Collectors.toList());
+  }
+
+  private static boolean matchesFilter(MetadataObject object, DomainMemberFilter filter) {
+    return (filter.types().isEmpty() || filter.types().contains(object.type()))
+        && filter
+            .nameContains()
+            .map(
+                text ->
+                    object
+                        .fullName()
+                        .toLowerCase(Locale.ROOT)
+                        .contains(text.toLowerCase(Locale.ROOT)))
+            .orElse(true);
+  }
+
   private void collectCandidates(
       String metalake,
       MetadataObject object,
@@ -281,16 +375,7 @@ final class DomainMembershipResolver {
       Set<MetadataObject> candidates)
       throws IOException {
     if (DomainMember.SUPPORTED_TYPES.contains(object.type())) {
-      if ((filter.types().isEmpty() || filter.types().contains(object.type()))
-          && filter
-              .nameContains()
-              .map(
-                  text ->
-                      object
-                          .fullName()
-                          .toLowerCase(Locale.ROOT)
-                          .contains(text.toLowerCase(Locale.ROOT)))
-              .orElse(true)) {
+      if (matchesFilter(object, filter)) {
         candidates.add(object);
       }
       return;

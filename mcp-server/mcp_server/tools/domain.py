@@ -51,9 +51,7 @@ def load_domain_tools(mcp: FastMCP):
         Authorization and errors are enforced by the Gravitino server.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_domain_operation().get_domain_by_name(
-            domain_name
-        )
+        return await client.as_domain_operation().get_domain_by_name(domain_name)
 
     @mcp.tool(
         tags={"domain"},
@@ -68,9 +66,7 @@ def load_domain_tools(mcp: FastMCP):
         Authorization and errors are enforced by the Gravitino server.
         """
         client = ctx.request_context.lifespan_context.rest_client()
-        return await client.as_domain_operation().list_subdomains(
-            domain_name, details
-        )
+        return await client.as_domain_operation().list_subdomains(domain_name, details)
 
     @mcp.tool(
         tags={"domain"},
@@ -82,10 +78,18 @@ def load_domain_tools(mcp: FastMCP):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        expand: bool = False,
     ) -> str:
-        """List recorded leaf members and all applicable relations.
+        """List domain members and all applicable relations.
 
-        types filters leaf object types (for example TABLE and TOPIC).
+        By default, lists objects that carry the domain's backing tag themselves,
+        including catalogs and schemas; a CATALOG or SCHEMA member includes all
+        objects under it and is listed once. expand=true instead expands catalogs
+        and schemas into the recorded leaf objects under them, with INHERITED
+        relations; use it to enumerate every table, view, fileset, topic, model or
+        semantic model in a domain.
+        types filters object types (for example TABLE, TOPIC, CATALOG or SCHEMA;
+        CATALOG and SCHEMA are not allowed with expand=true).
         domains filters source domain names. name_contains matches a case-insensitive
         substring of the full metadata object name. Blank values omit this filter.
 
@@ -94,7 +98,7 @@ def load_domain_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_domain_operation().list_domain_members(
-            domain_name, types, domains, name_contains
+            domain_name, types, domains, name_contains, expand
         )
 
     @mcp.tool(

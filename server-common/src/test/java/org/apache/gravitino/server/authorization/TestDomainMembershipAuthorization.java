@@ -32,6 +32,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -147,6 +148,55 @@ class TestDomainMembershipAuthorization {
     assertEquals(Collections.singleton("Tax"), filter.getValue().domains());
     assertEquals(Collections.singleton(MetadataObject.Type.TABLE), filter.getValue().types());
     assertEquals("trades", filter.getValue().nameContains().get());
+  }
+
+  @Test
+  void expandSurvivesVisibleScopeSelection() {
+    DomainEntity visible = domain("Tax", "Finance", Domain.Status.PUBLISHED);
+    when(dispatcher.listSubdomainInfos("lake", "Finance"))
+        .thenReturn(new DomainEntity[] {hidden, visible});
+    when(dispatcher.listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), any()))
+        .thenReturn(new DomainMember[0]);
+    DomainAuthzHelper.listMembers(
+        dispatcher,
+        "lake",
+        "Finance",
+        DomainMemberFilter.builder().withDomains("Trading", "Tax").withExpand(true).build());
+    ArgumentCaptor<DomainMemberFilter> filter = ArgumentCaptor.forClass(DomainMemberFilter.class);
+    verify(dispatcher)
+        .listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), filter.capture());
+    assertEquals(
+        DomainMemberFilter.builder().withDomains("Tax").withExpand(true).build(),
+        filter.getValue());
+  }
+
+  @Test
+  void catalogAndSchemaMembersAreFilteredByObjectAccess() {
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("cat.db", MetadataObject.Type.SCHEMA);
+    MetadataObject secretCatalog = MetadataObjects.parse("secret", MetadataObject.Type.CATALOG);
+    MetadataObject secretSchema = MetadataObjects.parse("cat.hidden", MetadataObject.Type.SCHEMA);
+    DomainRelation[] direct = {DomainRelation.direct()};
+    when(dispatcher.listMembers(eq("lake"), eq(parent), any(DomainEntity[].class), any()))
+        .thenReturn(
+            new DomainMember[] {
+              new DomainMemberInfo(catalog, direct),
+              new DomainMemberInfo(schema, direct),
+              new DomainMemberInfo(secretCatalog, direct),
+              new DomainMemberInfo(secretSchema, direct)
+            });
+    when(authorizer.deny(
+            any(), anyString(), eq(secretCatalog), eq(Privilege.Name.USE_CATALOG), any()))
+        .thenReturn(true);
+    when(authorizer.deny(
+            any(), anyString(), eq(secretSchema), eq(Privilege.Name.USE_SCHEMA), any()))
+        .thenReturn(true);
+    DomainMember[] members =
+        DomainAuthzHelper.listMembers(
+            dispatcher, "lake", "Finance", DomainMemberFilter.builder().build());
+    assertArrayEquals(
+        new MetadataObject[] {catalog, schema},
+        Arrays.stream(members).map(DomainMember::object).toArray(MetadataObject[]::new));
   }
 
   @Test

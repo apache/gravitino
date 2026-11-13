@@ -29,7 +29,7 @@ public final class DomainMemberInfo implements DomainMember {
   /**
    * Creates a member query result.
    *
-   * @param object The leaf metadata object.
+   * @param object The member metadata object.
    * @param relations All relations to the queried domain.
    */
   public DomainMemberInfo(MetadataObject object, DomainRelation[] relations) {

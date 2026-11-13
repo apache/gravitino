@@ -179,6 +179,15 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(query["types"], "TABLE,TOPIC")
         self.assertEqual(query.get_list("domains"), ["child,one", "child & 二"])
         self.assertEqual(query["nameContains"], "a&b + %/?")
+        self.assertNotIn("expand", query)
+
+        await self._call(
+            "list_domain_members",
+            {"domain_name": "sales", "types": ["TABLE"], "expand": True},
+        )
+        query = self.requests[-1].url.params
+        self.assertEqual(query["types"], "TABLE")
+        self.assertEqual(query["expand"], "true")
 
     async def test_encoded_paths_and_authorization(self):
         value = "a/b ?#%,二"
@@ -401,9 +410,7 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
                 "mcp_server.core.context._get_request_authorization",
                 return_value="",
             ),
-            patch(
-                "mcp_server.core.context._in_http_request", return_value=True
-            ),
+            patch("mcp_server.core.context._in_http_request", return_value=True),
         ):
             with self.assertRaisesRegex(
                 ToolError, "HTTP request omitted Authorization"
@@ -412,12 +419,8 @@ class TestDomainTool(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.requests)
 
     async def test_mock_client_implements_domain_facet(self):
-        with patch.object(
-            RESTClientFactory, "_rest_client_class", MockOperation
-        ):
-            self.mcp = GravitinoMCPServer(
-                Setting("test_metalake", tags={"domain"})
-            ).mcp
+        with patch.object(RESTClientFactory, "_rest_client_class", MockOperation):
+            self.mcp = GravitinoMCPServer(Setting("test_metalake", tags={"domain"})).mcp
             for name, args in (
                 ("list_of_domains", {}),
                 ("get_domain_by_name", {"domain_name": "sales"}),

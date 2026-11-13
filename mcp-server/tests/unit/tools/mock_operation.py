@@ -118,25 +118,22 @@ class MockSchemaOperation(SchemaOperation):
     async def get_list_of_schemas(self, catalog_name: str) -> str:
         return "mock_schemas"
 
-    async def create_schema(
-        self, catalog_name, name, comment, properties
-    ) -> str:
+    async def create_schema(self, catalog_name, name, comment, properties) -> str:
         return f"mock_schema_created: {catalog_name}.{name}"
 
     async def alter_schema(self, catalog_name, schema_name, updates) -> str:
-        return f"mock_schema_altered: {catalog_name}.{schema_name} with updates {updates}"
+        return (
+            f"mock_schema_altered: {catalog_name}.{schema_name} with updates {updates}"
+        )
 
     async def drop_schema(self, catalog_name, schema_name, cascade) -> str:
         return (
-            f"mock_schema_dropped: {catalog_name}.{schema_name}, "
-            f"cascade={cascade}"
+            f"mock_schema_dropped: {catalog_name}.{schema_name}, " f"cascade={cascade}"
         )
 
 
 class MockTableOperation(TableOperation):
-    async def get_list_of_tables(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def get_list_of_tables(self, catalog_name: str, schema_name: str) -> str:
         return "mock_tables"
 
     async def load_table(
@@ -163,17 +160,13 @@ class MockTableOperation(TableOperation):
             f"partitioning={partitioning}"
         )
 
-    async def alter_table(
-        self, catalog_name, schema_name, table_name, updates
-    ) -> str:
+    async def alter_table(self, catalog_name, schema_name, table_name, updates) -> str:
         return (
             f"mock_table_altered: {catalog_name}.{schema_name}.{table_name} "
             f"with updates {updates}"
         )
 
-    async def drop_table(
-        self, catalog_name, schema_name, table_name, purge
-    ) -> str:
+    async def drop_table(self, catalog_name, schema_name, table_name, purge) -> str:
         return (
             f"mock_table_dropped: {catalog_name}.{schema_name}.{table_name}, "
             f"purge={purge}"
@@ -181,9 +174,7 @@ class MockTableOperation(TableOperation):
 
 
 class MockFilesetOperation(FilesetOperation):
-    async def list_of_filesets(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_filesets(self, catalog_name: str, schema_name: str) -> str:
         return "mock_filesets"
 
     async def load_fileset(
@@ -228,12 +219,8 @@ class MockFilesetOperation(FilesetOperation):
             f"with updates {updates}"
         )
 
-    async def drop_fileset(
-        self, catalog_name, schema_name, fileset_name
-    ) -> str:
-        return (
-            f"mock_fileset_dropped: {catalog_name}.{schema_name}.{fileset_name}"
-        )
+    async def drop_fileset(self, catalog_name, schema_name, fileset_name) -> str:
+        return f"mock_fileset_dropped: {catalog_name}.{schema_name}.{fileset_name}"
 
 
 class MockPolicyOperation(PolicyOperation):
@@ -243,9 +230,7 @@ class MockPolicyOperation(PolicyOperation):
     async def associate_policy_with_tag(
         self, tag_name: str, policy_name: str, selector: dict
     ) -> str:
-        return (
-            f"associate_policy_with_tag: {tag_name}, {policy_name}, {selector}"
-        )
+        return f"associate_policy_with_tag: {tag_name}, {policy_name}, {selector}"
 
     async def disassociate_policy_from_tag(
         self, tag_name: str, policy_name: str
@@ -327,9 +312,7 @@ class MockModelOperation(ModelOperation):
             f"{catalog_name}.{schema_name}.{model_name} alias={alias}"
         )
 
-    async def alter_model(
-        self, catalog_name, schema_name, model_name, updates
-    ) -> str:
+    async def alter_model(self, catalog_name, schema_name, model_name, updates) -> str:
         return (
             f"mock_model_altered: {catalog_name}.{schema_name}.{model_name} "
             f"with updates {updates}"
@@ -371,9 +354,7 @@ class MockTopicOperation(TopicOperation):
     ) -> str:
         return f"mock_topic_created: {catalog_name}.{schema_name}.{name}"
 
-    async def alter_topic(
-        self, catalog_name, schema_name, topic_name, updates
-    ) -> str:
+    async def alter_topic(self, catalog_name, schema_name, topic_name, updates) -> str:
         return (
             f"mock_topic_altered: {catalog_name}.{schema_name}.{topic_name} "
             f"with updates {updates}"
@@ -510,14 +491,10 @@ class MockSemanticModelOperation(SemanticModelOperation):
     async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
         return "[]"
 
-    async def list_metric_infos(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_metric_infos(self, catalog_name: str, schema_name: str) -> str:
         return "[]"
 
-    async def list_of_semantic_models(
-        self, catalog_name: str, schema_name: str
-    ) -> str:
+    async def list_of_semantic_models(self, catalog_name: str, schema_name: str) -> str:
         return "[]"
 
     async def load_semantic_model(
@@ -559,9 +536,7 @@ class MockDomainOperation(DomainOperation):
     async def get_domain_by_name(self, domain_name: str) -> str:
         return "{}"
 
-    async def list_subdomains(
-        self, domain_name: str, details: bool = True
-    ) -> str:
+    async def list_subdomains(self, domain_name: str, details: bool = True) -> str:
         return "[]"
 
     async def list_domain_members(
@@ -570,6 +545,7 @@ class MockDomainOperation(DomainOperation):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        expand: bool = False,
     ) -> str:
         return "[]"
 

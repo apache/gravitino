@@ -611,7 +611,8 @@ for creating constrained tags and assigning them to catalogs or schemas.
 ### Assign a Backing Tag to an Object
 
 Assign the Finance backing-tag value to the model using normal tag permissions. The same API
-works for leaf, schema and catalog assignments; the latter contribute recorded leaf members.
+works for leaf, schema and catalog assignments; a tagged catalog or schema is listed as one member
+that includes its children, and is expanded into its recorded leaves with `expand=true`.
 Tag-value requests use `application/vnd.gravitino.v2+json`; Domain endpoints use the v1 API.
 
 <Tabs groupId='language' queryString>
@@ -681,8 +682,10 @@ model.supports_tags().assign_tags(
 
 ### List Domain Members
 
-List accessible recorded leaves in the domain and its visible children. Each object occurs once
-with all applicable relations and complete sources. An empty query returns an empty member array.
+List the accessible objects that directly carry the backing tag of the domain or its visible
+children. Leaves, catalogs and schemas are returned; a catalog or schema member includes its
+children and is listed once. Each object occurs once with all applicable relations and complete
+sources. An empty query returns an empty member array.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">
@@ -704,6 +707,36 @@ DomainMember[] members = domain.listMembers(DomainMemberFilter.builder().build()
 
 ```python
 members = domain.list_members(DomainMemberFilter())
+```
+
+</TabItem>
+</Tabs>
+
+### List Expanded Domain Members
+
+Set `expand` to replace each tagged catalog or schema by the accessible recorded leaves under it
+that inherit the backing tag. Only leaves are returned, with `inherited` relations where they apply.
+
+<Tabs groupId='language' queryString>
+<TabItem value="shell" label="REST">
+
+```shell
+curl --fail-with-body -u anonymous:dummy \
+  "http://127.0.0.1:8090/api/metalakes/test/domains/Finance/objects?expand=true"
+```
+
+</TabItem>
+<TabItem value="java" label="Java">
+
+```java
+DomainMember[] leaves = domain.listMembers(DomainMemberFilter.builder().withExpand(true).build());
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+leaves = domain.list_members(DomainMemberFilter(expand=True))
 ```
 
 </TabItem>

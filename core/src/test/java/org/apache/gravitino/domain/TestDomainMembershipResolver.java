@@ -31,6 +31,7 @@ import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -75,6 +76,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 class TestDomainMembershipResolver {
@@ -93,6 +95,7 @@ class TestDomainMembershipResolver {
   private MockedStatic<MetadataObjectUtil> metadataObjects;
   private final Map<String, List<TagEntity>> assignments = new HashMap<>();
   private final Map<Long, List<GenericEntity>> candidates = new HashMap<>();
+  private final Map<String, List<GenericEntity>> valuedCandidates = new HashMap<>();
 
   @BeforeEach
   void setUp() throws Exception {
@@ -119,6 +122,13 @@ class TestDomainMembershipResolver {
               RelationQuery query = call.getArgument(0);
               assertEquals(Entity.EntityType.TAG, query.anchorEntityType());
               assertTrue(query.anchorId().isPresent());
+              // Like the store, a valued query returns only assignments of that exact value.
+              if (query.relationValue().isPresent()) {
+                String key = query.anchorId().get() + "=" + query.relationValue().get();
+                if (valuedCandidates.containsKey(key)) {
+                  return valuedCandidates.get(key);
+                }
+              }
               return candidates.getOrDefault(query.anchorId().get(), Collections.emptyList());
             });
     when(relations.listEntitiesByRelation(
@@ -136,6 +146,170 @@ class TestDomainMembershipResolver {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "catalogManager", previousCatalogManager, true);
     metadataObjects.close();
+  }
+
+  @Test
+  void testDirectMembersListContainersOnceWithoutExpansion() throws Exception {
+    DomainEntity finance = domain(1, "Finance", null, 10L, null);
+    DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity tax = domain(3, "Tax", "Finance", 30L, "tax");
+    DomainEntity[] domains = {finance, trading, tax};
+    MetadataObject view = object("cat.db.positions", MetadataObject.Type.VIEW);
+    MetadataObject otherValue = object("cat.db.files", MetadataObject.Type.FILESET);
+    // Finance tags the catalog and a leaf; Trading tags the schema and the same leaf.
+    candidate(
+        10,
+        CATALOG,
+        TABLE,
+        object("cat.db.trades.column", MetadataObject.Type.COLUMN),
+        object("cat.db.func", MetadataObject.Type.FUNCTION));
+    candidate(20, SCHEMA, TABLE);
+    // The valued binding of Tax matches only the assignments with its exact value.
+    valuedCandidate(30, "tax", view);
+    valuedCandidate(30, "other", otherValue);
+
+    DomainMember[] members = resolver.listMembers(METALAKE, finance, domains, direct().build());
+    assertArrayEquals(
+        new MetadataObject[] {CATALOG, SCHEMA, TABLE, view},
+        Arrays.stream(members).map(DomainMember::object).toArray(MetadataObject[]::new));
+    assertArrayEquals(new DomainRelation[] {DomainRelation.direct()}, members[0].relations());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, members[1].relations());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct(), DomainRelation.viaSubdomain("Trading")},
+        members[2].relations());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain("Tax")}, members[3].relations());
+
+    // Neither catalog nor schema is expanded, and no effective tag is resolved.
+    verify(store, never()).list(any(), any(), any());
+    verify(store, never()).listDescendantSchemas(any());
+    verify(relations, never())
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+            any(NameIdentifier.class),
+            any(Entity.EntityType.class));
+    ArgumentCaptor<RelationQuery> queries = ArgumentCaptor.forClass(RelationQuery.class);
+    verify(relations, times(3)).listEntitiesByRelation(queries.capture());
+    assertEquals(
+        Arrays.asList(null, "tax", null),
+        queries.getAllValues().stream()
+            .map(query -> query.relationValue().orElse(null))
+            .collect(Collectors.toList()));
+
+    // A sub-domain lists its own assignments as direct.
+    DomainMember[] tradingMembers =
+        resolver.listMembers(METALAKE, trading, domains, direct().build());
+    assertArrayEquals(
+        new MetadataObject[] {SCHEMA, TABLE},
+        Arrays.stream(tradingMembers).map(DomainMember::object).toArray(MetadataObject[]::new));
+    for (DomainMember member : tradingMembers) {
+      assertArrayEquals(new DomainRelation[] {DomainRelation.direct()}, member.relations());
+    }
+  }
+
+  @Test
+  void testDirectMemberFilters() {
+    DomainEntity finance = domain(1, "Finance", null, 10L, null);
+    DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity[] domains = {finance, trading};
+    candidate(10, CATALOG, TABLE);
+    candidate(20, SCHEMA, TABLE);
+
+    assertArrayEquals(
+        new MetadataObject[] {CATALOG, SCHEMA},
+        objects(
+            resolver.listMembers(
+                METALAKE,
+                finance,
+                domains,
+                direct()
+                    .withTypes(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA)
+                    .build())));
+    assertArrayEquals(
+        new MetadataObject[] {TABLE},
+        objects(
+            resolver.listMembers(
+                METALAKE,
+                finance,
+                domains,
+                direct().withTypes(MetadataObject.Type.TABLE).build())));
+    assertArrayEquals(
+        new MetadataObject[] {SCHEMA, TABLE},
+        objects(
+            resolver.listMembers(
+                METALAKE, finance, domains, direct().withNameContains("CAT.DB").build())));
+
+    // Selecting a sub-domain selects its members but keeps all their relations.
+    DomainMember[] selected =
+        resolver.listMembers(METALAKE, finance, domains, direct().withDomains("Trading").build());
+    assertArrayEquals(new MetadataObject[] {SCHEMA, TABLE}, objects(selected));
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct(), DomainRelation.viaSubdomain("Trading")},
+        selected[1].relations());
+    assertEquals(
+        3,
+        resolver.listMembers(METALAKE, finance, domains, direct().withDomains("Finance").build())
+            .length);
+    assertEquals(
+        0,
+        resolver.listMembers(METALAKE, finance, domains, direct().withDomains("missing").build())
+            .length);
+  }
+
+  @Test
+  void testDirectAndExpandedModesOnTheSameAssignments() throws Exception {
+    DomainEntity finance = domain(1, "Finance", null, 10L, "finance");
+    DomainEntity[] domains = {finance};
+    candidate(10, SCHEMA);
+    assign(SCHEMA, tag(10, "dept", "finance"));
+    when(store.list(
+            Namespace.of(METALAKE, "cat", "db"), TableEntity.class, Entity.EntityType.TABLE))
+        .thenReturn(
+            Collections.singletonList(
+                TableEntity.builder()
+                    .withId(6L)
+                    .withName("trades")
+                    .withNamespace(Namespace.of(METALAKE, "cat", "db"))
+                    .withAuditInfo(AUDIT)
+                    .withColumns(Collections.emptyList())
+                    .build()));
+
+    DomainMember[] directMembers =
+        resolver.listMembers(METALAKE, finance, domains, direct().build());
+    assertArrayEquals(new MetadataObject[] {SCHEMA}, objects(directMembers));
+    assertArrayEquals(new DomainRelation[] {DomainRelation.direct()}, directMembers[0].relations());
+
+    DomainMember[] expanded = resolver.listMembers(METALAKE, finance, domains, all());
+    assertArrayEquals(new MetadataObject[] {TABLE}, objects(expanded));
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.inherited(SCHEMA)}, expanded[0].relations());
+  }
+
+  @Test
+  void testDirectMembersStorageFailureAndUnknownScopes() throws Exception {
+    DomainEntity finance = domain(1, "Finance", null, 10L, null);
+    DomainEntity unbound = domain(2, "Unbound", null, null, null);
+    assertEquals(
+        0,
+        resolver.listMembers(METALAKE, unbound, new DomainEntity[] {unbound}, direct().build())
+            .length);
+    assertEquals(
+        0,
+        resolver.listMembers(
+                METALAKE, finance, new DomainEntity[0], direct().withDomains("unknown").build())
+            .length);
+    verifyNoInteractions(relations);
+    when(relations.listEntitiesByRelation(any(RelationQuery.class)))
+        .thenThrow(new IOException("storage"));
+    assertInstanceOf(
+        IOException.class,
+        assertThrows(
+                RuntimeException.class,
+                () ->
+                    resolver.listMembers(
+                        METALAKE, finance, new DomainEntity[] {finance}, direct().build()))
+            .getCause());
   }
 
   @Test
@@ -157,9 +331,9 @@ class TestDomainMembershipResolver {
     for (DomainMemberFilter filter :
         Arrays.asList(
             all(),
-            DomainMemberFilter.builder().withDomains("Finance").build(),
-            DomainMemberFilter.builder().withDomains("Trading").build(),
-            DomainMemberFilter.builder().withDomains("Tax", "Trading").build())) {
+            DomainMemberFilter.builder().withExpand(true).withDomains("Finance").build(),
+            DomainMemberFilter.builder().withExpand(true).withDomains("Trading").build(),
+            DomainMemberFilter.builder().withExpand(true).withDomains("Tax", "Trading").build())) {
       DomainMember[] members = resolver.listMembers(METALAKE, parent, domains, filter);
       assertEquals(1, members.length);
       assertEquals(TABLE, members[0].object());
@@ -171,7 +345,7 @@ class TestDomainMembershipResolver {
                 METALAKE,
                 parent,
                 domains,
-                DomainMemberFilter.builder().withDomains("missing").build())
+                DomainMemberFilter.builder().withExpand(true).withDomains("missing").build())
             .length);
     assertArrayEquals(
         new DomainRelation[] {DomainRelation.direct()},
@@ -261,6 +435,7 @@ class TestDomainMembershipResolver {
             domain,
             domains,
             DomainMemberFilter.builder()
+                .withExpand(true)
                 .withTypes(MetadataObject.Type.TABLE)
                 .withNameContains("CAT.DB.TRA")
                 .build());
@@ -273,7 +448,7 @@ class TestDomainMembershipResolver {
                 METALAKE,
                 domain,
                 domains,
-                DomainMemberFilter.builder().withNameContains("absent").build())
+                DomainMemberFilter.builder().withExpand(true).withNameContains("absent").build())
             .length);
     assertEquals(
         0,
@@ -281,7 +456,10 @@ class TestDomainMembershipResolver {
                 METALAKE,
                 domain,
                 domains,
-                DomainMemberFilter.builder().withTypes(MetadataObject.Type.MODEL).build())
+                DomainMemberFilter.builder()
+                    .withExpand(true)
+                    .withTypes(MetadataObject.Type.MODEL)
+                    .build())
             .length);
   }
 
@@ -321,7 +499,10 @@ class TestDomainMembershipResolver {
       candidate(10, ancestor);
       assign(ancestor, tag(10, "dept", "finance"));
       DomainMemberFilter filter =
-          DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+          DomainMemberFilter.builder()
+              .withExpand(true)
+              .withTypes(MetadataObject.Type.TABLE)
+              .build();
       DomainMember[] members = resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter);
       assertEquals(1, members.length);
       assertEquals(childTable, members[0].object());
@@ -338,7 +519,7 @@ class TestDomainMembershipResolver {
   void testUnknownScopesReturnEmptyWithoutEnumeratingMembers() {
     DomainEntity finance = domain(1, "Finance", null, 10L, "finance");
     DomainMemberFilter filter =
-        DomainMemberFilter.builder().withDomains("unknown", "Secret").build();
+        DomainMemberFilter.builder().withExpand(true).withDomains("unknown", "Secret").build();
     assertEquals(0, resolver.listMembers(METALAKE, finance, new DomainEntity[0], filter).length);
     verifyNoInteractions(relations);
   }
@@ -462,6 +643,14 @@ class TestDomainMembershipResolver {
   }
 
   private void candidate(long tagId, MetadataObject... objects) {
+    candidates.put(tagId, entities(objects));
+  }
+
+  private void valuedCandidate(long tagId, String value, MetadataObject... objects) {
+    valuedCandidates.put(tagId + "=" + value, entities(objects));
+  }
+
+  private static List<GenericEntity> entities(MetadataObject... objects) {
     List<GenericEntity> entities = new ArrayList<>();
     for (MetadataObject object : objects) {
       entities.add(
@@ -471,11 +660,20 @@ class TestDomainMembershipResolver {
               .withEntityType(Entity.EntityType.valueOf(object.type().name()))
               .build());
     }
-    candidates.put(tagId, entities);
+    return entities;
   }
 
+  /** Lists expanded members, the behavior these tests cover unless they say otherwise. */
   private static DomainMemberFilter all() {
-    return DomainMemberFilter.builder().build();
+    return DomainMemberFilter.builder().withExpand(true).build();
+  }
+
+  private static DomainMemberFilter.Builder direct() {
+    return DomainMemberFilter.builder();
+  }
+
+  private static MetadataObject[] objects(DomainMember[] members) {
+    return Arrays.stream(members).map(DomainMember::object).toArray(MetadataObject[]::new);
   }
 
   private static MetadataObject object(String name, MetadataObject.Type type) {

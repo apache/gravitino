@@ -31,6 +31,7 @@ public class TestDomainMemberFilter {
     Assertions.assertTrue(filter.types().isEmpty());
     Assertions.assertFalse(filter.nameContains().isPresent());
     Assertions.assertTrue(filter.domains().isEmpty());
+    Assertions.assertFalse(filter.expand());
 
     Assertions.assertEquals(DomainMemberFilter.builder().build(), filter);
     Assertions.assertEquals(DomainMemberFilter.builder().build().hashCode(), filter.hashCode());
@@ -121,10 +122,29 @@ public class TestDomainMemberFilter {
     for (MetadataObject.Type type : DomainMember.SUPPORTED_TYPES) {
       Assertions.assertEquals(
           ImmutableSet.of(type), DomainMemberFilter.builder().withTypes(type).build().types());
+      Assertions.assertEquals(
+          ImmutableSet.of(type),
+          DomainMemberFilter.builder().withTypes(type).withExpand(true).build().types());
+    }
+
+    // Catalogs and schemas are direct members, listed only without expansion.
+    for (MetadataObject.Type type : DomainMember.CONTAINER_TYPES) {
+      Assertions.assertEquals(
+          ImmutableSet.of(type), DomainMemberFilter.builder().withTypes(type).build().types());
+      IllegalArgumentException e =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DomainMemberFilter.builder()
+                      .withTypes(MetadataObject.Type.TABLE, type)
+                      .withExpand(true)
+                      .build());
+      Assertions.assertTrue(e.getMessage().contains("expand"));
     }
 
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
-      if (!DomainMember.SUPPORTED_TYPES.contains(type)) {
+      if (!DomainMember.SUPPORTED_TYPES.contains(type)
+          && !DomainMember.CONTAINER_TYPES.contains(type)) {
         IllegalArgumentException e =
             Assertions.assertThrows(
                 IllegalArgumentException.class,
@@ -133,7 +153,7 @@ public class TestDomainMemberFilter {
       }
     }
 
-    // Only leaf objects are members: never catalogs, schemas, columns, functions or domains.
+    // Leaf types stay separate from container types, as reverse lookup accepts only leaves.
     Assertions.assertEquals(
         ImmutableSet.of(
             MetadataObject.Type.TABLE,
@@ -143,12 +163,23 @@ public class TestDomainMemberFilter {
             MetadataObject.Type.MODEL,
             MetadataObject.Type.SEMANTIC_MODEL),
         DomainMember.SUPPORTED_TYPES);
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DomainMemberFilter.builder().withTypes(MetadataObject.Type.CATALOG));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> DomainMemberFilter.builder().withTypes(MetadataObject.Type.SCHEMA));
+    Assertions.assertEquals(
+        ImmutableSet.of(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA),
+        DomainMember.CONTAINER_TYPES);
+  }
+
+  @Test
+  public void testExpand() {
+    DomainMemberFilter expanded = DomainMemberFilter.builder().withExpand(true).build();
+    Assertions.assertTrue(expanded.expand());
+    Assertions.assertNotEquals(DomainMemberFilter.builder().build(), expanded);
+    Assertions.assertEquals(DomainMemberFilter.builder().withExpand(true).build(), expanded);
+    Assertions.assertEquals(
+        DomainMemberFilter.builder().withExpand(true).build().hashCode(), expanded.hashCode());
+    Assertions.assertTrue(expanded.toString().contains("expand=true"));
+    Assertions.assertEquals(
+        DomainMemberFilter.builder().build(),
+        DomainMemberFilter.builder().withExpand(true).withExpand(false).build());
   }
 
   @Test

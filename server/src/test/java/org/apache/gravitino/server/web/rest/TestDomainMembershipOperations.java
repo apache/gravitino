@@ -168,6 +168,59 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
     }
   }
 
+  @Test
+  public void testDirectContainerMembersAndExpand() {
+    MetadataObject catalog = MetadataObjects.parse("cat", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("cat.schema", MetadataObject.Type.SCHEMA);
+    when(dispatcher.listMembers(eq("test"), eq("Finance"), any()))
+        .thenReturn(
+            new DomainMember[] {
+              new DomainMemberInfo(catalog, new DomainRelation[] {DomainRelation.direct()}),
+              new DomainMemberInfo(
+                  schema, new DomainRelation[] {DomainRelation.viaSubdomain("Tax_Trading")})
+            });
+    try (Response response =
+        target(MEMBERS).queryParam("types", "catalog, SCHEMA").request().get()) {
+      assertEquals(200, response.getStatus());
+      DomainMemberListResponse result = response.readEntity(DomainMemberListResponse.class);
+      result.validate();
+      assertEquals(2, result.getMembers().length);
+      assertEquals(MetadataObject.Type.CATALOG, result.getMembers()[0].getObject().type());
+      assertEquals("cat", result.getMembers()[0].getObject().fullName());
+      assertEquals(MetadataObject.Type.SCHEMA, result.getMembers()[1].getObject().type());
+      assertEquals(
+          DomainRelation.Type.VIA_SUBDOMAIN,
+          result.getMembers()[1].getRelations()[0].getRelation());
+    }
+    try (Response response =
+        target(MEMBERS).queryParam("types", "TABLE").queryParam("expand", true).request().get()) {
+      assertEquals(200, response.getStatus());
+    }
+    ArgumentCaptor<DomainMemberFilter> filter = ArgumentCaptor.forClass(DomainMemberFilter.class);
+    verify(dispatcher, times(2)).listMembers(eq("test"), eq("Finance"), filter.capture());
+    assertEquals(
+        DomainMemberFilter.builder()
+            .withTypes(MetadataObject.Type.CATALOG, MetadataObject.Type.SCHEMA)
+            .build(),
+        filter.getAllValues().get(0));
+    assertEquals(
+        DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).withExpand(true).build(),
+        filter.getAllValues().get(1));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"CATALOG", "SCHEMA", "TABLE,schema"})
+  public void testContainerTypesRejectedWithExpand(String types) {
+    try (Response response =
+        target(MEMBERS).queryParam("types", types).queryParam("expand", "true").request().get()) {
+      assertEquals(400, response.getStatus());
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      assertEquals("IllegalArgumentException", error.getType());
+      assertTrue(error.getMessage().contains("expand"));
+    }
+    verifyNoInteractions(dispatcher);
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"TABLE", "VIEW", "FILESET", "TOPIC", "MODEL", "SEMANTIC_MODEL"})
   public void testSupportedMemberTypes(String type) {
@@ -189,18 +242,7 @@ public class TestDomainMembershipOperations extends BaseOperationsTest {
 
   @ParameterizedTest
   @ValueSource(
-      strings = {
-        "",
-        "TABLE,",
-        ",TABLE",
-        "TABLE,,VIEW",
-        "CATALOG",
-        "SCHEMA",
-        "COLUMN",
-        "FUNCTION",
-        "DOMAIN",
-        "UNKNOWN"
-      })
+      strings = {"", "TABLE,", ",TABLE", "TABLE,,VIEW", "COLUMN", "FUNCTION", "DOMAIN", "UNKNOWN"})
   public void testInvalidTypes(String types) {
     try (Response response = target(MEMBERS).queryParam("types", types).request().get()) {
       assertEquals(400, response.getStatus());

@@ -31,10 +31,21 @@ existing [tag assignments and inheritance](./tags.md), rather than maintained in
 Use the [tag API](./manage-tags-in-gravitino.md) to assign/remove a backing tag on a leaf, schema or
 catalog. There is no Domain add-member or remove-member API.
 
-Only these leaf types are members: **table, view, fileset, topic, model and semantic model**.
-Tagged catalogs and schemas contribute their recorded leaves; they are never members themselves.
-Only objects already recorded by Gravitino are enumerated: a tag on an external catalog is not a
-request to crawl its backend. Empty results do not establish that external objects are absent.
+A member query has two modes:
+
+- **Direct members** (the default) are the objects that carry the backing tag themselves: leaves
+  (**table, view, fileset, topic, model and semantic model**) as well as **catalogs and schemas**.
+  A tagged catalog or schema is returned once and includes its children; the objects under it are
+  not listed. This mode reads only tag assignments and does not resolve each leaf's effective tags.
+- **Expanded members** (`expand=true`) are leaves only. A tagged catalog or schema is replaced by the
+  recorded leaves under it whose effective tags match the binding, following the inheritance rules
+  below. Only objects already recorded by Gravitino are enumerated: a tag on an external catalog is
+  not a request to crawl its backend. Empty results do not establish that external objects are
+  absent.
+
+Clients identify a member that includes its children by its `catalog` or `schema` type. Such a
+member stands for the objects under it, except those where a nearer assignment of the same tag
+overrides it as described below; use `expand=true` or object-to-domain lookup to resolve them.
 
 For the same tag, the assignment nearest the leaf wins: leaf before schema before catalog.
 Assignments are replaced as a whole at each nearer level, not combined with ancestor values.
@@ -54,18 +65,21 @@ cannot exclude the leaf from that domain.
 ## Relations and sources
 
 A member query lists each object once, with **all** applicable relations relative to the queried
-domain. The same relations appear on detailed object-to-domain lookup. Relations have no precedence;
-clients must preserve their whole array.
+domain. Expanded members report the same relations as detailed object-to-domain lookup. Relations
+have no precedence; clients must preserve their whole array.
 
 | SDK relation | REST `relation` | `source` |
 | --- | --- | --- |
-| `DIRECT` | `direct` | Omitted: the leaf itself carries the backing tag. |
+| `DIRECT` | `direct` | Omitted: the object itself carries the backing tag. |
 | `INHERITED` | `inherited` | The nearest assigned catalog or schema, with its complete `fullName` and `type`. |
 | `VIA_SUBDOMAIN` | `via_subdomain` | The contributing child's literal name as `fullName`, with `type: domain`. |
 
-For example, a schema `ice.sales` carries Finance's backing tag and its table
+Direct members have only `direct` and `via_subdomain` relations; `inherited` appears only with
+`expand=true`. For example, a schema `ice.sales` carries Finance's backing tag and its table
 `ice.sales.forecast` carries Planning's separate backing tag. Querying Finance, whose child is
-Planning, returns the table with both `inherited` from `ice.sales` and `via_subdomain` from Planning.
+Planning, returns the schema as `direct` and the table as `via_subdomain` from Planning. With
+`expand=true` it returns the table with both `inherited` from `ice.sales` and `via_subdomain` from
+Planning, and does not return the schema.
 A direct assignment of Finance's tag masks its inherited assignment of that same tag, but the
 independent Planning relation remains. Multiple contributing children produce multiple
 `via_subdomain` relations. A child scope selected by a filter still reports relations relative to
@@ -86,16 +100,17 @@ All supplied options intersect; an unset option does not narrow the result.
 
 | Option | Meaning |
 | --- | --- |
-| `types` | Union of supported leaf types; REST accepts comma-separated, case-insensitive names with whitespace trimmed. Omit for all six types. |
+| `types` | Union of member types: the six leaf types, plus `CATALOG` and `SCHEMA` for direct members. REST accepts comma-separated, case-insensitive names with whitespace trimmed. Omit for all types. `CATALOG` or `SCHEMA` with `expand=true` is invalid. |
 | `nameContains` (Python `name_contains`) | Case-insensitive substring of the full object name, including catalog/schema text. No wildcard or regex interpretation. Omit for any name; blank text is invalid. |
 | `domains` | Union of selected scopes within the queried domain. Omit or use an empty SDK collection for its whole scope. |
+| `expand` | `false` (default) lists direct members; `true` expands catalogs and schemas into recorded leaves. Java `withExpand(true)`, Python `expand=True`, REST `expand=true`. |
 
 For Finance with children Tax and Planning:
 
 - Unset `domains`, or selecting `Finance`, includes Finance, Tax and Planning (subject to visibility).
 - Selecting `Tax` includes only Tax's scope; selecting Tax and Planning includes their union.
 - Selecting Finance does **not** mean only Finance's own members. To retain those, inspect relations
-  for `DIRECT` or `INHERITED` in the returned members.
+  for `DIRECT` (or, with `expand=true`, `INHERITED`) in the returned members.
 - Well-formed unknown names, unrelated domains and invisible children are ignored. If every supplied name is
   ignored, the result is empty. Duplicate names do not duplicate members.
 
