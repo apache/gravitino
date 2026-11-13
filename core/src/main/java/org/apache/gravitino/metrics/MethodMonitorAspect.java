@@ -21,6 +21,8 @@ package org.apache.gravitino.metrics;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+import com.google.common.annotations.VisibleForTesting;
+import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.metrics.source.MetricsSource;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -34,7 +36,7 @@ import org.slf4j.LoggerFactory;
 public class MethodMonitorAspect {
 
   private static final Logger LOG = LoggerFactory.getLogger(MethodMonitorAspect.class);
-  private MetricsSystem metricsSystem;
+  private volatile MetricsSystem metricsSystem;
 
   public MethodMonitorAspect() {
     this.metricsSystem = GravitinoEnv.getInstance().metricsSystem();
@@ -46,16 +48,34 @@ public class MethodMonitorAspect {
     }
   }
 
+  /**
+   * Replaces the metrics system used by this aspect. The aspect is a singleton that reads the
+   * metrics system only once, when it is created, so tests use this to install their own. Do not
+   * call it from production code.
+   *
+   * @param metricsSystem the metrics system to use, or null to disable monitoring
+   * @return the metrics system used before the call, which may be null, so the caller can restore
+   *     it
+   */
+  @VisibleForTesting
+  @Nullable
+  public MetricsSystem replaceMetricsSystem(@Nullable MetricsSystem metricsSystem) {
+    MetricsSystem previous = this.metricsSystem;
+    this.metricsSystem = metricsSystem;
+    return previous;
+  }
+
   @Pointcut("execution(@org.apache.gravitino.metrics.Monitored * *(..))")
   public void monitoredMethods() {}
 
   @Around("monitoredMethods() && @annotation(monitored)")
   public Object monitorMethod(ProceedingJoinPoint pjp, Monitored monitored) throws Throwable {
-    if (metricsSystem == null) {
+    MetricsSystem currentMetricsSystem = metricsSystem;
+    if (currentMetricsSystem == null) {
       return pjp.proceed();
     }
 
-    MetricsSource metricsSource = metricsSystem.getMetricsSource(monitored.metricsSource());
+    MetricsSource metricsSource = currentMetricsSystem.getMetricsSource(monitored.metricsSource());
     if (metricsSource == null) {
       LOG.warn(
           "MetricsSource {} is not registered in MetricsSystem, skip monitoring for method {}",

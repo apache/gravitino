@@ -19,7 +19,6 @@
 package org.apache.gravitino.maintenance.storage.service;
 
 import com.codahale.metrics.MetricRegistry;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.metrics.MethodMonitorAspect;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
@@ -34,23 +33,22 @@ import org.junit.jupiter.api.TestTemplate;
 class TestMaintenanceMetaServiceMetrics extends TestJDBCBackend {
 
   private MethodMonitorAspect aspect;
-  private Object originalMetricsSystem;
+  private MetricsSystem originalMetricsSystem;
   private MetricsSource metricsSource;
 
   @BeforeEach
-  void installMetricsSystem() throws IllegalAccessException {
+  void installMetricsSystem() {
     // The aspect reads the metrics system once when it is created, so replace it for this test.
     aspect = Aspects.aspectOf(MethodMonitorAspect.class);
-    originalMetricsSystem = FieldUtils.readField(aspect, "metricsSystem", true);
-    metricsSource = new MetricsSource(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME) {};
     MetricsSystem metricsSystem = new MetricsSystem();
+    originalMetricsSystem = aspect.replaceMetricsSystem(metricsSystem);
+    metricsSource = new MetricsSource(MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME) {};
     metricsSystem.register(metricsSource);
-    FieldUtils.writeField(aspect, "metricsSystem", metricsSystem, true);
   }
 
   @AfterEach
-  void restoreMetricsSystem() throws IllegalAccessException {
-    FieldUtils.writeField(aspect, "metricsSystem", originalMetricsSystem, true);
+  void restoreMetricsSystem() {
+    aspect.replaceMetricsSystem(originalMetricsSystem);
   }
 
   @TestTemplate
