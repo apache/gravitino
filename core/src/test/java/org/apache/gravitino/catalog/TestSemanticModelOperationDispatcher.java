@@ -55,6 +55,10 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.CustomExtension;
 import org.apache.gravitino.semantic.Dataset;
+import org.apache.gravitino.semantic.DialectExpression;
+import org.apache.gravitino.semantic.Dialects;
+import org.apache.gravitino.semantic.Expression;
+import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.OssieDocument;
 import org.apache.gravitino.semantic.OssieFormat;
 import org.apache.gravitino.semantic.Relationship;
@@ -530,9 +534,16 @@ public class TestSemanticModelOperationDispatcher {
 
   private static SemanticModelDefinition validDefinition() {
     Dataset orders =
-        dataset("orders", "orders", new String[] {"order_id"}, new String[][] {{"customer_id"}});
+        dataset(
+            "orders",
+            "orders",
+            new String[] {"order_id"},
+            new String[][] {{"customer_id"}},
+            "order_id",
+            "customer_id");
     Dataset customers =
-        dataset("customers", "customers", new String[] {"customer_id"}, new String[0][]);
+        dataset(
+            "customers", "customers", new String[] {"customer_id"}, new String[0][], "customer_id");
     Relationship relationship =
         Relationship.builder()
             .withName("orders_to_customers")
@@ -560,12 +571,37 @@ public class TestSemanticModelOperationDispatcher {
   }
 
   private static Dataset dataset(
-      String name, String source, String[] primaryKey, String[][] uniqueKeys) {
+      String name,
+      String source,
+      String[] primaryKey,
+      String[][] uniqueKeys,
+      String... fieldNames) {
+    Field[] fields = new Field[fieldNames.length];
+    for (int index = 0; index < fieldNames.length; index++) {
+      fields[index] = field(fieldNames[index]);
+    }
     return Dataset.builder()
         .withName(name)
         .withSource(NameIdentifier.of("sales", "mart", source))
         .withPrimaryKey(primaryKey)
         .withUniqueKeys(uniqueKeys)
+        .withFields(fields)
+        .build();
+  }
+
+  private static Field field(String name) {
+    return Field.builder()
+        .withName(name)
+        .withExpression(
+            Expression.builder()
+                .withDialects(
+                    new DialectExpression[] {
+                      DialectExpression.builder()
+                          .withDialect(Dialects.ANSI_SQL)
+                          .withExpression(name)
+                          .build()
+                    })
+                .build())
         .build();
   }
 }
