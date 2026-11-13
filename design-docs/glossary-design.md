@@ -319,9 +319,15 @@ page shows the terms linked to the object.
 `catalog.schema.table.column`, using the table and column IDs, and authorize through that table.
 The endpoint fence is metalake -> catalog -> schema -> table, followed by the existing column
 identity check. Table alteration fences column changes and cleans up removed-column bindings;
-table/column renames preserve the IDs and bindings. A COLUMN lookup whose parent resolves only
-as a view returns 404; do not reinterpret a view as a table. View-column bindings are outside
-Step 1. Binding a view itself remains supported, but `children=true` on a view returns 400.
+renames retain bindings when the platform retains the registered IDs. External-table column
+identity has an existing concurrent load/alter limitation: a stale catalog snapshot can turn a
+rename into drop/add and lose the column ID and its bindings, as with column tags. This is tracked
+by [#14279](https://github.com/apache/gravitino/issues/14279); binding endpoint fences alone do
+not solve it. Step 1 inherits this limitation rather than adding a separate column-identity
+protocol. Until that fix is available, avoid concurrent loads/alters during column rename and
+verify bindings afterwards. A COLUMN lookup whose parent resolves only as a view returns 404;
+do not reinterpret a view as a table. View-column bindings are outside Step 1. Binding a view
+itself remains supported, but `children=true` on a view returns 400.
 
 Both kinds are stored in `glossary_term_binding`, using the target's own stable ID:
 
@@ -407,10 +413,10 @@ Both can write bindings. The server checks each term in the request separately:
 **Cleanup**
 
 - Dropping an object soft-deletes its bindings. This happens in the same places that clean up
-  `tag_relation_meta` (by object, schema, catalog and metalake). Renames keep the bindings, because
-  bindings use IDs.
-- Dropping a column in `alterTable` soft-deletes the bindings of the column, in the same
-  transaction.
+  `tag_relation_meta` (by object, schema, catalog and metalake). Renames keep bindings when their
+  registered IDs are preserved, subject to the external column-identity limitation above.
+- Removing a registered column, whether through `alterTable` or a later load's local column
+  reconciliation, soft-deletes its bindings in that local store transaction.
 - Metrics already have internal IDs. When a semantic model is altered, clean up bindings by
   `target_type = METRIC` and the retired metric IDs. Reuse the existing metric identity lifecycle:
   content edits and semantic-model renames preserve a metric ID; removing a metric retires its ID.
@@ -421,10 +427,26 @@ Both can write bindings. The server checks each term in the request separately:
   and names, the triggering alter operation and the resulting term revision. This also applies
   to metric removal without a rename; bindings are never silently transferred to a new identity.
 - Every surviving term that loses bindings gets one revision increment in the same transaction
-  as the object change and binding cleanup, even if it loses several bindings. Unaffected terms
-  do not change. The transaction locks all affected term rows in ID order before deleting the
-  bindings (see Locking). Failure rolls back the object change, bindings and revisions together,
-  with no successful cleanup audit record.
+  as the local registered-object change and binding cleanup, even if it loses several bindings.
+  Unaffected terms do not change. The transaction locks affected term rows in ID order before
+  deleting bindings (see Locking). Failure rolls back local object/column state, bindings,
+  revisions and successful cleanup audit records together. Managed metric changes are local
+  store changes and use this atomic boundary.
+- **External catalog boundary**: Hive/JDBC and other external DDL can finish before the local
+  store update. A failed local cleanup cannot undo that external change. Keep the platform's
+  existing DDL response conventions, including best-effort local updates where already used;
+  do not add a distributed transaction or a new partial-response protocol for glossary. Record
+  a failed cleanup with the operation, registered target identity and cause, without a false
+  cleanup-success record. Neither an external DDL success nor an error proves that the local
+  bindings were cleaned up; callers must reload/inspect state before deciding what to do next,
+  and must not blindly replay non-idempotent DDL.
+  Loading an existing external table can reconcile removed columns and run the local cleanup,
+  but this is not guaranteed recovery: a failed local table drop followed by a false external
+  drop can leave a stale registration. External systems without a persistent source identity
+  can also make same-name recreation indistinguishable from the old registration. These are
+  existing catalog recovery/identity limits; Step 1 adds no general automatic repair service.
+  Such cases require operator verification and repair. Never restore lost bindings by guessing
+  names; when an identity is retired, cleanup uses that ID and a new identity needs explicit binds.
 
 ### Status and versions
 
@@ -1132,8 +1154,10 @@ General contributor workflow and test-execution policies remain in the project g
    checks this with `grep`.
 2. **Check the exact failure.** A negative test checks the exception class, or the HTTP code and
    the error type. "Something failed" is not enough.
-3. **Check that nothing changed.** After a failed write, read the term again. Its fields, `version`,
-   relations, domains and bindings must be the same as before. No success event was sent.
+3. **Check that nothing changed locally.** After a failed glossary/store transaction, read the
+   term again. Its fields, `version`, relations, domains and bindings must be unchanged, with no
+   change-success event. For external DDL, separately assert its actual result and the local
+   failure diagnostics; do not assume a database rollback undoes an external change.
 4. **Check the invariants.** Every database test of the glossary calls
    `GlossaryInvariants.assertHolds(metalake)` in `@AfterEach` (see Invariants).
 5. **Prove that guards work.** Some cases are marked **(guard)**. For each one, the author removes
@@ -1526,7 +1550,10 @@ The users for these cases:
 - T11.8 Drop one column with `alterTable`. Its bindings are gone. The bindings of the other columns
   and of the table stay. Each term losing bindings gets one revision increment; terms whose
   bindings do not change keep their revisions.
-- T11.9 Rename the table, and rename a column. The bindings stay.
+- T11.9 Rename the table, and rename a column without concurrent load/alter. The bindings stay
+  when their registered IDs are preserved. Concurrent external-column rename preservation is
+  subject to #14279, not proved by this sequential case; retain the documented operational limit
+  until that fix covers the two-server stale-load timing. Do not restore bindings by name.
 - T11.10 Alter a semantic model to remove a metric. Its bindings are gone. A renamed metric loses
   its bindings, with the audit details of T11.15. Each affected term's revision grows by 1, even
   when several metrics bound to it are removed in one alter. Unaffected terms keep their revisions.
@@ -1539,9 +1566,10 @@ The users for these cases:
   H2, MySQL and PostgreSQL. **(guard)**
 - T11.13 Drop a table with several bound columns and a table binding to the same term. That term
   gets exactly one revision increment and one audit record listing the lost bindings. Repeat
-  for schema and catalog drop. A metalake drop leaves no surviving terms. Inject failure during
-  column or metric cleanup: the object change, bindings, revisions and successful cleanup audit
-  records all roll back. No-op cleanup leaves revisions unchanged. **(guard)**
+  for schema and catalog drop. A metalake drop leaves no surviving terms. Inject failure in the
+  local column/metric cleanup transaction: registered object changes, bindings, revisions and
+  successful cleanup audit records roll back. Test external outcomes separately in T11.18;
+  no-op cleanup leaves revisions unchanged. **(guard)**
 - T11.14 Race column or metric removal against binding writes and ordinary term edits. Endpoint
   locks exclude new bindings before affected terms are collected; all affected term rows are
   then locked in ID order. No deadlock, dangling binding or lost revision increment occurs.
@@ -1558,6 +1586,13 @@ The users for these cases:
   correct model/name without truncation. Content edits and a semantic-model rename preserve
   bindings. Remove a metric and reintroduce the same name: it has a new ID and no old bindings.
   Explicitly binding it again does not conflict with the retired identity. **(guard)**
+- T11.18 Complete external column/table DDL, then fail its local store cleanup. Assert the
+  external change remains, local rows/revisions roll back, and diagnostics retain the target
+  identity and cause without a cleanup-success record. Preserve existing catalog response
+  conventions and do not automatically replay DDL. Exercise a subsequent load that can reconcile
+  a removed column, plus a failed local table drop whose external retry returns false and keeps
+  a stale registration: do not claim the latter was repaired. Include same-name recreation
+  without a persistent source identity as a recovery limitation, not proof of a new incarnation.
 
 **T12. Binding reads**
 
@@ -1832,7 +1867,10 @@ parallel once the tasks they depend on are merged.
       target IDs, reusing existing metric IDs; non-NULL unique keys and storage-level duplicate
       tests on all backends; cleanup on object drop, column drop and
       metric removal, with surviving-term revisions and audit details for metric rename and
-      removal. Depends on: T6, T10.
+      removal. Include load-triggered local column reconciliation; keep local atomicity separate
+      from external DDL outcomes and record cleanup failures. Reuse the column-identity behavior
+      and #14279 limitation above; unconditional concurrent-rename preservation requires that
+      platform fix, not a second glossary protocol. Depends on: T6, T10.
 - [ ] **T12. Add binding REST APIs and reads** (`server/`). Bind and unbind endpoints; objects of a
       term with bounded cursor pages and root status guards in a consistent read snapshot;
       cursor identity/revision/filter validation; target authorization for
@@ -1857,7 +1895,9 @@ parallel once the tasks they depend on are merged.
       user journeys, on H2, MySQL and PostgreSQL (Docker). Depends on: T14, T16.
 - [ ] **T18. Add a hierarchy performance test** and set the final depth limit from it. Depends on:
       T5.
-- [ ] **T19. Add Glossary user documentation** (`docs/`). Depends on: T14, T15.
+- [ ] **T19. Add Glossary user documentation** (`docs/`), including binding-page continuation,
+      external DDL cleanup/recovery limits and the inherited concurrent-column-rename limitation.
+      Depends on: T14, T15.
 
 Step 1 ships when T1–T19 are merged and all CUJs pass, including the depth-boundary rerun after
 T18 selects the release limit. This completes Step 1 only, not the later scope of #14238.
