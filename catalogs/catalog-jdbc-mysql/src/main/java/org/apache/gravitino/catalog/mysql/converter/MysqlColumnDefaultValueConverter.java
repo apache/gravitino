@@ -39,22 +39,18 @@ import org.apache.gravitino.rel.types.Types;
 
 public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConverter {
 
-  // MySQL DATE and DATETIME can have a zero month or day in permissive SQL modes.
-  private static final String ZERO_DATE =
-      "[0-9]{4}-(?:00-(?:[0-2][0-9]|3[01])|(?:0[1-9]|1[0-2])-00)";
-  private static final String FRACTIONAL_SECONDS = "(?:\\.[0-9]{1,6})?";
-  private static final Pattern ZERO_DATE_PATTERN = Pattern.compile(ZERO_DATE);
-  private static final Pattern ZERO_DATETIME_PATTERN =
+  // Only quoted temporal literals may be rendered from an unparsed default.
+  private static final Pattern QUOTED_TEMPORAL_LITERAL =
       Pattern.compile(
-          ZERO_DATE + " (?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]" + FRACTIONAL_SECONDS);
-  private static final Pattern ZERO_TIMESTAMP_PATTERN =
-      Pattern.compile("0000-00-00 00:00:00" + FRACTIONAL_SECONDS);
+          "'(?:[0-9]{4}-[0-9]{2}-[0-9]{2}(?: [0-9]{2}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)?"
+              + "|-?[0-9]{2,3}:[0-9]{2}:[0-9]{2}(?:\\.[0-9]{1,6})?)'");
 
   /**
-   * Renders Boolean literal defaults as numeric 1 or 0. Gravitino maps BOOLEAN to MySQL BIT, which
-   * rejects the quoted 'true' and 'false' strings. The check uses the literal type, so a Boolean
-   * default that is loaded from BIT(1) and then re-rendered by MODIFY COLUMN keeps working after a
-   * type change to a numeric column. Other defaults use the shared JDBC rendering.
+   * Renders preserved temporal defaults as quoted SQL literals and Boolean defaults as numeric 1 or
+   * 0. Gravitino maps BOOLEAN to MySQL BIT, which rejects the quoted 'true' and 'false' strings.
+   * The check uses the literal type, so a Boolean default that is loaded from BIT(1) and then
+   * re-rendered by MODIFY COLUMN keeps working after a type change to a numeric column. Other
+   * defaults use the shared JDBC rendering.
    *
    * @param defaultValue the Gravitino default expression
    * @return the SQL expression, or null when no default is set
@@ -63,6 +59,12 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
   @Override
   @Nullable
   public String fromGravitino(Expression defaultValue) {
+    if (defaultValue instanceof UnparsedExpression) {
+      String sql = ((UnparsedExpression) defaultValue).unparsedExpression();
+      if (QUOTED_TEMPORAL_LITERAL.matcher(sql).matches()) {
+        return sql;
+      }
+    }
     if (defaultValue instanceof Literal
         && ((Literal<?>) defaultValue).dataType() instanceof Types.BooleanType) {
       String value = String.valueOf(((Literal<?>) defaultValue).value()).trim();
@@ -102,8 +104,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
       return UnparsedExpression.of(columnDefaultValue);
     }
 
-    String typeName = type.getTypeName().toLowerCase();
-    switch (typeName) {
+    switch (type.getTypeName().toLowerCase()) {
       case MysqlTypeConverter.BIT:
         if (type.getColumnSize() == null || type.getColumnSize() == 1) {
           if ("b'1'".equalsIgnoreCase(columnDefaultValue) || "1".equals(columnDefaultValue)) {
@@ -139,23 +140,19 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
         return Literals.decimalLiteral(
             Decimal.of(columnDefaultValue, type.getColumnSize(), type.getScale()));
       case JdbcTypeConverter.DATE:
-        if (ZERO_DATE_PATTERN.matcher(columnDefaultValue).matches()) {
-          return UnparsedExpression.of("'" + columnDefaultValue + "'");
+        try {
+          return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
         }
-        return Literals.dateLiteral(LocalDate.parse(columnDefaultValue, DATE_FORMATTER));
       case JdbcTypeConverter.TIME:
-        return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        try {
+          return Literals.timeLiteral(LocalTime.parse(columnDefaultValue, TIME_FORMATTER));
+        } catch (DateTimeParseException e) {
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
+        }
       case JdbcTypeConverter.TIMESTAMP:
       case MysqlTypeConverter.DATETIME:
-        // MySQL permits zero-date defaults that Java temporal literals cannot represent.
-        // Preserve the SQL literal syntax in the unparsed expression.
-        Pattern zeroDefaultPattern =
-            MysqlTypeConverter.DATETIME.equals(typeName)
-                ? ZERO_DATETIME_PATTERN
-                : ZERO_TIMESTAMP_PATTERN;
-        if (zeroDefaultPattern.matcher(columnDefaultValue).matches()) {
-          return UnparsedExpression.of("'" + columnDefaultValue + "'");
-        }
         if (StringUtils.startsWithIgnoreCase(columnDefaultValue, CURRENT_TIMESTAMP)) {
           return DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
         }
@@ -163,8 +160,7 @@ public class MysqlColumnDefaultValueConverter extends JdbcColumnDefaultValueConv
           return Literals.timestampLiteral(
               LocalDateTime.parse(columnDefaultValue, DATE_TIME_FORMATTER));
         } catch (DateTimeParseException e) {
-          throw new IllegalArgumentException(
-              String.format("Unable to parse datetime value: %s", columnDefaultValue));
+          return UnparsedExpression.of(quoteStringLiteral(columnDefaultValue));
         }
       case JdbcTypeConverter.VARCHAR:
         return Literals.of(columnDefaultValue, Types.VarCharType.of(type.getColumnSize()));
