@@ -50,15 +50,19 @@ history and grants on domains. Implementation Steps lists what each step contain
    terms come from the other side. `RELATED` links two terms both ways. The server rejects cycles.
 3. **Bindings**: a term can be linked to catalogs, schemas, tables, views, columns, filesets,
    topics and models (where the data is), and to semantic-model metrics (what is computed from it).
-   A term lists its objects, and an object lists its terms. A binding never gives access to data.
+   Column bindings in Step 1 support table columns only; views themselves can be bound. A term
+   lists its objects, and an object lists its terms. A binding never gives access to data.
 4. **Domains**: a term belongs to zero or more domains. A domain is optional when a term is
    created. In Step 1, domains group and filter terms. They do not change who can see or manage a
    term.
 5. **Status**: `DRAFT`, `APPROVED` or `DEPRECATED`. New terms are `APPROVED`. Anyone who can edit a
    term can set its status, in the create or update call. There are no transition rules. Agents
-   only see `APPROVED` terms.
+   only see `APPROVED` terms they can read. Step 1 has no approval decision; `APPROVED` means
+   available for agent use.
 6. **Privileges**: `VIEW_DEFINITION`, `CREATE_DEFINITION` and `MANAGE_DEFINITIONS`, granted on the
-   metalake. Deny wins over allow. REST and MCP use the same rules.
+   metalake. CREATE permits creation and maintenance of own terms; MANAGE permits reading,
+   editing and deleting any term, without an approval role in Step 1. Drafts are visible only to
+   their owner with CREATE and to MANAGE. Deny wins over allow. REST and MCP use the same rules.
 7. **Revisions**: every content change increases the revision number of the term, and is audited.
    There are no content snapshots and no history API in Step 1.
 8. **APIs**: REST, Java and Python clients, read-only MCP tools, events and audit. Each view of the
@@ -70,8 +74,9 @@ history and grants on domains. Implementation Steps lists what each step contain
 1. **Approval workflow, version history and grants on domains**: these come in Step 2 (see
    Implementation Steps). In Step 1, edits take effect at once. Step 2 plugs in through
    `TermChangeHandler` (see Status and versions).
-2. **Bulk import and export, connectors to other glossaries, SKOS export**: these tools can use the
-   REST API and the source reference.
+2. **CSV import/export in Step 1, external connectors and SKOS export**: Step 1 provides APIs
+   and a source reference for future importers. CSV is retained as Step 2 task S2.6, not dropped
+   from the feature plan. External connectors and SKOS export remain later work.
 3. **Ranked, fuzzy or semantic lookup in Step 1**: Step 1 only matches names and synonyms exactly
    (ignoring case and extra spaces). This is enough for words that the glossary defines. Better
    matching can come later without an API change: `matchedBy` can get new values (for example
@@ -80,6 +85,26 @@ history and grants on domains. Implementation Steps lists what each step contain
    no policies.
 5. **Agent writes and the UI itself**: the MCP tools are read-only. The UI uses the REST API. Web UI
    support lists the calls for each part of the page.
+
+## Delivery Scope and Tracking
+
+This is a design PR. T1–T19 describe future implementation work, not runtime functionality
+delivered by merging this document. [Issue #14238](https://github.com/apache/gravitino/issues/14238)
+also lists design requirements assigned to Step 2, including CSV import/export. The scope is:
+
+| Requirement in #14238 | Step 1 design | Later work and tracking |
+| -------------------- | ------------- | ----------------------- |
+| Terms, explicit domain membership, hierarchy, asset/metric bindings, REST, clients and exact MCP lookup | Covered by this document and T1–T19; membership uses selected Option A | Step 2 extends the same identities and live store |
+| Definition grants on domains | Metalake grants only | S2.3: domain grants and inherited authorization |
+| Version snapshots and history | Revision and audit only; no snapshots | S2.2: approved snapshots, history and diffs |
+| Independent review and no self-approval | No review; default APPROVED and immediate edits | S2.1: proposed changes, reviewer authorization and no self-approval |
+| CSV import/export | No CSV endpoint or format; APIs and source references are prerequisites only | S2.6 / Enterprise G16: a separate CSV design and implementation task |
+
+Until the remaining design requirements are accepted or explicitly split into linked follow-up
+issues, #14238 remains open. The PR description should use `Related to #14238`, rather than
+`Fixes #14238`. The S2 task IDs below track the deferred scope locally; they are not GitHub issue
+numbers. Filing the follow-up issues and linking them from #14238 is still a separate step.
+CSV remains planned, with its owner and scope in S2.6 and the OSS/Enterprise responsibility split.
 
 ## Usage Scenario
 
@@ -101,8 +126,8 @@ history and grants on domains. Implementation Steps lists what each step contain
 
    Then the agent loads the table or the semantic model with the existing tools. The full flow is
    in Agent integration.
-6. Later the term is replaced. The owner or the admin sets it to `DEPRECATED`, and agents stop
-   seeing it. Then the admin deletes it.
+6. Later the term is replaced. The owner or the admin can set it to `DEPRECATED`, and agents stop
+   seeing it. The admin can delete it in any status; deprecation is optional before deletion.
 
 ## Design
 
@@ -136,7 +161,8 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
   domain rules: up to 128 characters, and `/` is allowed (URL-encoded in paths).
 - **Synonyms** are stored one per row, with `synonym_key = key(synonym)`. Two terms can share a
   synonym. A synonym cannot be the name of another term. The server checks this in both
-  directions: when a synonym is added, and when a term is created or renamed (400).
+  directions: when a synonym is added, and when a term is created or renamed (400). Create, rename
+  and synonym changes take the same per-metalake hierarchy lock before checking (see Locking).
 - **Documentation links** (a label and a URL) are shown on the term page. They are stored in a JSON
   column of `glossary_term_meta`. No query reads inside them.
 - **Source reference** is optional. When set, it is unique in the metalake. It records where an
@@ -154,23 +180,30 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // created now; 
   the server finds them from the `BROADER` rows. `RELATED` is stored once per pair (with
   `from_term_id < to_term_id`) and shows on both terms.
 - Setting the broader or related term of A only changes A. The caller needs the edit privilege on A
-  and `VIEW_DEFINITION` on the other term.
+  and read access to the other term, including its draft visibility check (see Access control).
 - **Cycle check**: adding A → B fails with 400 if B already reaches A through `BROADER` links. The
   server walks up from B, level by level, under the hierarchy lock (see Locking). A term cannot be
   its own parent.
-- **Depth limit**: a `BROADER` chain has at most 20 levels. A new link that makes a chain longer
-  fails with 400. This bounds the cycle check and the hierarchy read. 20 is a first estimate. The
-  performance test (T18 in Testing) sets the final value.
+- **Depth limit**: a `BROADER` chain has at most `L` links, where `L` is the release depth-limit
+  constant in `GlossaryManager`. A new link that makes a chain longer fails with 400. This bounds
+  the cycle check and the hierarchy read. 20 is the provisional value; T18 in Testing selects the
+  final release value. Boundary tests use the loaded limit, not the provisional number.
 - **No overlap**: two terms cannot be `RELATED` if one is an ancestor of the other. Adding such a
   `RELATED` link, or a `BROADER` link that creates such a pair, fails with 400. This follows the
-  SKOS rule. The check uses the same walk as the cycle check.
+  SKOS rule. For a new `RELATED` pair, check ancestry in both directions. Before adding A → B,
+  collect A and all its descendants, and B and all its ancestors. Reject the link if any
+  `RELATED` pair crosses these two sets, regardless of how that pair is stored. For example,
+  X → A, B → Y and X `RELATED` Y make A → B invalid. Walking only upward from B misses X.
+  Both walks and the pair check run under the hierarchy lock, with visited IDs deduplicated
+  across each walk. An alter validates its complete proposed relation graph before committing.
 - **No recursive SQL**: the walk runs in code, with one batched query per level. The backend still
   supports MySQL 5.7, which has no `WITH RECURSIVE`.
 - A hierarchy read returns all ancestors or all descendants of a term. There are no cycles, so the
   walk always ends.
 - Deprecating a term does not change its children. Deleting a term removes its links. Each child
-  that loses a parent gets its own audit record. The child keeps its other parents, or becomes a
-  top-level term.
+  that loses a parent, and each surviving term that loses a `RELATED` link, gets one revision
+  increment and its own audit record in the cleanup transaction (see Status and versions). The
+  child keeps its other parents, or becomes a top-level term.
 
 How other systems store term relations:
 
@@ -190,10 +223,13 @@ any depth. That is why this design needs the cycle check and the hierarchy lock.
 A term belongs to zero or more domains. In Step 1 the definition privileges are granted on the
 metalake only, so a domain groups and filters terms but does not change who can see or manage them.
 In Step 2, domains also become the scope of grants (see Implementation Steps). Then membership
-decides who manages a term, and the choice below matters. There are two ways to store the
-membership. The choice is still open (Open Question 1).
+decides who manages a term. **Decision: Option A, explicit relations.** Jerry selected it in the
+[November 9 review](https://github.com/apache/gravitino/pull/14239#discussion_r4512415347), and
+the author acknowledged the choice. Step 1 and Step 2 use this single membership source.
+Backing tags (Option B) are retained under [Alternatives Considered](#alternatives-considered),
+not as an implementation prerequisite.
 
-**Option A: explicit relation (recommended)**
+**Selected design: explicit relation (Option A)**
 
 - A table `glossary_term_domain_rel (term_id, domain_id)`. Only the term API changes it: `domains`
   on create, `addDomain` and `removeDomain`. These changes go through `TermChangeHandler`, like any
@@ -203,37 +239,18 @@ membership. The choice is still open (Open Question 1).
   domain, so nobody can move a term into a domain where they cannot write.
 - **Terms of a domain** (`GET /terms?domain=`) use the same scope as the Domain design: terms in
   the domain, and terms in its subdomains that the caller can see.
+- **Domains in a response**: every `TermDTO.domains` contains only domains the caller can see
+  through the ordinary domain-read check (`USE_DOMAIN`). Apply this to direct gets, list and
+  lookup results, nested terms, and create/alter responses. A readable term remains readable
+  even if some or all of its domains are hidden; its returned domain list can be empty. Filtering
+  a response never changes stored membership or reveals a hidden-domain count.
 - Dropping a domain that still has terms fails with 409 `NonEmptyDomainException`. This is the same
   as a domain with subdomains. Removing the terms silently would change how they are grouped, and in
   Step 2 who manages them. The change is one more check in `DomainManager#dropDomain`.
-- **Descriptive tags** on terms use the existing tag APIs and `APPLY_TAG`. With Option A, a tag on a
-  term never changes its domains, even when the tag backs a domain.
+- **Descriptive tags** on terms use the existing tag APIs and `APPLY_TAG`. A tag on a term never
+  changes its domains, even when the tag backs a domain.
 
-**Option B: backing tags, the same as assets in #13867**
-
-How the Domain design puts a table into a domain: each domain has a tag, called its backing tag.
-For example, domain Finance has tag `finance`. A table with tag `finance` is in Finance. There is
-no member table: the tag alone decides it.
-
-Option B uses the same rule for terms. Term `Revenue` gets tag `finance`, so it is in Finance.
-Terms then also show in `GET /domains/{domain}/objects`. There is no relation table.
-
-In Step 1 this is safe, because grants are on the metalake. The problem comes in Step 2: tags are
-added with `APPLY_TAG`, and the Domain design gives `APPLY_TAG` to many table owners, so they can
-put their tables into a domain. For a table this is safe, because the domain does not change who
-can read the table. For a term in Step 2 it is not safe, because **the domain decides who can see,
-edit and approve the term**:
-
-| What happens                                                                            | Result                                                                              |
-| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| A table owner with `APPLY_TAG` on `finance` adds `finance` to the Sales term `Customer` | The Finance admins now also manage `Customer`. Nobody in Sales agreed               |
-| Someone deletes tag `finance`, or gives Finance another backing tag                     | All Finance terms leave Finance, and who manages them changes. Nobody edited a term |
-
-To block the first case, the tag code needs special rules only for terms: besides `APPLY_TAG`, the
-caller also needs the edit privilege on the term and `CREATE_DEFINITION` on the domain behind the
-tag. The second case cannot be blocked without changing how tags work.
-
-**Recommendation: Option A.** Most reasons are about Step 2:
+**Rationale for Option A.** Most reasons are about Step 2:
 
 1. **In Step 2, the domain decides who can read and manage a term.** For an asset, being in a domain
    gives nobody any permission. That is why the Domain design lets anyone with `APPLY_TAG` add an
@@ -272,8 +289,21 @@ page shows the terms linked to the object.
 | **Implemented by** | The object stores or computes the term         | `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `COLUMN`, `FILESET`, `TOPIC`, `MODEL` | `Customer` is implemented by table `sales.public.customers` and column `customers.customer_id` |
 | **Used by**        | A semantic-model metric is built from the term | a metric: (`SEMANTIC_MODEL`, `metricName`)                                  | metric `net_revenue` uses `Net revenue` and `Order`                                            |
 
-Both kinds are stored in `glossary_term_binding`. `metric_name` is set only for Used by, so it
-tells the two kinds apart. A binding is direct only: binding a table does not bind its columns.
+**Column scope in Step 1**: `COLUMN` means a table column. Resolve its identity as
+`catalog.schema.table.column`, using the table and column IDs, and authorize through that table.
+The endpoint fence is metalake -> catalog -> schema -> table, followed by the existing column
+identity check. Table alteration fences column changes and cleans up removed-column bindings;
+table/column renames preserve the IDs and bindings. A COLUMN lookup whose parent resolves only
+as a view returns 404; do not reinterpret a view as a table. View-column bindings are outside
+Step 1. Binding a view itself remains supported, but `children=true` on a view returns 400.
+
+Both kinds are stored in `glossary_term_binding`. In storage, `metric_name` is `NOT NULL`: it is
+the empty string for Implemented by and the non-empty metric name for Used by. Empty metric names
+are invalid, so the empty string is reserved for ordinary asset bindings. The other columns of
+the unique key are also `NOT NULL`, with `deleted_at = 0` for a live row. This makes the unique key
+enforce duplicate prevention on H2, MySQL and PostgreSQL without depending on how they compare
+NULLs. DTOs still omit `metricName` for Implemented by. A binding is direct only: binding a table
+does not bind its columns.
 
 - There is no semantic view type in Gravitino. A semantic view from another system (for example
   Snowflake) is stored as a semantic model, so its metrics use Used by.
@@ -301,27 +331,40 @@ Both can write bindings. The server checks each term in the request separately:
   - metrics: `MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`;
   - other types have no modify privilege, so the caller must own the object or one of its parents
     (metalake, catalog, schema).
-- The endpoint checks the object once, and then checks each term in the request body in code. If
-  one term fails both checks, the whole request fails with 403 and nothing changes. Removing a
-  binding needs the same privilege as adding it.
+- The endpoint checks the object once, and then checks each term in the request body in code.
+  A missing or hidden term returns 404 before checking its status. For a visible term, allow the
+  term-editor path in any status, even when the caller is also an object admin. Otherwise, an
+  object admin can use only `APPROVED` terms; another status returns 400. A caller satisfying
+  neither authorization path gets 403. Failure on any term rejects the whole request and
+  changes nothing. Removing a binding uses the same checks as adding it.
 - Each changed term gets a new revision and goes through `TermChangeHandler`. So the Step 2 workflow
   can hold a binding change, like any other term change.
 - Binding a missing object or metric fails with 404. Binding any other object type fails with 400.
-  If an object admin binds a term that is not `APPROVED`, the request fails with 400.
+  The status restriction on the object-admin path applies only after term visibility is checked
+  and only when the term-editor path does not allow the operation.
 - When a term is deprecated later, it keeps its bindings. It no longer shows in lookups or MCP
   results.
 
 **Reads**
 
 - `GET /terms/{term}/objects?kind=IMPLEMENTED_BY|USED_BY&types=` lists the bindings of a term. It
-  only returns objects and metrics the caller can access (`filterMetadataObject`). For a metric,
-  the caller needs access to its semantic model.
+  first checks read access to the root term, then returns only objects and metrics the caller
+  can access (`filterMetadataObject`). A table column requires read access to its table. A metric
+  requires read access to its semantic model.
 - `GET /objects/{type}/{fullName}/terms` and `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms`
-  list the terms of an object or a metric. They only return terms the caller can see.
-- `?children=true` on a table, view or semantic model also returns the terms of each column or
-  metric. A schema tab or a metric table then loads in one call, not one call per column. On the
-  server it is one query on `glossary_term_binding`, by the object and its column IDs (or by
-  `object_id` for metrics).
+  first authorize reading the target using its ordinary metadata-read expression, then list only
+  terms the caller can see. For COLUMN, authorize its table; for a metric, authorize its semantic
+  model and verify the metric exists. Glossary VIEW or MANAGE never replaces target access.
+  Insufficient target read access returns 403, and a missing target returns 404, with no terms,
+  child names or counts in the error. Check target access before enumerating children or reading
+  their bindings. Reuse `LOAD_TABLE_AUTHORIZATION_EXPRESSION` for tables and table columns,
+  `LOAD_VIEW_AUTHORIZATION_EXPRESSION` for views, `LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION`
+  for models' metrics, and the existing load expression for each other supported type.
+- `?children=true` on a table or semantic model also returns the terms of each table column or
+  metric that has readable terms. A schema tab or a metric table then loads in one call, not one
+  call per column. On the server it is one query on `glossary_term_binding`, by the table and its
+  column IDs (or by `object_id` for metrics). Other types, including VIEW, reject `children=true`
+  with 400. Views still support listing their own terms with no children.
 
 **Cleanup**
 
@@ -331,30 +374,47 @@ Both can write bindings. The server checks each term in the request separately:
 - Dropping a column in `alterTable` soft-deletes the bindings of the column, in the same
   transaction.
 - Metrics have no IDs. When a semantic model is altered, the bindings of removed metrics are
-  soft-deleted. A renamed metric loses its bindings and must be linked again.
+  soft-deleted. A renamed metric is treated as removal of the old name and addition of the new
+  name: it loses its bindings and must be linked again. The cleanup writes one audit record per
+  affected term, listing its ID and name, the semantic-model ID and name, the removed metric
+  names, the triggering alter operation and the resulting term revision. This also applies to
+  metric removal without a rename; bindings are never silently transferred to a new name.
+- Every surviving term that loses bindings gets one revision increment in the same transaction
+  as the object change and binding cleanup, even if it loses several bindings. Unaffected terms
+  do not change. The transaction locks all affected term rows in ID order before deleting the
+  bindings (see Locking). Failure rolls back the object change, bindings and revisions together,
+  with no successful cleanup audit record.
 
 ### Status and versions
 
-| Status               | Who can see it                              | Who can delete it                                       |
-| -------------------- | ------------------------------------------- | ------------------------------------------------------- |
-| `DRAFT`              | `CREATE_DEFINITION` or `MANAGE_DEFINITIONS` | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS` |
-| `APPROVED` (default) | `VIEW_DEFINITION`; MCP                      | nobody; deprecate it first                              |
-| `DEPRECATED`         | `VIEW_DEFINITION`; not MCP                  | `MANAGE_DEFINITIONS`                                    |
+| Status | Who can see it | Who can delete it |
+| ------ | -------------- | ----------------- |
+| `DRAFT` | owner with `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`; not MCP | `MANAGE_DEFINITIONS` |
+| `APPROVED` (default) | `VIEW_DEFINITION`; MCP also requires this privilege | `MANAGE_DEFINITIONS` |
+| `DEPRECATED` | `VIEW_DEFINITION`; not MCP | `MANAGE_DEFINITIONS` |
 
 - **Status is an ordinary field.** It is set in the create request (default `APPROVED`) or with
   `setStatus` in the update request. Anyone who can edit the term can set it: the owner with
   `CREATE_DEFINITION`, or `MANAGE_DEFINITIONS`. There are no transition rules and no separate
   status endpoint.
 - **What `APPROVED` means in Step 1**: the term can be used by agents. It does not mean that a
-  reviewer accepted it. An owner who wants to keep a term away from agents sets it to `DRAFT` or
-  `DEPRECATED`. In Step 2, review separates writing a term from approving it.
+  reviewer accepted it. Creation defaults to this status and makes the term immediately visible
+  to callers with read access. Content edits to an `APPROVED` term also take effect immediately.
+  An owner with CREATE can explicitly create a draft, or set any status on an existing own term;
+  MANAGE can do the same for any term. Neither action is an approval decision or requires a
+  reviewer in Step 1. Step 2 introduces review separately.
+- **Delete** requires `MANAGE_DEFINITIONS` in every status, including `APPROVED`. Being the owner
+  with CREATE never permits deletion, even after changing a term back to `DRAFT`. Deprecation
+  before deletion is optional. MANAGE is an administration privilege in Step 1, not an approval
+  privilege.
 - **Why three states**: each term is used on its own. `DRAFT` keeps a term away from agents while
   it is written. Bindings and people keep using a term after it is replaced, so `DEPRECATED` keeps
   it readable, which a delete cannot do. In Step 2, `APPROVED` also records that a reviewer
   accepted the term. A domain or an ontology (#14310) is published as a whole and has no review per
   item, so `DRAFT` / `PUBLISHED` is enough there.
-- **Every API shows the same terms** (REST, clients, MCP). If the caller cannot see a term, lists
-  leave it out and get returns 404. The same rule applies inside responses. The `broader`,
+- **Every API applies the same term-read authorization** (REST, clients, MCP); MCP additionally
+  excludes non-`APPROVED` terms. If the caller cannot see a term, lists leave it out and get
+  returns 404. The same rule applies inside responses. The `broader`,
   `narrower` and `related` lists of a term, the terms of an object, and the terms of a domain all
   leave out terms the caller cannot see. So a hidden draft never shows up as a relation.
 - **Known leaks**: hiding a term does not make it secret. A user can still find out that it exists
@@ -364,6 +424,15 @@ Both can write bindings. The server checks each term in the request separately:
   domains, bindings or status increases `current_version` by one, in the same transaction.
   Responses return it as `version`, so a client can see that a term changed after it read it.
   Owner and tag changes are only audited.
+- **Cleanup revisions**: deleting a term, object, column or metric also increments each surviving
+  term that loses a broader relation, a `RELATED` relation or a binding. Each affected term gets
+  exactly one increment per cleanup transaction, regardless of the number of removed rows, and
+  an audit record of the losses with its resulting revision. A change to a derived `narrower`
+  list alone does not increment the parent, just as adding or removing a broader relation only
+  changes the child. Terms deleted in the same transaction need no increment. No-op cleanup
+  changes no revisions; failed cleanup commits neither losses nor revision increments. These
+  are required cleanup effects, applied with the endpoint deletion rather than left pending for
+  review in Step 2.
 - **No snapshots in Step 1**: the audit log holds the change record. There is no history API.
   `glossary_term_version_info` is created with the other tables, but Step 1 writes no rows to it.
   Term reads and writes do not need it. A revision is not an approved version.
@@ -383,25 +452,34 @@ In Step 1, the three privileges are granted on the metalake:
 | --------------------------------------------------------- | ----------------- | ------------------- | -------------------- |
 | Read `APPROVED` and `DEPRECATED` terms; look up words     | ✓                 | ✓                   | ✓                    |
 | Create a term (the creator becomes the owner)             |                   | ✓                   | ✓                    |
-| See `DRAFT` terms                                         |                   | ✓                   | ✓                    |
+| See own `DRAFT` terms                                     |                   | ✓                   | ✓                    |
+| See other users' `DRAFT` terms                            |                   |                     | ✓                    |
 | Edit, bind and set the status of own terms, in any status |                   | ✓                   | ✓                    |
 | Edit, bind and set the status of any term                 |                   |                     | ✓                    |
-| Delete own `DRAFT` terms                                  |                   | ✓                   | ✓                    |
-| Delete any `DRAFT` or `DEPRECATED` term                   |                   |                     | ✓                    |
+| Delete any term, in any status                           |                   |                     | ✓                    |
 
 - `MANAGE_DEFINITIONS` includes `CREATE_DEFINITION`, and `CREATE_DEFINITION` includes
   `VIEW_DEFINITION`. The names are general, so other business-definition objects can use them too.
 - **Owner versus any term**: `CREATE_DEFINITION` lets a user write and maintain their own terms.
-  `MANAGE_DEFINITIONS` lets an admin fix any term. In Step 1 an owner can approve their own term.
-  Step 2 keeps the same three privileges and adds review: `CREATE_DEFINITION` then submits changes,
-  and only `MANAGE_DEFINITIONS` approves them.
+  `MANAGE_DEFINITIONS` lets an admin read, edit and delete any term. Ownership means the current
+  owner, including group members, not necessarily the original creator. Changing status is an
+  ordinary edit in Step 1; CREATE and MANAGE have no separate approval capability. Step 2 adds
+  submission and review, including reviewer authorization and no self-approval.
+- **Read privilege on a term**: `VIEW_DEFINITION` for `APPROVED` and `DEPRECATED`; for `DRAFT`,
+  `MANAGE_DEFINITIONS`, or being the owner with `CREATE_DEFINITION`. CREATE alone gives no access
+  to another owner's draft. Apply this rule to direct gets, lists and every nested term result.
 - **Edit privilege on a term**, used by Relations, Domain membership and Bindings:
   `MANAGE_DEFINITIONS`, or being the owner with `CREATE_DEFINITION`.
+- **Delete privilege on a term**: `MANAGE_DEFINITIONS` only, independent of status or ownership.
 - **Registration**: three new `Privilege.Name` values. In Step 1 their `canBindTo` accepts
   `METALAKE` only. The role APIs return 400 when these privileges are granted on any other object,
   or when anything is granted on `GLOSSARY_TERM`. Step 2 adds `DOMAIN`.
-- **Deny** works as for other privileges: a deny on the metalake wins over an allow. The metalake
-  owner always passes.
+- **Deny** works as for other privileges: expand the allowed grant implications above, then
+  apply explicit denies to each required capability. Every glossary operation requires effective
+  VIEW, so denying VIEW blocks both reads and writes, even for a term owner. Creating requires
+  effective CREATE; editing uses effective MANAGE or the owner-with-effective-CREATE path;
+  deleting requires effective MANAGE. A deny on MANAGE removes the all-term path, but leaves
+  effective CREATE usable on own terms. The metalake owner always passes.
 - **Bindings** are written on the object, by the object admin (`APPROVED` terms only) or by the
   term editor. See Bindings.
 - **Owner** (a user or a group), set through `/owners/glossary_term/{term}`. When a group owns a
@@ -409,14 +487,19 @@ In Step 1, the three privileges are granted on the metalake:
   owner, or have `MANAGE_GRANTS` on the metalake.
 - **Create** needs `CREATE_DEFINITION` on the metalake, and `USE_DOMAIN` on each domain in the
   request. The creator becomes the owner.
-- **Implementation**: `JcasbinAuthorizer#hasMetadataPrivilegePermission` checks `GLOSSARY_TERM`
-  against the metalake, plus the owner check. Domains and terms in a request body are checked in
-  code. In Step 2, a `TermScopeResolver` adds the domains of a term, and their parents, as more
-  levels of the same check.
+- **Implementation**: add shared glossary authorization checks for effective VIEW, CREATE and
+  MANAGE on the metalake, and for reading, editing and deleting a term using the rules above.
+  REST endpoints and request-body checks use these same checks. Do not use
+  `JcasbinAuthorizer#hasMetadataPrivilegePermission` as the term-edit check: it controls managing
+  grants and ownership, not glossary content. Owner-transfer and role-grant APIs retain their
+  existing authorization; MANAGE does not grant `MANAGE_GRANTS`. In Step 2, a `TermScopeResolver`
+  adds the domains of a term, and their parents, as more levels of the glossary checks.
 
 ### Locking
 
-Term operations use the existing lock tools of the store, always in this order:
+Before writing, plan the locks for the whole request, including every update in an alter and
+every relation and domain in a create. Acquire their union using the existing store tools,
+always in this order:
 
 1. the live-endpoint fence (`LiveEndpointService.lockLiveEndpoint`, shared): the metalake, plus the
    chain of the bound object when binding;
@@ -424,25 +507,42 @@ Term operations use the existing lock tools of the store, always in this order:
 3. term rows, in ID order (exclusive);
 4. domain rows (shared).
 
-Each row is locked only once, in its final mode.
+Each row is locked only once, in its final mode. Do not process updates one by one and acquire a
+hierarchy lock after a term lock. Once locked, reread and validate the current state, apply all
+updates in one transaction, and hold the locks until commit or rollback. If a reread shows that
+the plan needs an earlier lock or an additional term row that would break ID order, roll back
+and rebuild the plan before writing.
 
-| Operation                     | Locks                                                                    | Conflict it prevents                     |
-| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------- |
-| Create                        | metalake (shared) -> domains (shared)                                    | metalake or domain drop                  |
-| Edit content, status, domains | term (exclusive) -> added domains (shared)                               | edits at the same time; domain drop      |
-| Add or remove a relation      | metalake (shared) -> hierarchy lock -> both terms (exclusive, ID order)  | a cycle or overlap; the other term drop  |
-| Bind / unbind                 | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order) | object drop; term edits at the same time |
-| Delete                        | metalake (shared) -> hierarchy lock -> term (exclusive)                  | a new link to the term being deleted     |
+| Operation | Locks | Conflict it prevents |
+| --------- | ----- | -------------------- |
+| Create, including initial relations and domains | metalake (shared) -> hierarchy lock -> referenced terms (exclusive, ID order) -> domains (shared) | name/synonym conflict; invalid relations; endpoint drop |
+| Rename or change synonyms | metalake (shared) -> hierarchy lock -> term (exclusive) | name/synonym conflict; concurrent edits |
+| Edit other content, status or domains | metalake (shared) -> term (exclusive) -> added domains (shared) | concurrent edits; endpoint drop |
+| Add or remove a relation | metalake (shared) -> hierarchy lock -> all referenced terms (exclusive, ID order) -> added domains (shared), if any | a cycle or overlap; endpoint drop; mixed alters |
+| Bind / unbind | object chain (`lockLiveEndpoint`, shared) -> terms (exclusive, ID order) | object drop; concurrent term edits |
+| Delete a term | metalake (shared) -> hierarchy lock -> deleted and affected surviving terms (exclusive, ID order) | new links; lost cleanup revisions |
+| Object, column or metric cleanup | endpoint locks in the deleting or altering operation's final mode -> affected surviving terms (exclusive, ID order) | new bindings; lost cleanup revisions |
+
+For an alter that combines rows of this table, use the union of locks in the global order. For
+example, rename plus `addBroader` plus `addDomain` takes the metalake fence, hierarchy lock, the
+edited and referenced terms in ID order, then the added domain rows. Create with relations locks
+the existing referenced terms before inserting the new term and its relations. Relation cleanup
+finds the affected surviving terms after taking the hierarchy lock; binding cleanup finds them
+after taking the endpoint deletion or alteration locks, which must exclude concurrent binding
+writes. A metalake drop deletes all its terms, so there are no surviving terms to increment.
 
 - The **hierarchy lock** is a `SELECT … FOR UPDATE` on one row per metalake in
   `glossary_hierarchy_lock`. The row is inserted on first use. Locking only the two terms is not
   enough. Example: A → B and C → D are added at the same time, then B → C and D → A. Each link
-  passes its own check, but together they form a cycle. So every relation change takes the lock,
-  and so does a delete. Without it, A → B could be added while B is being deleted, and A would
-  point to a deleted term. Relation changes and deletes are rare, so running them one at a time per
-  metalake is cheap.
-- The walk runs after the lock is taken, so it reads the committed links. If a term was deleted
-  before the lock was taken, the server sees that when it locks the term row, and returns 404.
+  passes its own check, but together they form a cycle. Every relation change and term delete
+  takes this lock. Every create, rename and synonym change also takes it, so checking names in
+  `glossary_term_meta` and synonyms in `glossary_term_synonym` cannot race. These writes run one
+  at a time per metalake; other content edits do not take this lock.
+- Name/synonym checks and hierarchy walks run after the lock is taken and read the latest
+  committed state, including a transaction that committed while this request waited for the
+  lock. They must not reuse an earlier transaction snapshot or a MyBatis cached result. If a term
+  was deleted before the lock was taken, the server sees that when it locks the term row, and
+  returns 404.
 - For operations by name, the server finds the row by name, locks it, and then checks the name and
   `deleted_at` again. If they changed, it returns 404. The unique key on the name protects
   concurrent creates (409).
@@ -461,14 +561,14 @@ All paths are under `/api/metalakes/{metalake}`. They follow the Tag, Policy and
 | ---------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | List, filter, match    | `GET /terms?details=&domain=&status=&nameContains=&match=&bindings=`     | -> `NameListResponse` / `TermListResponse`                               |
 | Create                 | `POST /terms`                                                            | `TermCreateRequest` -> `TermResponse`                                    |
-| Get                    | `GET /terms/{term}`                                                      | -> `TermResponse`                                                        |
+| Get                    | `GET /terms/{term}?status=`                                              | -> `TermResponse`                                                        |
 | Alter                  | `PUT /terms/{term}`                                                      | `TermUpdatesRequest` -> `TermResponse`                                   |
 | Drop                   | `DELETE /terms/{term}`                                                   | -> `DropResponse`                                                        |
-| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER`                | -> `TermTreeResponse`                                                    |
-| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=`                                 | -> `TermBindingListResponse`                                             |
-| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=`                | -> `NameListResponse` / `ObjectTermsResponse`                            |
+| Hierarchy              | `GET /terms/{term}/hierarchy?direction=BROADER\|NARROWER&status=`        | -> `TermTreeResponse`                                                    |
+| Bindings of a term     | `GET /terms/{term}/objects?kind=&types=&status=`                         | -> `TermBindingListResponse`                                             |
+| Terms of an object     | `GET /objects/{type}/{fullName}/terms?details=&children=&status=`        | -> `NameListResponse` / `ObjectTermsResponse`                            |
 | Bind / unbind          | `POST /objects/{type}/{fullName}/terms`                                  | `TermsAssociateRequest{termsToAdd, termsToRemove}` -> `NameListResponse` |
-| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=` | -> `NameListResponse` / `TermListResponse`                               |
+| Terms of a metric      | `GET /objects/semantic_model/{fullName}/metrics/{metric}/terms?details=&status=` | -> `NameListResponse` / `TermListResponse`                        |
 | Bind / unbind a metric | `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`         | `TermsAssociateRequest` -> `NameListResponse`                            |
 | Owner                  | existing `/owners/glossary_term/{term}`                                  |                                                                          |
 | Tags                   | existing `/objects/glossary_term/{term}/tags`                            |                                                                          |
@@ -488,6 +588,20 @@ ObjectTermsResponse   { terms: [TermDTO], children: [{ name, terms: [TermDTO] }]
 TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
 ```
 
+- **Status filtering on reads**: `status` is optional on the term collection, get, hierarchy,
+  term-binding and reverse object/metric GET endpoints. With no filter, return any term the
+  caller is allowed to read. With a filter, apply both
+  authorization and that status to all terms: roots, list items, `broader`, `narrower`, `related`,
+  hierarchy nodes and terms inside object/metric responses. A named root that is hidden, missing
+  or in another status returns 404, including on `/terms/{term}/objects`, even though that
+  response contains only bindings. A list omits nonmatching terms; a hierarchy stops at each
+  nonmatching or hidden node and does not traverse through it. An invalid status returns 400.
+  Read root status and response data from one consistent database snapshot, using one query or
+  a read transaction for multiple queries. Do not check status in a separate request and then
+  fetch unguarded bindings or relations. This requires no write locks; each response reflects
+  its read snapshot, and later requests can observe subsequent status changes.
+- **Domain filtering on responses**: every occurrence of a term uses the domain visibility rule
+  in Domain membership, including terms embedded by hierarchy, object and metric endpoints.
 - **List** is used both to browse and to look up words:
   - `domain` returns the terms of the domain and of the subdomains the caller can see.
   - `nameContains` finds names that contain the text, ignoring case. It is for search boxes.
@@ -495,25 +609,32 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
     own, and a term is returned when it matches any word (OR). The server compares `key(word)`
     with `name_key` and `synonym_key`. Each returned term has `matchedBy`. With
     `status=APPROVED`, a word that only matches `DEPRECATED` terms returns nothing.
-  - `bindings=true` adds the bindings of each term, at most 20 per term. If there are more,
-    `bindingsTruncated` is set. It only works together with `match` and `details=true`. A lookup
-    then needs only one call. A word usually matches one to three terms.
+  - `bindings=true` adds at most 20 authorized bindings per term. Apply target-read authorization
+    before the limit: collect up to 21 visible bindings, return the first 20, and set
+    `bindingsTruncated` only when a 21st visible binding exists. Hidden bindings do not consume
+    the limit or affect the flag. A query may fetch candidates in batches, but must continue
+    through hidden rows until it finds 21 visible bindings or exhausts the candidates. It only
+    works together with `match` and `details=true`. A lookup then needs only one REST call. A word
+    usually matches one to three terms.
   - Why not a separate path like `/terms/resolve`? It would clash with a term named `resolve`. So
     lookup is a filter of the list.
 - **Alter** applies all updates in one transaction and increases the revision once. `narrower` is
   computed and cannot be set. `version` is the current revision. `updateLinks` replaces the whole
   link list. `status` defaults to `APPROVED` on create.
-- **Terms of an object**: `children=true` works on `table`, `view` and `semantic_model`. It adds
-  one entry to `children` for each column or metric with visible terms. A semantic model itself
-  has no terms; only its metrics do.
+- **Terms of an object**: `children=true` works on `table` and `semantic_model` after target-read
+  authorization. It adds one entry to `children` for each table column or metric with terms
+  passing the authorization and optional status filter. A semantic model itself has no terms;
+  only its metrics do. A view supports its own terms, without `children=true`.
 - **Bind / unbind** use the same request format as tag association. The response is the object's
   terms after the change.
 - **Errors**:
-  - 404: `NoSuchTermException` (missing, or the caller cannot see it), `NoSuchMetadataObjectException`;
+  - 404: `NoSuchTermException` (missing, hidden, or a named root excluded by the status filter),
+    `NoSuchMetadataObjectException`;
   - 409: `TermAlreadyExistsException` (same name or same source reference), `NonEmptyDomainException`;
   - 400: a cycle, a term as its own parent, binding an unsupported object type, a synonym equal to
-    another term's name, deleting an `APPROVED` term, an object admin binding a term that is not
-    `APPROVED`, or more than 20 `match` values;
+    another term's name, an object admin binding a visible non-`APPROVED` term without the
+    term-editor path, invalid `status`, `children=true` on an unsupported type, or more than 20
+    `match` values;
   - 403: `ForbiddenException`.
 - **Concurrency**: changes apply to the current state, and the last write wins, the same as other
   Gravitino metadata. Writes do not check the version. Responses include `version`, so a client
@@ -528,7 +649,8 @@ TermsAssociateRequest { termsToAdd: [name], termsToRemove: [name] }
     `matchTerms` returns approved terms with their bindings. It is for agents that do not use MCP.
   - On a `Term`: `broader()`, `narrower()`, `listBindings(kind)`.
   - `SupportsTerms` (`listTerms()`, `associateTerms(add, remove)`) on catalogs, schemas, tables,
-    views, columns, filesets, topics and models. Tables and views also have `listColumnTerms()`.
+    views, table columns, filesets, topics and models. Tables also have `listColumnTerms()`;
+    views do not support column-term operations in Step 1.
     `SemanticModel` has `listMetricTerms` and `associateMetricTerms`.
 
 ### Web UI support
@@ -539,15 +661,16 @@ the term page does not need a call per field.
 
 | Page                         | Part                                                                    | Calls                                                                                                     |
 | ---------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No domain) | `GET /terms?details=true` and `GET /domains?details=true`; the tree is built from `domains` and `broader` |
+| Glossary                     | Term tree (domain › subdomain › term, narrower terms nested, No visible domain) | `GET /terms?details=true` and `GET /domains?details=true`; the tree is built from `domains` and `broader` |
 | Glossary                     | Search terms                                                            | `GET /terms?nameContains=`                                                                                |
 | Glossary, term               | Header, Definition, Details, Related terms                              | `GET /terms/{term}`; the source label is the `sourceRef` system, or "Gravitino" if empty                  |
 | Glossary, term               | Implemented by, Used by                                                 | `GET /terms/{term}/objects?kind=IMPLEMENTED_BY`, `?kind=USED_BY`                                          |
-| Glossary, term               | Approve, Deprecate                                                      | `PUT /terms/{term}` with `setStatus`                                                                      |
+| Glossary, term               | Set status (immediate in Step 1; no approval decision)                   | `PUT /terms/{term}` with `setStatus`                                                                      |
 | Glossary, term               | Delete term (the dialog counts relations and asset links)               | `DELETE /terms/{term}`; the counts come from the term and its bindings                                    |
 | Glossary, Add or Edit term   | Name, Definition, Synonyms, Domain, Broader, Related, Documentation     | `POST /terms` or `PUT /terms/{term}` with the changed fields; pickers use `/domains` and `/terms`         |
 | Glossary, Add term           | Owner other than the creator                                            | `POST /terms`, then `PUT /owners/glossary_term/{term}` (allowed, because the creator is the owner)        |
-| Explore, table or view       | Terms N, Update terms drawer, column chips and the term filter          | `GET /objects/{type}/{fullName}/terms?details=true&children=true`; `POST .../terms` per change            |
+| Explore, table               | Terms N, Update terms drawer, column chips and the term filter          | `GET /objects/table/{fullName}/terms?details=true&children=true`; `POST .../terms` per change             |
+| Explore, view                | Terms N, Update terms drawer and the term filter; no view-column chips | `GET /objects/view/{fullName}/terms?details=true`; `POST .../terms` per change                             |
 | Explore, Update terms drawer | Term picker (approved, grouped by domain)                               | `GET /terms?details=true&status=APPROVED&nameContains=`                                                   |
 | Semantic model               | Glossary terms of each metric                                           | `GET /objects/semantic_model/{fullName}/terms?details=true&children=true`                                 |
 | Metric editor                | Terms (approved only)                                                   | the picker call above; `POST /objects/semantic_model/{fullName}/metrics/{metric}/terms`                   |
@@ -567,9 +690,22 @@ This design does not cover the parts below. They need another source, or the pag
 
 ### Agent integration
 
-The `mcp-server/` gets a read-only `glossary` tool tag, added to `SUPPORTED_TOOL_TAGS`. The MCP
-server forwards the caller's `Authorization` header. So an agent sees exactly what its user can
-see.
+The `mcp-server/` gets a read-only `glossary` tool tag, added to `SUPPORTED_TOOL_TAGS`. All glossary
+tools use `GravitinoContext.rest_client()` and its existing identity selection:
+
+| Mode | Identity used for the Gravitino request |
+| ---- | -------------------------------------- |
+| HTTP with a non-empty `Authorization` header | Forward that header verbatim, ahead of any configured service credential. Authentication failure does not trigger service fallback. |
+| HTTP without a header, with a service identity and fallback enabled | Use the configured static `--token`, or OAuth client-credentials when no token is set. |
+| HTTP without a header, with a service identity and `--no-service-identity-fallback` | Reject the tool call with `ServiceIdentityFallbackDisabled` before issuing a Gravitino request. |
+| HTTP without a header and without a service identity | Send no authorization credential; Gravitino applies its anonymous/unauthenticated behavior. |
+| stdio | Use the configured service identity, or send no credential if none is configured. The HTTP-only fallback flag does not apply. |
+
+Authorization applies to that effective principal, with an additional APPROVED-only restriction
+for glossary tools. User credentials therefore limit results to the user's authorized approved
+terms; service-identity modes limit results to the service principal's authorized approved terms.
+Do not claim end-user impersonation in service or unauthenticated modes. Reuse the existing audit
+attribution and client isolation by identity and metalake.
 
 **End-to-end flow**
 
@@ -600,7 +736,7 @@ User question
    ├── other object ─────▶ the tool for that object type (for example a fileset or a model)
    └── unmatched ────────▶ ask the user: "What do you mean by VIP?"
 
-6 Agent runs the query with the user's own privileges and answers
+6 Agent reads data through tools with their own access checks and answers
 ```
 
 | Step                    | Who                     | What happens                                                                                                                                                                                                                                                                                            |
@@ -610,7 +746,7 @@ User question
 | 3. Look up              | MCP server -> Gravitino | One REST call, with one `match` per word. The server compares `key(word)` with term names and synonyms, and keeps only `APPROVED` terms the caller can see (and in `domain`, if given). It adds the bindings of each term.                                                                              |
 | 4. Group                | MCP server              | Groups the terms by the word they matched (`matchedBy`), and lists the words with no match in `unmatched`.                                                                                                                                                                                              |
 | 5. Decide               | Agent                   | One term for a word: use it. Several terms: pick one by domain, or ask the user. No term: ask the user, and do not guess a column. Then follow the bindings with the existing tools.                                                                                                                    |
-| 6. Read data and answer | Agent -> existing tools | The query runs with the user's own privileges. The answer names the terms and definitions it used.                                                                                                                                                                                                      |
+| 6. Read data and answer | Agent -> existing tools | Data-access tools authenticate and authorize their own effective principals. Glossary bindings grant no additional access. The answer names the terms and definitions it used.                                                                                                                          |
 
 **How `match` works**
 
@@ -698,30 +834,66 @@ User question
 | Tool                      | REST calls                                                              | Use                                                              |
 | ------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------- |
 | `resolve_business_term`   | `GET /terms?match=&status=APPROVED&details=true&bindings=true`          | Map the words of a question to terms and their data              |
-| `get_term`                | `GET /terms/{term}`                                                     | Definition, synonyms, domains, relations                         |
+| `get_term`                | `GET /terms/{term}?status=APPROVED`                                     | Definition, synonyms, authorized domains and approved relations |
 | `list_terms`              | `GET /terms?details=true&status=APPROVED` (+ `domain`, `name_contains`) | Browse the terms of a domain                                     |
-| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy`                                           | Find wider or narrower terms                                     |
-| `list_metadata_by_term`   | `GET /terms/{term}/objects`                                             | All objects and metrics of a term, when the lookup was truncated |
-| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&children=true`       | Explain a table, its columns or the metrics of a model           |
+| `get_term_hierarchy`      | `GET /terms/{term}/hierarchy?status=APPROVED`                           | Find approved wider or narrower terms                           |
+| `list_metadata_by_term`   | `GET /terms/{term}/objects?status=APPROVED`                             | All authorized bindings of an approved term                     |
+| `list_terms_for_metadata` | `GET /objects/{type}/{fullName}/terms?details=true&status=APPROVED`; add `children=true` only for table or semantic model | Explain an authorized object, its table columns or model metrics |
 
-The other tools also remove terms that are not `APPROVED` from their output. With the `domain`
-tools of #13867, an agent can go from a domain to its terms, and then to the data.
+Every tool passes `status=APPROVED` to the server. The server applies the read contract in REST
+API to the root and every nested term, including name-only relations. A direct draft or deprecated
+name passed to `get_term`, `get_term_hierarchy` or `list_metadata_by_term` returns 404 with no term
+details or bindings, even for MANAGE. Hierarchy traversal stops at an unapproved or unauthorized
+node. The bindings endpoint checks root status in the same read snapshot as its payload, so a
+separate preflight get followed by an unfiltered bindings request is not sufficient. Object
+results enforce target-read authorization, omit filtered terms and empty children, and never
+return hidden domains. The MCP server must not retry a rejected filtered request without the
+status filter. With the `domain` tools of #13867, an agent can go from a domain to its terms, and
+then to the data.
 
 ### Events and audit
 
 - Every operation sends pre, success and failure events through a `GlossaryEventDispatcher`, and
   is written to the audit log: create, alter, status, bind and unbind, drop. When a term is
-  dropped, each child that lost a parent also gets its own audit entry.
+  dropped, each surviving term that loses a parent or a `RELATED` link also gets its own audit
+  entry with its new revision. Object, column and metric cleanup similarly records lost bindings
+  per surviving term. A metric rename records the old metric names and affected terms as specified
+  in Bindings. Successful cleanup records are committed with the cleanup; rollback must not leave
+  a record claiming that bindings or relations were removed.
 
 ## Alternatives Considered
 
 1. **A glossary container** (`metalake.glossary.term`). It adds a second way to group terms, next
    to domains. Then it is unclear which one controls privileges. Domains plus the term hierarchy
    are enough.
-2. **Domain membership through backing tags**: see Option B in Domain membership.
+2. **Domain membership through backing tags (Option B, not selected)**: see the alternative below.
 3. **Terms as tags on assets.** `APPLY_TAG` is a different privilege from the definition
    privileges. Tags have no definition, relations or status. Tags can carry policies, but a binding
    must never change access.
+
+### Domain membership through backing tags (Option B, not selected)
+
+How the Domain design puts a table into a domain: each domain has a tag, called its backing tag.
+For example, domain Finance has tag `finance`. A table with tag `finance` is in Finance. There is
+no member table: the tag alone decides it.
+
+Option B uses the same rule for terms. Term `Revenue` gets tag `finance`, so it is in Finance.
+Terms then also show in `GET /domains/{domain}/objects`. There is no relation table.
+
+In Step 1 this is safe, because grants are on the metalake. The problem comes in Step 2: tags are
+added with `APPLY_TAG`, and the Domain design gives `APPLY_TAG` to many table owners, so they can
+put their tables into a domain. For a table this is safe, because the domain does not change who
+can read the table. For a term in Step 2 it is not safe, because **the domain decides who can see,
+edit and approve the term**:
+
+| What happens                                                                            | Result                                                                              |
+| --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| A table owner with `APPLY_TAG` on `finance` adds `finance` to the Sales term `Customer` | The Finance admins now also manage `Customer`. Nobody in Sales agreed               |
+| Someone deletes tag `finance`, or gives Finance another backing tag                     | All Finance terms leave Finance, and who manages them changes. Nobody edited a term |
+
+To block the first case, the tag code needs special rules only for terms: besides `APPLY_TAG`, the
+caller also needs the edit privilege on the term and `CREATE_DEFINITION` on the domain behind the
+tag. The second case cannot be blocked without changing how tags work.
 
 ## Prior Art
 
@@ -735,13 +907,13 @@ tools of #13867, an agent can go from a domain to its terms, and then to the dat
   in Step 2. Unlike a page, a term can have no domain: a term used by several areas does not have
   to pick one.
 
-## Open Questions
+## Open Questions and Decisions
 
-1. **Domain membership of terms**: Option A (explicit relation) or Option B (backing tags)? In
-   Step 1 both are safe, because grants are on the metalake. The difference shows in Step 2, when a
-   domain decides who manages its terms. This needs agreement with the Domain design.
-2. **Who can see drafts**: this design shows `DRAFT` terms to every user with `CREATE_DEFINITION` or
-   `MANAGE_DEFINITIONS`. Should it be only the owner and `MANAGE_DEFINITIONS`?
+1. **Domain membership (decided)**: use explicit `glossary_term_domain_rel` relations (Option A),
+   as agreed in the November 9 review. Option B is an alternative, not a pending choice or a
+   prerequisite for T7.
+2. **Draft visibility (decided)**: only the owner with `CREATE_DEFINITION`, or a caller with
+   `MANAGE_DEFINITIONS`, can read a draft. This is fixed for Step 1 (see Access control).
 3. **Default read access**: everyone should be able to read terms by default. But Gravitino has no
    built-in role for all users. Should we add one (for example `PUBLIC`) with `VIEW_DEFINITION` on
    the metalake, or should admins grant it?
@@ -803,7 +975,9 @@ For one metalake, it reads the glossary tables directly and checks the live rows
 4. The `BROADER` links have no cycle. The longest chain has at most the depth limit of links.
 5. No `RELATED` pair has one term as an ancestor of the other. Each `RELATED` row has
    `from_term_id < to_term_id`.
-6. `metric_name` is set on a binding exactly when its object type is `SEMANTIC_MODEL`.
+6. Every binding has a non-NULL `metric_name`: non-empty exactly when its object type is
+   `SEMANTIC_MODEL`, and the empty string otherwise. No two live bindings have the same
+   `(term_id, object_type, object_id, metric_name)`.
 7. `glossary_term_version_info` has no rows.
 8. `glossary_hierarchy_lock` has at most one row for the metalake.
 
@@ -816,17 +990,22 @@ The design does not say these things. The tests use the answers below. If a revi
 different answer, change it here first.
 
 1. **Order of checks**: if the caller cannot see the term, 404. If the caller can see it but has
-   no privilege for the action, 403. For example, `CREATE_DEFINITION` dropping its own
-   `DEPRECATED` term gets 403. If the caller has the privilege but the change breaks a rule, 400
-   or 409. For example, anyone dropping an `APPROVED` term gets 400.
+   no privilege for the action, 403. For example, CREATE dropping its own term gets 403 in every
+   status, while MANAGE can delete it in every status. If the caller has the privilege but the
+   change breaks a rule, 400 or 409. Binding uses the two-path checks in Bindings: a hidden draft
+   gets 404; a visible `DEPRECATED` term gets 400 through the object-admin-only path, but a term
+   editor with object read access can bind it.
 2. **Revision**: a new term has `version` 1. Each successful alter call adds exactly 1, even when
    it has several updates. A bind or unbind call adds 1 to each term whose bindings changed. Owner
-   and tag changes add nothing.
+   and tag changes add nothing. A cleanup transaction adds 1 to each surviving term that loses
+   bindings, broader relations or `RELATED` relations, once per term rather than per removed
+   row. Derived `narrower` changes alone add nothing. No-op and failed cleanup add nothing.
 3. **Repeats are ignored**: adding a synonym, link, domain or binding that already exists, or
    removing one that does not exist, is not an error and writes nothing. It still counts as a
    successful call for the revision of an alter.
-4. **Depth** is the number of `BROADER` links on the longest chain. A chain of 21 terms has 20
-   links and is allowed. A link that joins two chains counts the links above and below it.
+4. **Depth** is the number of `BROADER` links on the longest chain. With loaded limit `L`, a
+   chain of `L + 1` terms has `L` links and is allowed; `L + 1` links exceed the limit. A link
+   joining two chains counts the links above and below it.
 5. **Hidden terms in a hierarchy**: the hierarchy read stops at a term that the caller cannot see.
    It shows neither that term nor the terms behind it.
 6. **Names**: the server trims spaces at both ends before it stores a name or a synonym. The case
@@ -834,8 +1013,15 @@ different answer, change it here first.
    the name of its own term fails with 400.
 7. **`key()`** treats every whitespace character (space, tab, new line) as a space.
 8. **`nameContains`** treats `%`, `_` and `\` as plain characters.
-9. **`bindings=true`** without `match` and `details=true` fails with 400.
-10. **The depth limit** is a constant in `GlossaryManager`. Tests can change it. Users cannot.
+9. **`bindings=true`** without `match` and `details=true` fails with 400. Its 20-binding limit
+   and `bindingsTruncated` count authorized bindings only, after filtering target access.
+10. **The depth limit** is a constant in `GlossaryManager`. Manager tests can inject a test limit
+    and run boundary cases at 10, 20 and 50. CUJ 6 reads the actual release limit without overriding
+    it. Users cannot configure the limit.
+11. **Read status filters** apply to roots and nested terms, and stop hierarchy traversal at a
+    nonmatching node. A named nonmatching root returns 404, including on the bindings endpoint.
+12. **Column scope** is table columns only. Views have their own term bindings, but no column
+    operations or `children=true` in Step 1.
 
 ### Where tests go and how to run them
 
@@ -921,20 +1107,32 @@ also need `-PskipDockerTests=false` and a running Docker.
   are stored and `version` grows by 2.
 - T4.12 `TermChangeHandler`: a test handler records each change. Every write sends exactly one
   change of the right kind. A test handler that rejects the change leaves the store unchanged.
-- T4.13 Drop a `DRAFT` term. Its synonyms, relations, domain links and bindings are soft-deleted in
-  the same transaction.
-- T4.14 Dropping an `APPROVED` term fails with 400. **(guard)**
+- T4.13 As MANAGE, drop a `DRAFT` term. Its synonyms, relations, domain links and bindings are
+  soft-deleted in the same transaction.
+- T4.14 As MANAGE, drop an `APPROVED` term without first changing its status. It succeeds and
+  cleans up the same rows as T4.13. Repeat with a `DEPRECATED` term. **(guard)**
+- T4.15 Race: create `X` while adding synonym ` x ` to another term. Exactly one succeeds; the
+  other fails with 400, and the name/synonym invariant holds. Use two independent store sessions,
+  hold the winning request after its checks, and assert that the other request waits on the
+  hierarchy lock. Release the winner to commit, then check that the waiter sees its changes.
+  Run with each request winning first, and also with the synonym supplied in a concurrent create.
+  **(guard: removing the hierarchy lock from either write lets both checks pass.)**
+- T4.16 Repeat T4.15 with a rename to `X` instead of a create. A rejected rename keeps the old
+  name and revision. **(guard)**
 
 **T5. Relations in the manager**
 
 - T5.1 A → A fails with 400. **(guard)**
 - T5.2 A → B exists. B → A fails with 400. **(guard)**
 - T5.3 A → B → C → D exists. D → A fails with 400.
-- T5.4 A chain of 20 links works. One more link at the top or the bottom fails with 400.
-  **(guard)**
-- T5.5 Chain X has 10 links and chain Y has 10 links. Add a link from the top of X to the bottom
-  of Y. The new chain, from the bottom of X to the top of Y, has 21 links, so the link fails with
-  400. (A check that only walks up from the new parent fails this test.) **(guard)**
+- T5.4 Read the loaded depth limit `L`. A chain of `L` links works; adding one link at either
+  end would create `L + 1` links and fails with 400, without changing the graph or revisions.
+  Parameterize manager tests with limits 10, 20 and 50. **(guard)**
+- T5.5 With loaded limit `L`, chain X has `floor(L / 2)` links and chain Y has
+  `L - floor(L / 2)` links. Both are valid separately. Join the top of X to the bottom of Y:
+  the resulting longest chain would have `L + 1` links, so the write fails with 400 and changes
+  nothing. Run for each limit of T5.4. A check that only walks up from the new parent accepts
+  this invalid link. **(guard)**
 - T5.6 C is an ancestor of A. Adding `RELATED` between A and C fails with 400, in both directions.
   **(guard)**
 - T5.7 A `RELATED` C exists. Adding A → B, where B → C, fails with 400. **(guard)**
@@ -943,14 +1141,31 @@ also need `-PskipDockerTests=false` and a running Docker.
   some rounds end with a cycle.)**
 - T5.9 Race: B is a `DRAFT`. One thread adds A → B while another drops B. Either the link is added and then removed
   by the drop, or the add fails with 404. No live link to B is left.
-- T5.10 A has parents B and C, and B is `DEPRECATED`. Drop B. A keeps C. The audit has one entry for A losing B.
+- T5.10 A has parents B and C, and B is `DEPRECATED`. Drop B. A keeps C and its revision grows by
+  1. The audit has one entry for A losing B, with the new revision. C's derived `narrower` list
+  and revision are unchanged.
 - T5.11 The hierarchy read of a diamond returns each term once, in both directions.
 - T5.12 The hierarchy read stops at a term the caller cannot see.
-- T5.13 Setting the broader term of A needs `VIEW_DEFINITION` on the parent. A hidden `DRAFT`
-  parent fails with 404.
+- T5.13 Setting the broader term of A needs read access to the parent. A `DRAFT` parent owned
+  by another user fails with 404 for CREATE, even when that caller can edit A. The parent owner
+  with CREATE, and any caller with MANAGE, can read that parent.
 - T5.14 Mixed load: 8 threads run 500 random relation adds, relation removes, edits and deletes on
   30 terms, on MySQL and PostgreSQL. No deadlock or lock-wait timeout happens, and the invariants
   hold at the end.
+- T5.15 X → A, B → Y and X `RELATED` Y exist. Adding A → B fails with 400 and changes nothing.
+  Cover both ID orders of the stored `RELATED` pair and an alter that combines content and
+  relation updates. **(guard: checking only ancestors of B accepts the invalid link.)**
+- T5.16 Race a mixed alter (content, rename or synonym, and `addBroader`) against deleting a
+  referenced `DEPRECATED` term. Also race create with initial relations against that delete.
+  Assert the lock order: endpoint, hierarchy, then all term IDs in order. No deadlock occurs;
+  either the write commits before cleanup or it fails with 404 and writes nothing. Use
+  independent sessions and latches at lock acquisition to exercise both orders. T7.7 extends
+  these cases with domains.
+- T5.17 A → B, B → C and B `RELATED` D exist, with no broader path between B and D. Drop
+  `DEPRECATED` B. A and D each get one revision increment and one audit record of their loss.
+  C loses B from its derived `narrower` list but keeps its revision. Cover either ID order of
+  the `RELATED` row. Inject a failure after cleanup starts: links, revisions and successful
+  cleanup audit records all roll back. **(guard)**
 
 **T6. Authorization**
 
@@ -974,17 +1189,43 @@ The users for these cases:
 - T6.2 `denied` sees nothing: get returns 404 and list is empty.
 - T6.3 `owner` passes every check.
 - T6.4 A group owns a term. A member of the group can edit it. A user outside the group with
-  `CREATE_DEFINITION` cannot.
+  `CREATE_DEFINITION` cannot. A group member with CREATE, or any caller with MANAGE, can read
+  its draft; other CREATE users cannot. Losing group membership removes the member's owner-based
+  read and edit access.
 - T6.5 Granting any definition privilege on a catalog, or anything on `GLOSSARY_TERM`, fails with
   400.
 - T6.6 `Child` has a hidden `DRAFT` parent and a visible parent. `viewer` sees only the visible one
   in `broader`. `admin` sees both.
-- T6.7 Known leak: `writer2` creates a term with the name of a hidden draft and gets 409. The error
-  message does not contain the definition, owner or domains of the hidden term.
+- T6.7 Known leak: `writer` owns DRAFT term `Hidden`; `writer2` has CREATE and owns nothing.
+  First assert that `writer2` gets 404 for `getTerm("Hidden")` and cannot find it in a list.
+  Then creating ` hidden ` as `writer2` fails with 409. Its error contains no definition, owner
+  or domains of the hidden term. Read back as `writer`: ID, name, content, owner and revision
+  are unchanged, and no new term or success event was created. **(guard)**
+- T6.8 For each status, `writer` cannot delete its own term (403), while `admin` can delete
+  either its own or another user's term. Also try `APPROVED` → `DRAFT` → delete and
+  `DEPRECATED` → `DRAFT` → delete as `writer`: status edits succeed, deletion still fails with
+  403, and the term remains. **(guard: deletion must check MANAGE, not ownership or status.)**
+- T6.9 CREATE can explicitly create in each status, with default `APPROVED` when omitted, and
+  can edit content and set any status on its own term without a reviewer. An edit to an
+  `APPROVED` term is visible immediately to `viewer`; a draft is visible to its owner and
+  `admin`, but get returns 404 and lists omit it for `viewer` and `writer2`. `admin` can edit
+  any term. No approval operation or reviewer privilege is consulted in these Step 1 calls.
+- T6.10 An allow on CREATE alone gives VIEW; an allow on MANAGE alone gives CREATE and VIEW.
+  A deny on VIEW blocks reads and writes for both, including term owners: get returns 404,
+  list is empty, and create returns 403. A deny on CREATE blocks creation even with an allow
+  on MANAGE, but effective MANAGE still permits editing and deleting existing terms.
+- T6.11 Allow MANAGE and deny MANAGE through different roles. The caller cannot use the
+  all-term edit/delete or draft-read paths, but retains effective CREATE from the allowed
+  grant's implications: it can create and maintain its own terms, and read its own drafts.
+  It still cannot delete its own terms. **(guard: do not short-circuit on an allow or owner
+  before checking the required denies.)**
+- T6.12 Transfer a draft from `writer` to `writer2` through the existing owner API. `writer2`
+  gains owner-based read and edit access; `writer` gets 404 for that draft and cannot edit it.
+  Neither can delete it. `admin` retains read, edit and delete access throughout.
 
 **T7. Domain membership**
 
-- T7.1 Create with two domains. Get returns both.
+- T7.1 Create with two domains the caller can read. Get returns both.
 - T7.2 Create in a domain without `USE_DOMAIN` on it fails with 403, and no term is created.
 - T7.3 `domain=Sales` returns the terms of Sales and of its subdomains that the caller can see. It
   leaves out the terms of hidden subdomains.
@@ -992,7 +1233,16 @@ The users for these cases:
   `removeDomain`, the drop works. **(guard)**
 - T7.5 Race: one thread adds a term to a domain while another drops the domain. Either the term is
   added and the drop fails with 409, or the drop wins and the add fails with 404.
-- T7.6 With Option A, a tag on a term never changes its domains, even if the tag backs a domain.
+- T7.6 Under the selected explicit-relation design, a tag on a term never changes its domains,
+  even if the tag backs a domain.
+- T7.7 Extend T5.16 with `addDomain` in the mixed alter and domains in the create. Domain rows
+  are locked only after all term rows, and a rejected request leaves membership, content,
+  relations and revisions unchanged.
+- T7.8 A readable term belongs to Sales and a domain the caller cannot see. Only Sales appears
+  in its returned domains, using the shared domain-filtering check. With both domains hidden,
+  the term stays readable and its domain list is empty. Returned data contains no hidden-domain
+  name, ID or count; stored membership stays intact, and reads do not change the revision.
+  Endpoint wiring is covered by T8.8, T12.8 and T13.12. **(guard)**
 
 **T8. REST**
 
@@ -1003,6 +1253,12 @@ The users for these cases:
 - T8.4 An unknown update type, and an empty update list, fail with 400.
 - T8.5 Each DTO turns into JSON and back with no loss. Missing optional fields keep their defaults.
 - T8.6 `./gradlew :docs:build` passes, and the spec has every endpoint in the REST API table.
+- T8.7 As MANAGE, an unfiltered get reads a DRAFT or DEPRECATED term, while get and hierarchy
+  with `status=APPROVED` return 404 for the same root. A matching root works; nested terms obey
+  the filter, including name-only lists. An invalid status returns 400. **(guard)**
+- T8.8 Exercise T7.8 through direct get, list, hierarchy and alter responses. Every nested
+  `TermDTO.domains` filters hidden domains; altering content without changing membership does
+  not reveal or remove a hidden domain. Create responses include only authorized domains.
 
 **T9. Tags on terms**
 
@@ -1014,37 +1270,83 @@ The users for these cases:
 
 - T10.1 Each write sends a pre event and a success event with the term name and the new `version`.
 - T10.2 A failed write sends a pre event and a failure event, and no success event.
-- T10.3 Dropping a term with two children writes one audit entry for each child.
+- T10.3 Dropping a term with two children writes one audit entry for each child, including its
+  lost parent and new revision. A surviving `RELATED` neighbor also gets a cleanup entry.
 
 **T11. Bindings**
 
 - T11.1 Bind and unbind a term on each of the 8 object types and on a metric.
 - T11.2 Binding a tag, a role or a term fails with 400. Binding a missing object or metric fails
   with 404.
-- T11.3 An object admin binds an `APPROVED` term: it works. The same admin binds a `DRAFT` term:
-  400. **(guard)**
+- T11.3 An object admin with VIEW but without term edit access binds an `APPROVED` term: it
+  works. Binding another user's `DRAFT` returns 404; binding a visible `DEPRECATED` term returns
+  400. A visible term with neither authorization path returns 403. Every failure leaves the
+  bindings and revisions unchanged. **(guard)**
 - T11.4 A term editor with only read access to the object binds a `DRAFT` term: it works.
+  Repeat as a caller who is both object admin and term editor: the term-editor path still
+  permits DRAFT and DEPRECATED bindings. MANAGE does not replace the required object read access.
 - T11.5 One request binds two terms, and the caller passes neither check for the second one. The
   request fails with 403, and the first term is not bound either. **(guard)**
 - T11.6 Binding the same term to the same object twice keeps one row.
 - T11.7 Drop the table. Its bindings and its column bindings are soft-deleted. Dropping the schema,
   the catalog and the metalake works the same way.
 - T11.8 Drop one column with `alterTable`. Its bindings are gone. The bindings of the other columns
-  and of the table stay.
+  and of the table stay. Each term losing bindings gets one revision increment; terms whose
+  bindings do not change keep their revisions.
 - T11.9 Rename the table, and rename a column. The bindings stay.
 - T11.10 Alter a semantic model to remove a metric. Its bindings are gone. A renamed metric loses
-  its bindings.
+  its bindings, with the audit details of T11.15. Each affected term's revision grows by 1, even
+  when several metrics bound to it are removed in one alter. Unaffected terms keep their revisions.
 - T11.11 Race: one thread binds a term to a table while another drops the table. No live binding
   to the dropped table is left.
+- T11.12 At the storage layer, insert the same live ordinary asset binding twice using
+  `metric_name = ''`: the unique key rejects the second insert. Repeat for a metric binding.
+  Different metric names on the same model work. A NULL `metric_name` fails, and a soft-deleted
+  binding does not block a new live one. Run on H2, MySQL and PostgreSQL. **(guard)**
+- T11.13 Drop a table with several bound columns and a table binding to the same term. That term
+  gets exactly one revision increment and one audit record listing the lost bindings. Repeat
+  for schema and catalog drop. A metalake drop leaves no surviving terms. Inject failure during
+  column or metric cleanup: the object change, bindings, revisions and successful cleanup audit
+  records all roll back. No-op cleanup leaves revisions unchanged. **(guard)**
+- T11.14 Race column or metric removal against binding writes and ordinary term edits. Endpoint
+  locks exclude new bindings before affected terms are collected; all affected term rows are
+  then locked in ID order. No deadlock, dangling binding or lost revision increment occurs.
+- T11.15 Rename a metric bound to two terms. Each term gets one audit entry with its ID and name,
+  the semantic-model ID and name, the removed metric name, the triggering alter operation and
+  its new revision. Removing multiple metrics in one alter groups the losses per term. A failed
+  alter leaves no successful cleanup entry.
+- T11.16 Bind a term to a view itself: it works. A COLUMN request under a view-only parent name
+  returns 404 and writes nothing. A table-column request resolves table and column IDs and
+  authorizes and locks the table chain. Verify its rename/drop behavior through T11.8 and
+  T11.9; do not resolve a view as a table or create a view-column binding. **(guard)**
 
 **T12. Binding reads**
 
 - T12.1 `GET /terms/{term}/objects` leaves out objects the caller cannot access. For a metric, the
-  caller needs access to the semantic model.
-- T12.2 `GET /objects/.../terms` leaves out terms the caller cannot see.
+  caller needs access to the semantic model; for a column, access to its table. A hidden root
+  term returns 404 before any bindings are returned.
+- T12.2 `GET /objects/.../terms` requires target read access and leaves out terms the caller
+  cannot see. The metric endpoint checks semantic-model read access and metric existence.
 - T12.3 `children=true` on a table with 3 columns, where 2 have terms, returns 2 entries in
   `children`. It sends one query to `glossary_term_binding`.
-- T12.4 `children=true` on a type other than table, view or semantic model fails with 400.
+- T12.4 `children=true` on a type other than table or semantic model, including VIEW, fails
+  with 400. A view's own terms can still be listed without children.
+- T12.5 A glossary viewer guesses a restricted table or model name. Reverse reads, including
+  `children=true` and the metric endpoint, return 403 with no terms, child names or counts.
+  Assert that child enumeration and binding queries are not called before target authorization.
+  Repeat as glossary MANAGE without target read access: MANAGE grants no asset access. **(guard)**
+- T12.6 As MANAGE, use `status=APPROVED` on reverse object/metric reads. Only APPROVED terms
+  appear, and table-column/metric children with only DRAFT or DEPRECATED terms are omitted.
+  Without the filter, ordinary term visibility applies. All nested DTOs filter hidden domains.
+- T12.7 Call `/terms/{term}/objects?status=APPROVED` directly as the draft owner and as MANAGE:
+  a DRAFT or DEPRECATED root returns 404 and no bindings. With an APPROVED root, pause the read
+  after its root check while another session changes status and bindings. The response must
+  use one consistent snapshot for both checks and payload; a later request sees the new status.
+  Exercise both commit orders and assert that reads take no write locks. **(guard: independent
+  root and payload reads can return bindings from an unapproved state.)**
+- T12.8 Exercise T7.8 through reverse object and metric reads, including table-column and
+  metric children. Each nested term filters its domains, independently of target and term
+  visibility; readable terms remain in the result when all their domains are hidden.
 
 **T13. Lookup**
 
@@ -1054,13 +1356,22 @@ The users for these cases:
 - T13.3 One term matches two words. It is returned once, with two `matchedBy` entries.
 - T13.4 A word that only matches a `DEPRECATED` term returns nothing with `status=APPROVED`.
 - T13.5 20 words work. 21 words fail with 400. **(guard)**
-- T13.6 A term with 21 bindings returns 20, with `bindingsTruncated` true. A term with 20 returns 20,
-  with `bindingsTruncated` false.
+- T13.6 A term with 21 authorized bindings returns 20, with `bindingsTruncated` true. A term
+  with 20 authorized bindings returns 20, with `bindingsTruncated` false.
 - T13.7 `nameContains=%` and `nameContains=_` return only names that contain those characters.
   **(guard)**
 - T13.8 `domain` and `match` together return only matching terms of the domain and its visible
   subdomains.
 - T13.9 `bindings=true` without `match`, or without `details=true`, fails with 400.
+- T13.10 A term has 20 hidden bindings followed by one visible binding. Return that binding
+  with `bindingsTruncated=false`. With all bindings hidden, return an empty list and false.
+  Hidden rows neither consume the limit nor affect the flag. **(guard)**
+- T13.11 Put hidden bindings across candidate-batch boundaries before, between and after
+  visible ones. With 21 visible bindings return 20 and true; with 20 visible bindings and any
+  number of hidden ones return 20 and false. The query continues until it finds a 21st visible
+  binding or exhausts candidates, rather than stopping after a fixed number of raw rows.
+- T13.12 Exercise T7.8 through lookup and match responses, including embedded bindings. Hidden
+  domains are filtered without removing a readable matching term or changing stored membership.
 
 **T14 and T15. Clients**
 
@@ -1068,17 +1379,35 @@ The users for these cases:
   reads the response.
 - T14.2 / T15.2 Each REST error turns into the matching client exception.
 - T14.3 / T15.3 `matchTerms` / `match_terms` returns only `APPROVED` terms, with their bindings.
+- T14.4 / T15.4 View bindings use the view itself, without column operations or `children=true`.
+  Table-column operations use the table parent; `listColumnTerms` is exposed for tables only.
 
 **T16. MCP tools**
 
 - T16.1 With the fixture of the example in Agent integration, `resolve_business_term` returns the
   JSON in that example. The test compares it with a stored JSON file.
 - T16.2 25 words send two REST calls (20 and 5). The results keep the order of the words.
-- T16.3 No tool output ever contains a `DRAFT` or `DEPRECATED` term. The test checks every tool in
-  the tool table.
-- T16.4 Each call forwards the caller's `Authorization` header.
+- T16.3 No successful tool result contains a DRAFT or DEPRECATED term, including root names,
+  name-only relations, hierarchy nodes and reverse object results. Run every tool as MANAGE
+  and as the draft owner, who can read the drafts through unfiltered REST. Direct draft or
+  deprecated roots fail with 404; a hierarchy walk from an APPROVED root through a DRAFT
+  toward another APPROVED node stops before the draft and all nodes reached only through it.
+  Test both traversal directions. Domains and binding targets are authorization-filtered.
+  **(guard)**
+- T16.4 An HTTP call with `Authorization` forwards that exact credential, ahead of configured
+  service credentials. Cover Basic, Bearer and Negotiate headers and assert that failed user
+  authentication is not retried with a service identity.
 - T16.5 The tool descriptions contain the four rules for agents.
 - T16.6 The tools exist only when the `glossary` tool tag is enabled.
+- T16.7 Cover every mode in the identity table: HTTP with credentials, service fallback,
+  fallback disabled, no configured credentials, and stdio with and without a service identity.
+  Check the effective principal, outgoing credentials, rejection before any backend call when
+  applicable, and audit attribution. Concurrent callers with different identities or metalakes
+  do not share authorization state. All successful modes still enforce APPROVED-only.
+- T16.8 Capture REST requests for all glossary tools: each term read passes `status=APPROVED`,
+  including root-bindings and hierarchy calls. An error never triggers an unfiltered retry.
+  `list_terms_for_metadata` uses `children=true` for tables and semantic models, and lists a
+  view's own terms without it. **(guard)**
 
 **T17. CUJ integration tests**: the cases are the CUJs in Critical user journeys below.
 
@@ -1087,7 +1416,16 @@ The users for these cases:
 - T18.1 Measure adding a link and reading the hierarchy, for chains of 10, 20 and 50 links, with
   3 parents per term, on MySQL and PostgreSQL. Report p50 and p95 over 100 runs.
 - T18.2 The final depth limit is the largest of 10, 20 and 50 whose p95 for adding a link is under
-  100 ms on both databases. The PR description has the result table.
+  100 ms on both databases for the chain and wide-DAG fixtures of T18.1 and T18.3. The PR
+  description has the result table.
+- T18.3 Repeat the measurements on layered DAGs of 10, 20 and 50 links, with 10 and 100 terms
+  per level and up to 3 parents per term. Include overlapping ancestor and descendant paths,
+  and `RELATED` pairs that make a proposed link invalid only across its descendant/ancestor
+  sets. Measure both accepted and rejected additions, report node and edge counts and p50/p95,
+  and verify that the walks deduplicate visited IDs and batch queries per level.
+- T18.4 After choosing the release constant, rerun T5.4, T5.5 and CUJ 6 using that value on
+  H2, MySQL and PostgreSQL. Record the selected limit and results. The release check must prove
+  that `L` links work and `L + 1` links fail; a fixed 21-link fixture is insufficient.
 
 **T19. User documentation**
 
@@ -1119,20 +1457,30 @@ and PostgreSQL.
 3. **Agent lookup.** Call `resolve_business_term(["net revenue", "active user", "VIP"])` as
    `viewer`. Expected: `active user` returns `Active Customer` by synonym, with its column and
    metric; `VIP` is in `unmatched`; a `DRAFT` term named `VIP` and a `DEPRECATED` term never show.
+   Repeat as `admin` and the owner of VIP, who can read it through unfiltered REST. All MCP
+   tools still exclude it; a direct `list_metadata_by_term(VIP)` fails with 404. An approved
+   term belonging to a hidden domain omits that domain, and inaccessible bindings are absent.
 4. **Privileges.** `viewer`, `writer2` and `admin` each try to read, edit, set the status of and
    drop `Active Customer`. Expected: the results match the T6.1 table.
-5. **Status and delete.** `writer` sets `Active Customer` to `DRAFT`, then back to `APPROVED`,
-   then to `DEPRECATED`. `writer` tries to drop it while it is `APPROVED` (400) and `DEPRECATED`
-   (403), and then `admin` drops it. `writer` also creates a `DRAFT` term and drops it. Expected:
-   `viewer` can read the term in each state as the Status table says; only the allowed drops work;
-   `version` grows by 1 on each status change.
-6. **Bad relations.** Add a link that makes a cycle, a chain of 21 links, and a `RELATED` link
-   between a term and its ancestor. Expected: each fails with 400, and nothing changes. Then two
-   servers add the two links of T5.8 at the same time, 20 rounds: exactly one succeeds each round.
+5. **Status and delete.** `writer` creates a term with no status: it is `APPROVED`, and `viewer`
+   can read it immediately. The writer edits its definition, and the viewer sees the edit with
+   no review step. Then `writer` sets it to `DRAFT`, `APPROVED`, `DEPRECATED` and `DRAFT` again,
+   trying to delete it in each state: all deletes return 403. `writer2` and `viewer` cannot read
+   it while it is a draft; `writer` and `admin` can. `admin` can delete it in any state; use a
+   fresh term for each state. Expected: no status change bypasses the deletion privilege, and
+   `version` grows by 1 on each content or status alter. No approval decision is required.
+6. **Bad relations.** Read the server's actual release depth limit `L`, without a test override.
+   Build a valid chain of `L` links, then try adding a link that would make `L + 1` links.
+   Also try a cycle and a `RELATED` link between a term and its ancestor. Expected: each invalid
+   write fails with 400, leaving data and revisions unchanged. Then two servers add the two
+   links of T5.8 at the same time, 20 rounds: exactly one succeeds each round.
 7. **Cleanup.** Drop a bound column, a bound table, a domain that has terms, a term with two
-   parents and one child (set to `DEPRECATED` first), and then the metalake. Expected: the
+   parents and one child (as `admin`, while it is `APPROVED`), and then the metalake. Expected: the
    bindings go away with the objects; the domain drop fails with 409; the child keeps its other
-   parent; after the metalake drop, no glossary data of the metalake can be read.
+   parent; each surviving term losing bindings or its parent gets one revision increment per
+   cleanup transaction and an audit record of its losses. Also rename a bound metric and check
+   that its bindings disappear, the affected term's revision grows by 1, and the audit names the
+   removed metric and term. After the metalake drop, no glossary data of the metalake can be read.
 8. **Edit on one server, read on another.** Start two servers on the same database. Edit, rename,
    relate and bind a term on server 1, and read it on server 2 right after each change. Expected:
    server 2 returns the new data each time (nothing is cached). If the test framework can start
@@ -1148,8 +1496,8 @@ parallel once the tasks they depend on are merged.
 ### Prerequisites
 
 - [ ] Domain code merged to `main` (it is on `branch-domain-dev` now). Only T7 needs it.
-- [ ] Decision on Open Question 1 (membership) before T7, and on Open Question 3 (PUBLIC role)
-      before T8.
+- [ ] Decision on Open Question 3 (PUBLIC role) before T8. Domain membership is already decided:
+      T7 implements explicit relations (Option A).
 
 ### Group A: API and storage
 
@@ -1170,44 +1518,58 @@ parallel once the tasks they depend on are merged.
 
 - [ ] **T4. Add the Glossary manager** (`core/`). Create, get, list, alter and drop; name and
       synonym rules; links, properties and source reference; status; revision; `TermChangeHandler`
-      with the default handler; row locks. Depends on: T2.
+      with the default handler; whole-request lock planning and name/synonym checks under the
+      hierarchy lock. Depends on: T2, T3.
 - [ ] **T5. Add term relations to the manager** (`core/`). Set broader and related terms; cycle
-      check, depth limit and the no-overlap rule under the hierarchy lock; hierarchy read; cleanup
-      on delete. Depends on: T3, T4.
+      check, depth limit and descendant/ancestor no-overlap checks under the hierarchy lock;
+      hierarchy reads with authorization and optional status filtering at every node; cleanup
+      on delete with surviving-term revisions and loss details for audit. Depends on: T3, T4.
 - [ ] **T6. Add Glossary authorization** (`core/`, `server/`). The `GLOSSARY_TERM` case in
-      `JcasbinAuthorizer`, owner checks for `CREATE_DEFINITION`, draft visibility, and filtering of
-      hidden terms inside relation lists. Depends on: T4.
-- [ ] **T7. Add domain membership** (`core/`). Membership storage (Option A or B, per Open
-      Question 1), add and remove domains on create and alter, and the 409 check on domain drop.
-      Depends on: T4, prerequisites.
+      shared glossary authorization checks, grant implications and deny precedence; owner checks
+      for CREATE edits and draft reads; MANAGE-only deletion in every status; filtering of hidden
+      terms inside relation lists. No Step 1 approval capability. Depends on: T4.
+- [ ] **T7. Add domain membership** (`core/`). Explicit `glossary_term_domain_rel` storage
+      (selected Option A), add and remove domains on create and alter, and the 409 check on
+      domain drop.
+      Shared domain filtering on term results and mixed relation/domain lock-order tests.
+      Depends on: T4, T5, T6, prerequisites.
 
 ### Group C: REST and events
 
 - [ ] **T8. Add Glossary REST APIs and OpenAPI** (`common/`, `server/`). DTOs, requests and
-      responses; endpoints for terms, status, relations, hierarchy and domains; error mapping.
-      Depends on: T5, T6.
+      responses; endpoints for terms, status, relations, hierarchy and domains; optional read
+      status filters on roots and nested terms; domain filtering on every term DTO; error
+      mapping. Depends on: T5, T6, T7.
 - [ ] **T9. Support tags on terms** (`core/`, `server/`). `GLOSSARY_TERM` as a taggable type in
       the existing tag APIs. Depends on: T8.
 - [ ] **T10. Add Glossary events and audit** (`core/`). `GlossaryEventDispatcher` with pre, post
-      and failure events for every write. Depends on: T8.
+      and failure events for every write, plus cleanup audit records with lost relations and
+      the resulting term revisions. T11 adds binding-loss records. Depends on: T8.
 
 ### Group D: Bindings and lookup
 
 - [ ] **T11. Add term bindings** (`core/`). `glossary_term_binding` storage; bind and unbind on all
-      supported objects and on metrics, with both privilege paths; cleanup on object drop, column
-      drop and metric removal. Depends on: T6.
+      supported objects and on metrics, with both privilege paths; COLUMN means table columns
+      only, with table identity, authorization and fencing; non-NULL binding keys and
+      storage-level duplicate tests on all backends; cleanup on object drop, column drop and
+      metric removal, with surviving-term revisions and audit details for metric rename and
+      removal. Depends on: T6, T10.
 - [ ] **T12. Add binding REST APIs and reads** (`server/`). Bind and unbind endpoints; objects of a
-      term; terms of an object or a metric; `children=true`; OpenAPI. Depends on: T8, T11.
+      term with root status guards in a consistent read snapshot; target authorization for
+      terms of an object or metric; nested domain and status filtering; `children=true` for
+      tables and semantic models only; OpenAPI. Depends on: T8, T11.
 - [ ] **T13. Add term lookup filters** (`core/`, `server/`). `domain`, `status`, `nameContains`
       and `match` on the list endpoint, `matchedBy` in the result, and `bindings=true` with the limit
-      per term. Depends on: T12.
+      and truncation flag computed after authorization. Depends on: T12.
 
 ### Group E: Clients and agents
 
 - [ ] **T14. Add Glossary to the Java client**, including `matchTerms`. Depends on: T13.
 - [ ] **T15. Add Glossary to the Python client**, including `match_terms`. Depends on: T13.
 - [ ] **T16. Add Glossary MCP tools** (`mcp-server/`), with the agent rules in the tool
-      descriptions, and tests for unmatched and ambiguous words. Depends on: T15.
+      descriptions, APPROVED filtering through every REST read, transport-specific effective
+      identity and fallback behavior, and tests for nested filtering, direct unapproved roots,
+      unmatched and ambiguous words. Depends on: T15.
 
 ### Group F: Release checks
 
@@ -1217,17 +1579,27 @@ parallel once the tasks they depend on are merged.
       T5.
 - [ ] **T19. Add Glossary user documentation** (`docs/`). Depends on: T14, T15.
 
-Step 1 ships when T1–T19 are merged and all CUJs pass.
+Step 1 ships when T1–T19 are merged and all CUJs pass, including the depth-boundary rerun after
+T18 selects the release limit. This completes Step 1 only, not the later scope of #14238.
 
 ### Step 2 tasks (not filed yet)
 
-These are filed as a separate epic after Step 1 ships. Their scope is in Implementation Steps.
+These are tracked here until separate GitHub issues are filed and linked. The local IDs below
+are not issue numbers, and no follow-up issues have been created by this document update.
 
-- [ ] Proposed-change storage and the review handler for `TermChangeHandler`
-- [ ] Snapshots in `glossary_term_version_info`, and the history and diff APIs
-- [ ] Grants on domains, inherited by subdomains
-- [ ] The metalake setting for the default status
-- [ ] Web UI: term pages, hierarchy, binding drawers, review queue and history
+- [ ] **S2.1. Review and no self-approval**: proposed-change storage, the review handler for
+      `TermChangeHandler`, reviewer authorization and rejection of a submitter reviewing their
+      own change, including content, relations, membership and both binding paths.
+- [ ] **S2.2. Version snapshots and history**: snapshots in `glossary_term_version_info`, the
+      history and diff APIs, and atomic commit with the approved live change.
+- [ ] **S2.3. Domain grants**: grants on domains, inherited by subdomains, with deny handling
+      and revalidation when membership changes.
+- [ ] **S2.4. Initial-status setting**: the audited metalake setting for the default status.
+- [ ] **S2.5. Web UI**: term pages, hierarchy, binding drawers, review queue and history.
+- [ ] **S2.6. CSV import/export** (Enterprise G16): define the CSV schema and validation,
+      permission-filtered exports, repeat-import identity using `sourceRef`, batch failure
+      semantics, and imports through the same review and no-self-approval checks as other
+      writes. This remains planned work, outside Step 1; public APIs alone do not deliver CSV.
 
 ## Implementation Steps
 
@@ -1239,14 +1611,15 @@ no data migration.
 | -------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Term model           | Terms with definitions, synonyms, owner, links, properties and source reference                       | Same terms                                                                                 |
 | Relations            | Several broader terms, related terms, cycle check, cleanup                                            | Relation changes are reviewed                                                              |
-| Domain membership    | Zero or more domains, optional on create; filters and cleanup (how it is stored: Open Question 1)     | Membership changes are reviewed; domains become the scope of grants                        |
+| Domain membership    | Explicit relations (Option A); zero or more domains, optional on create; filters and cleanup         | Same membership source; changes are reviewed and domains become the scope of grants         |
 | Tags                 | Ordinary tags on terms through the existing tag APIs                                                  | Same                                                                                       |
-| Bindings             | Catalogs, schemas, tables, views, columns, filesets, topics, models and metrics; both privilege paths | Binding changes are reviewed, on both paths                                                |
-| Privileges           | The three definition privileges on the metalake; owner checks, deny, filtered results                 | Same privileges, also granted on domains and inherited by subdomains                       |
-| Status               | Default `APPROVED`; anyone who can edit a term sets its status in the update call                     | Default `DRAFT`, or `APPROVED` by an audited metalake setting; status changes are reviewed |
+| Bindings             | Catalogs, schemas, tables, views, table columns, filesets, topics, models and metrics; both privilege paths | Binding changes are reviewed, on both paths                                            |
+| Privileges           | Metalake grants; CREATE maintains own terms; MANAGE reads, edits and deletes any term; private drafts, deny and filtering | Same privileges, also granted on domains and inherited by subdomains                       |
+| Status               | Default `APPROVED`, immediately readable with VIEW; ordinary status edits; no approval decision      | Default `DRAFT`, or `APPROVED` by an audited metalake setting; status changes are reviewed |
 | Changes              | Take effect at once; `TermChangeHandler` is the write hook                                            | Always reviewed; proposed changes are kept apart; nobody approves their own change         |
 | Versions and history | Revision number and audit only                                                                        | A snapshot of each approved change, readable history and diffs                             |
 | APIs and clients     | REST, Java and Python clients, OpenAPI                                                                | Proposal, decision and history APIs                                                        |
+| CSV import/export    | Not delivered; APIs and source references support future importers                                  | Planned as S2.6 / Enterprise G16, with permissions and review                               |
 | Agent lookup         | Exact match on names and synonyms; approved terms only; ambiguous and unmatched words                 | Same lookup, on the approved state                                                         |
 | Audit and events     | Create, edit, status, relation, membership, binding and delete                                        | Submit, approve, reject, and changes of the metalake setting                               |
 | UI                   | None; the REST calls behind each page are listed in Web UI support                                    | Term pages, hierarchy, binding drawers, review queue and history                           |
