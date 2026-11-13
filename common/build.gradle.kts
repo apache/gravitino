@@ -46,7 +46,6 @@ dependencies {
   testCompileOnly(libs.lombok)
 
   testImplementation(libs.jackson.dataformat.yaml)
-  testImplementation(gradleTestKit())
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
 
@@ -58,8 +57,3 @@ dependencies {
 }
 
 apply(from = rootProject.file("gradle/build-info.gradle.kts"))
-
-tasks.test {
-  // Used by TestBuildInfoGeneration to apply the real script to temporary projects.
-  systemProperty("buildInfoScript", rootProject.file("gradle/build-info.gradle.kts").path)
-}

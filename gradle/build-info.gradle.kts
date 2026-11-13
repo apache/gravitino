@@ -24,9 +24,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.concurrent.TimeUnit
 
-// The git executable can be overridden with -PgitExecutable=<path>; the build-info functional
-// test uses this to exercise the file-parsing fallback.
-val gitExecutable = providers.gradleProperty("gitExecutable").getOrElse("git")
 val gitCommitIdPattern = Regex("[0-9a-fA-F]{40}")
 
 // Ask git itself first: it handles linked worktrees, packed refs and detached HEAD.
@@ -37,7 +34,7 @@ fun getGitCommitIdFromGit(): String? {
     return null
   }
   return try {
-    val process = ProcessBuilder(gitExecutable, "rev-parse", "HEAD")
+    val process = ProcessBuilder("git", "rev-parse", "HEAD")
       .directory(rootDir)
       .redirectError(ProcessBuilder.Redirect.DISCARD)
       .start()
