@@ -132,6 +132,48 @@ class TestIndexSerdes(unittest.TestCase):
         serialized_dict = json.loads(mock_data_class.to_json())
         self.assertDictEqual(json_dict, serialized_dict)
 
+    def test_text_index_empty_properties(self):
+        index_json = {
+            "indexType": "DATA_SKIPPING_TEXT",
+            "name": "idx_body",
+            "fieldNames": [["body"]],
+        }
+        for properties in ({}, {"properties": None}, {"properties": {}}):
+            with self.subTest(properties=properties):
+                index = IndexSerdes.deserialize({**index_json, **properties})
+                self.assertEqual(index.properties(), {})
+                self.assertDictEqual(IndexSerdes.serialize(index), index_json)
+
+    def test_text_indexes_properties_json_round_trip(self):
+        indexes_json = {
+            "indexes": [
+                {
+                    "indexType": "DATA_SKIPPING_TEXT",
+                    "name": "idx_tokens",
+                    "fieldNames": [["body"]],
+                    "properties": {"tokenizer": "tokens"},
+                },
+                {
+                    "indexType": "DATA_SKIPPING_TEXT",
+                    "name": "idx_ngrams",
+                    "fieldNames": [["body"]],
+                    "properties": {"tokenizer": "ngrams", "ngram_size": "3"},
+                },
+            ]
+        }
+
+        decoded = MockDataClass.from_json(json.dumps(indexes_json))
+        self.assertEqual(
+            [index.type() for index in decoded.indexes],
+            [Index.IndexType.DATA_SKIPPING_TEXT] * 2,
+        )
+        self.assertEqual(decoded.indexes[0].properties(), {"tokenizer": "tokens"})
+        self.assertEqual(
+            decoded.indexes[1].properties(),
+            {"tokenizer": "ngrams", "ngram_size": "3"},
+        )
+        self.assertDictEqual(json.loads(decoded.to_json()), indexes_json)
+
     def test_text_index_properties_round_trip(self):
         index_json = {
             "indexType": "DATA_SKIPPING_TEXT",
