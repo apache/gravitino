@@ -21,7 +21,6 @@ import java.util.Properties;
 import java.util.concurrent.ExecutionException;
 import kafka.cluster.EndPoint;
 import kafka.server.KafkaConfig;
-import kafka.server.KafkaConfig$;
 import kafka.server.KafkaServer;
 import org.apache.commons.io.FileUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -86,7 +85,7 @@ public class KafkaEmbedded {
 
   /** The ZooKeeper connection string aka `zookeeper.connect`. */
   public String zookeeperConnect() {
-    return effectiveConfig.getProperty("zookeeper.connect");
+    return effectiveConfig.getProperty(BrokerConfigKeys.ZOOKEEPER_CONNECT);
   }
 
   /** Stop the broker. */
@@ -106,14 +105,14 @@ public class KafkaEmbedded {
 
   private Properties effectiveConfigFrom(final Properties initialConfig) {
     final Properties effectiveConfig = new Properties();
-    effectiveConfig.put(KafkaConfig$.MODULE$.BrokerIdProp(), 0);
-    effectiveConfig.put(KafkaConfig$.MODULE$.NumPartitionsProp(), 1);
-    effectiveConfig.put(KafkaConfig$.MODULE$.AutoCreateTopicsEnableProp(), true);
-    effectiveConfig.put(KafkaConfig$.MODULE$.MessageMaxBytesProp(), 1000000);
-    effectiveConfig.put(KafkaConfig$.MODULE$.ControlledShutdownEnableProp(), true);
+    effectiveConfig.put(BrokerConfigKeys.BROKER_ID, 0);
+    effectiveConfig.put(BrokerConfigKeys.NUM_PARTITIONS, 1);
+    effectiveConfig.put(BrokerConfigKeys.AUTO_CREATE_TOPICS_ENABLE, true);
+    effectiveConfig.put(BrokerConfigKeys.MESSAGE_MAX_BYTES, 1000000);
+    effectiveConfig.put(BrokerConfigKeys.CONTROLLED_SHUTDOWN_ENABLE, true);
 
     effectiveConfig.putAll(initialConfig);
-    effectiveConfig.setProperty(KafkaConfig$.MODULE$.LogDirProp(), LOG_DIR);
+    effectiveConfig.setProperty(BrokerConfigKeys.LOG_DIR, LOG_DIR);
     return effectiveConfig;
   }
 }

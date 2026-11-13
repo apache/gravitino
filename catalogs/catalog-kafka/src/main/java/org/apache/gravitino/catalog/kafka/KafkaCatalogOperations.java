@@ -100,6 +100,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   private static final String DEFAULT_SCHEMA_NAME = "default";
   @VisibleForTesting static final String CLIENT_ID_TEMPLATE = "%s-%s.%s";
 
+  // Kafka resolves "${provider:path:key}" placeholders in client configs through the providers
+  // named by "config.providers". Those providers read the Gravitino server's own environment
+  // variables and files, so they must not be selectable through catalog properties.
+  @VisibleForTesting static final String CONFIG_PROVIDERS_KEY = "config.providers";
+
   private final EntityStore store;
   private final IdGenerator idGenerator;
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
@@ -143,6 +148,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
                 Collectors.toMap(
                     e -> e.getKey().substring(CATALOG_BYPASS_PREFIX.length()),
                     Map.Entry::getValue));
+    checkNoConfigProviders(config);
     adminClientConfig.putAll(bypassConfigs);
     adminClientConfig.put(
         AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
@@ -639,5 +645,29 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     } catch (IOException ioe) {
       throw ExceptionMessages.wrap("Failed to create default schema for Kafka catalog", ioe);
     }
+  }
+
+  /**
+   * Rejects Kafka config provider properties passed through the bypass prefix.
+   *
+   * @param config the catalog configuration
+   * @throws IllegalArgumentException if any {@code gravitino.bypass.config.providers} property is
+   *     set
+   */
+  static void checkNoConfigProviders(Map<String, String> config) {
+    String disallowedKeys =
+        config.keySet().stream()
+            .filter(KafkaCatalogOperations::isConfigProviderKey)
+            .sorted()
+            .collect(Collectors.joining(", "));
+    Preconditions.checkArgument(
+        disallowedKeys.isEmpty(),
+        "Kafka config providers are not supported, please remove the properties: %s",
+        disallowedKeys);
+  }
+
+  private static boolean isConfigProviderKey(String key) {
+    String providersKey = CATALOG_BYPASS_PREFIX + CONFIG_PROVIDERS_KEY;
+    return key.equals(providersKey) || key.startsWith(providersKey + ".");
   }
 }

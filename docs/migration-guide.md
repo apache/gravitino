@@ -40,6 +40,50 @@ existing deployments. For database backup, schema scripts, and rollback commands
   whole Kubernetes pod CIDR, lets those clients choose the recorded address again. See
   [HTTP Server](./gravitino-server-config.md#http-server).
 
+### Kafka catalog client upgrade
+- The Kafka catalog now ships the Kafka client 3.9.2 instead of 3.4.0. The `gravitino.bypass.`
+  properties are passed to this client, so check them against the
+  [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs).
+- The Kafka catalog rejects `gravitino.bypass.config.providers` and `gravitino.bypass.config.providers.*`
+  (for example `.class` and `.param.*`), including when they come from
+  `catalogs/kafka/conf/kafka.conf`. Kafka 3.5 added an environment variable config provider, and
+  any provider can read the Gravitino server's own environment or files. In 1.3, the file and
+  directory providers could be used through these properties. After the upgrade, creating or
+  altering a catalog with them is rejected, and an existing catalog that still has them fails on
+  schema and topic operations and on `testConnection`, with an error that names the rejected
+  properties, until it is updated.
+- Before upgrading, while still on 1.3, take an inventory:
+  1. List the Kafka catalogs and the `kafka.conf` entries that set `gravitino.bypass.config.providers`.
+     Its value is a comma-separated list of provider aliases chosen by the operator, for example
+     `file`, `env`, or `fileProvider`.
+  2. For each alias, search the property values of that catalog for `${<alias>:...}` references.
+     Searching only for `${file:`, `${directory:`, or `${env:` misses custom aliases. See
+     [Kafka configuration providers](https://kafka.apache.org/39/configuration/configuration-providers/).
+  3. Record the value each reference resolves to, and whether it is a credential.
+- After upgrading to 2.0, update each affected catalog with one `alterCatalog` call that removes
+  the provider properties and replaces every reference. An `alterCatalog` call that leaves any
+  provider property in place is rejected, including a comment-only change. Until this update,
+  the catalog cannot run Kafka operations, so apply it right after the upgrade.
+  - Set a non-sensitive value, such as a timeout, as a literal value.
+  - Do not set a credential as a literal value. Bypass properties can be returned in plaintext by
+    the REST API: Gravitino masks only keys that match
+    [sensitive key keywords](./gravitino-server-config.md#sensitive-property-key-matching), so a
+    password inside `gravitino.bypass.sasl.jaas.config` is returned unchanged. With a Gravitino
+    secret provider configured, bind the whole property with `CatalogChange.setSecretBinding`
+    (REST update type `setSecretBinding`) in the same call. `setSecretBinding` is not available in
+    the 1.3 client or REST API.
+  - In `kafka.conf`, remove the provider properties and write the resolved values before starting
+    the 2.0 server. Values from this file are not stored as catalog properties, so restrict access
+    to the file if it holds credentials.
+- The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
+  configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
+  the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the
+  Gravitino JVM property `java.security.auth.login.config`, because a catalog without
+  `sasl.jaas.config` falls back to that entry. Catalogs that use `LdapLoginModule` fail to connect
+  after the upgrade, so switch them to another login module. Do not override the
+  `org.apache.kafka.disallowed.login.modules` JVM property to re-enable it: the override replaces
+  the default blocklist for every Kafka catalog in the Gravitino JVM, and everyone who can supply
+  Kafka JAAS settings could then select the module.
 ### Policies are selected through tags
 
 - Direct policy associations with metadata objects are no longer read or written at runtime.
