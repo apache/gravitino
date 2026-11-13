@@ -85,7 +85,7 @@ public class KafkaEmbedded {
 
   /** The ZooKeeper connection string aka `zookeeper.connect`. */
   public String zookeeperConnect() {
-    return effectiveConfig.getProperty("zookeeper.connect");
+    return effectiveConfig.getProperty(BrokerConfigKeys.ZOOKEEPER_CONNECT);
   }
 
   /** Stop the broker. */
@@ -105,14 +105,14 @@ public class KafkaEmbedded {
 
   private Properties effectiveConfigFrom(final Properties initialConfig) {
     final Properties effectiveConfig = new Properties();
-    effectiveConfig.put("broker.id", 0);
-    effectiveConfig.put("num.partitions", 1);
-    effectiveConfig.put("auto.create.topics.enable", true);
-    effectiveConfig.put("message.max.bytes", 1000000);
-    effectiveConfig.put("controlled.shutdown.enable", true);
+    effectiveConfig.put(BrokerConfigKeys.BROKER_ID, 0);
+    effectiveConfig.put(BrokerConfigKeys.NUM_PARTITIONS, 1);
+    effectiveConfig.put(BrokerConfigKeys.AUTO_CREATE_TOPICS_ENABLE, true);
+    effectiveConfig.put(BrokerConfigKeys.MESSAGE_MAX_BYTES, 1000000);
+    effectiveConfig.put(BrokerConfigKeys.CONTROLLED_SHUTDOWN_ENABLE, true);
 
     effectiveConfig.putAll(initialConfig);
-    effectiveConfig.setProperty("log.dir", LOG_DIR);
+    effectiveConfig.setProperty(BrokerConfigKeys.LOG_DIR, LOG_DIR);
     return effectiveConfig;
   }
 }
