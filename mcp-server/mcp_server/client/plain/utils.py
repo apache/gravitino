@@ -34,8 +34,7 @@ def encode_path_segment(segment: str) -> str:
 
 
 def extract_content_from_response(response, field: str, default="") -> str:
-    response_json = response.json(parse_float=Decimal)
-    _handle_gravitino_exception(response_json)
+    response_json = _response_content(response)
     return simplejson.dumps(response_json.get(field, default), use_decimal=True)
 
 
@@ -65,9 +64,22 @@ def extract_list_from_response(response, field: str) -> str:
 
 
 def extract_response(response) -> str:
-    response_json = response.json(parse_float=Decimal)
-    _handle_gravitino_exception(response_json)
+    response_json = _response_content(response)
     return simplejson.dumps(response_json, use_decimal=True)
+
+
+def _response_content(response):
+    try:
+        content = response.json(parse_float=Decimal)
+    except ValueError:
+        response.raise_for_status()
+        raise
+
+    if isinstance(content, dict):
+        _handle_gravitino_exception(content)
+    if not response.is_success:
+        response.raise_for_status()
+    return content
 
 
 def _handle_gravitino_exception(response: dict):

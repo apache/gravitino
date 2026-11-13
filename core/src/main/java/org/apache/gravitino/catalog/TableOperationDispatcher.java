@@ -29,6 +29,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,6 +47,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -181,55 +183,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    */
   @Override
   public Table loadTable(NameIdentifier ident) throws NoSuchTableException {
-    EntityCombinedTable entityCombinedTable =
-        TreeLockUtils.doWithTreeLock(
-            ident,
-            LockType.READ,
-            () -> {
-              // A cold external table will be loaded under its own WRITE lock below. Do not
-              // fetch it here only to discard the snapshot and fetch it again during import.
-              // Managed catalogs do not need the external import path, even without a store row.
-              if (getEntity(ident, TABLE, TableEntity.class) == null
-                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
-                return null;
-              }
-              return internalLoadTable(ident);
-            });
+    return loadAndImportTable(ident, AuditInfo.EMPTY);
+  }
 
-    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
-      // Load the schema to make sure the schema is imported.
-      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
-      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
-      schemaDispatcher.loadSchema(schemaIdent);
-
-      // Import under the table lock: the source snapshot and store write exclude local changes
-      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
-      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
-      try {
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.WRITE, () -> importTable(ident));
-      } catch (EntityAlreadyExistsException e) {
-        // HA race: another Gravitino node concurrently imported this table. Reload from the
-        // entity store to pick up the entity stored by the winning node.
-        LOG.info(
-            "Table {} was concurrently imported by another node; reloading from store.", ident);
-        entityCombinedTable =
-            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
-        if (!entityCombinedTable.imported()) {
-          throw new UnsupportedOperationException(
-              "Table managed by multiple catalogs. This may cause unexpected issues such as privilege conflicts. "
-                  + "To resolve: Remove all catalogs managing this table, then recreate one catalog to ensure single-catalog management.");
-        }
-      }
-    }
-
-    // Update the column entities in Gravitino store if the columns are different from the ones
-    // fetching from the underlying source.
-    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
-
-    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
-        .withHiddenProperties(entityCombinedTable.hiddenProperties())
-        .withImported(entityCombinedTable.imported());
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    Preconditions.checkArgument(auditInfo != null, "auditInfo must not be null");
+    return loadAndImportTable(ident, auditInfo);
   }
 
   /**
@@ -608,7 +569,118 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
     }
   }
 
-  private EntityCombinedTable importTable(NameIdentifier identifier) {
+  private Table loadAndImportTable(NameIdentifier ident, AuditInfo importAudit)
+      throws NoSuchTableException {
+    EntityCombinedTable entityCombinedTable =
+        TreeLockUtils.doWithTreeLock(
+            ident,
+            LockType.READ,
+            () -> {
+              // A cold external table will be loaded under its own WRITE lock below. Do not
+              // fetch it here only to discard the snapshot and fetch it again during import.
+              // Managed catalogs do not need the external import path, even without a store row.
+              if (getEntity(ident, TABLE, TableEntity.class) == null
+                  && !isManagedEntity(getCatalogIdentifier(ident), Capability.Scope.TABLE)) {
+                return null;
+              }
+              return internalLoadTable(ident);
+            });
+
+    if (entityCombinedTable == null || !entityCombinedTable.imported()) {
+      // Load the schema to make sure the schema is imported.
+      SchemaDispatcher schemaDispatcher = getSchemaDispatcher();
+      NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
+      schemaDispatcher.loadSchema(schemaIdent);
+
+      // Import under the table lock: the source snapshot and store write exclude local changes
+      // to this table, while sibling tables remain available. Ancestor READ locks still exclude
+      // schema drop/rename. Never reuse a snapshot read before acquiring this lock.
+      try {
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(
+                ident, LockType.WRITE, () -> importTableFromCatalog(ident, importAudit));
+      } catch (EntityAlreadyExistsException e) {
+        // A create-only import can conflict either because another Gravitino node won an HA race,
+        // or because the external identifier is already stored under another Gravitino path.
+        // Reload to distinguish a successful concurrent import from an identity conflict.
+        LOG.info(
+            "Table {} import conflicted with existing metadata; reloading from store: {}",
+            ident,
+            e.getMessage());
+        entityCombinedTable =
+            TreeLockUtils.doWithTreeLock(ident, LockType.READ, () -> internalLoadTable(ident));
+        if (!entityCombinedTable.imported()) {
+          throw retainedExternalIdentifierConflictException(ident, TABLE);
+        }
+      }
+    }
+
+    // Update the column entities in Gravitino store if the columns are different from the ones
+    // fetching from the underlying source.
+    TableEntity updatedEntity = updateColumnsIfNecessaryWhenLoad(ident, entityCombinedTable);
+    updatedEntity =
+        fillMissingCreationAudit(
+            updatedEntity,
+            TableEntity.class,
+            entityCombinedTable.tableFromCatalog().auditInfo(),
+            importAudit,
+            (current, audit) ->
+                TableEntity.builder()
+                    .withId(current.id())
+                    .withName(current.name())
+                    .withNamespace(current.namespace())
+                    .withComment(current.comment())
+                    .withProperties(current.properties())
+                    .withColumns(fillMissingColumnCreationAudit(current.columns(), audit))
+                    .withPartitioning(current.partitioning())
+                    .withDistribution(current.distribution())
+                    .withSortOrders(current.sortOrders())
+                    .withIndexes(current.indexes())
+                    .withAuditInfo(audit)
+                    .build());
+
+    return EntityCombinedTable.of(entityCombinedTable.tableFromCatalog(), updatedEntity)
+        .withHiddenProperties(entityCombinedTable.hiddenProperties())
+        .withImported(
+            entityCombinedTable.imported()
+                && (entityCombinedTable.tableFromGravitino() == null || updatedEntity != null));
+  }
+
+  private static List<ColumnEntity> fillMissingColumnCreationAudit(
+      List<ColumnEntity> columns, AuditInfo tableAudit) {
+    return columns.stream()
+        .map(
+            column -> {
+              Audit audit = column.auditInfo();
+              if (audit.creator() != null) {
+                return column;
+              }
+              return ColumnEntity.builder()
+                  .withId(column.id())
+                  .withName(column.name())
+                  .withPosition(column.position())
+                  .withDataType(column.dataType())
+                  .withComment(column.comment())
+                  .withNullable(column.nullable())
+                  .withAutoIncrement(column.autoIncrement())
+                  .withDefaultValue(column.defaultValue())
+                  .withAuditInfo(
+                      AuditInfo.builder()
+                          .withCreator(tableAudit.creator())
+                          .withCreateTime(
+                              audit.createTime() == null
+                                  ? tableAudit.createTime()
+                                  : audit.createTime())
+                          .withLastModifier(audit.lastModifier())
+                          .withLastModifiedTime(audit.lastModifiedTime())
+                          .build())
+                  .build();
+            })
+        .collect(Collectors.toList());
+  }
+
+  private EntityCombinedTable importTableFromCatalog(
+      NameIdentifier identifier, AuditInfo importAudit) {
     EntityCombinedTable table = internalLoadTable(identifier);
 
     if (table.imported()) {
@@ -624,13 +696,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     long uid;
     if (stringId != null) {
-      // If the entity in the store doesn't match the external system, we use the data
-      // of external system to correct it.
+      // An external identifier may already be stored under another Gravitino path because the
+      // table was renamed outside Gravitino or because multiple catalogs expose one metastore.
+      // Those cases are indistinguishable here, so Gravitino must not automatically reassign the
+      // stored identity because doing so can silently move the table between paths. The create-only
+      // write below reports the conflict for manual identifier cleanup.
       LOG.warn(
-          "The Table uid {} existed but still need to be imported, this could be happened "
-              + "when Table is renamed by external systems not controlled by Gravitino. In this "
-              + "case, we need to overwrite the stored entity to keep the consistency.",
-          stringId);
+          "Table uid {} exists externally but is not imported at {}. Gravitino will use a "
+              + "create-only import; if this uid is already stored under another identifier, "
+              + "manual identifier cleanup is required.",
+          stringId,
+          identifier);
       uid = stringId.id();
     } else {
       // If entity doesn't exist, we import the entity from the external system.
@@ -644,6 +720,9 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withLastModifier(table.auditInfo().lastModifier())
             .withLastModifiedTime(table.auditInfo().lastModifiedTime())
             .build();
+    if (audit.creator() == null) {
+      audit = audit.merge(importAudit, false /* overwrite */);
+    }
     List<ColumnEntity> columnEntityList =
         toColumnEntities(table.tableFromCatalog().columns(), audit);
     TableEntity tableEntity =
@@ -655,11 +734,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             .withAuditInfo(audit)
             .build();
     try {
-      // Overwrite only with the id stored in the catalog: it identifies the table, so a row under
-      // the same name with another id is stale and gets replaced. A generated id identifies
-      // nothing, so a row that appeared meanwhile, e.g. from a concurrent import on another node,
-      // must win. The plain insert then conflicts, and loadTable reloads that row.
-      store.put(tableEntity, stringId != null);
+      // Never overwrite imported table metadata. In particular, an overwrite by stable ID can
+      // silently change schema or catalog ownership and make existing privileges refer to the
+      // wrong path.
+      store.put(tableEntity, false);
     } catch (EntityAlreadyExistsException e) {
       throw e;
     } catch (OptimisticLockException e) {
@@ -790,7 +868,34 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // If the table is managed by Gravitino, we don't need to create TableEntity and store it again.
     if (catalogResult.managed) {
-      return EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      // ManagedTableOperations persists the server-issued ID on insertion and preserves the old
+      // ID when returning an existing table. Inspect the unmasked snapshot: the public properties
+      // omit this reserved identifier. Do not infer creation from the presence of an owner.
+      StringIdentifier persistedId = StringIdentifier.fromProperties(table.properties());
+      EntityCombinedTable result =
+          EntityCombinedTable.of(table).withHiddenProperties(catalogResult.hiddenProperties);
+      long persistedTableId;
+      if (persistedId != null) {
+        persistedTableId = persistedId.id();
+      } else {
+        // Custom managed connectors may omit reserved properties from their returned Table. Read
+        // the stored identity in that case; absence or a replacement cannot prove this request
+        // created the object. Never require an extra connector read after external creation.
+        try {
+          persistedTableId = store.get(ident, TABLE, TableEntity.class).id();
+        } catch (NoSuchEntityException e) {
+          return result;
+        } catch (IOException e) {
+          throw new GravitinoRuntimeException(
+              e,
+              "Table %s was returned by the catalog, but its stored creation identity could not be read. "
+                  + "Check the entity store before retrying or assigning ownership.",
+              ident);
+        }
+      }
+      return persistedTableId == catalogResult.id
+          ? result.withCreatedTableId(catalogResult.id)
+          : result;
     }
 
     AuditInfo audit =
@@ -831,6 +936,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
     // Merge both the metadata from catalog operation and the metadata from entity store.
     return EntityCombinedTable.of(table, tableEntity)
+        .withCreatedTableId(tableEntity.id())
         .withHiddenProperties(catalogResult.hiddenProperties);
   }
 

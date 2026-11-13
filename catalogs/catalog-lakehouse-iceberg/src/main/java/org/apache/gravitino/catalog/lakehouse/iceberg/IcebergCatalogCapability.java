@@ -25,6 +25,7 @@ import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 public class IcebergCatalogCapability implements Capability {
 
   private final String schemaSeparator;
+  private final boolean hiveBackend;
 
   /**
    * Creates a capability with the given external schema separator.
@@ -32,7 +33,18 @@ public class IcebergCatalogCapability implements Capability {
    * @param schemaSeparator the external separator used in logical schema names (e.g. {@code ":"})
    */
   public IcebergCatalogCapability(String schemaSeparator) {
+    this(schemaSeparator, false);
+  }
+
+  /**
+   * Creates a capability with the given external schema separator and backend behavior.
+   *
+   * @param schemaSeparator the external separator used in logical schema names (e.g. {@code ":"})
+   * @param hiveBackend whether the Iceberg catalog uses Hive as its backend
+   */
+  public IcebergCatalogCapability(String schemaSeparator, boolean hiveBackend) {
     this.schemaSeparator = schemaSeparator;
+    this.hiveBackend = hiveBackend;
   }
 
   @Override
@@ -46,6 +58,15 @@ public class IcebergCatalogCapability implements Capability {
   public CapabilityResult supportsHierarchicalSchema() {
     // Iceberg namespaces can be multi-level, so Iceberg supports hierarchical (nested) schemas.
     return CapabilityResult.SUPPORTED;
+  }
+
+  @Override
+  public CapabilityResult caseSensitiveOnName(Scope scope) {
+    if (hiveBackend && (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.VIEW)) {
+      return CapabilityResult.unsupported(
+          "The Iceberg Hive backend is case insensitive for schemas, tables, and views.");
+    }
+    return Capability.super.caseSensitiveOnName(scope);
   }
 
   /**

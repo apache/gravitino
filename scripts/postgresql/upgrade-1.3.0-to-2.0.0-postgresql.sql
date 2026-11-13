@@ -18,6 +18,25 @@
 --
 
 
+-- Preserve retired registrations while keeping each external ID unique among active rows.
+ALTER TABLE schema_meta
+    DROP CONSTRAINT IF EXISTS schema_meta_pkey,
+    ADD CONSTRAINT schema_meta_pkey PRIMARY KEY (schema_id, deleted_at);
+
+ALTER TABLE table_meta
+    DROP CONSTRAINT IF EXISTS table_meta_pkey,
+    ADD CONSTRAINT table_meta_pkey PRIMARY KEY (table_id, deleted_at);
+
+ALTER TABLE topic_meta
+    DROP CONSTRAINT IF EXISTS topic_meta_pkey,
+    ADD CONSTRAINT topic_meta_pkey PRIMARY KEY (topic_id, deleted_at);
+
+ALTER TABLE view_meta
+    DROP CONSTRAINT IF EXISTS view_meta_pkey,
+    ADD CONSTRAINT view_meta_pkey PRIMARY KEY (view_id, deleted_at);
+
+
+
 
 
 
@@ -365,3 +384,173 @@ COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name 
 COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
 COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
 COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';
+
+-- Clear governance attached to retired external registrations before their IDs can be reused.
+-- A retry must preserve relationships attached to a new active registration of the same ID.
+UPDATE owner_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT),
+    updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE role_meta_securable_object r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE tag_relation_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE statistic_meta r
+SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+CREATE TABLE IF NOT EXISTS domain_meta (
+    domain_id BIGINT NOT NULL,
+    domain_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    domain_comment VARCHAR(256) DEFAULT '',
+    domain_status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    backing_tag_id BIGINT DEFAULT NULL,
+    backing_tag_value VARCHAR(256) DEFAULT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (domain_id),
+    UNIQUE (metalake_id, domain_name, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS domain_meta_idx_backing_tag ON domain_meta (metalake_id, backing_tag_id, backing_tag_value, deleted_at);
+COMMENT ON TABLE domain_meta IS 'domain metadata';
+COMMENT ON COLUMN domain_meta.domain_id IS 'domain id';
+COMMENT ON COLUMN domain_meta.domain_name IS 'domain name';
+COMMENT ON COLUMN domain_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN domain_meta.domain_comment IS 'domain comment';
+COMMENT ON COLUMN domain_meta.domain_status IS 'domain status, DRAFT or PUBLISHED';
+COMMENT ON COLUMN domain_meta.backing_tag_id IS 'id of the backing tag, NULL if the domain has none';
+COMMENT ON COLUMN domain_meta.backing_tag_value IS 'value of the backing tag, NULL binds the tag without a value';
+COMMENT ON COLUMN domain_meta.properties IS 'domain properties';
+COMMENT ON COLUMN domain_meta.audit_info IS 'domain audit info';
+COMMENT ON COLUMN domain_meta.current_version IS 'domain current version';
+COMMENT ON COLUMN domain_meta.last_version IS 'domain last version';
+COMMENT ON COLUMN domain_meta.deleted_at IS 'domain deleted at';
+
+CREATE TABLE IF NOT EXISTS domain_rel (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    metalake_id BIGINT NOT NULL,
+    parent_id BIGINT NOT NULL,
+    child_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_dr_ci_del UNIQUE (child_id, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS domain_rel_idx_parent ON domain_rel (parent_id, deleted_at);
+CREATE INDEX IF NOT EXISTS domain_rel_idx_metalake ON domain_rel (metalake_id, deleted_at);
+COMMENT ON TABLE domain_rel IS 'domain parent relation';
+COMMENT ON COLUMN domain_rel.id IS 'auto increment id';
+COMMENT ON COLUMN domain_rel.metalake_id IS 'metalake id';
+COMMENT ON COLUMN domain_rel.parent_id IS 'parent domain id';
+COMMENT ON COLUMN domain_rel.child_id IS 'sub-domain id';
+COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
+COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
+COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
+COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';

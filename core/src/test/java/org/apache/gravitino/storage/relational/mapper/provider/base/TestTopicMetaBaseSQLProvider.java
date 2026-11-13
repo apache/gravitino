@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +55,9 @@ class TestTopicMetaBaseSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = PROVIDER.softDeleteTopicMetasByTopicId(null, null);
+    String sql = PROVIDER.softDeleteTopicMetasByTopicId(null, null, null, null, null);
+    assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    assertTrue(sql.contains("AND topic_name = #{topicName}"));
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));

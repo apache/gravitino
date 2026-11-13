@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.iceberg.integration.test;
 
+import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable.DEFAULT_ICEBERG_PROVIDER;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_AVRO_FILE_FORMAT;
 import static org.apache.gravitino.catalog.lakehouse.iceberg.IcebergTable.ICEBERG_ORC_FILE_FORMAT;
@@ -259,6 +260,44 @@ public abstract class CatalogIcebergBaseIT extends BaseIT {
     Assertions.assertEquals(createdCatalog, loadCatalog);
 
     catalog = loadCatalog;
+  }
+
+  @Test
+  void testRecreateTableAfterExternalDropDoesNotInheritGovernance() {
+    NameIdentifier identifier = NameIdentifier.of(schemaName, tableName);
+    TableIdentifier sourceIdentifier =
+        TableIdentifier.of(IcebergCatalogWrapperHelper.getIcebergNamespace(schemaName), tableName);
+    Column[] columns = new Column[] {Column.of("value", Types.IntegerType.get())};
+    TableCatalog tables = catalog.asTableCatalog();
+    Table original =
+        tables.createTable(
+            identifier, columns, "original", Collections.emptyMap(), new Transform[0]);
+    String oldId = icebergCatalog.loadTable(sourceIdentifier).properties().get(ID_KEY);
+    Assertions.assertNotNull(oldId);
+
+    String tagName = GravitinoITUtils.genRandomName("old_table_tag");
+    metalake.createTag(tagName, "old registration", Collections.emptyMap());
+    try {
+      original.supportsTags().associateTags(new String[] {tagName}, null);
+      Assertions.assertEquals(1, metalake.getTag(tagName).associatedObjects().objects().length);
+
+      // Bypass Gravitino exactly as an external REST client would (issue #14865). Its old
+      // metadata registration remains live when the source table is dropped without purging.
+      Assertions.assertTrue(icebergCatalog.dropTable(sourceIdentifier, false));
+      Assertions.assertDoesNotThrow(
+          () ->
+              tables.createTable(
+                  identifier, columns, "replacement", Collections.emptyMap(), new Transform[0]));
+      String newId = icebergCatalog.loadTable(sourceIdentifier).properties().get(ID_KEY);
+      Assertions.assertNotNull(newId);
+      Assertions.assertNotEquals(oldId, newId);
+      Table loaded = Assertions.assertDoesNotThrow(() -> tables.loadTable(identifier));
+      Assertions.assertEquals("replacement", loaded.comment());
+      Assertions.assertEquals(0, loaded.supportsTags().listTags().length);
+      Assertions.assertEquals(0, metalake.getTag(tagName).associatedObjects().objects().length);
+    } finally {
+      metalake.deleteTag(tagName);
+    }
   }
 
   @Test

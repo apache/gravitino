@@ -180,7 +180,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   // BaseGVFSOperations
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
-  private final ThreadPoolExecutor fileSystemExecutor =
+  @VisibleForTesting
+  final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
           Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 16)),
           Math.max(2, Math.min(Runtime.getRuntime().availableProcessors() * 2, 32)),
@@ -1475,7 +1476,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         new FileSystemCacheKey(scheme, authority),
         cacheKey -> {
           try {
-            return getFileSystem(path, conf);
+            // Create the file system for the user it is cached under.
+            return getFileSystem(path, conf, cacheKey.currentUser);
           } catch (IOException e) {
             throw new GravitinoRuntimeException(
                 e, "Failed to get FileSystem for fileset: path: %s", path);
@@ -1492,6 +1494,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+    // Read the user here: a pool thread keeps the Subject of the request that started it.
+    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName());
+  }
+
+  FileSystem getFileSystem(Path path, Map<String, String> config, String user) throws IOException {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1518,7 +1525,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     try {
       return executeFileSystemTask(
-          () -> createFileSystem(path, config, scheme, provider), timeoutSeconds);
+          () -> createFileSystem(path, config, scheme, provider, user), timeoutSeconds);
     } catch (TimeoutException e) {
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
@@ -1622,6 +1629,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           String.format("Fileset connection testing does not support scheme %s", scheme));
     }
 
+    // Read the user here: a pool thread keeps the Subject of the request that started it.
+    String user = PrincipalUtils.getCurrentUserName();
     String credentialHandle = null;
     try {
       credentialHandle = addVendedCredential(path, scheme, fileSystemProvider, probeConf);
@@ -1635,7 +1644,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       executeFileSystemTask(
           () -> {
             try (FileSystem fileSystem =
-                createProbeFileSystem(path, probeConf, scheme, fileSystemProvider)) {
+                createProbeFileSystem(path, probeConf, scheme, fileSystemProvider, user)) {
               Path qualifiedPath =
                   path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
               try {
@@ -1738,21 +1747,29 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         credentialManagerSupplier.get(), "Catalog credential manager must not be null");
   }
 
-  private FileSystem createFileSystem(
-      Path path, Map<String, String> config, String scheme, FileSystemProvider provider)
+  @VisibleForTesting
+  FileSystem createFileSystem(
+      Path path,
+      Map<String, String> config,
+      String scheme,
+      FileSystemProvider provider,
+      String user)
       throws IOException {
     if (scheme.equals(SCHEME_HDFS)) {
-      return new ImpersonationHDFSFileSystemProxy(path, config, PrincipalUtils::getCurrentUserName)
-          .getProxy();
+      return new ImpersonationHDFSFileSystemProxy(path, config, () -> user).getProxy();
     }
     return provider.getFileSystem(path, config);
   }
 
   private FileSystem createProbeFileSystem(
-      Path path, Map<String, String> config, String scheme, FileSystemProvider provider)
+      Path path,
+      Map<String, String> config,
+      String scheme,
+      FileSystemProvider provider,
+      String user)
       throws IOException {
     try {
-      return createFileSystem(path, config, scheme, provider);
+      return createFileSystem(path, config, scheme, provider, user);
     } catch (Exception e) {
       throw new ProbeInitializationException(e);
     }

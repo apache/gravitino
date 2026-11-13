@@ -175,3 +175,8 @@ user is allowed to read.
 Tags can be created, attached, and read over REST and through the Java and Python clients, which is
 also the only way to tag views, filesets, topics, models, and functions today. Endpoints, payload
 shapes, and worked examples are in [Manage Tags](./manage-tags-in-gravitino.md).
+
+[Domains](./domains.md) use explicit backing tags to derive business membership from these same
+assignments, including catalog/schema inheritance. See
+[Manage domains](./manage-domains-in-gravitino.md#backing-tag-operations) for binding conflicts,
+tag identity and the separation of Domain and tag permissions.

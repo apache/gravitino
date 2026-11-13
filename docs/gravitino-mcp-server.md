@@ -11,7 +11,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 
 ## Requirements
 
-1. Python 3.10+
+1. Python 3.11+
 2. uv is installed. Install uv by following the [official guide](https://docs.astral.sh/uv/getting-started/installation/).
 
 ## Usage
@@ -239,6 +239,57 @@ an ordered, non-empty `updates` array. Supported `@type` values are `rename`,
 
 `drop_semantic_model` takes the model's catalog, schema, and name and returns a JSON boolean
 indicating whether it was dropped. It removes semantic metadata without deleting source tables or data.
+
+### Domains (read-only)
+
+See [Domains](./domains.md) for membership semantics and the
+[Domain guide](./manage-domains-in-gravitino.md) for SDK and REST mutations.
+
+Use `--include-tool-tags domain` to expose the five Domain tools.
+All are annotated as read-only and idempotent and issue only GET requests.
+
+| Tool | Arguments | Result |
+|------|-----------|--------|
+| `list_of_domains` | `details=true` | Domain snapshots, or names when false |
+| `get_domain_by_name` | `domain_name` | A complete domain snapshot |
+| `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
+| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains` | Recorded leaf members with all applicable relations |
+| `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
+
+Results follow the existing MCP JSON-string convention; empty lists return `[]`.
+Snapshots retain the server's backing tag, status, parent, properties, audit and
+relation information. Relations can be `direct`, `inherited` (with the catalog or
+schema source), or `via_subdomain` (with the source domain). Multiple relations
+for the same member or domain remain intact. Names-only results omit relations.
+
+For example, call `list_domain_members` with:
+
+```json
+{
+  "domain_name": "sales",
+  "types": ["TABLE", "TOPIC"],
+  "domains": ["regional-sales", "online"],
+  "name_contains": "orders"
+}
+```
+
+`types` is a list of leaf object types; `domains` selects the union of named scopes using repeated query parameters.
+Selecting the requested domain includes its visible children. Well-formed names outside that scope are ignored.
+`name_contains` matches a case-insensitive substring of the full metadata object name.
+If `name_contains` is omitted, empty, or contains only whitespace, MCP omits the
+`nameContains` query parameter. Sending an empty or whitespace-only `nameContains`
+directly to the REST endpoint returns HTTP 400.
+Omitted or empty type/domain lists leave those filters unset.
+Leaf lookups support tables, filesets, topics, models, views and semantic models;
+use the REST object type spelling (for example `table` or `semantic_model`).
+Paths and filter values are URL encoded. Requests use the caller's existing
+Gravitino authentication, and server authorization, validation and not-found
+errors propagate through the standard MCP error handling. Results reflect the
+caller's visibility; no client-side hierarchy expansion or relation inference
+is performed.
+
+No Domain creation, modification, deletion, publishing, parent changes or
+binding changes are exposed. Existing tools in other groups retain their behavior.
 
 ## Configuration
 

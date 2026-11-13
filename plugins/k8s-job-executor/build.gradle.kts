@@ -30,9 +30,25 @@ val shadedJarTest: SourceSet by sourceSets.creating
 val shadedJarTestImplementation: Configuration by configurations.getting
 val shadedJarTestRuntimeOnly: Configuration by configurations.getting
 
+// Keeps the Jackson line brought in by fabric8 on its latest patch release. The BOM sits in a
+// dedicated configuration so that it only applies to this module and is not exported to the
+// modules that depend on it.
+val jacksonBom: Configuration by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = false
+}
+listOf(
+  "compileClasspath",
+  "runtimeClasspath",
+  "testCompileClasspath",
+  "testRuntimeClasspath"
+).forEach {
+  configurations.named(it) { extendsFrom(jacksonBom) }
+}
 dependencies {
   annotationProcessor(libs.lombok)
 
+  jacksonBom(platform(libs.jackson.bom.v218))
   // Provided by the Gravitino server at runtime, never bundled into the shaded jar.
   compileOnly(project(":api"))
   compileOnly(project(":common"))

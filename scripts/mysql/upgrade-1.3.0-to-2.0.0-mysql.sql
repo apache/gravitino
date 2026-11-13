@@ -17,6 +17,69 @@
 -- under the License.
 --
 
+
+-- Preserve retired registrations while keeping each external ID unique among active rows.
+SET @ddl = IF((SELECT COUNT(*) = 2 AND SUM(
+        (seq_in_index = 1 AND column_name = 'schema_id') OR
+        (seq_in_index = 2 AND column_name = 'deleted_at')) = 2
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'schema_meta' AND index_name = 'PRIMARY'),
+    'SELECT 1',
+    IF((SELECT COUNT(*) = 1 AND MAX(column_name) = 'schema_id'
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'schema_meta' AND index_name = 'PRIMARY'),
+        'ALTER TABLE `schema_meta` DROP PRIMARY KEY, ADD PRIMARY KEY (`schema_id`, `deleted_at`)',
+        'ALTER TABLE `schema_meta` ADD PRIMARY KEY (`schema_id`, `deleted_at`)'));
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF((SELECT COUNT(*) = 2 AND SUM(
+        (seq_in_index = 1 AND column_name = 'table_id') OR
+        (seq_in_index = 2 AND column_name = 'deleted_at')) = 2
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'PRIMARY'),
+    'SELECT 1',
+    IF((SELECT COUNT(*) = 1 AND MAX(column_name) = 'table_id'
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'table_meta' AND index_name = 'PRIMARY'),
+        'ALTER TABLE `table_meta` DROP PRIMARY KEY, ADD PRIMARY KEY (`table_id`, `deleted_at`)',
+        'ALTER TABLE `table_meta` ADD PRIMARY KEY (`table_id`, `deleted_at`)'));
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF((SELECT COUNT(*) = 2 AND SUM(
+        (seq_in_index = 1 AND column_name = 'topic_id') OR
+        (seq_in_index = 2 AND column_name = 'deleted_at')) = 2
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'PRIMARY'),
+    'SELECT 1',
+    IF((SELECT COUNT(*) = 1 AND MAX(column_name) = 'topic_id'
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'topic_meta' AND index_name = 'PRIMARY'),
+        'ALTER TABLE `topic_meta` DROP PRIMARY KEY, ADD PRIMARY KEY (`topic_id`, `deleted_at`)',
+        'ALTER TABLE `topic_meta` ADD PRIMARY KEY (`topic_id`, `deleted_at`)'));
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = IF((SELECT COUNT(*) = 2 AND SUM(
+        (seq_in_index = 1 AND column_name = 'view_id') OR
+        (seq_in_index = 2 AND column_name = 'deleted_at')) = 2
+    FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'view_meta' AND index_name = 'PRIMARY'),
+    'SELECT 1',
+    IF((SELECT COUNT(*) = 1 AND MAX(column_name) = 'view_id'
+        FROM information_schema.statistics
+        WHERE table_schema = DATABASE() AND table_name = 'view_meta' AND index_name = 'PRIMARY'),
+        'ALTER TABLE `view_meta` DROP PRIMARY KEY, ADD PRIMARY KEY (`view_id`, `deleted_at`)',
+        'ALTER TABLE `view_meta` ADD PRIMARY KEY (`view_id`, `deleted_at`)'));
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+
 -- MySQL has no ADD COLUMN / CREATE INDEX IF NOT EXISTS. Guard completed DDL
 -- so a failed upgrade can be restarted from the beginning without --force.
 -- Keep each operation in this session; no stored routines or extra privileges are required.
@@ -712,3 +775,151 @@ CREATE TABLE IF NOT EXISTS `semantic_model_source_rel` (
     KEY `idx_smsr_deleted_at` (`deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin
   COMMENT 'current semantic model dataset source associations';
+
+-- Clear governance attached to retired external registrations before their IDs can be reused.
+-- A retry must preserve relationships attached to a new active registration of the same ID.
+UPDATE owner_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+    updated_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE role_meta_securable_object r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE tag_relation_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE statistic_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain metadata';
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';

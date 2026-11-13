@@ -116,6 +116,7 @@ dependencies {
   implementation(libs.guava)
 
   constraints {
+    implementation(libs.postgresql.driver)
     implementation(libs.snakeyaml)
     implementation(libs.woodstox.core)
   }

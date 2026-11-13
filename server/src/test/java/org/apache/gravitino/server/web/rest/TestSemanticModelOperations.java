@@ -213,9 +213,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
     viewsSupported = true;
     sourceAuthorizer = new PassThroughAuthorizer();
     Table table = registeredTable();
-    Column column = mock(Column.class);
-    when(column.name()).thenReturn("order_id");
-    when(table.columns()).thenReturn(new Column[] {column});
     when(tables.loadTable(any())).thenReturn(table);
     when(dispatcher.loadSemanticModel(any())).thenReturn(semanticModel("sales", null));
     doCallRealMethod().when(dispatcher).importOssieDocument(any(), any(), any());
@@ -287,7 +284,7 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "denied", "connection", "column"})
+  @ValueSource(strings = {"missing", "denied", "connection"})
   void testOssieImportValidatesSourcesBeforePersistence(String failure) {
     String yaml =
         "version: 0.2.0.dev0\nname: sales\ndatasets:\n"
@@ -314,12 +311,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         code = ErrorConstants.CONNECTION_FAILED_CODE;
         type = ConnectionFailedException.class;
         message = "offline";
-        break;
-      case "column":
-        Table table = registeredTable();
-        when(table.columns()).thenReturn(new Column[0]);
-        when(tables.loadTable(any())).thenReturn(table);
-        message = "order_id";
         break;
       default:
         throw new AssertionError(failure);
@@ -728,9 +719,6 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
     // The original table was renamed and another table now uses its previous name.
     Table replacementTable = registeredTable(202L);
-    Column column = mock(Column.class);
-    when(column.name()).thenReturn("order_id");
-    when(replacementTable.columns()).thenReturn(new Column[] {column});
     when(tables.loadTable(any())).thenReturn(replacementTable);
     SemanticModelDefinition replacement = original;
     if (metricOnlyChange) {
@@ -1016,17 +1004,21 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
 
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
-  void testMissingColumnWithAuthorizationDisabled(boolean replaceDefinition) {
+  void testSourceColumnMetadataIsNotConsulted(boolean replaceDefinition) {
+    // Keys and relationship columns resolve to declared dataset fields, so source column
+    // metadata is never read during source validation.
     Table table = registeredTable();
     when(table.columns()).thenReturn(new Column[0]);
     when(tables.loadTable(any())).thenReturn(table);
-    assertError(
-        writeDefinition(replaceDefinition, semanticModelDefinition()),
-        Response.Status.BAD_REQUEST,
-        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
-        IllegalSemanticModelException.class.getSimpleName(),
-        "order_id");
-    verifyNoModelWrites();
+    when(dispatcher.createSemanticModel(any(), any(), any(), any(), any()))
+        .thenReturn(semanticModel("sales", null));
+    when(dispatcher.alterSemanticModel(any(), any(), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("sales", null));
+    Assertions.assertEquals(
+        Response.Status.OK.getStatusCode(),
+        writeDefinition(replaceDefinition, semanticModelDefinition()).getStatus());
+    verify(table, never()).columns();
+    verifyNoInteractions(views);
   }
 
   @ParameterizedTest

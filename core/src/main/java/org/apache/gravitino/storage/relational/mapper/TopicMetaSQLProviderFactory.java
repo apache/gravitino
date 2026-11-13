@@ -124,15 +124,23 @@ public class TopicMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that soft-deletes a topic by ID and expected version.
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
    *
-   * @param topicId the topic ID
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked delete SQL
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
+   * @return the guarded soft-delete SQL
    */
   public static String softDeleteTopicMetasByTopicId(
-      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion);
+      @Param("topicId") Long topicId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName) {
+    return getProvider()
+        .softDeleteTopicMetasByTopicId(topicId, currentVersion, catalogId, schemaId, topicName);
   }
 
   public static String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

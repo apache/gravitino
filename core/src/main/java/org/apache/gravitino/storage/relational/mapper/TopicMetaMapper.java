@@ -89,17 +89,24 @@ public interface TopicMetaMapper {
       @Param("schemaId") Long schemaId, @Param("topicName") String name);
 
   /**
-   * Soft-deletes a topic only if its version has not changed since the caller read it.
+   * Soft-deletes an observed topic registration in the same catalog lifetime.
    *
-   * @param topicId the topic ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the topic changed or disappeared
+   * @param topicId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param topicName the observed topic name
+   * @return the number of affected rows
    */
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,
       method = "softDeleteTopicMetasByTopicId")
   Integer softDeleteTopicMetasByTopicId(
-      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion);
+      @Param("topicId") Long topicId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("topicName") String topicName);
 
   @UpdateProvider(
       type = TopicMetaSQLProviderFactory.class,

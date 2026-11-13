@@ -33,7 +33,7 @@ from gravitino.dto.responses.tag_response import (
     TagResponse,
 )
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import encode_metadata_object_name, encode_string
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -65,7 +65,7 @@ class MetadataObjectTagOperations(SupportsTags):
         self.tag_request_path = MetadataObjectTagOperations.TAG_REQUEST_PATH.format(
             encode_string(metalake_name),
             metadata_object.type().name.lower(),
-            encode_string(metadata_object.full_name()),
+            encode_metadata_object_name(metadata_object),
         )
 
     def list_tags(self) -> list[str]:

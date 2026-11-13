@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +27,10 @@ class TestViewMetaPostgreSQLProvider {
 
   @Test
   void testDirectDeleteUsesVersionCas() {
-    String sql = new ViewMetaPostgreSQLProvider().softDeleteViewMetasByViewId(null, null);
+    String sql =
+        new ViewMetaPostgreSQLProvider().softDeleteViewMetasByViewId(null, null, null, null, null);
+    assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    assertTrue(sql.contains("AND view_name = #{viewName}"));
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
