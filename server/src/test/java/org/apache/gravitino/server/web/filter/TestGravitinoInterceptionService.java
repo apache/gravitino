@@ -34,9 +34,11 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.security.Principal;
 import java.security.PrivilegedExceptionAction;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -105,7 +107,10 @@ import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
+import org.apache.gravitino.server.web.rest.DomainOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
@@ -244,6 +249,55 @@ public class TestGravitinoInterceptionService {
       assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
       verify(malformedRequest, never()).getName();
       verify(invocation, never()).proceed();
+    }
+  }
+
+  /** Verifies that every Domain endpoint rejects non-members before dispatch. */
+  @Test
+  public void testDomainEndpointsValidateMetalakeMembershipBeforeDispatch() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principals = mockStatic(PrincipalUtils.class);
+        MockedStatic<AuthorizationUtils> authorization = mockStatic(AuthorizationUtils.class)) {
+      principals.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+      authorization
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.eq("metalake"),
+                      ArgumentMatchers.eq("tester"),
+                      any(AuthorizationRequestContext.class)))
+          .thenThrow(new ForbiddenException("Not a member"));
+      GravitinoInterceptionService service = new GravitinoInterceptionService();
+      for (Class<?> resource :
+          Arrays.asList(
+              DomainOperations.class,
+              DomainMembershipOperations.class,
+              MetadataObjectDomainOperations.class)) {
+        Descriptor descriptor = mock(Descriptor.class);
+        when(descriptor.getImplementation()).thenReturn(resource.getName());
+        Assertions.assertTrue(service.getDescriptorFilter().matches(descriptor));
+        for (Method method : resource.getDeclaredMethods()) {
+          if (method.getReturnType() != Response.class
+              || !Modifier.isPublic(method.getModifiers())) {
+            continue;
+          }
+          Assertions.assertNotNull(method.getAnnotation(AuthorizationExpression.class));
+          Object[] args = new Object[method.getParameterCount()];
+          for (int index = 0; index < args.length; index++) {
+            AuthorizationMetadata metadata =
+                method.getParameters()[index].getAnnotation(AuthorizationMetadata.class);
+            if (metadata != null && metadata.type() == Entity.EntityType.METALAKE) {
+              args[index] = "metalake";
+            }
+          }
+          MethodInvocation invocation = mock(MethodInvocation.class);
+          when(invocation.getMethod()).thenReturn(method);
+          when(invocation.getArguments()).thenReturn(args);
+          Response response =
+              (Response) service.getMethodInterceptors(method).get(0).invoke(invocation);
+          assertEquals(403, response.getStatus());
+          verify(invocation, never()).proceed();
+        }
+      }
     }
   }
 
@@ -674,6 +728,39 @@ public class TestGravitinoInterceptionService {
       Assertions.assertFalse(error.getMessage().contains("system internal error"));
     }
     verify(invocation, never()).proceed();
+  }
+
+  @Test
+  public void testInvalidDomainNameRejectedBeforeOwnerAndGrantAuthorization() throws Throwable {
+    Method owner =
+        OwnerOperations.class.getMethod(
+            "getOwnerForObject", String.class, String.class, String.class);
+    Method grant =
+        PermissionOperations.class.getMethod(
+            "grantPrivilegeToRole",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            PrivilegeGrantRequest.class);
+    for (Method method : new Method[] {owner, grant}) {
+      MethodInvocation invocation = mock(MethodInvocation.class);
+      when(invocation.getMethod()).thenReturn(method);
+      when(invocation.getArguments())
+          .thenReturn(
+              method.equals(owner)
+                  ? new Object[] {"metalake", "domain", "Finance "}
+                  : new Object[] {"metalake", "role", "domain", "Finance ", null});
+      MethodInterceptor interceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      try (Response response = (Response) interceptor.invoke(invocation)) {
+        assertEquals(400, response.getStatus());
+        assertEquals(
+            ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+            ((ErrorResponse) response.getEntity()).getCode());
+      }
+      verify(invocation, never()).proceed();
+    }
   }
 
   @Test

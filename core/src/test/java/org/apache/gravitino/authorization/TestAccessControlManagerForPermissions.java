@@ -46,6 +46,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -54,12 +55,14 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -451,6 +454,45 @@ public class TestAccessControlManagerForPermissions {
     Assertions.assertThrows(
         NoSuchGroupException.class,
         () -> accessControlManager.revokeRolesFromGroup(METALAKE, ROLE, notExist));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"METALAKE", "DOMAIN"})
+  void testDomainPrivilegeGrantAndRevokeStayLocal(String scope) throws IOException {
+    MetadataObject.Type type = MetadataObject.Type.valueOf(scope);
+    String name = "domain_privileges_" + scope;
+    String fullName = type == MetadataObject.Type.METALAKE ? METALAKE : "Finance_v1";
+    if (type == MetadataObject.Type.DOMAIN) {
+      entityStore.put(
+          DomainEntity.builder()
+              .withId(RandomIdGenerator.INSTANCE.nextId())
+              .withName(fullName)
+              .withNamespace(NamespaceUtil.ofDomain(METALAKE))
+              .withStatus(Domain.Status.DRAFT)
+              .withProperties(Maps.newHashMap())
+              .withAuditInfo(auditInfo)
+              .build(),
+          false);
+    }
+    entityStore.put(
+        RoleEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(name)
+            .withNamespace(AuthorizationUtils.ofRoleNamespace(METALAKE))
+            .withAuditInfo(auditInfo)
+            .withSecurableObjects(List.of())
+            .build(),
+        false);
+    PermissionManager manager = new PermissionManager(entityStore, Mockito.mock(RoleManager.class));
+    MetadataObject object = MetadataObjects.parse(fullName, type);
+    Set<Privilege> privileges =
+        Set.of(Privileges.ManageDomain.allow(), Privileges.UseDomain.deny());
+    reset(authorizationPlugin);
+    Role granted = manager.grantPrivilegesToRole(METALAKE, name, object, privileges);
+    Assertions.assertEquals(privileges, Set.copyOf(granted.securableObjects().get(0).privileges()));
+    Role revoked = manager.revokePrivilegesFromRole(METALAKE, name, object, privileges);
+    Assertions.assertTrue(revoked.securableObjects().isEmpty());
+    Mockito.verifyNoInteractions(authorizationPlugin);
   }
 
   @ParameterizedTest

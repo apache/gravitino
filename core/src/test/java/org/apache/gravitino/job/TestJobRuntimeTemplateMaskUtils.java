@@ -249,7 +249,7 @@ public class TestJobRuntimeTemplateMaskUtils {
     Assertions.assertFalse(masked.get("spark_conf").contains("jdbc-pw"));
     Assertions.assertTrue(masked.get("spark_conf").contains("1g"));
     Assertions.assertTrue(jobConf.get("updater_options").contains("arg-pw"));
-    Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(null));
+    Assertions.assertTrue(JobRuntimeTemplateMaskUtils.maskSensitiveJobConf(null).isEmpty());
   }
 
   private static SparkJobTemplateDTO sparkWithArguments(List<String> arguments) {

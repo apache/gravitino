@@ -81,9 +81,11 @@ public final class Dataset {
   }
 
   /**
-   * Returns a copy of the primary key columns.
+   * Returns a copy of the primary key field names.
    *
-   * @return The primary key columns, or {@code null} if they are not set.
+   * <p>The names refer to fields declared by this dataset, not columns of its source.
+   *
+   * @return The primary key field names, or {@code null} if they are not set.
    */
   @Nullable
   public String[] primaryKey() {
@@ -91,9 +93,11 @@ public final class Dataset {
   }
 
   /**
-   * Returns a deep copy of the unique key definitions.
+   * Returns a deep copy of the unique key field names.
    *
-   * @return The unique keys, or {@code null} if they are not set.
+   * <p>The names refer to fields declared by this dataset, not columns of its source.
+   *
+   * @return The unique key field names, or {@code null} if they are not set.
    */
   @Nullable
   public String[][] uniqueKeys() {
@@ -250,9 +254,11 @@ public final class Dataset {
     }
 
     /**
-     * Sets the optional primary key columns.
+     * Sets the optional primary key field names.
      *
-     * @param primaryKey The primary key columns, or {@code null} to leave them unset.
+     * <p>The names must refer to fields declared by this dataset, not columns of its source.
+     *
+     * @param primaryKey The primary key field names, or {@code null} to leave them unset.
      * @return This builder.
      */
     public Builder withPrimaryKey(@Nullable String[] primaryKey) {
@@ -261,9 +267,11 @@ public final class Dataset {
     }
 
     /**
-     * Sets the optional unique key definitions.
+     * Sets the optional unique key field names.
      *
-     * @param uniqueKeys The unique keys, or {@code null} to leave them unset.
+     * <p>The names must refer to fields declared by this dataset, not columns of its source.
+     *
+     * @param uniqueKeys The unique key field names, or {@code null} to leave them unset.
      * @return This builder.
      */
     public Builder withUniqueKeys(@Nullable String[][] uniqueKeys) {

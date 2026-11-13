@@ -34,8 +34,10 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.ModelEntity;
@@ -47,6 +49,7 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -144,6 +147,22 @@ public class TestSecurableObjects extends TestJDBCBackend {
         SecurableObjects.ofView(
             schemaObject, "view", Lists.newArrayList(Privileges.SelectTable.allow()));
 
+    DomainEntity domain =
+        DomainEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("Finance_v1")
+            .withNamespace(NamespaceUtil.ofDomain(metalakeName))
+            .withStatus(Domain.Status.DRAFT)
+            .withProperties(ImmutableMap.of())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(domain, false);
+    SecurableObject domainObject =
+        SecurableObjects.parse(
+            domain.name(),
+            MetadataObject.Type.DOMAIN,
+            Lists.newArrayList(Privileges.ManageDomain.allow(), Privileges.UseDomain.deny()));
+
     ArrayList<SecurableObject> securableObjects =
         Lists.newArrayList(
             metalakeObject,
@@ -153,7 +172,8 @@ public class TestSecurableObjects extends TestJDBCBackend {
             tableObject,
             filesetObject,
             topicObject,
-            viewObject);
+            viewObject,
+            domainObject);
     securableObjects.sort(Comparator.comparing(MetadataObject::fullName));
 
     RoleEntity role1 =

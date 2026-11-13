@@ -50,7 +50,12 @@ public class TestSemanticModelValidator {
             .withUniqueKeys(new String[][] {{"order_id"}, {"external_id", "source"}})
             .withFields(
                 new Field[] {
-                  field("id", expression("order_id")), field("amount", expression("amount"))
+                  field("order_id", expression("o_orderkey")),
+                  field("external_id", expression("external_id")),
+                  field("source", expression("source")),
+                  field("customer_id", expression("o_custkey")),
+                  field("tenant_id", expression("tenant_id")),
+                  field("amount", expression("amount"))
                 })
             .withCustomExtensions(new CustomExtension[] {extension})
             .build();
@@ -58,7 +63,11 @@ public class TestSemanticModelValidator {
         Dataset.builder()
             .withName("customers")
             .withSource(NameIdentifier.of("missing_catalog", "missing_schema", "customers"))
-            .withFields(new Field[] {field("id", expression("customer_id"))})
+            .withFields(
+                new Field[] {
+                  field("id", expression("customer_id")),
+                  field("tenant_id", expression("tenant_id"))
+                })
             .build();
     Relationship relationship =
         relationship(
@@ -165,6 +174,19 @@ public class TestSemanticModelValidator {
         "datasets[0].fields[1].name: duplicate field name 'id'; first declared at "
             + "datasets[0].fields[0].name");
 
+    // Field names resolve case-insensitively, so names equal ignoring case are duplicates too.
+    Dataset caseFoldedDuplicateFields =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withFields(
+                new Field[] {field("id", expression("id")), field("ID", expression("other_id"))})
+            .build();
+    assertInvalid(
+        definition(caseFoldedDuplicateFields),
+        "datasets[0].fields[1].name: duplicate field name 'id'; first declared at "
+            + "datasets[0].fields[0].name");
+
     assertDoesNotThrow(
         () ->
             SemanticModelValidator.validateDefinition(
@@ -173,8 +195,8 @@ public class TestSemanticModelValidator {
 
   @Test
   public void testRelationshipNamesAndEndpoints() {
-    Dataset orders = dataset("orders");
-    Dataset customers = dataset("customers");
+    Dataset orders = datasetWithField("orders", "customer_id");
+    Dataset customers = datasetWithField("customers", "id");
     Relationship relationship = relationship("by_customer", "orders", "customers");
 
     assertInvalid(
@@ -199,6 +221,121 @@ public class TestSemanticModelValidator {
     assertInvalid(
         definition(new Dataset[] {dataset("orders")}, null, new Metric[] {revenue, revenue}),
         "metrics[1].name: duplicate metric name 'revenue'; first declared at metrics[0].name");
+  }
+
+  @Test
+  public void testKeyReferencesResolveToDeclaredFields() {
+    Dataset aliased =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withPrimaryKey(new String[] {"Order_ID"})
+            .withUniqueKeys(new String[][] {{"order_id", "Tenant_ID"}})
+            .withFields(
+                new Field[] {
+                  field("order_id", expression("o_orderkey")),
+                  field("tenant_id", expression("o_tenantkey"))
+                })
+            .build();
+    assertDoesNotThrow(() -> SemanticModelValidator.validateDefinition(definition(aliased)));
+
+    // A source column name is not a field reference even when a field expression uses it.
+    Dataset physicalColumn =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withPrimaryKey(new String[] {"o_orderkey"})
+            .withFields(new Field[] {field("order_id", expression("o_orderkey"))})
+            .build();
+    assertInvalid(
+        definition(physicalColumn),
+        "datasets[0].primaryKey[0]: 'o_orderkey' is not a declared field of dataset 'orders'");
+
+    Dataset uniqueKeyViolation =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withUniqueKeys(new String[][] {{"order_id"}, {"region", "tenant_id"}})
+            .withFields(
+                new Field[] {
+                  field("order_id", expression("o_orderkey")),
+                  field("tenant_id", expression("o_tenantkey"))
+                })
+            .build();
+    assertInvalid(
+        definition(uniqueKeyViolation),
+        "datasets[0].uniqueKeys[1][0]: 'region' is not a declared field of dataset 'orders'");
+
+    Dataset noFields =
+        Dataset.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "mart", "orders"))
+            .withPrimaryKey(new String[] {"order_id"})
+            .build();
+    assertInvalid(
+        definition(noFields),
+        "datasets[0].primaryKey[0]: 'order_id' is not a declared field of dataset 'orders'");
+  }
+
+  @Test
+  public void testRelationshipColumnsResolveToEndpointFields() {
+    Dataset orders = datasetWithFields("orders", "customer_id", "tenant_id");
+    Dataset customers = datasetWithFields("customers", "id", "tenant_id");
+
+    assertDoesNotThrow(
+        () ->
+            SemanticModelValidator.validateDefinition(
+                definition(
+                    new Dataset[] {orders, customers},
+                    new Relationship[] {
+                      relationship(
+                          "by_customer",
+                          "orders",
+                          "customers",
+                          new String[] {"Customer_ID", "TENANT_ID"},
+                          new String[] {"id", "Tenant_Id"})
+                    },
+                    null)));
+
+    assertInvalid(
+        definition(
+            new Dataset[] {orders, customers},
+            new Relationship[] {
+              relationship(
+                  "bad_from", "orders", "customers", new String[] {"missing"}, new String[] {"id"})
+            },
+            null),
+        "relationships[0].fromColumns[0]: 'missing' is not a declared field of dataset 'orders'");
+
+    assertInvalid(
+        definition(
+            new Dataset[] {orders, customers},
+            new Relationship[] {
+              relationship(
+                  "bad_to",
+                  "orders",
+                  "customers",
+                  new String[] {"customer_id"},
+                  new String[] {"missing"})
+            },
+            null),
+        "relationships[0].toColumns[0]: 'missing' is not a declared field of dataset 'customers'");
+
+    // A dataset that declares no fields exposes nothing to relationship columns.
+    Dataset fieldless = dataset("customers");
+    assertInvalid(
+        definition(
+            new Dataset[] {orders, fieldless},
+            new Relationship[] {
+              relationship(
+                  "bad_to",
+                  "orders",
+                  "customers",
+                  new String[] {"customer_id"},
+                  new String[] {"id"})
+            },
+            null),
+        "relationships[0].toColumns[0]: 'id' is not a declared field of dataset 'customers'");
   }
 
   private static void assertInvalid(
@@ -231,10 +368,18 @@ public class TestSemanticModelValidator {
   }
 
   private static Dataset datasetWithField(String name, String fieldName) {
+    return datasetWithFields(name, fieldName);
+  }
+
+  private static Dataset datasetWithFields(String name, String... fieldNames) {
+    Field[] fields = new Field[fieldNames.length];
+    for (int index = 0; index < fieldNames.length; index++) {
+      fields[index] = field(fieldNames[index], expression(fieldNames[index]));
+    }
     return Dataset.builder()
         .withName(name)
         .withSource(NameIdentifier.of("sales", "mart", name))
-        .withFields(new Field[] {field(fieldName, expression(fieldName))})
+        .withFields(fields)
         .build();
   }
 

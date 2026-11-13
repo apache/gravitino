@@ -143,19 +143,21 @@ public class TestGravitinoClientEviction {
   }
 
   @Test
-  void testSeededCatalogIsNotLoadedAgain() throws Exception {
+  void testDiscoveredCatalogIsLoadedOnFirstUse() throws Exception {
     createManager(client -> {});
     GravitinoCatalogManager manager = GravitinoCatalogManager.get();
     GravitinoClient seedClient = manager.getClient(GravitinoIdentity.application("simple"));
     Catalog seeded = clients.get(0).newCatalog(CATALOG_NAME);
-    when(seedClient.listCatalogsInfo()).thenReturn(new Catalog[] {seeded});
+    when(seedClient.listCatalogsInfo(false)).thenReturn(new Catalog[] {seeded});
     manager.loadRelationalCatalogs();
+    verify(seedClient, never()).loadCatalog(anyString());
 
     TestCatalog catalog = new TestCatalog();
     catalog.initialize(CATALOG_NAME, CaseInsensitiveStringMap.empty());
     catalog.listNamespaces();
 
-    verify(seedClient, never()).loadCatalog(anyString());
+    catalog.listNamespaces();
+    verify(seedClient).loadCatalog(CATALOG_NAME);
   }
 
   @Test

@@ -25,6 +25,8 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.rel.ViewDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
@@ -39,9 +41,11 @@ import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic view. */
-class GenericView implements View, SupportsTags, SupportsSecrets {
+class GenericView implements View, SupportsTags, SupportsDomains, SupportsSecrets {
 
   private final ViewDTO viewDTO;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
@@ -56,6 +60,8 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
         new MetadataObjectSemanticModelOperations(viewNs.level(0), viewObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(viewNs.level(0), viewObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(viewNs.level(0), viewObject, restClient);
     this.objectSecretOperations =
         new MetadataObjectSecretOperations(viewNs.level(0), viewObject, restClient);
   }
@@ -98,6 +104,24 @@ class GenericView implements View, SupportsTags, SupportsSecrets {
   @Override
   public Map<String, String> properties() {
     return viewDTO.properties();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
   }
 
   @Override

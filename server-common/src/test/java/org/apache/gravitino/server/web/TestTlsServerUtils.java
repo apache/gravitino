@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import java.util.Optional;
 import javax.net.ssl.SSLHandshakeException;
 import javax.servlet.http.HttpServlet;
 import org.apache.gravitino.Config;
@@ -38,7 +39,12 @@ public final class TestTlsServerUtils {
   private TestTlsServerUtils() {}
 
   public static int startHttpsServer(
-      JettyServer server, boolean clientAuth, HttpServlet servlet, String servletPath)
+      JettyServer server,
+      boolean clientAuth,
+      HttpServlet servlet,
+      String servletPath,
+      String protocol,
+      String cipherSuite)
       throws Exception {
 
     int port = RESTUtils.findAvailablePort(6000, 7000);
@@ -61,11 +67,27 @@ public final class TestTlsServerUtils {
       config.set(JettyServerConfig.SSL_TRUST_STORE_PASSWORD, TEST_STORE_PASSWORD);
     }
 
+    // Configure TLS protocol when provided.
+    if (protocol != null) {
+      config.set(JettyServerConfig.SSL_PROTOCOL, Optional.of(protocol));
+    }
+
+    // Configure allowed cipher suites when provided.
+    if (cipherSuite != null) {
+      config.set(JettyServerConfig.ENABLE_CIPHER_ALGORITHMS, cipherSuite);
+    }
+
     server.initialize(JettyServerConfig.fromConfig(config), "test", false);
     server.start();
     server.addServlet(servlet, servletPath);
 
     return port;
+  }
+
+  public static int startHttpsServer(
+      JettyServer server, boolean clientAuth, HttpServlet servlet, String servletPath)
+      throws Exception {
+    return startHttpsServer(server, clientAuth, servlet, servletPath, null, null);
   }
 
   public static int startHttpServer(JettyServer server, HttpServlet servlet, String servletPath)

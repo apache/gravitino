@@ -62,6 +62,9 @@ PROTOCOL_NAME = "gvfs"
 
 TIME_WITHOUT_EXPIRATION = sys.maxsize
 
+# The server returns this placeholder for hidden and secret-bound property values.
+_MASKED_PROPERTY_VALUE = "******"
+
 # Maps Gravitino credentialInfo / catalog property keys to Python GVFS option names.
 _CREDENTIAL_INFO_TO_GVFS_KEYS = {
     "s3-access-key-id": GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY,
@@ -525,19 +528,34 @@ class BaseGVFSOperations(ABC):
         :param actual_location: The actual storage location
         :return: Merged properties dictionary
         """
+        metalake_name = fileset_ident.namespace().level(0)
         catalog_name = fileset_ident.namespace().level(1)
         schema_name = fileset_ident.namespace().level(2)
-        catalog = self._get_gravitino_client().load_catalog(catalog_name)
-        schema = catalog.as_schemas().load_schema(schema_name)
-        fileset = catalog.as_fileset_catalog().load_fileset(
-            NameIdentifier.of(schema_name, fileset_ident.name())
-        )
-        fileset_props = dict(catalog.properties() or {})
+        if self._enable_fileset_metadata_cache:
+            # Go through the metadata cache so that an operation does not reload the
+            # catalog, schema and fileset. Secrets are not cached and are still
+            # fetched on every call.
+            catalog = self._get_fileset_catalog(
+                NameIdentifier.of(metalake_name, catalog_name)
+            )
+            schema = self._get_fileset_schema(
+                NameIdentifier.of(metalake_name, catalog_name, schema_name)
+            )
+            fileset = self._get_fileset(fileset_ident)
+        else:
+            catalog = self._get_gravitino_client().load_catalog(catalog_name)
+            schema = catalog.as_schemas().load_schema(schema_name)
+            fileset = catalog.as_fileset_catalog().load_fileset(
+                NameIdentifier.of(schema_name, fileset_ident.name())
+            )
+        # Masked placeholders are skipped, as the Java client does: a cached entry can still
+        # hold one for a secret removed since, which would overwrite a value merged before it.
+        fileset_props = self._omit_masked_properties(catalog.properties())
         fileset_props.update(catalog.get_secrets())
         self._merge_static_catalog_credentials(fileset_props, catalog)
-        fileset_props.update(schema.properties() or {})
+        fileset_props.update(self._omit_masked_properties(schema.properties()))
         fileset_props.update(schema.get_secrets())
-        fileset_props.update(fileset.properties() or {})
+        fileset_props.update(self._omit_masked_properties(fileset.properties()))
         fileset_props.update(fileset.get_secrets())
         if self._options:
             fileset_props.update(self._options)
@@ -546,6 +564,11 @@ class BaseGVFSOperations(ABC):
         user_defined_configs = self._get_user_defined_configs(actual_location)
         fileset_props.update(user_defined_configs)
         return fileset_props
+
+    @staticmethod
+    def _omit_masked_properties(properties) -> Dict[str, str]:
+        props = properties or {}
+        return {k: v for k, v in props.items() if v != _MASKED_PROPERTY_VALUE}
 
     def _merge_static_catalog_credentials(
         self, fileset_props: Dict[str, str], catalog

@@ -63,12 +63,15 @@ import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecuto
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
 import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
+import org.apache.gravitino.server.web.rest.DomainMembershipOperations;
+import org.apache.gravitino.server.web.rest.DomainOperations;
 import org.apache.gravitino.server.web.rest.ExceptionHandlers;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
 import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectDomainOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectSemanticModelOperations;
@@ -92,6 +95,7 @@ import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.server.web.rest.UserOperations;
 import org.apache.gravitino.server.web.rest.ViewOperations;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NameValidationUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.glassfish.hk2.api.Descriptor;
 import org.glassfish.hk2.api.Filter;
@@ -132,6 +136,9 @@ public class GravitinoInterceptionService implements InterceptionService {
             PartitionOperations.class.getName(),
             MetadataObjectTagOperations.class.getName(),
             TagOperations.class.getName(),
+            DomainOperations.class.getName(),
+            DomainMembershipOperations.class.getName(),
+            MetadataObjectDomainOperations.class.getName(),
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
@@ -180,10 +187,21 @@ public class GravitinoInterceptionService implements InterceptionService {
           String expression = expressionAnnotation.expression();
           Object[] args = methodInvocation.getArguments();
           Optional<String> entityType = extractMetadataObjectTypeFromParameters(parameters, args);
+          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
+          // Grant and owner expressions may resolve this path before the resource method runs.
+          Object objectType =
+              pathParams.getOrDefault("p_metadataObjectType", pathParams.get("p_type"));
+          if ("domain".equalsIgnoreCase(String.valueOf(objectType))
+              && pathParams.containsKey("p_fullName")) {
+            try {
+              NameValidationUtils.validateName("domain", (String) pathParams.get("p_fullName"));
+            } catch (IllegalArgumentException e) {
+              return Utils.illegalArguments(e.getMessage(), e);
+            }
+          }
           Map<Entity.EntityType, NameIdentifier> metadataContext =
               extractNameIdentifierFromParameters(parameters, args);
 
-          Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationRequestContext authorizationRequestContext =
               new AuthorizationRequestContext();
 

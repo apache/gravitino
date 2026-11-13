@@ -181,10 +181,12 @@ Field
   reference contract is defined.
 - Inline query sources are not supported. A query-backed source must first be created as a logical
   View and then referenced by `NameIdentifier`.
-- For Table and logical View sources, every column named by `primary_key`, `unique_keys`,
-  `from_columns`, or `to_columns` must exist in the source metadata. Validation rejects the
-  definition when column metadata is unavailable or a named column is missing; Gravitino does not
-  infer these references from free-form field or metric expressions.
+- `primary_key`, `unique_keys`, `from_columns`, and `to_columns` name fields declared in the
+  referenced datasets' `fields`, not columns of the datasets' sources, following the Ossie Name
+  Resolution rules. Field names compare case-insensitively. A dataset that declares no fields
+  exposes no names to keys or relationships. Validation rejects the definition when a named field
+  is not declared; Gravitino does not infer these references from free-form field or metric
+  expressions.
 
 #### Relationships and Metrics
 
@@ -209,8 +211,8 @@ Metric
 
 - Relationship and Metric names are unique within a Semantic Model.
 - Each relationship endpoint names a Dataset in the same Semantic Model.
-- `from_columns` and `to_columns` are non-empty, have equal lengths, and name columns exposed by
-  their respective Dataset sources.
+- `from_columns` and `to_columns` are non-empty, have equal lengths, and name fields declared by
+  the `from` and `to` datasets respectively.
 - Metrics may reference fields and datasets in the same Semantic Model. Cross-model metric
   references are not defined by this contract.
 
