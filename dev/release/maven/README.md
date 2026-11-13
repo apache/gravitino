@@ -93,7 +93,7 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
   embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD
   text) and supplement only the missing full EPL-2.0 text.
-- Snappy Java 1.1.10.8: [NOTICE](https://github.com/xerial/snappy-java/blob/v1.1.10.8/NOTICE).
+- Snappy Java 1.1.10.12: [NOTICE](https://github.com/xerial/snappy-java/blob/v1.1.10.12/NOTICE).
   Its native libraries include [Snappy 1.1.10](https://github.com/google/snappy/blob/1.1.10/COPYING)
   and [Bitshuffle 0.3.4](https://github.com/kiyo-masui/bitshuffle/blob/0.3.4/LICENSE),
   as recorded by the tagged Makefile and VERSION file.
