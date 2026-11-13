@@ -193,6 +193,38 @@ public class CatalogKafkaIT extends BaseIT {
   }
 
   @Test
+  public void testConnectionRejectsConfigProviders() {
+    // A caller-selected Kafka config provider must not be able to read server environment values.
+    String marker = "GRAVITINO_KAFKA_IT_ENV_MARKER";
+    ImmutableMap<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(BOOTSTRAP_SERVERS, kafkaBootstrapServers)
+            .put("gravitino.bypass.config.providers", "env")
+            .put(
+                "gravitino.bypass.config.providers.env.class",
+                "org.apache.kafka.common.config.provider.EnvVarConfigProvider")
+            .put("gravitino.bypass.request.timeout.ms", "${env:" + marker + "}")
+            .build();
+
+    Exception exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                metalake.testConnection(
+                    GravitinoITUtils.genRandomName("test_catalog"),
+                    Catalog.Type.MESSAGING,
+                    PROVIDER,
+                    "comment",
+                    properties));
+    Assertions.assertTrue(
+        exception.getMessage().contains("Kafka config providers are not supported"),
+        exception.getMessage());
+    Assertions.assertTrue(
+        exception.getMessage().contains("gravitino.bypass.config.providers"),
+        exception.getMessage());
+  }
+
+  @Test
   public void testCatalogException() {
     String catalogName1 = GravitinoITUtils.genRandomName("test_catalog");
     Catalog catalog1 =

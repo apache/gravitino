@@ -53,6 +53,7 @@ import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.PA
 import static org.apache.gravitino.catalog.kafka.KafkaTopicPropertiesMetadata.REPLICATION_FACTOR;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
@@ -315,6 +316,79 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     Assertions.assertTrue(ops.schemaExists(ops.defaultSchemaIdent));
     Schema schema = ops.loadSchema(ops.defaultSchemaIdent);
     Assertions.assertEquals(DEFAULT_SCHEMA_NAME, schema.name());
+  }
+
+  @Test
+  public void testInitializeRejectsConfigProviders() {
+    CatalogEntity catalogEntity =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("test_kafka_catalog_config_providers")
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withType(MESSAGING)
+            .withProvider("kafka")
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
+            .build();
+
+    for (String key :
+        ImmutableList.of(
+            "config.providers",
+            "config.providers.env.class",
+            "config.providers.env.param.allowlist.pattern")) {
+      Map<String, String> properties =
+          ImmutableMap.<String, String>builder()
+              .putAll(MOCK_CATALOG_PROPERTIES)
+              .put("gravitino.bypass." + key, "env")
+              .put("gravitino.bypass.request.timeout.ms", "${env:PATH}")
+              .build();
+      KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  ops.initialize(
+                      properties, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA));
+      Assertions.assertTrue(
+          exception.getMessage().contains("gravitino.bypass." + key), exception.getMessage());
+      // The AdminClient must not be created, and no placeholder may be resolved or echoed.
+      Assertions.assertNull(ops.adminClientConfig.get("request.timeout.ms"));
+      Assertions.assertFalse(exception.getMessage().contains(System.getenv("PATH")));
+    }
+  }
+
+  @Test
+  public void testInitializeKeepsOtherBypassConfigs() throws IOException {
+    CatalogEntity catalogEntity =
+        CatalogEntity.builder()
+            .withId(idGenerator.nextId())
+            .withName("test_kafka_catalog_bypass")
+            .withNamespace(Namespace.of(METALAKE_NAME))
+            .withType(MESSAGING)
+            .withProvider("kafka")
+            .withAuditInfo(
+                AuditInfo.builder()
+                    .withCreator("testKafkaUser")
+                    .withCreateTime(Instant.now())
+                    .build())
+            .withProperties(MOCK_CATALOG_PROPERTIES)
+            .build();
+    store.put(catalogEntity, false);
+
+    // "config.providers" must only match whole keys and its sub-keys, not similar names.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .putAll(MOCK_CATALOG_PROPERTIES)
+            .put("gravitino.bypass.request.timeout.ms", "30000")
+            .put("gravitino.bypass.config.providersx", "ignored")
+            .build();
+    KafkaCatalogOperations ops = new KafkaCatalogOperations(store, idGenerator);
+    ops.initialize(properties, catalogEntity.toCatalogInfo(), KAFKA_PROPERTIES_METADATA);
+    Assertions.assertEquals("30000", ops.adminClientConfig.get("request.timeout.ms"));
   }
 
   @Test
