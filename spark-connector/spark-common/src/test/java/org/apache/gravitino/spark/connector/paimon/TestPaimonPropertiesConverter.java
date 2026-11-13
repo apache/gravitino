@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.paimon;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -102,5 +103,66 @@ public class TestPaimonPropertiesConverter {
             PaimonPropertiesConstants.PAIMON_CATALOG_WAREHOUSE,
             "filesystem-warehouse"),
         properties);
+  }
+
+  @Test
+  void testTablePropertiesKeepProvider() {
+    // Without the Hive backend, the provider is passed on unchanged, as before.
+    Assertions.assertEquals(
+        ImmutableMap.of(TableCatalog.PROP_PROVIDER, "parquet", "k1", "v1"),
+        paimonPropertiesConverter.toGravitinoTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "parquet", "k1", "v1")));
+  }
+
+  @Test
+  void testHiveBackendPropertiesForPaimonTable() {
+    // USING paimon, or no USING clause, keeps a Paimon table.
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "paimon", "k1", "v1")));
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "PAIMON", "k1", "v1")));
+    Assertions.assertEquals(
+        ImmutableMap.of("k1", "v1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(ImmutableMap.of("k1", "v1")));
+  }
+
+  @Test
+  void testHiveBackendPropertiesForFormatTable() {
+    // A file format provider becomes a Paimon format table of that format.
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE,
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE_FORMAT_TABLE,
+            PaimonPropertiesConstants.PAIMON_FILE_FORMAT,
+            "csv",
+            "csv.field-delimiter",
+            "\\t"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(TableCatalog.PROP_PROVIDER, "CSV", "csv.field-delimiter", "\\t")));
+  }
+
+  @Test
+  void testHiveBackendPropertiesWithLocation() {
+    // LOCATION is passed to Paimon as the table path; Spark's external flag is dropped.
+    Assertions.assertEquals(
+        ImmutableMap.of(
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE,
+            PaimonPropertiesConstants.PAIMON_TABLE_TYPE_FORMAT_TABLE,
+            PaimonPropertiesConstants.PAIMON_FILE_FORMAT,
+            "parquet",
+            PaimonPropertiesConstants.PAIMON_TABLE_LOCATION,
+            "hdfs://ns/data/t1"),
+        paimonPropertiesConverter.toHiveBackendTableProperties(
+            ImmutableMap.of(
+                TableCatalog.PROP_PROVIDER,
+                "parquet",
+                TableCatalog.PROP_LOCATION,
+                "hdfs://ns/data/t1",
+                TableCatalog.PROP_EXTERNAL,
+                "true")));
   }
 }

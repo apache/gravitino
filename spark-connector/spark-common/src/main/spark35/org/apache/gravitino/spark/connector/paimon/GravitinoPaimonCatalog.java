@@ -23,6 +23,8 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonPropertiesUtils;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -38,13 +40,22 @@ import org.apache.paimon.spark.procedure.ProcedureBuilder;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
+import org.apache.spark.sql.connector.expressions.Transform;
+import org.apache.spark.sql.types.StructType;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
 public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCatalog {
 
+  // Whether the Paimon catalog uses the Hive backend, the only Paimon backend that can create
+  // format tables.
+  private boolean hiveBackend;
+
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
+    this.hiveBackend =
+        PaimonPropertiesConstants.PAIMON_CATALOG_BACKEND_HIVE.equalsIgnoreCase(
+            properties.get(PaimonPropertiesConstants.GRAVITINO_PAIMON_CATALOG_BACKEND));
     String catalogBackendName = PaimonPropertiesUtils.getCatalogBackendName(properties);
     TableCatalog paimonCatalog = new SparkCatalog();
     Map<String, String> all =
@@ -53,6 +64,23 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
         CredentialPropertyUtils.getCredentials(gravitinoCatalog()), all);
     paimonCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return paimonCatalog;
+  }
+
+  /**
+   * With the Hive backend, a CREATE TABLE with a file format provider (USING csv, parquet, ...)
+   * creates a Paimon format table, as it does in Paimon's own SparkCatalog. Other backends cannot
+   * create format tables and keep creating Paimon tables.
+   */
+  @Override
+  protected org.apache.gravitino.rel.Table createGravitinoTable(
+      Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
+      throws NoSuchSchemaException, TableAlreadyExistsException {
+    Map<String, String> tableProperties = properties;
+    if (hiveBackend && properties != null) {
+      tableProperties =
+          PaimonPropertiesConverter.getInstance().toHiveBackendTableProperties(properties);
+    }
+    return super.createGravitinoTable(ident, schema, transforms, tableProperties);
   }
 
   @Override
@@ -64,6 +92,15 @@ public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCata
       PropertiesConverter propertiesConverter,
       SparkTransformConverter sparkTransformConverter,
       SparkTypeConverter sparkTypeConverter) {
+    // Paimon's SparkCatalog returns a SparkTable only for Paimon file store tables. Other table
+    // types, such as format tables backed by a metastore (CSV, JSON, ORC, Parquet or text files
+    // registered in Hive), come back as a different Spark table (a FileTable or, in newer Paimon
+    // versions, a PaimonFormatTable). Their schema and partitions are already resolved by Paimon
+    // and they read and write through their own code path, so return them as they are instead of
+    // failing with a ClassCastException.
+    if (!(sparkTable instanceof SparkTable)) {
+      return sparkTable;
+    }
     return new SparkPaimonTable(
         identifier,
         gravitinoTable,
