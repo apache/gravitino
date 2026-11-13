@@ -27,24 +27,37 @@ import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.net.ConnectException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.client.GravitinoClient;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.DynamicBearerTokenProvider;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
+import org.apache.spark.SparkContext;
+import org.apache.spark.api.plugin.PluginContext;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 /**
@@ -62,6 +75,195 @@ public class TestGravitinoDriverPlugin {
   private static final String GLUE_CATALOG = "org.example.GlueCatalog";
   private static final String JDBC_CATALOG = "org.example.JdbcCatalog";
   private static final String POSTGRESQL_CATALOG = "org.example.PostgreSqlCatalog";
+
+  @ParameterizedTest
+  @MethodSource("invalidConnectionConfigurations")
+  void testMissingOrBlankConnectionSettingsSkipInitialization(
+      @Nullable String uri, @Nullable String metalake) {
+    for (String failFast : Arrays.asList(null, "false")) {
+      SparkConf sparkConf = connectionConf(uri, metalake);
+      if (failFast != null) {
+        sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, failFast);
+      }
+      sparkConf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), USER_EXTENSION);
+      sparkConf.set("spark.sql.catalog.existing", HIVE_CATALOG);
+      sparkConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true");
+      SparkConf originalConf = sparkConf.clone();
+      SparkContext sparkContext = mock(SparkContext.class);
+      when(sparkContext.conf()).thenReturn(sparkConf);
+      GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+      assertEquals(Collections.emptyMap(), plugin.init(sparkContext, mock(PluginContext.class)));
+
+      Assertions.assertArrayEquals(originalConf.getAll(), sparkConf.getAll());
+      Mockito.verify(sparkContext, Mockito.never()).sparkUser();
+      Assertions.assertDoesNotThrow(plugin::shutdown);
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidConnectionConfigurations")
+  void testFailFastRejectsMissingOrBlankConnectionSettings(
+      @Nullable String uri, @Nullable String metalake) {
+    SparkConf sparkConf = connectionConf(uri, metalake);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, "true");
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> plugin.init(sparkContext, mock(PluginContext.class)));
+
+    assertTrue(exception.getMessage().contains("should not be empty"));
+    Mockito.verify(sparkContext, Mockito.never()).sparkUser();
+    Assertions.assertDoesNotThrow(plugin::shutdown);
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testValidConnectionSettingsStillRegisterCatalogs(boolean failFast) {
+    SparkConf sparkConf = connectionConf("http://localhost:8090", "test");
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, String.valueOf(failFast));
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    when(sparkContext.sparkUser()).thenReturn("spark-user");
+    GravitinoCatalogManager catalogManager = mock(GravitinoCatalogManager.class);
+    Catalog catalog = catalogWithProvider("hive");
+    when(catalogManager.getCatalogs()).thenReturn(ImmutableMap.of("my_hive", catalog));
+
+    try (MockedStatic<GravitinoCatalogManager> managerClass =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      managerClass
+          .when(
+              () ->
+                  GravitinoCatalogManager.create(
+                      Mockito.eq(sparkConf), Mockito.eq("spark-user"), Mockito.any()))
+          .thenReturn(catalogManager);
+      GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+      assertEquals(Collections.emptyMap(), plugin.init(sparkContext, mock(PluginContext.class)));
+
+      Mockito.verify(catalogManager).loadRelationalCatalogs();
+      assertEquals(HIVE_CATALOG, sparkConf.get("spark.sql.catalog.my_hive"));
+      assertEquals(AUTHZ_EXTENSION, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+      plugin.shutdown();
+      plugin.shutdown();
+      Mockito.verify(catalogManager).close();
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("initializationFailureScenarios")
+  void testInitializationFailureCleansUpBeforeSkippingOrRethrowing(
+      @Nullable String failFast,
+      RuntimeException failure,
+      boolean failDuringCreate,
+      boolean failDuringClose) {
+    SparkConf sparkConf = connectionConf("http://localhost:8090", "test");
+    if (failFast != null) {
+      sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, failFast);
+    }
+    sparkConf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), USER_EXTENSION);
+    sparkConf.set("spark.sql.catalog.existing", HIVE_CATALOG);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, "true");
+    SparkConf originalConf = sparkConf.clone();
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    when(sparkContext.sparkUser()).thenReturn("spark-user");
+    GravitinoCatalogManager catalogManager = mock(GravitinoCatalogManager.class);
+    RuntimeException closeFailure = new IllegalStateException("Manager cleanup failed");
+    if (!failDuringCreate) {
+      Mockito.doThrow(failure).when(catalogManager).loadRelationalCatalogs();
+    }
+    if (failDuringClose) {
+      Mockito.doThrow(closeFailure).when(catalogManager).close();
+    }
+
+    try (MockedStatic<GravitinoCatalogManager> managerClass =
+        Mockito.mockStatic(GravitinoCatalogManager.class)) {
+      MockedStatic.Verification createManager =
+          () ->
+              GravitinoCatalogManager.create(
+                  Mockito.eq(sparkConf), Mockito.eq("spark-user"), Mockito.any());
+      if (failDuringCreate) {
+        managerClass.when(createManager).thenThrow(failure);
+      } else {
+        managerClass.when(createManager).thenReturn(catalogManager);
+      }
+      GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+      if (Boolean.parseBoolean(failFast)) {
+        Assertions.assertSame(
+            failure,
+            Assertions.assertThrows(
+                RuntimeException.class,
+                () -> plugin.init(sparkContext, mock(PluginContext.class))));
+      } else {
+        assertEquals(Collections.emptyMap(), plugin.init(sparkContext, mock(PluginContext.class)));
+      }
+
+      Assertions.assertArrayEquals(originalConf.getAll(), sparkConf.getAll());
+      Mockito.verify(catalogManager, Mockito.never()).getCatalogs();
+      Mockito.verify(catalogManager, Mockito.times(failDuringCreate ? 0 : 1)).close();
+      if (failDuringClose) {
+        Assertions.assertArrayEquals(new Throwable[] {closeFailure}, failure.getSuppressed());
+      }
+      Assertions.assertDoesNotThrow(plugin::shutdown);
+      Mockito.verify(catalogManager, Mockito.times(failDuringCreate ? 0 : 1)).close();
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("invalidClientConfigurations")
+  void testInvalidClientConfigurationDoesNotLeaveASharedManager(
+      String configKey, String configValue, boolean failFast) {
+    SparkConf sparkConf = connectionConf("http://localhost:8090", "test");
+    sparkConf.set(configKey, configValue);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, String.valueOf(failFast));
+    SparkConf originalConf = sparkConf.clone();
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    when(sparkContext.sparkUser()).thenReturn("spark-user");
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    try {
+      if (failFast) {
+        IllegalArgumentException failure =
+            Assertions.assertThrows(
+                IllegalArgumentException.class,
+                () -> plugin.init(sparkContext, mock(PluginContext.class)));
+        if (GravitinoSparkConfig.GRAVITINO_AUTH_TYPE.equals(configKey)) {
+          assertTrue(failure.getMessage().contains(GravitinoSparkConfig.GRAVITINO_BASIC_USERNAME));
+        }
+      } else {
+        assertEquals(Collections.emptyMap(), plugin.init(sparkContext, mock(PluginContext.class)));
+      }
+
+      Assertions.assertArrayEquals(originalConf.getAll(), sparkConf.getAll());
+      Assertions.assertThrows(IllegalStateException.class, GravitinoCatalogManager::get);
+      GravitinoCatalogManager replacement =
+          GravitinoCatalogManager.create(
+              new SparkConf(false), "spark-user", identity -> mock(GravitinoClient.class));
+      replacement.close();
+    } finally {
+      plugin.shutdown();
+    }
+  }
+
+  @Test
+  void testInvalidFailFastSettingIsRejected() {
+    SparkConf sparkConf = connectionConf("http://localhost:8090", "test");
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, "invalid");
+    SparkContext sparkContext = mock(SparkContext.class);
+    when(sparkContext.conf()).thenReturn(sparkConf);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> plugin.init(sparkContext, mock(PluginContext.class)));
+    Mockito.verify(sparkContext, Mockito.never()).sparkUser();
+  }
 
   @Test
   void testIcebergExtensionName() {
@@ -396,6 +598,66 @@ public class TestGravitinoDriverPlugin {
         .registerGravitinoCatalogs(sparkConf, Collections.singletonMap("existing", catalog));
 
     assertEquals("example.UserCatalog", sparkConf.get("spark.sql.catalog.existing"));
+  }
+
+  private static Stream<Arguments> invalidConnectionConfigurations() {
+    return Stream.of(
+        Arguments.of(null, null),
+        Arguments.of(null, "test"),
+        Arguments.of("", "test"),
+        Arguments.of(" \t", "test"),
+        Arguments.of("http://localhost:8090", null),
+        Arguments.of("http://localhost:8090", ""),
+        Arguments.of("http://localhost:8090", " \t"));
+  }
+
+  private static Stream<Arguments> initializationFailureScenarios() {
+    return Stream.<String>of(null, "false", "true")
+        .flatMap(
+            failFast ->
+                Stream.of(
+                    Arguments.of(
+                        failFast,
+                        new IllegalArgumentException("Invalid client cache size"),
+                        true,
+                        false),
+                    Arguments.of(
+                        failFast,
+                        new ConnectionFailedException(
+                            new ConnectException("Connection refused"), "Catalog discovery failed"),
+                        false,
+                        false),
+                    Arguments.of(
+                        failFast,
+                        new UnauthorizedException("Authentication rejected"),
+                        false,
+                        false),
+                    Arguments.of(
+                        failFast,
+                        new ConnectionFailedException("Catalog discovery failed"),
+                        false,
+                        true)));
+  }
+
+  private static Stream<Arguments> invalidClientConfigurations() {
+    return Stream.of(
+        Arguments.of(
+            GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.BASIC_AUTH_TYPE, false),
+        Arguments.of(
+            GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, AuthProperties.BASIC_AUTH_TYPE, true),
+        Arguments.of(GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_MAX_SIZE, "-1", false),
+        Arguments.of(GravitinoSparkConfig.GRAVITINO_CLIENT_CACHE_MAX_SIZE, "-1", true));
+  }
+
+  private static SparkConf connectionConf(@Nullable String uri, @Nullable String metalake) {
+    SparkConf sparkConf = new SparkConf(false);
+    if (uri != null) {
+      sparkConf.set(GravitinoSparkConfig.GRAVITINO_URI, uri);
+    }
+    if (metalake != null) {
+      sparkConf.set(GravitinoSparkConfig.GRAVITINO_METALAKE, metalake);
+    }
+    return sparkConf;
   }
 
   private static SparkConf tokenAuthConf() {

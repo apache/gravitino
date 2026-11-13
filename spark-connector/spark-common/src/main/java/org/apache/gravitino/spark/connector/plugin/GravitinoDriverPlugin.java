@@ -112,28 +112,14 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
     SparkConf conf = sc.conf();
-    String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI);
-    String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
-    Map<String, String> gravitinoClientConfig = extractGravitinoClientConfig(conf);
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(gravitinoUri),
-        String.format(
-            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri));
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(metalake),
-        String.format(
-            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
-
-    registerOptInExtensions(conf);
-
-    this.catalogManager =
-        GravitinoCatalogManager.create(
-            conf,
-            sc.sparkUser(),
-            identity ->
-                createGravitinoClient(
-                    gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
-    catalogManager.loadRelationalCatalogs();
+    boolean failFast = conf.getBoolean(GravitinoSparkConfig.GRAVITINO_FAIL_FAST, false);
+    try {
+      initializeCatalogManager(sc, conf);
+      registerOptInExtensions(conf);
+    } catch (RuntimeException e) {
+      handleInitializationFailure(e, failFast);
+      return Collections.emptyMap();
+    }
     registerGravitinoCatalogs(conf, catalogManager.getCatalogs());
     registerSqlExtensions(conf);
     return Collections.emptyMap();
@@ -141,8 +127,10 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   @Override
   public void shutdown() {
-    if (catalogManager != null) {
-      catalogManager.close();
+    GravitinoCatalogManager manager = catalogManager;
+    catalogManager = null;
+    if (manager != null) {
+      manager.close();
     }
   }
 
@@ -442,5 +430,54 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                             t -> t._2,
                             (oldVal, newVal) -> newVal)))
         .orElse(ImmutableMap.of());
+  }
+
+  private void initializeCatalogManager(SparkContext sc, SparkConf conf) {
+    String gravitinoUri = conf.get(GravitinoSparkConfig.GRAVITINO_URI, "");
+    String metalake = conf.get(GravitinoSparkConfig.GRAVITINO_METALAKE, "");
+    validateConnectionSettings(gravitinoUri, metalake);
+    Map<String, String> gravitinoClientConfig = extractGravitinoClientConfig(conf);
+    this.catalogManager =
+        GravitinoCatalogManager.create(
+            conf,
+            sc.sparkUser(),
+            identity ->
+                createGravitinoClient(
+                    gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));
+    catalogManager.loadRelationalCatalogs();
+  }
+
+  private void handleInitializationFailure(RuntimeException failure, boolean failFast) {
+    try {
+      shutdown();
+    } catch (RuntimeException closeFailure) {
+      if (closeFailure != failure) {
+        failure.addSuppressed(closeFailure);
+      }
+      LOG.warn(
+          "Failed to close the Gravitino catalog manager after initialization failed ({}).",
+          closeFailure.getClass().getSimpleName());
+    }
+    if (failFast) {
+      throw failure;
+    }
+    // Authentication failures can include credentials in exception messages.
+    LOG.warn(
+        "Failed to initialize the Gravitino Spark connector ({}). "
+            + "Gravitino catalogs will not be registered. Check the URI, metalake and authentication "
+            + "settings. Set {}=true to fail Spark startup instead.",
+        failure.getClass().getSimpleName(),
+        GravitinoSparkConfig.GRAVITINO_FAIL_FAST);
+  }
+
+  private static void validateConnectionSettings(String gravitinoUri, String metalake) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(gravitinoUri),
+        String.format(
+            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_URI, gravitinoUri));
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(metalake),
+        String.format(
+            "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
   }
 }
