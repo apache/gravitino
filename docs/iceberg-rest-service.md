@@ -178,6 +178,41 @@ The settings below tune the background workers and are optional.
 | `gravitino.iceberg-rest.async-cleanup.max-attempts`           | Number of failed attempts before a cleanup job is marked `FAILED`.                                   | `5`           | No       |
 | `gravitino.iceberg-rest.async-cleanup.retention-hours`        | Retention time for terminal `SUCCEEDED` or `FAILED` cleanup rows before pruning.                     | `720`         | No       |
 
+### JDBC Idempotency Storage
+
+The `jdbc` idempotency store persists request reservations and response bodies in Gravitino's
+relational entity store. Replicas connected to the same database share records, and finalized
+responses survive Iceberg REST service restarts. This supplies the storage backend for
+[Idempotency-Key endpoint integration](https://github.com/apache/gravitino/pull/12474); the storage
+backend alone does not enable HTTP request replay.
+
+Use this backend in auxiliary mode, with an initialized relational entity store. Standalone Iceberg
+REST servers cannot use it. It reuses Gravitino's connection pool and supports H2, MySQL, and
+PostgreSQL. For multiple replicas, use the same shared MySQL or PostgreSQL database; separate local
+H2 databases do not provide cross-replica deduplication.
+
+| Configuration item | Description | Default value | Required |
+|--------------------|-------------|---------------|----------|
+| `gravitino.iceberg-rest.idempotency-store-type` | Select `jdbc` for durable storage, `in-memory` for node-local storage, or a custom implementation class. | `in-memory` | No |
+| `gravitino.iceberg-rest.idempotency-cleanup-interval` | Time between bounded JDBC cleanup passes, as an ISO-8601 duration of at least one millisecond. | `PT5M` | No |
+
+Initialize a new database with the 2.0.0 schema or apply the 1.3.0-to-2.0.0 upgrade before selecting
+`jdbc`. An existing development 2.0.0 database created before this table was added must also apply
+the `iceberg_idempotency_key_meta` table and its expiry index from the matching database's schema
+script. Store initialization fails if the table is missing. The new table is additive and does not
+modify catalog metadata.
+
+Reservations are atomic across replicas. A claim token prevents an old request from finalizing or
+releasing a newer reservation. Expiry is enforced on reads, finalization, and reservation attempts;
+reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most
+100 batches of 1,000 expired rows, and transient failures are retried on the next pass. Synchronize
+replica clocks because reuse-window deadlines are evaluated using each server's UTC clock.
+
+Durable storage does not make catalog mutations and response persistence one transaction. A crash
+or response-persistence failure after the catalog mutation can still allow re-execution after the
+reservation is released or expires. Claim fencing protects idempotency records, not external catalog
+side effects. A request running beyond its reuse window can overlap a retry.
+
 ### Catalog Backend Configuration
 
 :::info

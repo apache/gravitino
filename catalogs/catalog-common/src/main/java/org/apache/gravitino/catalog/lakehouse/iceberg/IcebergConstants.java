@@ -229,4 +229,7 @@ public class IcebergConstants {
 
   /** Capacity of the in-memory idempotency store. */
   public static final String ICEBERG_IDEMPOTENCY_MAX_ENTRIES = "idempotency-max-entries";
+
+  /** Interval between JDBC idempotency cleanup passes. */
+  public static final String ICEBERG_IDEMPOTENCY_CLEANUP_INTERVAL = "idempotency-cleanup-interval";
 }
