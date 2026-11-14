@@ -34,6 +34,7 @@ public class ChainedAuthorization extends BaseAuthorization<ChainedAuthorization
       String metalake, String catalogProvider, Map<String, String> config) {
     switch (catalogProvider) {
       case "hive":
+      case "kafka":
         return new ChainedAuthorizationPlugin(metalake, catalogProvider, config);
       default:
         throw new IllegalArgumentException("Unknown catalog provider: " + catalogProvider);
