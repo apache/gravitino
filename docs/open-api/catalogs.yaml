@@ -617,7 +617,11 @@ components:
           description: The property to set
         value:
           type: string
-          description: The value to set
+          description: >
+            The value to set. If the property holds a write-through secret URN of this catalog, the
+            value is written as a new version of that secret. If it holds another secret URN, the
+            value is written through that secret's provider right away, and a failed alter does not
+            undo it.
       example: {
         "@type": "setProperty",
         "property": "key1",

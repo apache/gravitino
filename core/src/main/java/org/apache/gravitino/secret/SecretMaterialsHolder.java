@@ -18,25 +18,33 @@
  */
 package org.apache.gravitino.secret;
 
-import java.util.List;
+import com.google.common.base.Preconditions;
 
 /**
- * Mutable holder so {@code store.update} lambdas can record written secrets for rollback.
+ * Mutable holder so {@code store.update} lambdas can record secret version changes.
  *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secrets inside {@code
- * store.update} and roll back on failure.
+ * <p>Used by catalog, schema, and fileset alter paths that stage secret versions inside {@code
+ * store.update}, commit them after the update and roll them back on failure.
  */
 public final class SecretMaterialsHolder {
 
-  private List<SecretMaterial> materials = List.of();
+  private SecretVersionChanges changes = SecretVersionChanges.EMPTY;
 
-  /** Returns written secret materials. */
-  public List<SecretMaterial> get() {
-    return materials;
+  /**
+   * Returns the recorded secret version changes.
+   *
+   * @return the recorded changes, {@link SecretVersionChanges#EMPTY} until {@link #set} is called
+   */
+  public SecretVersionChanges get() {
+    return changes;
   }
 
-  /** Records written secret materials. */
-  public void set(List<SecretMaterial> materials) {
-    this.materials = materials;
+  /**
+   * Records the secret version changes of the alter.
+   *
+   * @param changes the changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   */
+  public void set(SecretVersionChanges changes) {
+    this.changes = Preconditions.checkNotNull(changes, "changes must not be null");
   }
 }
