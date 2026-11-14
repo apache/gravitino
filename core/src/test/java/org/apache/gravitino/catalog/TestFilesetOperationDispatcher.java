@@ -368,7 +368,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
 
-      // The catalog rejects the batch after the secrets are prepared, so rollback deletes the
+      // The catalog rejects the batch after the secrets are staged, so rollback deletes the
       // first binding of k3, which was readable as soon as it was written.
       SecretUrn rejectedUrn =
           SecretUrn.buildWriteThrough(

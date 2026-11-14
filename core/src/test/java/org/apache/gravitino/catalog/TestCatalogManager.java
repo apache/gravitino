@@ -2845,7 +2845,7 @@ public class TestCatalogManager {
                   .getProperties()
                   .get(PROPERTY_KEY4));
 
-      // The updater prepares the secrets, then the store fails to write the entity.
+      // The updater stages the secrets, then the store fails to write the entity.
       IOException failure = new IOException("catalog update failed");
       Mockito.doAnswer(
               invocation -> {

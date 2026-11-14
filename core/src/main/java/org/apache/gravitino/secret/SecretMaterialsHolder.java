@@ -23,12 +23,12 @@ import com.google.common.base.Preconditions;
 /**
  * Mutable holder so {@code store.update} lambdas can record secret version changes.
  *
- * <p>Used by catalog, schema, and fileset alter paths that prepare secret versions inside {@code
+ * <p>Used by catalog, schema, and fileset alter paths that stage secret versions inside {@code
  * store.update}, commit them after the update and roll them back on failure.
  */
 public final class SecretMaterialsHolder {
 
-  private SecretVersionChanges prepared = SecretVersionChanges.EMPTY;
+  private SecretVersionChanges changes = SecretVersionChanges.EMPTY;
 
   /**
    * Returns the recorded secret version changes.
@@ -36,15 +36,15 @@ public final class SecretMaterialsHolder {
    * @return the recorded changes, {@link SecretVersionChanges#EMPTY} until {@link #set} is called
    */
   public SecretVersionChanges get() {
-    return prepared;
+    return changes;
   }
 
   /**
    * Records the secret version changes of the alter.
    *
-   * @param prepared the changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param changes the changes returned by a {@code SecretAlterChanges.prepare*Changes} method
    */
-  public void set(SecretVersionChanges prepared) {
-    this.prepared = Preconditions.checkNotNull(prepared, "prepared must not be null");
+  public void set(SecretVersionChanges changes) {
+    this.changes = Preconditions.checkNotNull(changes, "changes must not be null");
   }
 }

@@ -22,7 +22,7 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * Write-through secret versions that a prepared entity alter wrote or stopped referencing.
+ * Write-through secret versions that an entity alter staged or stopped referencing.
  *
  * <p>Created by the {@code SecretAlterChanges.prepare*Changes} methods. After the entity alter
  * commits, {@link SecretManager#commitSecrets} applies them; if the alter fails, {@link

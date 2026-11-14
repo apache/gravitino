@@ -50,7 +50,7 @@ public final class SecretAlterChanges {
    * @param entityId catalog entity id, or null if the catalog has none yet; then the batch cannot
    *     bind, rewrite, replace or remove a write-through secret
    * @param changes catalog changes
-   * @return effective changes and the prepared write-through secret versions
+   * @return effective changes and the write-through secret versions the batch wrote or released
    * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
    *     write-through secret
    */
@@ -98,12 +98,12 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges prepared =
+    SecretVersionChanges staged =
         entityId == null
             ? SecretVersionChanges.EMPTY
-            : secretManager.prepareSecretVersions(
+            : secretManager.stageSecrets(
                 currentProperties, properties, "catalog", entityId, plaintexts);
-    return Pair.of(out.toArray(new CatalogChange[0]), prepared);
+    return Pair.of(out.toArray(new CatalogChange[0]), staged);
   }
 
   /**
@@ -166,7 +166,7 @@ public final class SecretAlterChanges {
    * @param entityId schema entity id, or null if the schema has none yet; then the batch cannot
    *     bind, rewrite, replace or remove a write-through secret
    * @param changes schema changes
-   * @return effective changes and the prepared write-through secret versions
+   * @return effective changes and the write-through secret versions the batch wrote or released
    * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
    *     write-through secret
    */
@@ -213,12 +213,12 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges prepared =
+    SecretVersionChanges staged =
         entityId == null
             ? SecretVersionChanges.EMPTY
-            : secretManager.prepareSecretVersions(
+            : secretManager.stageSecrets(
                 currentProperties, properties, "schema", entityId, plaintexts);
-    return Pair.of(out.toArray(new SchemaChange[0]), prepared);
+    return Pair.of(out.toArray(new SchemaChange[0]), staged);
   }
 
   /**
@@ -229,7 +229,7 @@ public final class SecretAlterChanges {
    * @param entityId fileset entity id, or null if the fileset has none yet; then the batch cannot
    *     bind, rewrite, replace or remove a write-through secret
    * @param changes fileset changes
-   * @return effective changes and the prepared write-through secret versions
+   * @return effective changes and the write-through secret versions the batch wrote or released
    * @throws IllegalArgumentException if {@code entityId} is null and the batch touches a
    *     write-through secret
    */
@@ -277,11 +277,11 @@ public final class SecretAlterChanges {
       }
     }
     // Without an id the checks above let no change write or release a write-through secret.
-    SecretVersionChanges prepared =
+    SecretVersionChanges staged =
         entityId == null
             ? SecretVersionChanges.EMPTY
-            : secretManager.prepareSecretVersions(
+            : secretManager.stageSecrets(
                 currentProperties, properties, "fileset", entityId, plaintexts);
-    return Pair.of(out.toArray(new FilesetChange[0]), prepared);
+    return Pair.of(out.toArray(new FilesetChange[0]), staged);
   }
 }

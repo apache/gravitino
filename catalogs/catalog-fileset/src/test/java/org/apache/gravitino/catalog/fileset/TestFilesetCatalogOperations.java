@@ -2248,7 +2248,7 @@ public class TestFilesetCatalogOperations {
       ops.alterFileset(ident, bindSecret("k", "new"));
       Assertions.assertEquals("new", secretManager.readSecret(urn));
 
-      // The updater prepares the secrets, then the store fails to write the entity.
+      // The updater stages the secrets, then the store fails to write the entity.
       IOException failure = new IOException("fileset update failed");
       Mockito.doAnswer(
               invocation -> {

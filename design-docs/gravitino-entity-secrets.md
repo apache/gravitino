@@ -469,20 +469,21 @@ If a provider of a written or released URN does not implement them, the alter fa
 `UnsupportedOperationException`. Released URNs are checked before any version is written; versions
 already written for other keys in the batch are deleted best-effort.
 
-1. Prepare (before the entity update): apply the whole batch to a copy of the properties. For each
-   key whose final value is a write-through URN of this entity with a new plaintext, record the
-   current version and write the plaintext as a new version. The new version is current only when
-   the URN had none. For each write-through URN of this entity that the final properties no
-   longer hold, record its current version.
-2. Commit (after the entity update): make each new version current and delete the version it
-   replaced, then delete the recorded versions of released URNs. Failures are logged and do not
-   fail the alter. If making a new version current fails and the provider then reports it as
+1. Stage (before the entity update): apply the whole batch to a copy of the properties, then
+   `SecretManager.stageSecrets` handles the start and final properties. For each key whose final
+   value is a write-through URN of this entity with a new plaintext, it records the current version
+   and writes the plaintext as a new version. The new version is current only when the URN had none.
+   For each write-through URN of this entity that the final properties no longer hold, it records
+   the current version.
+2. Commit (`commitSecrets`, after the entity update): make each new version current and delete the
+   version it replaced, then delete the recorded versions of released URNs. Failures are logged and
+   do not fail the alter. If making a new version current fails and the provider then reports it as
    current (the switch took effect before failing), the previous version is deleted; otherwise the
    new version is deleted. If the current version cannot be looked up, or that delete fails, the
    leftover version stays until a drop that still holds the key deletes the URN. Running the same
    change again writes another version and makes it current.
-3. Rollback (entity update failed): delete the new versions. The entity keeps reading the versions
-   that were current before the alter.
+3. Rollback (`rollbackSecrets`, entity update failed): delete the new versions. The entity keeps
+   reading the versions that were current before the alter.
 
 An alter releases a write-through URN of the entity when the final properties no longer hold it,
 for example after `removeProperty`, `setSecretReference`, or a binding to another provider. Working

@@ -333,11 +333,11 @@ public class SecretManager implements Closeable {
    * current version cannot be looked up, both versions are kept. Running the same change again
    * writes a new version and makes it current.
    *
-   * @param prepared changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param changes changes returned by a {@code SecretAlterChanges.prepare*Changes} method
    */
-  public void commitSecrets(SecretVersionChanges prepared) {
-    Preconditions.checkArgument(prepared != null, "prepared must not be null");
-    for (SecretVersionChanges.WrittenVersion written : prepared.written()) {
+  public void commitSecrets(SecretVersionChanges changes) {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    for (SecretVersionChanges.WrittenVersion written : changes.written()) {
       // Without a previous version the write already made the new version current.
       if (written.previousId() == null) {
         continue;
@@ -364,7 +364,7 @@ public class SecretManager implements Closeable {
         LOG.warn("Failed to delete replaced version {} of secret {}", written.previousId(), urn, e);
       }
     }
-    deleteSecretVersions(prepared.released());
+    deleteSecretVersions(changes.released());
   }
 
   /**
@@ -411,19 +411,20 @@ public class SecretManager implements Closeable {
    * secrets keep the values it still references. A secret that {@link #alterSetProperty} rewrote
    * right away is not restored.
    *
-   * @param prepared changes returned by a {@code SecretAlterChanges.prepare*Changes} method
+   * @param changes changes returned by a {@code SecretAlterChanges.prepare*Changes} method
    */
-  public void rollbackSecrets(SecretVersionChanges prepared) {
-    Preconditions.checkArgument(prepared != null, "prepared must not be null");
-    List<SecretVersionChanges.Version> versions = new ArrayList<>(prepared.written().size());
-    for (SecretVersionChanges.WrittenVersion written : prepared.written()) {
+  public void rollbackSecrets(SecretVersionChanges changes) {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    List<SecretVersionChanges.Version> versions = new ArrayList<>(changes.written().size());
+    for (SecretVersionChanges.WrittenVersion written : changes.written()) {
       versions.add(written.version());
     }
     deleteSecretVersions(versions);
   }
 
   /**
-   * Writes the plaintexts of an alter batch as new versions and finds the versions it releases.
+   * Stages an alter batch: writes its plaintexts as new versions and finds the versions it
+   * releases.
    *
    * <p>Works from the properties before and after the whole batch, so a batch that changes one key
    * several times is treated by its net effect. A URN that has a current version keeps it readable
@@ -439,7 +440,7 @@ public class SecretManager implements Closeable {
    * @throws UnsupportedOperationException if a provider of a written or released secret does not
    *     support secret versions
    */
-  SecretVersionChanges prepareSecretVersions(
+  SecretVersionChanges stageSecrets(
       @Nullable Map<String, String> startProperties,
       Map<String, String> finalProperties,
       String entityType,
@@ -576,8 +577,8 @@ public class SecretManager implements Closeable {
   /**
    * Applies alter setSecretBinding to {@code properties} and records the plaintext to write.
    *
-   * <p>Nothing is written to the provider here: {@link #prepareSecretVersions} writes the
-   * plaintexts recorded for the whole batch.
+   * <p>Nothing is written to the provider here: {@link #stageSecrets} writes the plaintexts
+   * recorded for the whole batch.
    *
    * @param properties mutable properties map updated as changes are applied
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
