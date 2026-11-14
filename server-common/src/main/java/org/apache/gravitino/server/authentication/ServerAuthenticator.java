@@ -21,10 +21,14 @@ package org.apache.gravitino.server.authentication;
 
 import java.util.List;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
+import org.apache.gravitino.auth.AuthConstants;
 
 public class ServerAuthenticator {
 
   private List<Authenticator> authenticators;
+
+  private volatile String tokenHeader = AuthConstants.HTTP_HEADER_AUTHORIZATION;
 
   private ServerAuthenticator() {}
 
@@ -48,6 +52,7 @@ public class ServerAuthenticator {
    */
   public void initialize(Config config) {
     // Create and initialize Authenticator related modules
+    this.tokenHeader = config.get(Configs.AUTHENTICATOR_TOKEN_HEADER);
     this.authenticators = AuthenticatorFactory.createAuthenticators(config);
     for (Authenticator authenticator : authenticators) {
       authenticator.initialize(config);
@@ -56,5 +61,15 @@ public class ServerAuthenticator {
 
   public List<Authenticator> authenticators() {
     return authenticators;
+  }
+
+  /**
+   * The request header the credential is read from, {@code Authorization} unless overridden by
+   * {@code gravitino.authenticator.tokenHeader}.
+   *
+   * @return The token header name.
+   */
+  public String tokenHeader() {
+    return tokenHeader;
   }
 }

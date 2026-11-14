@@ -220,7 +220,8 @@ public class AuthenticationFilter implements Filter {
   }
 
   private static byte[] authorizationData(HttpServletRequest request) {
-    Enumeration<String> headerData = request.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION);
+    Enumeration<String> headerData =
+        request.getHeaders(ServerAuthenticator.getInstance().tokenHeader());
     return headerData.hasMoreElements()
         ? headerData.nextElement().getBytes(StandardCharsets.UTF_8)
         : null;
