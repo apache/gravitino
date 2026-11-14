@@ -507,6 +507,7 @@ whatever username the client sends.
 | Configuration Item         | Description                                                                                                    | Default Value |
 |----------------------------|----------------------------------------------------------------------------------------------------------------|---------------|
 | `gravitino.authenticators` | Comma-separated authenticators to enable. Valid values are `simple`, `oauth`, `kerberos`, `basic`, and `none`. | `simple`      |
+| `gravitino.authenticator.tokenHeader` | The HTTP request header the authenticators read the credential from. | `Authorization` |
 
 Naming an authenticator is one line; configuring it is not. Each value reads its own family of
 `gravitino.authenticator.*` properties, covered in

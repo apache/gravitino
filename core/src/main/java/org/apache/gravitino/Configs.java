@@ -25,6 +25,7 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.audit.FileAuditWriter;
 import org.apache.gravitino.audit.v2.SimpleFormatterV2;
+import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -320,6 +321,16 @@ public class Configs {
                   valueList != null && valueList.stream().allMatch(StringUtils::isNotBlank),
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(Lists.newArrayList("simple"));
+
+  public static final ConfigEntry<String> AUTHENTICATOR_TOKEN_HEADER =
+      new ConfigBuilder("gravitino.authenticator.tokenHeader")
+          .doc(
+              "The HTTP request header from which the authenticators read the credential. "
+                  + "Defaults to the standard Authorization header")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(AuthConstants.HTTP_HEADER_AUTHORIZATION);
 
   public static final ConfigEntry<Long> STORE_TRANSACTION_MAX_SKEW_TIME =
       new ConfigBuilder("gravitino.entity.store.maxTransactionSkewTimeMs")
