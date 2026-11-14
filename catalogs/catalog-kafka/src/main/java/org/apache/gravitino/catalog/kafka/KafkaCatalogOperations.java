@@ -105,8 +105,9 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   @VisibleForTesting NameIdentifier defaultSchemaIdent;
   @VisibleForTesting Properties adminClientConfig;
   private CatalogInfo info;
-  private AdminClient adminClient;
+  @VisibleForTesting AdminClient adminClient;
   private HasPropertyMetadata propertiesMetadata;
+  private Map<String, String> catalogConfig = Collections.emptyMap();
 
   @VisibleForTesting
   KafkaCatalogOperations(EntityStore store, IdGenerator idGenerator) {
@@ -123,6 +124,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata)
       throws RuntimeException {
     this.propertiesMetadata = propertiesMetadata;
+    this.catalogConfig = config != null ? ImmutableMap.copyOf(config) : Collections.emptyMap();
     Preconditions.checkArgument(
         config.containsKey(KafkaCatalogPropertiesMetadata.BOOTSTRAP_SERVERS),
         "Missing configuration: %s",
@@ -236,7 +238,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         .withName(ident.name())
         // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic ID
         // as the Gravitino ID
-        .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), properties))
+        .withProperties(
+            newPropertiesWithId(
+                convertToGravitinoId(topicId),
+                enrichTableTopicLinkageProperties(ident.name(), properties)))
         .withAuditInfo(
             AuditInfo.builder()
                 .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -251,6 +256,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       throws NoSuchSchemaException, TopicAlreadyExistsException {
     NameIdentifier schemaIdent = NameIdentifier.of(ident.namespace().levels());
     checkSchemaExists(schemaIdent);
+    rejectReservedLinkageProperties(properties);
+    // TopicOperationDispatcher validates individual property entries, while
+    // validateTableTopicProperties enforces cross-property rules and direct-call invariants.
+    KafkaTopicPropertiesMetadata.validateTableTopicProperties(properties);
 
     try {
       CreateTopicsResult createTopicsResult =
@@ -283,7 +292,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
           .withComment(comment)
           // Because there is no way to store the Gravitino ID in Kafka, therefor we use the topic
           // ID as the Gravitino ID
-          .withProperties(newPropertiesWithId(convertToGravitinoId(topicId), created_properties))
+          .withProperties(
+              newPropertiesWithId(
+                  convertToGravitinoId(topicId),
+                  enrichTableTopicLinkageProperties(ident.name(), created_properties)))
           .withAuditInfo(
               AuditInfo.builder()
                   .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -327,6 +339,7 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     int newPartitionCount = oldPartitionCount;
     Map<String, String> alteredProperties = Maps.newHashMap(topic.properties());
     List<AlterConfigOp> alterConfigOps = Lists.newArrayList();
+    boolean tableTopicEnableRemoved = false;
     for (TopicChange change : changes) {
       if (change instanceof TopicChange.UpdateTopicComment) {
         newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
@@ -339,15 +352,36 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         } else {
           // alter other properties
           setProperty(setProperty, alteredProperties, alterConfigOps);
+          if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE.equals(
+              setProperty.getProperty())) {
+            tableTopicEnableRemoved = false;
+          }
         }
 
       } else if (change instanceof TopicChange.RemoveProperty) {
-        removeProperty((TopicChange.RemoveProperty) change, alteredProperties, alterConfigOps);
+        TopicChange.RemoveProperty removeChange = (TopicChange.RemoveProperty) change;
+        removeProperty(removeChange, alteredProperties, alterConfigOps);
+        if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE.equals(
+            removeChange.getProperty())) {
+          tableTopicEnableRemoved = true;
+        }
 
       } else {
         throw new IllegalArgumentException("Unsupported topic change: " + change);
       }
     }
+
+    alteredProperties
+        .keySet()
+        .removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
+    // Validate cross-property constraints against the merged post-alter property map.
+    Map<String, String> propsForValidation = alteredProperties;
+    if (tableTopicEnableRemoved
+        && !alteredProperties.containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE)) {
+      propsForValidation = Maps.newHashMap(alteredProperties);
+      propsForValidation.put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false");
+    }
+    KafkaTopicPropertiesMetadata.validateTableTopicProperties(propsForValidation);
 
     if (newPartitionCount != oldPartitionCount) {
       doPartitionCountIncrement(ident.name(), newPartitionCount);
@@ -356,6 +390,8 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     if (!alterConfigOps.isEmpty()) {
       doAlterTopicConfig(ident.name(), alterConfigOps);
     }
+
+    alteredProperties = enrichTableTopicLinkageProperties(ident.name(), alteredProperties);
 
     return KafkaTopic.builder()
         .withName(ident.name())
@@ -460,6 +496,47 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     }
   }
 
+  @VisibleForTesting
+  Map<String, String> enrichTableTopicLinkageProperties(
+      String topicName, Map<String, String> rawProperties) {
+    Map<String, String> enriched =
+        rawProperties == null ? Maps.newHashMap() : Maps.newHashMap(rawProperties);
+    enriched.keySet().removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
+
+    String enabled = enriched.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE);
+    if (enabled == null || !"true".equalsIgnoreCase(enabled.trim())) {
+      return enriched;
+    }
+
+    String namespace = enriched.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE);
+    if (namespace == null || namespace.trim().isEmpty()) {
+      namespace = catalogConfig.get(KafkaCatalogPropertiesMetadata.TABLE_TOPIC_DEFAULT_NAMESPACE);
+    }
+    if (namespace == null || namespace.trim().isEmpty()) {
+      namespace = "default";
+    } else {
+      namespace = namespace.trim();
+    }
+
+    String icebergCatalog =
+        catalogConfig.get(KafkaCatalogPropertiesMetadata.TABLE_TOPIC_ICEBERG_CATALOG);
+    enriched.put(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED, "true");
+    enriched.put(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE, namespace);
+    enriched.put(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_TABLE, topicName);
+
+    if (icebergCatalog != null && !icebergCatalog.trim().isEmpty()) {
+      String trimmedCatalog = icebergCatalog.trim();
+      enriched.put(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_CATALOG, trimmedCatalog);
+      enriched.put(
+          KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT,
+          trimmedCatalog + "." + namespace + "." + topicName);
+    } else {
+      enriched.put(
+          KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT, namespace + "." + topicName);
+    }
+    return enriched;
+  }
+
   /**
    * Make sure the schema exists, otherwise throw an exception.
    *
@@ -509,24 +586,29 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       TopicChange.SetProperty setProperty,
       Map<String, String> alteredProperties,
       List<AlterConfigOp> alterConfigOps) {
-    alteredProperties.put(setProperty.getProperty(), setProperty.getValue());
+    String key = setProperty.getProperty();
+    if (KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS.contains(key)) {
+      throw new IllegalArgumentException(
+          "Property " + key + " is reserved and cannot be set directly");
+    }
+    alteredProperties.put(key, setProperty.getValue());
     alterConfigOps.add(
-        new AlterConfigOp(
-            new ConfigEntry(setProperty.getProperty(), setProperty.getValue()),
-            AlterConfigOp.OpType.SET));
+        new AlterConfigOp(new ConfigEntry(key, setProperty.getValue()), AlterConfigOp.OpType.SET));
   }
 
   private void removeProperty(
       TopicChange.RemoveProperty removeProperty,
       Map<String, String> alteredProperties,
       List<AlterConfigOp> alterConfigOps) {
+    String key = removeProperty.getProperty();
     Preconditions.checkArgument(
-        !KafkaTopicPropertiesMetadata.PARTITION_COUNT.equals(removeProperty.getProperty()),
-        "Cannot remove partition count");
-    alteredProperties.remove(removeProperty.getProperty());
-    alterConfigOps.add(
-        new AlterConfigOp(
-            new ConfigEntry(removeProperty.getProperty(), null), AlterConfigOp.OpType.DELETE));
+        !KafkaTopicPropertiesMetadata.PARTITION_COUNT.equals(key), "Cannot remove partition count");
+    if (KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS.contains(key)) {
+      throw new IllegalArgumentException(
+          "Property " + key + " is reserved and cannot be removed directly");
+    }
+    alteredProperties.remove(key);
+    alterConfigOps.add(new AlterConfigOp(new ConfigEntry(key, null), AlterConfigOp.OpType.DELETE));
   }
 
   private void doPartitionCountIncrement(String topicName, int newPartitionCount) {
@@ -594,11 +676,25 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   private Map<String, String> buildNewTopicConfigs(Map<String, String> properties) {
-    Map<String, String> topicConfigs = Maps.newHashMap(properties);
+    Map<String, String> topicConfigs =
+        properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
     topicConfigs.remove(KafkaTopicPropertiesMetadata.PARTITION_COUNT);
     topicConfigs.remove(KafkaTopicPropertiesMetadata.REPLICATION_FACTOR);
     topicConfigs.remove(ID_KEY);
+    topicConfigs.keySet().removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
     return topicConfigs;
+  }
+
+  private void rejectReservedLinkageProperties(Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return;
+    }
+    for (String key : properties.keySet()) {
+      if (KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS.contains(key)) {
+        throw new IllegalArgumentException(
+            "Property " + key + " is reserved and cannot be set directly");
+      }
+    }
   }
 
   private void createDefaultSchemaIfNecessary() {

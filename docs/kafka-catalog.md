@@ -17,10 +17,12 @@ One Kafka catalog corresponds to one Kafka cluster.
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Kafka catalog has the following properties:
 
-| Property Name       | Description                                                                                                                                                                                                   | Default Value | Required |
-|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `bootstrap.servers` | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
-| `gravitino.bypass.` | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
+| Property Name                 | Description                                                                                                                                                                                                   | Default Value | Required |
+|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `bootstrap.servers`           | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
+| `gravitino.bypass.`           | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
+| `table-topic.iceberg-catalog` | Optional name of the Iceberg catalog in the same metalake where AutoMQ Table Topics are materialized. Used to compute read-only Iceberg linkage properties on topics.                                          | (none)        | No       |
+| `table-topic.default-namespace` | Default Iceberg namespace (schema) used when an AutoMQ Table Topic does not specify `automq.table.topic.namespace`.                                                                                          | `default`     | No       |
 
 ### Catalog Operations
 
@@ -71,12 +73,35 @@ workaround.
 
 ### Topic Properties
 
-| Property name        | Description                              | Default value                                                                       | Required |
-|----------------------|------------------------------------------|-------------------------------------------------------------------------------------|----------|
-| `partition-count`    | The number of partitions for the topic.  | if not specified, will use the `num.partitions` property in the broker.              | No       |
-| `replication-factor` | The number of replications for the topic | if not specified, will use the `default.replication.factor` property in the broker. | No       |
+| Property name                          | Description                                                                                     | Default value                                                                       | Required |
+|----------------------------------------|-------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------|----------|
+| `partition-count`                      | The number of partitions for the topic.                                                         | if not specified, will use the `num.partitions` property in the broker.             | No       |
+| `replication-factor`                   | The number of replications for the topic                                                        | if not specified, will use the `default.replication.factor` property in the broker. | No       |
+| `automq.table.topic.enable`            | Whether to materialize this Kafka topic as an AutoMQ Table Topic in Apache Iceberg.             | (none)                                                                              | No       |
+| `automq.table.topic.commit.interval.ms`| Commit interval in milliseconds for materializing AutoMQ Table Topic records (must be `> 0`).   | (none)                                                                              | No       |
+| `automq.table.topic.namespace`         | Target Iceberg namespace (schema) for the materialized Table Topic.                             | (none)                                                                              | No       |
+| `automq.table.topic.schema.type`       | Schema mode for Table Topic conversion (`schemaless`, `schema`, `record_name`, or `topic_name`).| (none)                                                                              | No       |
+| `automq.table.topic.id.columns`        | Comma-separated primary key column names for Iceberg equality deletes/upserts. Required when `automq.table.topic.upsert.enable=true` and `automq.table.topic.enable` is not `false`. | (none) | No |
+| `automq.table.topic.partition.by`      | Iceberg partition transform expressions for the materialized Table Topic.                       | (none)                                                                              | No       |
+| `automq.table.topic.upsert.enable`     | Whether upsert mode is enabled for the materialized AutoMQ Table Topic.                         | (none)                                                                              | No       |
+| `automq.table.topic.cdc.field`         | Field name carrying the CDC operation code for AutoMQ Table Topic materialization.              | (none)                                                                              | No       |
+| `automq.table.topic.errors.tolerance`  | Error tolerance policy when converting records (`none` or `all`).                               | (none)                                                                              | No       |
 
 Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
+
+#### AutoMQ Table Topic Iceberg Linkage Properties
+
+When `automq.table.topic.enable` is set to `true`, Gravitino populates the following reserved read-only properties on `loadTopic`, `createTopic`, and `alterTopic` responses (these properties cannot be set, altered, or removed directly by clients):
+
+| Property name                 | Description                                                                                                                |
+|-------------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| `table-topic.enabled`         | Set to `true` when AutoMQ Table Topic materialization is enabled on the topic.                                             |
+| `table-topic.iceberg-catalog` | Linked Iceberg catalog name from catalog property `table-topic.iceberg-catalog`, if configured.                            |
+| `table-topic.iceberg-namespace`| Resolved Iceberg namespace (`automq.table.topic.namespace`, falling back to `table-topic.default-namespace`, or `default`).|
+| `table-topic.iceberg-table`   | Target Iceberg table name (matching the Kafka topic name).                                                                 |
+| `table-topic.iceberg-ident`   | Qualified Iceberg table identifier (`<iceberg-catalog>.<namespace>.<table>` or `<namespace>.<table>` if catalog is unset). |
+
+Gravitino's MCP server exposes `get_topic_iceberg_linkage` to retrieve this linked Iceberg identifier and Table Topic configuration for a topic.
 
 ### Topic Operations
 
