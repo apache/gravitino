@@ -816,3 +816,16 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
+
+CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
+  `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
+  `operation_binding` TEXT        NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
+  `claim`             BIGINT NOT NULL COMMENT 'reservation fencing token',
+  `http_status`       INT(10)    UNSIGNED DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
+  `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
+  `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
+  `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
+  `expires_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record expires at (unix epoch millis)',
+  PRIMARY KEY (`idempotency_key`),
+  KEY `idx_iik_expires` (`expires_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency key records';

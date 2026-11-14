@@ -1415,3 +1415,24 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS iceberg_idempotency_key_meta (
+  idempotency_key   VARCHAR(36)  NOT NULL PRIMARY KEY,
+  operation_binding TEXT NOT NULL,
+  claim             BIGINT NOT NULL,
+  http_status       INT,
+  response_summary  TEXT,
+  audit_info        TEXT         NOT NULL,
+  created_at        BIGINT       NOT NULL,
+  expires_at        BIGINT       NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_iik_expires ON iceberg_idempotency_key_meta (expires_at);
+COMMENT ON TABLE iceberg_idempotency_key_meta IS 'Iceberg REST idempotency key records';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.idempotency_key IS 'client-provided UUIDv7 idempotency key';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.operation_binding IS 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.claim IS 'reservation fencing token';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.http_status IS 'HTTP status of finalized response, NULL while reserved';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.response_summary IS 'serialized response body (JSON) for replay';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.audit_info IS 'idempotency record audit info';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.created_at IS 'record created at (unix epoch millis)';
+COMMENT ON COLUMN iceberg_idempotency_key_meta.expires_at IS 'record expires at (unix epoch millis)';
