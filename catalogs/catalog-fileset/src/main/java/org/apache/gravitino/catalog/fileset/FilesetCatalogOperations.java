@@ -19,12 +19,7 @@
 package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
-import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_PRINCIPAL;
-import static org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider.GRAVITINO_BYPASS;
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.SCHEME_HDFS;
-import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import static org.apache.gravitino.file.Fileset.PROPERTY_ALLOW_EXISTING_LOCATION_AS_MANAGED;
 import static org.apache.gravitino.file.Fileset.PROPERTY_CATALOG_PLACEHOLDER;
@@ -92,10 +87,9 @@ import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProxy;
 import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
-import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
-import org.apache.gravitino.catalog.hadoop.fs.kerberos.KerberosConfig;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -188,6 +182,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   // BaseGVFSOperations
   @VisibleForTesting Cache<FileSystemCacheKey, FileSystem> fileSystemCache;
 
+  // Resolving the HDFS login settings parses XML, so it is done once for each configuration.
+  // Expiring after write lets edits to the config.resources files reach the key within an hour.
+  private final Cache<Map<String, String>, Map<String, String>> hdfsLoginSettingsCache =
+      Caffeine.newBuilder().maximumSize(1000).expireAfterWrite(1, TimeUnit.HOURS).build();
+
   @VisibleForTesting
   final ThreadPoolExecutor fileSystemExecutor =
       new ThreadPoolExecutor(
@@ -231,52 +230,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
      * When the path is a path without scheme such as 'file','hdfs', etc., then the scheme and
      * authority are both null
      *
-     * <p>NOTE: The filesystem cache key includes the scheme, authority, current user and the
-     * authentication settings of the configuration. Changes to other configuration of the fileset
-     * will not affect the cached filesystem.
+     * <p>NOTE: The filesystem cache key includes the scheme, authority, current user and, for HDFS,
+     * the login settings of the configuration. Changes to other configuration of the fileset will
+     * not affect the cached filesystem.
      */
     @Nullable private final String scheme;
 
     @Nullable private final String authority;
     private final String currentUser;
-    private final Map<String, String> authenticationSettings;
+    private final Map<String, String> loginSettings;
 
-    FileSystemCacheKey(String scheme, String authority, Map<String, String> conf) {
+    FileSystemCacheKey(String scheme, String authority, Map<String, String> loginSettings) {
       this.scheme = scheme;
       this.authority = authority;
       this.currentUser = PrincipalUtils.getCurrentUserName();
-      this.authenticationSettings = resolveAuthenticationSettings(conf);
-    }
-
-    /**
-     * Resolves the settings that decide how an HDFS file system logs in from the Hadoop
-     * configuration that {@code HDFSFileSystemProxy} builds, so that values from {@code
-     * config.resources} files and variable expansion count. The authority carries the principal
-     * only without its realm, and a location without a scheme has no authority at all.
-     */
-    private static Map<String, String> resolveAuthenticationSettings(Map<String, String> conf) {
-      Configuration configuration =
-          FileSystemUtils.createCompatibleConfiguration(
-              GRAVITINO_BYPASS, additionalHDFSConfig(conf));
-      AuthenticationConfig authenticationConfig = new AuthenticationConfig(conf, configuration);
-      Map<String, String> settings = new HashMap<>();
-      settings.put(AuthenticationConfig.AUTH_TYPE_KEY, authenticationConfig.getAuthType());
-      settings.put(
-          AuthenticationConfig.IMPERSONATION_ENABLE_KEY,
-          String.valueOf(authenticationConfig.isImpersonationEnabled()));
-      // A catalog, schema or fileset property overrides the Hadoop value, as in KerberosConfig.
-      settings.put(
-          KerberosConfig.PRINCIPAL_KEY,
-          conf.getOrDefault(
-              KerberosConfig.PRINCIPAL_KEY, configuration.get(HADOOP_SECURITY_PRINCIPAL, "")));
-      settings.put(
-          KerberosConfig.KEY_TAB_URI_KEY,
-          conf.getOrDefault(
-              KerberosConfig.KEY_TAB_URI_KEY, configuration.get(HADOOP_SECURITY_KEYTAB, "")));
-      settings.put(HADOOP_KRB5_CONF, configuration.get(HADOOP_KRB5_CONF, ""));
-      // Other settings in these files, such as HA name services, decide which cluster is reached.
-      settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
-      return Collections.unmodifiableMap(settings);
+      this.loginSettings = loginSettings;
     }
 
     @Override
@@ -291,7 +259,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       return Objects.equals(scheme, that.scheme)
           && Objects.equals(authority, that.authority)
           && Objects.equals(currentUser, that.currentUser)
-          && authenticationSettings.equals(that.authenticationSettings);
+          && loginSettings.equals(that.loginSettings);
     }
 
     @Override
@@ -299,7 +267,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       int result = 31 * (scheme == null ? 0 : scheme.hashCode());
       result = 31 * result + (authority == null ? 0 : authority.hashCode());
       result = 31 * result + currentUser.hashCode();
-      result = 31 * result + authenticationSettings.hashCode();
+      result = 31 * result + loginSettings.hashCode();
       return result;
     }
   }
@@ -1094,6 +1062,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               });
       fileSystemCache.cleanUp();
     }
+    // The keys hold the merged configuration, which may carry resolved secrets.
+    hdfsLoginSettingsCache.invalidateAll();
 
     // Metrics System could be null in UT.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
@@ -1517,7 +1487,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
     return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority, conf),
+        new FileSystemCacheKey(scheme, authority, loginSettings(path, conf)),
         cacheKey -> {
           try {
             // Create the file system for the user it is cached under.
@@ -1527,6 +1497,32 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 e, "Failed to get FileSystem for fileset: path: %s", path);
           }
         });
+  }
+
+  // Only an HDFS file system logs in with these settings, see createFileSystem.
+  private Map<String, String> loginSettings(Path path, Map<String, String> conf) {
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    if (!SCHEME_HDFS.equals(scheme)) {
+      return Collections.emptyMap();
+    }
+
+    try {
+      return hdfsLoginSettingsCache.get(
+          Collections.unmodifiableMap(new HashMap<>(conf)),
+          c -> {
+            Map<String, String> settings = new HashMap<>(HDFSFileSystemProxy.loginSettings(c));
+            // Other settings in these files, such as HA name services, decide which cluster is
+            // reached.
+            settings.put(CONFIG_RESOURCES, c.getOrDefault(CONFIG_RESOURCES, ""));
+            return Collections.unmodifiableMap(settings);
+          });
+    } catch (RuntimeException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to get FileSystem for fileset: path: %s", path);
+    }
   }
 
   private String buildGVFSFilePath(

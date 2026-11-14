@@ -45,8 +45,11 @@ import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.CATALOG_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.FILESET_PROPERTIES_META;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogImpl.SCHEMA_PROPERTIES_META;
+import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DEFAULT_FS_PROVIDER;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.DISABLE_FILESYSTEM_OPS;
 import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetadata.LOCATION;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_HDFS_FS_PROVIDER;
+import static org.apache.gravitino.catalog.hadoop.fs.Constants.BUILTIN_LOCAL_FS_PROVIDER;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.CONFIG_RESOURCES;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_KRB5_CONF;
 import static org.apache.gravitino.catalog.hadoop.fs.Constants.HADOOP_SECURITY_KEYTAB;
@@ -2764,25 +2767,35 @@ public class TestFilesetCatalogOperations {
         new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
   }
 
-  @Test
-  public void testFileSystemCacheSeparatesAuthenticationSettings() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheSeparatesAuthenticationSettings(String defaultProvider)
+      throws Exception {
     File resourceA = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/a-site.xml");
     File resourceB = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/b-site.xml");
     FileUtils.writeStringToFile(resourceA, "<configuration/>", StandardCharsets.UTF_8);
     FileUtils.writeStringToFile(resourceB, "<configuration/>", StandardCharsets.UTF_8);
-    // Listed here, not read from FileSystemCacheKey, so that removing a key there fails this test.
+    // Listed here, not read from the code under test, so that dropping a setting there fails this
+    // test.
     Map<String, String[]> settings =
         ImmutableMap.<String, String[]>builder()
             .put(AuthenticationConfig.AUTH_TYPE_KEY, new String[] {"simple", "kerberos"})
-            .put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, new String[] {"false", "true"})
-            .put(KerberosConfig.PRINCIPAL_KEY, new String[] {"svc@A.COM", "svc@B.COM"})
-            .put(
-                KerberosConfig.KEY_TAB_URI_KEY,
-                new String[] {"file:///a.keytab", "file:///b.keytab"})
             .put(HADOOP_SECURITY_AUTHENTICATION, new String[] {"simple", "kerberos"})
             .put(
                 GRAVITINO_BYPASS + HADOOP_SECURITY_AUTHENTICATION,
                 new String[] {"simple", "kerberos"})
+            .put(AuthenticationConfig.IMPERSONATION_ENABLE_KEY, new String[] {"false", "true"})
+            .put(
+                CONFIG_RESOURCES,
+                new String[] {resourceA.getAbsolutePath(), resourceB.getAbsolutePath()})
+            .build();
+    // These decide the login only with Kerberos authentication.
+    Map<String, String[]> kerberosSettings =
+        ImmutableMap.<String, String[]>builder()
+            .put(KerberosConfig.PRINCIPAL_KEY, new String[] {"svc@A.COM", "svc@B.COM"})
+            .put(
+                KerberosConfig.KEY_TAB_URI_KEY,
+                new String[] {"file:///a.keytab", "file:///b.keytab"})
             .put(HADOOP_SECURITY_PRINCIPAL, new String[] {"svc@A.COM", "svc@B.COM"})
             .put(
                 GRAVITINO_BYPASS + HADOOP_SECURITY_PRINCIPAL,
@@ -2791,32 +2804,24 @@ public class TestFilesetCatalogOperations {
             .put(GRAVITINO_BYPASS + HADOOP_SECURITY_KEYTAB, new String[] {"/a.keytab", "/b.keytab"})
             .put(HADOOP_KRB5_CONF, new String[] {"/a-krb5.conf", "/b-krb5.conf"})
             .put(GRAVITINO_BYPASS + HADOOP_KRB5_CONF, new String[] {"/a-krb5.conf", "/b-krb5.conf"})
-            .put(
-                CONFIG_RESOURCES,
-                new String[] {resourceA.getAbsolutePath(), resourceB.getAbsolutePath()})
             .build();
 
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
-      for (Path path :
-          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
-        for (Map.Entry<String, String[]> setting : settings.entrySet()) {
-          Map<String, String> first = ImmutableMap.of(setting.getKey(), setting.getValue()[0]);
-          Map<String, String> second = ImmutableMap.of(setting.getKey(), setting.getValue()[1]);
-          FileSystem fs = ops.getFileSystemWithCache(path, first);
-          Assertions.assertSame(
-              fs,
-              ops.getFileSystemWithCache(
-                  path, ImmutableMap.<String, String>builder().putAll(first).put("k", "v").build()),
-              setting.getKey());
-          Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second), setting.getKey());
-        }
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
+        assertSettingsSeparateFileSystems(ops, path, ImmutableMap.of(), settings);
+        assertSettingsSeparateFileSystems(
+            ops,
+            path,
+            ImmutableMap.of(AuthenticationConfig.AUTH_TYPE_KEY, "kerberos"),
+            kerberosSettings);
       }
     }
   }
 
-  @Test
-  public void testFileSystemCacheSeparatesResolvedLoginSettings() throws Exception {
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheSeparatesResolvedLoginSettings(String defaultProvider)
+      throws Exception {
     File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/shared-site.xml");
     FileUtils.writeStringToFile(
         resource,
@@ -2826,25 +2831,155 @@ public class TestFilesetCatalogOperations {
         StandardCharsets.UTF_8);
     Map<String, String> first =
         ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
             CONFIG_RESOURCES,
             resource.getAbsolutePath(),
             GRAVITINO_BYPASS + "tenant.realm",
             "A.COM");
     Map<String, String> second =
         ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
             CONFIG_RESOURCES,
             resource.getAbsolutePath(),
             GRAVITINO_BYPASS + "tenant.realm",
             "B.COM");
 
-    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
-      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
-      for (Path path :
-          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
         Assertions.assertNotSame(
             ops.getFileSystemWithCache(path, first), ops.getFileSystemWithCache(path, second));
       }
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {BUILTIN_HDFS_FS_PROVIDER, BUILTIN_LOCAL_FS_PROVIDER})
+  public void testFileSystemCacheResolvesPrincipalWithKerberosAuthentication(String defaultProvider)
+      throws Exception {
+    // The proxy switches Hadoop to Kerberos authentication before it expands the principal.
+    Map<String, String> first =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-${" + HADOOP_SECURITY_AUTHENTICATION + "}@EXAMPLE.COM");
+    Map<String, String> second =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-simple@EXAMPLE.COM");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
+      for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
+        Assertions.assertNotSame(
+            ops.getFileSystemWithCache(path, first), ops.getFileSystemWithCache(path, second));
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheIgnoresAuthenticationSettingsOfNonHdfsPaths() throws Exception {
+    Map<String, String> simple = ImmutableMap.of(AuthenticationConfig.AUTH_TYPE_KEY, "simple");
+    Map<String, String> kerberos =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "svc@A.COM");
+
+    // Only HDFS file systems log in with these settings. The default provider here is local.
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      for (Path path :
+          new Path[] {new Path(TEST_ROOT_PATH, "cache_key"), new Path("/tmp/cache_key")}) {
+        Assertions.assertSame(
+            ops.getFileSystemWithCache(path, simple), ops.getFileSystemWithCache(path, kerberos));
+      }
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheResolvesLoginSettingsOncePerConfiguration() throws Exception {
+    Map<String, String> conf =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            KerberosConfig.PRINCIPAL_KEY,
+            "svc@A.COM");
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER);
+        MockedStatic<FileSystemUtils> utils =
+            mockStatic(FileSystemUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      // Each request merges its own copy of the configuration.
+      FileSystem fs = ops.getFileSystemWithCache(path, new HashMap<>(conf));
+      Assertions.assertSame(fs, ops.getFileSystemWithCache(path, new HashMap<>(conf)));
+      // Building the Hadoop configuration parses XML, so the second lookup must not do it again.
+      utils.verify(
+          () -> FileSystemUtils.createCompatibleConfiguration(any(), any()), Mockito.times(1));
+    }
+  }
+
+  @Test
+  public void testFileSystemCacheReportsPathOfUnreadableLoginSettings() throws Exception {
+    File resource = new File(UNFORMALIZED_TEST_ROOT_PATH, "cache_key/malformed-site.xml");
+    FileUtils.writeStringToFile(resource, "<configuration>", StandardCharsets.UTF_8);
+    Map<String, String> conf = ImmutableMap.of(CONFIG_RESOURCES, resource.getAbsolutePath());
+    Path path = new Path("hdfs://localhost:8020/cache_key");
+
+    try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(BUILTIN_HDFS_FS_PROVIDER)) {
+      GravitinoRuntimeException e =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class, () -> ops.getFileSystemWithCache(path, conf));
+      Assertions.assertTrue(e.getMessage().contains(path.toString()), e.getMessage());
+      // The cause carries the parse error.
+      Assertions.assertNotNull(e.getCause());
+    }
+  }
+
+  // A real HDFS file system needs a NameNode, and a Kerberos login needs a KDC.
+  private FilesetCatalogOperations newOpsWithStubbedHdfs(String defaultProvider)
+      throws IOException {
+    FilesetCatalogOperations ops = Mockito.spy(new FilesetCatalogOperations(store, secretManager));
+    ops.initialize(
+        ImmutableMap.of(DEFAULT_FS_PROVIDER, defaultProvider),
+        randomCatalogInfo("m1", "c1"),
+        FILESET_PROPERTIES_METADATA);
+    Mockito.doAnswer(invocation -> Mockito.mock(FileSystem.class))
+        .when(ops)
+        .createFileSystem(any(), any(), any(), any(), any());
+    return ops;
+  }
+
+  // An absolute HDFS path, and a path without a scheme when HDFS is the default provider.
+  private static Path[] hdfsCacheKeyPaths(String defaultProvider) {
+    Path absolute = new Path("hdfs://localhost:8020/cache_key");
+    return BUILTIN_HDFS_FS_PROVIDER.equals(defaultProvider)
+        ? new Path[] {absolute, new Path("/cache_key")}
+        : new Path[] {absolute};
+  }
+
+  private static void assertSettingsSeparateFileSystems(
+      FilesetCatalogOperations ops,
+      Path path,
+      Map<String, String> base,
+      Map<String, String[]> settings) {
+    for (Map.Entry<String, String[]> setting : settings.entrySet()) {
+      Map<String, String> first = withSetting(base, setting.getKey(), setting.getValue()[0]);
+      Map<String, String> second = withSetting(base, setting.getKey(), setting.getValue()[1]);
+      FileSystem fs = ops.getFileSystemWithCache(path, first);
+      Assertions.assertSame(
+          fs, ops.getFileSystemWithCache(path, withSetting(first, "k", "v")), setting.getKey());
+      Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second), setting.getKey());
+    }
+  }
+
+  private static Map<String, String> withSetting(
+      Map<String, String> conf, String key, String value) {
+    return ImmutableMap.<String, String>builder().putAll(conf).put(key, value).build();
   }
 
   @Test
