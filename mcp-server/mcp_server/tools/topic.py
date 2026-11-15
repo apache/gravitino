@@ -275,6 +275,7 @@ def load_topic_tools(mcp: FastMCP):
                 props.get("table-topic.iceberg-table") or resolved_topic_name
             )
             iceberg_ident = props.get("table-topic.iceberg-ident") or (
+                f"{ctx.request_context.lifespan_context.resolve_metalake()}."
                 f"{iceberg_catalog}.{iceberg_namespace}.{iceberg_table}"
                 if iceberg_catalog
                 else f"{iceberg_namespace}.{iceberg_table}"

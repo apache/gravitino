@@ -333,13 +333,14 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     checkSchemaExists(schemaIdent);
 
     KafkaTopic topic = (KafkaTopic) loadTopic(ident);
+    boolean wasTableTopicEnabled = isTableTopicEnabled(topic.properties());
     String newComment = topic.comment();
     int oldPartitionCount =
         Integer.parseInt(topic.properties().get(KafkaTopicPropertiesMetadata.PARTITION_COUNT));
     int newPartitionCount = oldPartitionCount;
     Map<String, String> alteredProperties = Maps.newHashMap(topic.properties());
     List<AlterConfigOp> alterConfigOps = Lists.newArrayList();
-    boolean tableTopicEnableRemoved = false;
+    boolean namespaceExplicitlyRemoved = false;
     for (TopicChange change : changes) {
       if (change instanceof TopicChange.UpdateTopicComment) {
         newComment = ((TopicChange.UpdateTopicComment) change).getNewComment();
@@ -352,18 +353,18 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         } else {
           // alter other properties
           setProperty(setProperty, alteredProperties, alterConfigOps);
-          if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE.equals(
+          if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE.equals(
               setProperty.getProperty())) {
-            tableTopicEnableRemoved = false;
+            namespaceExplicitlyRemoved = false;
           }
         }
 
       } else if (change instanceof TopicChange.RemoveProperty) {
         TopicChange.RemoveProperty removeChange = (TopicChange.RemoveProperty) change;
         removeProperty(removeChange, alteredProperties, alterConfigOps);
-        if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE.equals(
+        if (KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE.equals(
             removeChange.getProperty())) {
-          tableTopicEnableRemoved = true;
+          namespaceExplicitlyRemoved = true;
         }
 
       } else {
@@ -374,14 +375,24 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     alteredProperties
         .keySet()
         .removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
-    // Validate cross-property constraints against the merged post-alter property map.
-    Map<String, String> propsForValidation = alteredProperties;
-    if (tableTopicEnableRemoved
-        && !alteredProperties.containsKey(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE)) {
-      propsForValidation = Maps.newHashMap(alteredProperties);
-      propsForValidation.put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false");
+    if (!wasTableTopicEnabled
+        && isTableTopicEnabled(alteredProperties)
+        && !namespaceExplicitlyRemoved
+        && !hasNonBlankProperty(
+            alteredProperties, KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE)) {
+      String defaultNamespace = resolveConfiguredDefaultNamespace();
+      if (defaultNamespace != null) {
+        alteredProperties.put(
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE, defaultNamespace);
+        alterConfigOps.add(
+            new AlterConfigOp(
+                new ConfigEntry(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE, defaultNamespace),
+                AlterConfigOp.OpType.SET));
+      }
     }
-    KafkaTopicPropertiesMetadata.validateTableTopicProperties(propsForValidation);
+    // Validate cross-property constraints against the merged post-alter property map.
+    KafkaTopicPropertiesMetadata.validateTableTopicProperties(alteredProperties);
 
     if (newPartitionCount != oldPartitionCount) {
       doPartitionCountIncrement(ident.name(), newPartitionCount);
@@ -503,15 +514,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
         rawProperties == null ? Maps.newHashMap() : Maps.newHashMap(rawProperties);
     enriched.keySet().removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
 
-    String enabled = enriched.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE);
-    if (enabled == null || !"true".equalsIgnoreCase(enabled.trim())) {
+    if (!isTableTopicEnabled(enriched)) {
       return enriched;
     }
 
     String namespace = enriched.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE);
-    if (namespace == null || namespace.trim().isEmpty()) {
-      namespace = catalogConfig.get(KafkaCatalogPropertiesMetadata.TABLE_TOPIC_DEFAULT_NAMESPACE);
-    }
     if (namespace == null || namespace.trim().isEmpty()) {
       namespace = "default";
     } else {
@@ -526,10 +533,18 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
 
     if (icebergCatalog != null && !icebergCatalog.trim().isEmpty()) {
       String trimmedCatalog = icebergCatalog.trim();
+      String metalake =
+          info != null && info.namespace() != null && info.namespace().length() > 0
+              ? info.namespace().level(0)
+              : null;
+      String catalogQualifier =
+          metalake != null && !metalake.trim().isEmpty()
+              ? metalake.trim() + "." + trimmedCatalog
+              : trimmedCatalog;
       enriched.put(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_CATALOG, trimmedCatalog);
       enriched.put(
           KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT,
-          trimmedCatalog + "." + namespace + "." + topicName);
+          catalogQualifier + "." + namespace + "." + topicName);
     } else {
       enriched.put(
           KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT, namespace + "." + topicName);
@@ -682,7 +697,41 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
     topicConfigs.remove(KafkaTopicPropertiesMetadata.REPLICATION_FACTOR);
     topicConfigs.remove(ID_KEY);
     topicConfigs.keySet().removeAll(KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS);
+    if (isTableTopicEnabled(topicConfigs)
+        && !hasNonBlankProperty(
+            topicConfigs, KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE)) {
+      String defaultNamespace = resolveConfiguredDefaultNamespace();
+      if (defaultNamespace != null) {
+        topicConfigs.put(
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE, defaultNamespace);
+      }
+    }
     return topicConfigs;
+  }
+
+  private static boolean isTableTopicEnabled(Map<String, String> properties) {
+    if (properties == null) {
+      return false;
+    }
+    String enabled = properties.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE);
+    return enabled != null && "true".equalsIgnoreCase(enabled.trim());
+  }
+
+  private static boolean hasNonBlankProperty(Map<String, String> properties, String key) {
+    if (properties == null) {
+      return false;
+    }
+    String value = properties.get(key);
+    return value != null && !value.trim().isEmpty();
+  }
+
+  private String resolveConfiguredDefaultNamespace() {
+    String configured =
+        catalogConfig.get(KafkaCatalogPropertiesMetadata.TABLE_TOPIC_DEFAULT_NAMESPACE);
+    if (configured == null || configured.trim().isEmpty()) {
+      return null;
+    }
+    return configured.trim();
   }
 
   private void rejectReservedLinkageProperties(Map<String, String> properties) {

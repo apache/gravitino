@@ -134,7 +134,8 @@ class TestTopicTool(unittest.TestCase):
                     "table-topic.iceberg-namespace": "analytics",
                     "table-topic.iceberg-table": "orders_events",
                     "table-topic.iceberg-ident": (
-                        "iceberg_lakehouse.analytics.orders_events"
+                        "mock_metalake.iceberg_lakehouse."
+                        "analytics.orders_events"
                     ),
                 },
             }
@@ -164,7 +165,8 @@ class TestTopicTool(unittest.TestCase):
                     self.assertEqual("analytics", payload["iceberg_namespace"])
                     self.assertEqual("orders_events", payload["iceberg_table"])
                     self.assertEqual(
-                        "iceberg_lakehouse.analytics.orders_events",
+                        "mock_metalake.iceberg_lakehouse."
+                        "analytics.orders_events",
                         payload["iceberg_ident"],
                     )
                     self.assertEqual("schema", payload["schema_type"])
@@ -212,6 +214,45 @@ class TestTopicTool(unittest.TestCase):
                         "default.orders_raw", payload["iceberg_ident"]
                     )
                     self.assertFalse(payload["upsert_enabled"])
+
+        asyncio.run(_test(self.mcp))
+
+    def test_get_topic_iceberg_linkage_catalog_fallback_includes_metalake(self):
+        topic_payload = json.dumps(
+            {
+                "name": "orders_raw",
+                "properties": {
+                    "automq.table.topic.enable": "true",
+                    "table-topic.iceberg-catalog": "iceberg_lakehouse",
+                },
+            }
+        )
+
+        async def _test(mcp_server):
+            with patch.object(
+                MockTopicOperation,
+                "load_topic",
+                new=AsyncMock(return_value=topic_payload),
+            ):
+                async with Client(mcp_server) as client:
+                    result = await client.call_tool(
+                        "get_topic_iceberg_linkage",
+                        {
+                            "catalog_name": "kafka_cat",
+                            "schema_name": "default",
+                            "topic_name": "orders_raw",
+                        },
+                    )
+                    payload = json.loads(result.content[0].text)
+                    self.assertEqual(
+                        "iceberg_lakehouse", payload["iceberg_catalog"]
+                    )
+                    self.assertEqual("default", payload["iceberg_namespace"])
+                    self.assertEqual("orders_raw", payload["iceberg_table"])
+                    self.assertEqual(
+                        "mock_metalake.iceberg_lakehouse.default.orders_raw",
+                        payload["iceberg_ident"],
+                    )
 
         asyncio.run(_test(self.mcp))
 

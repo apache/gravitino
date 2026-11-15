@@ -200,7 +200,8 @@ public class TestKafkaTopicPropertiesMetadata {
             KafkaTopicPropertiesMetadata.validateTableTopicProperties(
                 ImmutableMap.of(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD, "")));
 
-    // Disabling Table Topic allows cleaning up id.columns even if upsert.enable was previously true
+    // Disabling Table Topic (or leaving automq.table.topic.enable unset) allows omitting
+    // id.columns even if upsert.enable is true
     Assertions.assertDoesNotThrow(
         () ->
             KafkaTopicPropertiesMetadata.validateTableTopicProperties(
@@ -209,5 +210,10 @@ public class TestKafkaTopicPropertiesMetadata {
                     "false",
                     KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE,
                     "true")));
+    Assertions.assertDoesNotThrow(
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE, "true")));
   }
 }

@@ -22,7 +22,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `bootstrap.servers`           | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
 | `gravitino.bypass.`           | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
 | `table-topic.iceberg-catalog` | Optional name of the Iceberg catalog in the same metalake where AutoMQ Table Topics are materialized. Used to compute read-only Iceberg linkage properties on topics.                                          | (none)        | No       |
-| `table-topic.default-namespace` | Default Iceberg namespace (schema) used when an AutoMQ Table Topic does not specify `automq.table.topic.namespace`.                                                                                          | `default`     | No       |
+| `table-topic.default-namespace` | Default Iceberg namespace (schema) written to `automq.table.topic.namespace` when creating or enabling an AutoMQ Table Topic through Gravitino without specifying `automq.table.topic.namespace`.              | `default`     | No       |
 
 ### Catalog Operations
 
@@ -81,7 +81,7 @@ workaround.
 | `automq.table.topic.commit.interval.ms`| Commit interval in milliseconds for materializing AutoMQ Table Topic records (must be `> 0`).   | (none)                                                                              | No       |
 | `automq.table.topic.namespace`         | Target Iceberg namespace (schema) for the materialized Table Topic.                             | (none)                                                                              | No       |
 | `automq.table.topic.schema.type`       | Schema mode for Table Topic conversion (`schemaless`, `schema`, `record_name`, or `topic_name`).| (none)                                                                              | No       |
-| `automq.table.topic.id.columns`        | Comma-separated primary key column names for Iceberg equality deletes/upserts. Required when `automq.table.topic.upsert.enable=true` and `automq.table.topic.enable` is not `false`. | (none) | No |
+| `automq.table.topic.id.columns`        | Comma-separated primary key column names for Iceberg equality deletes/upserts. Required when both `automq.table.topic.enable=true` and `automq.table.topic.upsert.enable=true`. | (none) | No |
 | `automq.table.topic.partition.by`      | Iceberg partition transform expressions for the materialized Table Topic.                       | (none)                                                                              | No       |
 | `automq.table.topic.upsert.enable`     | Whether upsert mode is enabled for the materialized AutoMQ Table Topic.                         | (none)                                                                              | No       |
 | `automq.table.topic.cdc.field`         | Field name carrying the CDC operation code for AutoMQ Table Topic materialization.              | (none)                                                                              | No       |
@@ -97,9 +97,9 @@ When `automq.table.topic.enable` is set to `true`, Gravitino populates the follo
 |-------------------------------|----------------------------------------------------------------------------------------------------------------------------|
 | `table-topic.enabled`         | Set to `true` when AutoMQ Table Topic materialization is enabled on the topic.                                             |
 | `table-topic.iceberg-catalog` | Linked Iceberg catalog name from catalog property `table-topic.iceberg-catalog`, if configured.                            |
-| `table-topic.iceberg-namespace`| Resolved Iceberg namespace (`automq.table.topic.namespace`, falling back to `table-topic.default-namespace`, or `default`).|
+| `table-topic.iceberg-namespace`| Effective Iceberg namespace from `automq.table.topic.namespace` on the topic (`default` if unset on the broker).          |
 | `table-topic.iceberg-table`   | Target Iceberg table name (matching the Kafka topic name).                                                                 |
-| `table-topic.iceberg-ident`   | Qualified Iceberg table identifier (`<iceberg-catalog>.<namespace>.<table>` or `<namespace>.<table>` if catalog is unset). |
+| `table-topic.iceberg-ident`   | Qualified Iceberg table identifier (`<metalake>.<iceberg-catalog>.<namespace>.<table>`, or `<namespace>.<table>` if catalog is unset). |
 
 Gravitino's MCP server exposes `get_topic_iceberg_linkage` to retrieve this linked Iceberg identifier and Table Topic configuration for a topic.
 

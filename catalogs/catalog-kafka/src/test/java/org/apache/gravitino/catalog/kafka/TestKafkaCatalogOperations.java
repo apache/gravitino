@@ -863,6 +863,9 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                   "schema"));
 
       Assertions.assertEquals(
+          "analytics_default",
+          brokerTopicConfigs.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
+      Assertions.assertEquals(
           "true", created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED));
       Assertions.assertEquals(
           "lakehouse_iceberg",
@@ -874,12 +877,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
           topicName,
           created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_TABLE));
       Assertions.assertEquals(
-          "lakehouse_iceberg.analytics_default." + topicName,
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
           created.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
 
       Topic loaded = operations.loadTopic(ident);
       Assertions.assertEquals(
-          "lakehouse_iceberg.analytics_default." + topicName,
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
           loaded.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
 
       Topic alteredNamespace =
@@ -893,7 +896,7 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
               .properties()
               .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
       Assertions.assertEquals(
-          "lakehouse_iceberg.custom_ns." + topicName,
+          "metalake.lakehouse_iceberg.custom_ns." + topicName,
           alteredNamespace
               .properties()
               .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
@@ -902,7 +905,9 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
           operations.alterTopic(
               ident,
               TopicChange.setProperty(
-                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false"));
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "false"),
+              TopicChange.removeProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
       for (String reservedKey : KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS) {
         Assertions.assertFalse(
             disabled.properties().containsKey(reservedKey),
@@ -914,6 +919,33 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
           loadedAfterDisable
               .properties()
               .containsKey(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ENABLED));
+
+      // Enabling Table Topic via alterTopic without an explicit namespace applies default-namespace
+      // to automq.table.topic.namespace on the broker.
+      Topic reEnabled =
+          operations.alterTopic(
+              ident,
+              TopicChange.setProperty(
+                  KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE, "true"));
+      Assertions.assertEquals(
+          "analytics_default",
+          brokerTopicConfigs.get(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.analytics_default." + topicName,
+          reEnabled.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
+
+      // An externally created AutoMQ Table Topic without automq.table.topic.namespace on the
+      // broker materializes into AutoMQ's built-in "default" namespace.
+      brokerTopicConfigs.remove(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_NAMESPACE);
+      Topic externalLoaded = operations.loadTopic(ident);
+      Assertions.assertEquals(
+          "default",
+          externalLoaded
+              .properties()
+              .get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_NAMESPACE));
+      Assertions.assertEquals(
+          "metalake.lakehouse_iceberg.default." + topicName,
+          externalLoaded.properties().get(KafkaTopicPropertiesMetadata.TABLE_TOPIC_ICEBERG_IDENT));
     }
   }
 
@@ -1080,6 +1112,12 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
       for (String reservedKey : KafkaTopicPropertiesMetadata.RESERVED_TABLE_TOPIC_LINKAGE_KEYS) {
         Assertions.assertFalse(altered.properties().containsKey(reservedKey));
       }
+
+      // Subsequent unrelated alterations must still succeed while automq.table.topic.enable is
+      // absent and automq.table.topic.upsert.enable=true remains on the broker.
+      Topic followUpAltered =
+          operations.alterTopic(ident, TopicChange.setProperty("retention.ms", "60000"));
+      Assertions.assertEquals("60000", followUpAltered.properties().get("retention.ms"));
     }
   }
 

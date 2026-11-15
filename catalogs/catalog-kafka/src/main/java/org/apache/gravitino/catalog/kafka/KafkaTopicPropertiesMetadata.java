@@ -223,12 +223,10 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
     }
 
     String tableTopicEnable = properties.get(AUTOMQ_TABLE_TOPIC_ENABLE);
-    boolean tableTopicDisabled =
-        tableTopicEnable != null && "false".equalsIgnoreCase(tableTopicEnable.trim());
+    boolean tableTopicEnabled =
+        tableTopicEnable != null && "true".equalsIgnoreCase(tableTopicEnable.trim());
     String upsertEnable = properties.get(AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE);
-    if (!tableTopicDisabled
-        && upsertEnable != null
-        && "true".equalsIgnoreCase(upsertEnable.trim())) {
+    if (tableTopicEnabled && upsertEnable != null && "true".equalsIgnoreCase(upsertEnable.trim())) {
       String idColumns = properties.get(AUTOMQ_TABLE_TOPIC_ID_COLUMNS);
       if (isBlank(idColumns)) {
         throw new IllegalArgumentException(
