@@ -24,6 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyMap;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
@@ -284,7 +286,6 @@ public class TestBaseGVFSOperationsSecrets {
             });
     TestOps ops = spy(opsFor(catalog));
     NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
-    doReturn(fileset).when(ops).getFileset(ident);
     doReturn(true).when(ops).enableCredentialVending();
     FileSystem filesystem = mock(FileSystem.class);
     doReturn(filesystem).when(ops).getActualFileSystemByPath(any(Path.class), anyMap());
@@ -298,6 +299,60 @@ public class TestBaseGVFSOperationsSecrets {
         assertThrows(
             RuntimeException.class, () -> ops.getActualFileSystemByLocationName(ident, "default"));
     assertSame(denied, failure.getCause());
+  }
+
+  @Test
+  void testCredentialVendingReusesLoadedFileset() throws Exception {
+    Catalog catalog =
+        mockCatalogWithCredentials(Map.of("s3-endpoint", "http://s3.example.com"), null);
+    FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
+    Fileset fileset = filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"));
+    when(fileset.storageLocations()).thenReturn(Map.of("default", "s3a://bucket/data"));
+    SupportsCredentials filesetCredentials = mock(SupportsCredentials.class);
+    when(fileset.supportsCredentials()).thenReturn(filesetCredentials);
+    when(filesetCredentials.getCredentials())
+        .thenReturn(
+            new Credential[] {
+              new S3TokenCredential("SCOPED", "scoped-secret", "token", Long.MAX_VALUE)
+            });
+    TestOps ops = spy(opsFor(catalog));
+    NameIdentifier ident = NameIdentifier.of("ml", "catalog", "schema", "fs");
+    doReturn(true).when(ops).enableCredentialVending();
+    doReturn(mock(FileSystem.class)).when(ops).getActualFileSystemByPath(any(Path.class), anyMap());
+    clearInvocations(filesetCatalog);
+
+    ops.getActualFileSystemByLocationName(ident, "default");
+
+    // Expected values: one resolution gets the fileset catalog and the fileset once, and credential
+    // vending uses that fileset instead of getting it again.
+    verify(ops, times(1)).getFilesetCatalog(NameIdentifier.of("ml", "catalog"));
+    verify(ops, times(1)).getFileset(ident, filesetCatalog);
+    verify(filesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
+    verify(filesetCredentials, times(1)).getCredentials();
+  }
+
+  @Test
+  void testFilesetCatalogThatIsNotCatalog() throws Exception {
+    // The fixture's fileset catalog implements only FilesetCatalog, as one returned by an
+    // overriding getFilesetCatalog may, and opsFor disables the automatic location creation.
+    Catalog catalog =
+        mockCatalogWithCredentials(Map.of("s3-endpoint", "http://s3.example.com"), null);
+    Fileset fileset = catalog.asFilesetCatalog().loadFileset(NameIdentifier.of("schema", "fs"));
+    when(fileset.storageLocations()).thenReturn(Map.of("default", "s3a://bucket/data"));
+    TestOps ops = spy(opsFor(catalog));
+    FileSystem filesystem = mock(FileSystem.class);
+    doReturn(filesystem).when(ops).getActualFileSystemByPath(any(Path.class), anyMap());
+
+    assertSame(
+        filesystem,
+        ops.getActualFileSystemByLocationName(
+            NameIdentifier.of("ml", "catalog", "schema", "fs"), "default"));
+    // Expected value: the catalog properties come from the catalog loaded through the client,
+    // because the fileset catalog is not a Catalog.
+    verify(ops)
+        .getActualFileSystemByPath(
+            any(Path.class),
+            argThat(props -> "http://s3.example.com".equals(props.get("s3-endpoint"))));
   }
 
   @Test
