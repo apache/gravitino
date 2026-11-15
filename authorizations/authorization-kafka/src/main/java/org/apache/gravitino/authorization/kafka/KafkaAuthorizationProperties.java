@@ -71,6 +71,14 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
   /** Whether {@code ALLOW PRODUCE_TOPIC} also grants {@code CLUSTER:IDEMPOTENT_WRITE}. */
   public static final String IDEMPOTENT_WRITE_ACL_ENABLED = PREFIX + "idempotent-write-acl.enabled";
 
+  /**
+   * Whether Gravitino group role grants and group ownership are pushed to Kafka ACLs. Disabled by
+   * default because Apache Kafka's built-in {@code StandardAuthorizer} does not expand group
+   * membership unless paired with a group-aware {@code Authorizer} or {@code
+   * KafkaPrincipalBuilder}.
+   */
+  public static final String GROUP_ACL_ENABLED = PREFIX + "group-acl.enabled";
+
   /** Timeout in milliseconds for Kafka {@code AdminClient} ACL requests (default {@code 30000}). */
   public static final String REQUEST_TIMEOUT_MS = PREFIX + "request-timeout-ms";
 
@@ -91,6 +99,9 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
 
   /** Default flag for granting cluster idempotent write on produce grants. */
   public static final boolean DEFAULT_IDEMPOTENT_WRITE_ACL_ENABLED = true;
+
+  /** Default flag for pushing group ACLs to Kafka. */
+  public static final boolean DEFAULT_GROUP_ACL_ENABLED = false;
 
   /** Default Kafka AdminClient request timeout in milliseconds. */
   public static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
@@ -134,8 +145,14 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
     if (StringUtils.isBlank(getUserPrincipalType())) {
       throw new IllegalArgumentException(USER_PRINCIPAL_TYPE + " must not be blank");
     }
+    if ("*".equals(getUserPrincipalType())) {
+      throw new IllegalArgumentException(USER_PRINCIPAL_TYPE + " must not be wildcard '*'");
+    }
     if (StringUtils.isBlank(getGroupPrincipalType())) {
       throw new IllegalArgumentException(GROUP_PRINCIPAL_TYPE + " must not be blank");
+    }
+    if ("*".equals(getGroupPrincipalType())) {
+      throw new IllegalArgumentException(GROUP_PRINCIPAL_TYPE + " must not be wildcard '*'");
     }
     if (StringUtils.isBlank(getConsumerGroupPattern())) {
       throw new IllegalArgumentException(CONSUMER_GROUP_PATTERN + " must not be blank");
@@ -147,16 +164,9 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
     // Validate consumer group pattern type
     getConsumerGroupPatternType();
 
-    // Validate boolean flag strictly
-    String idempotentRaw = properties.get(IDEMPOTENT_WRITE_ACL_ENABLED);
-    if (idempotentRaw != null
-        && !"true".equalsIgnoreCase(idempotentRaw.trim())
-        && !"false".equalsIgnoreCase(idempotentRaw.trim())) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Invalid boolean value '%s' for %s; expected 'true' or 'false'",
-              idempotentRaw, IDEMPOTENT_WRITE_ACL_ENABLED));
-    }
+    // Validate boolean flags strictly
+    isIdempotentWriteAclEnabled();
+    isGroupAclEnabled();
 
     // Validate request timeout
     int timeoutMs = getRequestTimeoutMs();
@@ -246,9 +256,22 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
    * @return {@code true} if idempotent write ACLs should be emitted.
    */
   public boolean isIdempotentWriteAclEnabled() {
-    String raw = properties.get(IDEMPOTENT_WRITE_ACL_ENABLED);
+    return parseStrictBoolean(IDEMPOTENT_WRITE_ACL_ENABLED, DEFAULT_IDEMPOTENT_WRITE_ACL_ENABLED);
+  }
+
+  /**
+   * Returns whether Gravitino group grants and group ownership are pushed to Kafka ACLs.
+   *
+   * @return {@code true} if group ACL push-down is enabled.
+   */
+  public boolean isGroupAclEnabled() {
+    return parseStrictBoolean(GROUP_ACL_ENABLED, DEFAULT_GROUP_ACL_ENABLED);
+  }
+
+  private boolean parseStrictBoolean(String key, boolean defaultValue) {
+    String raw = properties.get(key);
     if (raw == null) {
-      return DEFAULT_IDEMPOTENT_WRITE_ACL_ENABLED;
+      return defaultValue;
     }
     String trimmed = raw.trim();
     if ("true".equalsIgnoreCase(trimmed)) {
@@ -258,9 +281,7 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
       return false;
     }
     throw new IllegalArgumentException(
-        String.format(
-            "Invalid boolean value '%s' for %s; expected 'true' or 'false'",
-            raw, IDEMPOTENT_WRITE_ACL_ENABLED));
+        String.format("Invalid boolean value '%s' for %s; expected 'true' or 'false'", raw, key));
   }
 
   /**
@@ -311,6 +332,9 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
    */
   public String formatUserPrincipal(String username) {
     Preconditions.checkArgument(StringUtils.isNotBlank(username), "Username must not be blank");
+    Preconditions.checkArgument(
+        !"*".equals(username.trim()),
+        "Wildcard Kafka principal name '*' is not allowed for Gravitino user ACLs");
     return getUserPrincipalType() + ":" + username;
   }
 
@@ -322,6 +346,9 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
    */
   public String formatGroupPrincipal(String groupName) {
     Preconditions.checkArgument(StringUtils.isNotBlank(groupName), "Group name must not be blank");
+    Preconditions.checkArgument(
+        !"*".equals(groupName.trim()),
+        "Wildcard Kafka principal name '*' is not allowed for Gravitino group ACLs");
     return getGroupPrincipalType() + ":" + groupName;
   }
 

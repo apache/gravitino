@@ -66,10 +66,12 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
@@ -717,6 +719,55 @@ public class TestAccessControlManager {
     Assertions.assertThrows(
         NoSuchMetalakeException.class,
         () -> accessControlManager.listGroups("no_such_metalake", 0, 10));
+  }
+
+  @Test
+  public void testRemoveUserAndGroupInvokesAuthorizationPlugin() throws Exception {
+    Mockito.reset(authorizationPlugin);
+    when(catalogManager.listCatalogs(Namespace.of(METALAKE)))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of(METALAKE, "catalog")});
+    try {
+      accessControlManager.addUser(METALAKE, "plugin_removed_user");
+      when(authorizationPlugin.onUserRemoved(any()))
+          .thenAnswer(
+              inv -> {
+                User removedUser = inv.getArgument(0);
+                Assertions.assertEquals("plugin_removed_user", removedUser.name());
+                Assertions.assertTrue(
+                    entityStore.exists(
+                        AuthorizationUtils.ofUser(METALAKE, "plugin_removed_user"),
+                        Entity.EntityType.USER),
+                    "onUserRemoved must run before deleting the user from EntityStore");
+                return Boolean.TRUE;
+              });
+
+      Assertions.assertTrue(accessControlManager.removeUser(METALAKE, "plugin_removed_user"));
+      Mockito.verify(authorizationPlugin, Mockito.times(1)).onUserRemoved(any());
+
+      // Removing a non-existent user must not invoke authorization plugins
+      Assertions.assertFalse(accessControlManager.removeUser(METALAKE, "plugin_missing_user"));
+      Mockito.verify(authorizationPlugin, Mockito.times(1)).onUserRemoved(any());
+
+      accessControlManager.addGroup(METALAKE, "plugin_removed_group");
+      when(authorizationPlugin.onGroupRemoved(any()))
+          .thenAnswer(
+              inv -> {
+                Group removedGroup = inv.getArgument(0);
+                Assertions.assertEquals("plugin_removed_group", removedGroup.name());
+                Assertions.assertTrue(
+                    entityStore.exists(
+                        AuthorizationUtils.ofGroup(METALAKE, "plugin_removed_group"),
+                        Entity.EntityType.GROUP),
+                    "onGroupRemoved must run before deleting the group from EntityStore");
+                return Boolean.TRUE;
+              });
+
+      Assertions.assertTrue(accessControlManager.removeGroup(METALAKE, "plugin_removed_group"));
+      Mockito.verify(authorizationPlugin, Mockito.times(1)).onGroupRemoved(any());
+    } finally {
+      when(catalogManager.listCatalogs(Namespace.of(METALAKE))).thenReturn(null);
+      Mockito.reset(authorizationPlugin);
+    }
   }
 
   private void createCatalogRole(String role) {

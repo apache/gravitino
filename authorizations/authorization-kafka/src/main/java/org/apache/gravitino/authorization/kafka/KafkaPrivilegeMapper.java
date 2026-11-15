@@ -159,11 +159,6 @@ public final class KafkaPrivilegeMapper {
         if (permissionType == AclPermissionType.ALLOW) {
           bindings.add(
               new AclBinding(
-                  CLUSTER_RESOURCE,
-                  new AccessControlEntry(
-                      kafkaPrincipal, host, AclOperation.CREATE, AclPermissionType.ALLOW)));
-          bindings.add(
-              new AclBinding(
                   topicTarget,
                   new AccessControlEntry(
                       kafkaPrincipal, host, AclOperation.CREATE, AclPermissionType.ALLOW)));
@@ -233,13 +228,6 @@ public final class KafkaPrivilegeMapper {
               CLUSTER_RESOURCE,
               new AccessControlEntry(
                   kafkaPrincipal, host, AclOperation.IDEMPOTENT_WRITE, AclPermissionType.ALLOW)));
-    }
-    if (metadataObject.type() != MetadataObject.Type.TOPIC) {
-      bindings.add(
-          new AclBinding(
-              CLUSTER_RESOURCE,
-              new AccessControlEntry(
-                  kafkaPrincipal, host, AclOperation.CREATE, AclPermissionType.ALLOW)));
     }
     return Collections.unmodifiableSet(bindings);
   }

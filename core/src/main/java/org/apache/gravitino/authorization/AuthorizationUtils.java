@@ -271,6 +271,21 @@ public class AuthorizationUtils {
     }
   }
 
+  public static void callAuthorizationPluginForMetalake(
+      String metalake, Consumer<AuthorizationPlugin> consumer) {
+    CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
+    if (catalogManager == null) {
+      return;
+    }
+    NameIdentifier[] catalogIdents = catalogManager.listCatalogs(Namespace.of(metalake));
+    if (catalogIdents == null) {
+      return;
+    }
+    for (NameIdentifier catalogIdent : catalogIdents) {
+      callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
+    }
+  }
+
   public static boolean needApplyAuthorizationPluginAllCatalogs(SecurableObject securableObject) {
     if (securableObject.type() == MetadataObject.Type.METALAKE) {
       List<Privilege> privileges = securableObject.privileges();

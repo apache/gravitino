@@ -39,7 +39,6 @@ import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.MetadataObjectChange;
@@ -73,7 +72,9 @@ import org.slf4j.LoggerFactory;
 public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(KafkaAuthorizationPlugin.class);
+  private static final String GROUP_PROBE_PRINCIPAL = "Group:__gravitino_group_probe__";
 
+  private final Object aclSyncLock = new Object();
   private final KafkaAuthorizationProperties properties;
   private final AdminClient adminClient;
   private final KafkaAuthorizationStateProvider stateProvider;
@@ -133,33 +134,37 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       return Boolean.TRUE;
     }
 
-    Set<String> excludedRoles = Collections.singleton(role.name());
-    List<String> boundUsers = stateProvider.listUserNamesByRole(metalake, role.name());
-    for (String username : boundUsers) {
-      String principal = properties.formatUserPrincipal(username);
-      Set<AclBinding> candidateRemovals = bindingsForRoles(List.of(role), principal);
-      removeBindingsPreservingActiveGrants(
-          Owner.Type.USER,
-          username,
-          candidateRemovals,
-          excludedRoles,
-          Collections.emptyList(),
-          Collections.emptyMap(),
-          null);
-    }
+    synchronized (aclSyncLock) {
+      Set<String> excludedRoles = Collections.singleton(role.name());
+      List<String> boundUsers = stateProvider.listUserNamesByRole(metalake, role.name());
+      for (String username : boundUsers) {
+        String principal = properties.formatUserPrincipal(username);
+        Set<AclBinding> candidateRemovals = bindingsForRoles(List.of(role), principal);
+        removeBindingsPreservingActiveGrants(
+            Owner.Type.USER,
+            username,
+            candidateRemovals,
+            excludedRoles,
+            excludedRoles,
+            Collections.emptyMap(),
+            null);
+      }
 
-    List<String> boundGroups = stateProvider.listGroupNamesByRole(metalake, role.name());
-    for (String groupName : boundGroups) {
-      String principal = properties.formatGroupPrincipal(groupName);
-      Set<AclBinding> candidateRemovals = bindingsForRoles(List.of(role), principal);
-      removeBindingsPreservingActiveGrants(
-          Owner.Type.GROUP,
-          groupName,
-          candidateRemovals,
-          excludedRoles,
-          Collections.emptyList(),
-          Collections.emptyMap(),
-          null);
+      if (properties.isGroupAclEnabled()) {
+        List<String> boundGroups = stateProvider.listGroupNamesByRole(metalake, role.name());
+        for (String groupName : boundGroups) {
+          String principal = properties.formatGroupPrincipal(groupName);
+          Set<AclBinding> candidateRemovals = bindingsForRoles(List.of(role), principal);
+          removeBindingsPreservingActiveGrants(
+              Owner.Type.GROUP,
+              groupName,
+              candidateRemovals,
+              excludedRoles,
+              excludedRoles,
+              Collections.emptyMap(),
+              null);
+        }
+      }
     }
     return Boolean.TRUE;
   }
@@ -170,40 +175,32 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       return Boolean.TRUE;
     }
 
-    List<String> boundUsers = stateProvider.listUserNamesByRole(metalake, role.name());
-    List<String> boundGroups = stateProvider.listGroupNamesByRole(metalake, role.name());
-    if (boundUsers.isEmpty() && boundGroups.isEmpty()) {
-      return Boolean.TRUE;
-    }
+    synchronized (aclSyncLock) {
+      List<String> boundUsers = stateProvider.listUserNamesByRole(metalake, role.name());
+      List<String> boundGroups = stateProvider.listGroupNamesByRole(metalake, role.name());
+      if (boundUsers.isEmpty() && boundGroups.isEmpty()) {
+        return Boolean.TRUE;
+      }
 
-    Role updatedRole = applyRoleChanges(role, changes);
-    Set<String> replacedRoleNames = Collections.singleton(role.name());
-    List<Role> replacementRoles = Collections.singletonList(updatedRole);
+      if (!boundGroups.isEmpty() && !properties.isGroupAclEnabled()) {
+        RoleChangeBindings probeDelta =
+            computeRoleChangeBindings(role, changes, GROUP_PROBE_PRINCIPAL);
+        if (!probeDelta.beforeBindings.isEmpty() || !probeDelta.afterBindings.isEmpty()) {
+          ensureGroupAclEnabled();
+        }
+      }
 
-    for (String username : boundUsers) {
-      String principal = properties.formatUserPrincipal(username);
-      applyRoleUpdateForPrincipal(
-          Owner.Type.USER,
-          username,
-          principal,
-          role,
-          updatedRole,
-          changes,
-          replacedRoleNames,
-          replacementRoles);
-    }
+      for (String username : boundUsers) {
+        String principal = properties.formatUserPrincipal(username);
+        applyRoleUpdateForPrincipal(Owner.Type.USER, username, principal, role, changes);
+      }
 
-    for (String groupName : boundGroups) {
-      String principal = properties.formatGroupPrincipal(groupName);
-      applyRoleUpdateForPrincipal(
-          Owner.Type.GROUP,
-          groupName,
-          principal,
-          role,
-          updatedRole,
-          changes,
-          replacedRoleNames,
-          replacementRoles);
+      if (properties.isGroupAclEnabled()) {
+        for (String groupName : boundGroups) {
+          String principal = properties.formatGroupPrincipal(groupName);
+          applyRoleUpdateForPrincipal(Owner.Type.GROUP, groupName, principal, role, changes);
+        }
+      }
     }
 
     return Boolean.TRUE;
@@ -214,8 +211,10 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     if (user == null || roles == null || roles.isEmpty()) {
       return Boolean.TRUE;
     }
-    String principal = properties.formatUserPrincipal(user.name());
-    createAcls(bindingsForRoles(roles, principal));
+    synchronized (aclSyncLock) {
+      String principal = properties.formatUserPrincipal(user.name());
+      createAcls(bindingsForRoles(roles, principal));
+    }
     return Boolean.TRUE;
   }
 
@@ -224,16 +223,18 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     if (user == null || roles == null || roles.isEmpty()) {
       return Boolean.TRUE;
     }
-    String principal = properties.formatUserPrincipal(user.name());
-    Set<AclBinding> candidateRemovals = bindingsForRoles(roles, principal);
-    removeBindingsPreservingActiveGrants(
-        Owner.Type.USER,
-        user.name(),
-        candidateRemovals,
-        extractRoleNames(roles),
-        Collections.emptyList(),
-        Collections.emptyMap(),
-        null);
+    synchronized (aclSyncLock) {
+      String principal = properties.formatUserPrincipal(user.name());
+      Set<AclBinding> candidateRemovals = bindingsForRoles(roles, principal);
+      removeBindingsPreservingActiveGrants(
+          Owner.Type.USER,
+          user.name(),
+          candidateRemovals,
+          extractRoleNames(roles),
+          Collections.emptySet(),
+          Collections.emptyMap(),
+          null);
+    }
     return Boolean.TRUE;
   }
 
@@ -242,8 +243,16 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     if (group == null || roles == null || roles.isEmpty()) {
       return Boolean.TRUE;
     }
-    String principal = properties.formatGroupPrincipal(group.name());
-    createAcls(bindingsForRoles(roles, principal));
+    synchronized (aclSyncLock) {
+      if (!properties.isGroupAclEnabled()) {
+        if (!bindingsForRoles(roles, GROUP_PROBE_PRINCIPAL).isEmpty()) {
+          ensureGroupAclEnabled();
+        }
+        return Boolean.TRUE;
+      }
+      String principal = properties.formatGroupPrincipal(group.name());
+      createAcls(bindingsForRoles(roles, principal));
+    }
     return Boolean.TRUE;
   }
 
@@ -252,16 +261,24 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     if (group == null || roles == null || roles.isEmpty()) {
       return Boolean.TRUE;
     }
-    String principal = properties.formatGroupPrincipal(group.name());
-    Set<AclBinding> candidateRemovals = bindingsForRoles(roles, principal);
-    removeBindingsPreservingActiveGrants(
-        Owner.Type.GROUP,
-        group.name(),
-        candidateRemovals,
-        extractRoleNames(roles),
-        Collections.emptyList(),
-        Collections.emptyMap(),
-        null);
+    synchronized (aclSyncLock) {
+      if (!properties.isGroupAclEnabled()) {
+        if (!bindingsForRoles(roles, GROUP_PROBE_PRINCIPAL).isEmpty()) {
+          ensureGroupAclEnabled();
+        }
+        return Boolean.TRUE;
+      }
+      String principal = properties.formatGroupPrincipal(group.name());
+      Set<AclBinding> candidateRemovals = bindingsForRoles(roles, principal);
+      removeBindingsPreservingActiveGrants(
+          Owner.Type.GROUP,
+          group.name(),
+          candidateRemovals,
+          extractRoleNames(roles),
+          Collections.emptySet(),
+          Collections.emptyMap(),
+          null);
+    }
     return Boolean.TRUE;
   }
 
@@ -273,10 +290,35 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onUserRemoved(User user) throws RuntimeException {
-    if (user == null) {
+    if (user == null || isWildcardIdentityName(user.name())) {
       return Boolean.TRUE;
     }
-    deleteAclsByPrincipal(properties.formatUserPrincipal(user.name()));
+    synchronized (aclSyncLock) {
+      String principal = properties.formatUserPrincipal(user.name());
+      Set<AclBinding> candidateRemovals =
+          collectActiveAclBindingsForPrincipal(
+              Owner.Type.USER,
+              user.name(),
+              principal,
+              Collections.emptySet(),
+              Collections.emptyMap(),
+              null);
+      if (candidateRemovals.isEmpty()) {
+        return Boolean.TRUE;
+      }
+      if (sameUserAndGroupPrincipalType() && properties.isGroupAclEnabled()) {
+        Set<AclBinding> peerBindings =
+            collectActiveAclBindingsForPrincipal(
+                Owner.Type.GROUP,
+                user.name(),
+                principal,
+                Collections.emptySet(),
+                Collections.emptyMap(),
+                null);
+        candidateRemovals = new LinkedHashSet<>(Sets.difference(candidateRemovals, peerBindings));
+      }
+      deleteExactAcls(candidateRemovals);
+    }
     return Boolean.TRUE;
   }
 
@@ -292,10 +334,35 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
 
   @Override
   public Boolean onGroupRemoved(Group group) throws RuntimeException {
-    if (group == null) {
+    if (group == null || !properties.isGroupAclEnabled() || isWildcardIdentityName(group.name())) {
       return Boolean.TRUE;
     }
-    deleteAclsByPrincipal(properties.formatGroupPrincipal(group.name()));
+    synchronized (aclSyncLock) {
+      String principal = properties.formatGroupPrincipal(group.name());
+      Set<AclBinding> candidateRemovals =
+          collectActiveAclBindingsForPrincipal(
+              Owner.Type.GROUP,
+              group.name(),
+              principal,
+              Collections.emptySet(),
+              Collections.emptyMap(),
+              null);
+      if (candidateRemovals.isEmpty()) {
+        return Boolean.TRUE;
+      }
+      if (sameUserAndGroupPrincipalType()) {
+        Set<AclBinding> peerBindings =
+            collectActiveAclBindingsForPrincipal(
+                Owner.Type.USER,
+                group.name(),
+                principal,
+                Collections.emptySet(),
+                Collections.emptyMap(),
+                null);
+        candidateRemovals = new LinkedHashSet<>(Sets.difference(candidateRemovals, peerBindings));
+      }
+      deleteExactAcls(candidateRemovals);
+    }
     return Boolean.TRUE;
   }
 
@@ -308,29 +375,45 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
   public Boolean onOwnerSet(
       MetadataObject metadataObject, @Nullable Owner preOwner, @Nullable Owner newOwner)
       throws RuntimeException {
-    if (metadataObject == null || !appliesToThisCatalog(metadataObject)) {
+    if (metadataObject == null) {
       return Boolean.TRUE;
     }
 
-    if (preOwner != null && !sameOwner(preOwner, newOwner)) {
-      String prePrincipal = formatOwnerPrincipal(preOwner);
-      Set<AclBinding> candidateRemovals =
-          KafkaPrivilegeMapper.ownerAclBindings(metadataObject, prePrincipal, properties);
-      Map<MetadataObject, Optional<Owner>> ownerOverrides = new HashMap<>();
-      ownerOverrides.put(metadataObject, Optional.ofNullable(newOwner));
-      removeBindingsPreservingActiveGrants(
-          preOwner.type(),
-          preOwner.name(),
-          candidateRemovals,
-          Collections.emptySet(),
-          Collections.emptyList(),
-          ownerOverrides,
-          null);
-    }
+    synchronized (aclSyncLock) {
+      if (!appliesToThisCatalog(metadataObject)) {
+        return Boolean.TRUE;
+      }
 
-    if (newOwner != null) {
-      String newPrincipal = formatOwnerPrincipal(newOwner);
-      createAcls(KafkaPrivilegeMapper.ownerAclBindings(metadataObject, newPrincipal, properties));
+      boolean groupTouched =
+          (preOwner != null
+                  && preOwner.type() == Owner.Type.GROUP
+                  && !sameOwner(preOwner, newOwner))
+              || (newOwner != null && newOwner.type() == Owner.Type.GROUP);
+      if (groupTouched) {
+        ensureGroupAclEnabled();
+      }
+
+      String newPrincipal = newOwner != null ? formatOwnerPrincipal(newOwner) : null;
+
+      if (preOwner != null && !sameOwner(preOwner, newOwner)) {
+        String prePrincipal = formatOwnerPrincipal(preOwner);
+        Set<AclBinding> candidateRemovals =
+            KafkaPrivilegeMapper.ownerAclBindings(metadataObject, prePrincipal, properties);
+        Map<MetadataObject, Optional<Owner>> ownerOverrides = new HashMap<>();
+        ownerOverrides.put(metadataObject, Optional.ofNullable(newOwner));
+        removeBindingsPreservingActiveGrants(
+            preOwner.type(),
+            preOwner.name(),
+            candidateRemovals,
+            Collections.emptySet(),
+            Collections.emptySet(),
+            ownerOverrides,
+            null);
+      }
+
+      if (newPrincipal != null) {
+        createAcls(KafkaPrivilegeMapper.ownerAclBindings(metadataObject, newPrincipal, properties));
+      }
     }
 
     return Boolean.TRUE;
@@ -342,17 +425,19 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       return Boolean.TRUE;
     }
 
-    for (MetadataObjectChange change : changes) {
-      if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
-        MetadataObject removed =
-            ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
-        handleMetadataRemoved(removed);
-      } else if (change instanceof MetadataObjectChange.RenameMetadataObject) {
-        MetadataObjectChange.RenameMetadataObject rename =
-            (MetadataObjectChange.RenameMetadataObject) change;
-        handleMetadataRenamed(rename.metadataObject(), rename.newMetadataObject());
-      } else if (change != null) {
-        LOG.debug("Ignoring unsupported metadata object change: {}", change);
+    synchronized (aclSyncLock) {
+      for (MetadataObjectChange change : changes) {
+        if (change instanceof MetadataObjectChange.RemoveMetadataObject) {
+          MetadataObject removed =
+              ((MetadataObjectChange.RemoveMetadataObject) change).metadataObject();
+          handleMetadataRemoved(removed);
+        } else if (change instanceof MetadataObjectChange.RenameMetadataObject) {
+          MetadataObjectChange.RenameMetadataObject rename =
+              (MetadataObjectChange.RenameMetadataObject) change;
+          handleMetadataRenamed(rename.metadataObject(), rename.newMetadataObject());
+        } else if (change != null) {
+          LOG.debug("Ignoring unsupported metadata object change: {}", change);
+        }
       }
     }
     return Boolean.TRUE;
@@ -368,88 +453,91 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       String principalName,
       String kafkaPrincipal,
       Role preUpdateRole,
-      Role updatedRole,
-      RoleChange[] changes,
-      Set<String> replacedRoleNames,
-      List<Role> replacementRoles) {
-    Map<String, SecurableObject> beforeObjects = new LinkedHashMap<>();
-    Map<String, SecurableObject> afterObjects = new LinkedHashMap<>();
+      RoleChange[] changes) {
+    RoleChangeBindings delta = computeRoleChangeBindings(preUpdateRole, changes, kafkaPrincipal);
+    Set<AclBinding> addedBindings =
+        new LinkedHashSet<>(Sets.difference(delta.afterBindings, delta.beforeBindings));
+    Set<AclBinding> candidateRemovals =
+        new LinkedHashSet<>(Sets.difference(delta.beforeBindings, delta.afterBindings));
+
+    createAcls(addedBindings);
+
+    // PermissionManager commits the full post-update role to EntityStore before invoking
+    // onRoleUpdated callbacks, so reconciling against persisted stateProvider roles accurately
+    // reflects multi-object overridePrivilegesInRole updates.
+    removeBindingsPreservingActiveGrants(
+        principalType,
+        principalName,
+        candidateRemovals,
+        Collections.emptySet(),
+        Collections.emptySet(),
+        Collections.emptyMap(),
+        null);
+  }
+
+  private RoleChangeBindings computeRoleChangeBindings(
+      Role preUpdateRole, RoleChange[] changes, String kafkaPrincipal) {
+    Map<String, SecurableObject> preUpdateByKey = new HashMap<>();
     if (preUpdateRole.securableObjects() != null) {
       for (SecurableObject existing : preUpdateRole.securableObjects()) {
         if (existing != null) {
-          String key = securableObjectKey(existing);
-          beforeObjects.put(key, existing);
-          afterObjects.put(key, existing);
+          preUpdateByKey.put(securableObjectKey(existing), existing);
         }
       }
     }
+
+    Map<String, Optional<SecurableObject>> initialTouched = new LinkedHashMap<>();
+    Map<String, Optional<SecurableObject>> finalTouched = new LinkedHashMap<>();
 
     for (RoleChange change : changes) {
       if (change instanceof RoleChange.AddSecurableObject) {
         SecurableObject added = ((RoleChange.AddSecurableObject) change).getSecurableObject();
         if (added != null) {
-          afterObjects.put(securableObjectKey(added), added);
+          String key = securableObjectKey(added);
+          initialTouched.computeIfAbsent(key, k -> Optional.empty());
+          finalTouched.put(key, Optional.of(added));
         }
       } else if (change instanceof RoleChange.RemoveSecurableObject) {
         SecurableObject removed = ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
         if (removed != null) {
           String key = securableObjectKey(removed);
-          if (!beforeObjects.containsKey(key) && !afterObjects.containsKey(key)) {
-            beforeObjects.put(key, removed);
-          }
-          afterObjects.remove(key);
+          initialTouched.computeIfAbsent(
+              key, k -> Optional.ofNullable(preUpdateByKey.getOrDefault(k, removed)));
+          finalTouched.put(key, Optional.empty());
         }
       } else if (change instanceof RoleChange.UpdateSecurableObject) {
         RoleChange.UpdateSecurableObject update = (RoleChange.UpdateSecurableObject) change;
         SecurableObject oldObj = update.getSecurableObject();
         SecurableObject newObj = update.getNewSecurableObject();
         if (oldObj != null) {
-          String key = securableObjectKey(oldObj);
-          if (!beforeObjects.containsKey(key) && !afterObjects.containsKey(key)) {
-            beforeObjects.put(key, oldObj);
-          }
-          if (newObj != null) {
-            afterObjects.put(securableObjectKey(newObj), newObj);
-          } else {
-            afterObjects.remove(key);
-          }
-        } else if (newObj != null) {
-          afterObjects.put(securableObjectKey(newObj), newObj);
+          String oldKey = securableObjectKey(oldObj);
+          initialTouched.computeIfAbsent(oldKey, k -> Optional.of(oldObj));
+          finalTouched.put(oldKey, Optional.empty());
+        }
+        if (newObj != null) {
+          String newKey = securableObjectKey(newObj);
+          initialTouched.computeIfAbsent(
+              newKey, k -> Optional.ofNullable(preUpdateByKey.get(newKey)));
+          finalTouched.put(newKey, Optional.of(newObj));
         }
       }
     }
 
     Set<AclBinding> beforeBindings = new LinkedHashSet<>();
-    for (SecurableObject beforeObj : beforeObjects.values()) {
-      beforeBindings.addAll(bindingsForSecurableObject(beforeObj, kafkaPrincipal));
+    for (Optional<SecurableObject> beforeObj : initialTouched.values()) {
+      if (beforeObj.isPresent()) {
+        beforeBindings.addAll(bindingsForSecurableObject(beforeObj.get(), kafkaPrincipal));
+      }
     }
 
     Set<AclBinding> afterBindings = new LinkedHashSet<>();
-    for (SecurableObject afterObj : afterObjects.values()) {
-      afterBindings.addAll(bindingsForSecurableObject(afterObj, kafkaPrincipal));
+    for (Optional<SecurableObject> afterObj : finalTouched.values()) {
+      if (afterObj.isPresent()) {
+        afterBindings.addAll(bindingsForSecurableObject(afterObj.get(), kafkaPrincipal));
+      }
     }
 
-    // Fallback delta if changes and preUpdateRole yielded identical before/after sets.
-    if (beforeBindings.equals(afterBindings)) {
-      beforeBindings.addAll(bindingsForRoles(List.of(preUpdateRole), kafkaPrincipal));
-      afterBindings.addAll(bindingsForRoles(List.of(updatedRole), kafkaPrincipal));
-    }
-
-    Set<AclBinding> addedBindings =
-        new LinkedHashSet<>(Sets.difference(afterBindings, beforeBindings));
-    Set<AclBinding> candidateRemovals =
-        new LinkedHashSet<>(Sets.difference(beforeBindings, afterBindings));
-
-    createAcls(addedBindings);
-
-    removeBindingsPreservingActiveGrants(
-        principalType,
-        principalName,
-        candidateRemovals,
-        replacedRoleNames,
-        replacementRoles,
-        Collections.emptyMap(),
-        null);
+    return new RoleChangeBindings(beforeBindings, afterBindings);
   }
 
   private void removeBindingsPreservingActiveGrants(
@@ -457,7 +545,7 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       String principalName,
       Set<AclBinding> candidateRemovals,
       Set<String> excludedRoleNames,
-      List<Role> extraActiveRoles,
+      Set<String> peerExcludedRoleNames,
       Map<MetadataObject, Optional<Owner>> ownerOverrides,
       @Nullable MetadataObject excludedObject) {
     if (candidateRemovals == null || candidateRemovals.isEmpty()) {
@@ -465,24 +553,27 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     }
 
     String kafkaPrincipal = formatPrincipal(principalType, principalName);
-    Set<AclBinding> roleActiveBindings =
-        computeRoleBindingsForPrincipal(
+    Set<AclBinding> activeBindings =
+        collectActiveAclBindingsForPrincipal(
             principalType,
             principalName,
             kafkaPrincipal,
             excludedRoleNames,
-            extraActiveRoles,
+            ownerOverrides,
             excludedObject);
-    Set<AclBinding> remaining =
-        new LinkedHashSet<>(Sets.difference(candidateRemovals, roleActiveBindings));
-    if (remaining.isEmpty()) {
-      return;
+    if (sameUserAndGroupPrincipalType()) {
+      Owner.Type peerType = principalType == Owner.Type.USER ? Owner.Type.GROUP : Owner.Type.USER;
+      activeBindings.addAll(
+          collectActiveAclBindingsForPrincipal(
+              peerType,
+              principalName,
+              kafkaPrincipal,
+              peerExcludedRoleNames,
+              ownerOverrides,
+              excludedObject));
     }
 
-    Set<AclBinding> ownerActiveBindings =
-        computeOwnerBindingsForPrincipal(
-            principalType, principalName, kafkaPrincipal, ownerOverrides, excludedObject);
-    Set<AclBinding> toDelete = Sets.difference(remaining, ownerActiveBindings);
+    Set<AclBinding> toDelete = Sets.difference(candidateRemovals, activeBindings);
     deleteExactAcls(toDelete);
   }
 
@@ -491,17 +582,14 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       String principalName,
       String kafkaPrincipal,
       Set<String> excludedRoleNames,
-      List<Role> extraActiveRoles,
       Map<MetadataObject, Optional<Owner>> ownerOverrides,
       @Nullable MetadataObject excludedObject) {
+    if (principalType == Owner.Type.GROUP && !properties.isGroupAclEnabled()) {
+      return new LinkedHashSet<>();
+    }
     Set<AclBinding> activeBindings =
         computeRoleBindingsForPrincipal(
-            principalType,
-            principalName,
-            kafkaPrincipal,
-            excludedRoleNames,
-            extraActiveRoles,
-            excludedObject);
+            principalType, principalName, kafkaPrincipal, excludedRoleNames, excludedObject);
     activeBindings.addAll(
         computeOwnerBindingsForPrincipal(
             principalType, principalName, kafkaPrincipal, ownerOverrides, excludedObject));
@@ -513,8 +601,10 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       String principalName,
       String kafkaPrincipal,
       Set<String> excludedRoleNames,
-      List<Role> extraActiveRoles,
       @Nullable MetadataObject excludedObject) {
+    if (principalType == Owner.Type.GROUP && !properties.isGroupAclEnabled()) {
+      return new LinkedHashSet<>();
+    }
     Set<AclBinding> active = new LinkedHashSet<>();
 
     List<Role> storedRoles =
@@ -528,10 +618,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
                 Collections.singletonList(role), kafkaPrincipal, excludedObject));
       }
     }
-    if (extraActiveRoles != null && !extraActiveRoles.isEmpty()) {
-      active.addAll(
-          bindingsForRolesExcludingObject(extraActiveRoles, kafkaPrincipal, excludedObject));
-    }
     return active;
   }
 
@@ -541,6 +627,9 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       String kafkaPrincipal,
       Map<MetadataObject, Optional<Owner>> ownerOverrides,
       @Nullable MetadataObject excludedObject) {
+    if (principalType == Owner.Type.GROUP && !properties.isGroupAclEnabled()) {
+      return new LinkedHashSet<>();
+    }
     Set<AclBinding> active = new LinkedHashSet<>();
     String resolvedCatalog = resolveCatalogName();
     List<MetadataObject> ownedObjects =
@@ -654,9 +743,7 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
         continue;
       }
       AclOperation operation = deleted.entry().operation();
-      if (operation != AclOperation.READ
-          && operation != AclOperation.WRITE
-          && operation != AclOperation.CREATE) {
+      if (operation != AclOperation.READ && operation != AclOperation.WRITE) {
         continue;
       }
       deletedOpsByPrincipal
@@ -712,13 +799,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
                 new AccessControlEntry(
                     kafkaPrincipal, host, AclOperation.IDEMPOTENT_WRITE, AclPermissionType.ALLOW)));
       }
-      if (ops.contains(AclOperation.CREATE)) {
-        candidateAuxRemovals.add(
-            new AclBinding(
-                clusterPattern,
-                new AccessControlEntry(
-                    kafkaPrincipal, host, AclOperation.CREATE, AclPermissionType.ALLOW)));
-      }
 
       Set<AclBinding> activeBindings =
           collectActiveAclBindingsForPrincipal(
@@ -726,7 +806,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
               principalName,
               kafkaPrincipal,
               Collections.emptySet(),
-              Collections.emptyList(),
               removedOwnerOverride,
               removedTopic);
       if (userPrefix.equals(groupPrefix)) {
@@ -737,7 +816,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
                 principalName,
                 kafkaPrincipal,
                 Collections.emptySet(),
-                Collections.emptyList(),
                 removedOwnerOverride,
                 removedTopic));
       }
@@ -812,6 +890,25 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     return this.catalogName;
   }
 
+  private void ensureGroupAclEnabled() {
+    if (!properties.isGroupAclEnabled()) {
+      throw new AuthorizationPluginException(
+          "Kafka group ACL push-down is disabled by default because Apache Kafka's built-in"
+              + " StandardAuthorizer does not expand group membership. Configure a group-aware"
+              + " Kafka Authorizer or KafkaPrincipalBuilder on the broker and set %s=true on the"
+              + " catalog to enable group ACLs.",
+          KafkaAuthorizationProperties.GROUP_ACL_ENABLED);
+    }
+  }
+
+  private boolean sameUserAndGroupPrincipalType() {
+    return properties.getUserPrincipalType().equals(properties.getGroupPrincipalType());
+  }
+
+  private static boolean isWildcardIdentityName(@Nullable String name) {
+    return name != null && "*".equals(name.trim());
+  }
+
   private String formatOwnerPrincipal(Owner owner) {
     return formatPrincipal(owner.type(), owner.name());
   }
@@ -855,25 +952,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     deleteAclsByFilter(filters);
   }
 
-  private void deleteAclsByPrincipal(String kafkaPrincipal) {
-    AccessControlEntryFilter entryFilter =
-        new AccessControlEntryFilter(
-            kafkaPrincipal, properties.getAclHost(), AclOperation.ANY, AclPermissionType.ANY);
-    // Scope cleanup to Kafka resources managed by Gravitino so out-of-band entries such as
-    // TRANSACTIONAL_ID or DELEGATION_TOKEN on shared clusters remain intact.
-    List<AclBindingFilter> filters =
-        List.of(
-            new AclBindingFilter(
-                new ResourcePatternFilter(ResourceType.TOPIC, null, PatternType.ANY), entryFilter),
-            new AclBindingFilter(
-                new ResourcePatternFilter(ResourceType.GROUP, null, PatternType.ANY), entryFilter),
-            new AclBindingFilter(
-                new ResourcePatternFilter(
-                    ResourceType.CLUSTER, Resource.CLUSTER_NAME, PatternType.LITERAL),
-                entryFilter));
-    deleteAclsByFilter(filters);
-  }
-
   private Collection<AclBinding> deleteAclsByFilter(Collection<AclBindingFilter> filters) {
     if (filters == null || filters.isEmpty()) {
       return Collections.emptyList();
@@ -906,31 +984,6 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
       throw new AuthorizationPluginException(
           e.getCause() != null ? e.getCause() : e, "Failed to describe Kafka ACLs");
     }
-  }
-
-  private static Role applyRoleChanges(Role originalRole, RoleChange... changes) {
-    List<SecurableObject> updatedObjects = new ArrayList<>();
-    if (originalRole.securableObjects() != null) {
-      updatedObjects.addAll(originalRole.securableObjects());
-    }
-
-    for (RoleChange change : changes) {
-      if (change instanceof RoleChange.AddSecurableObject) {
-        SecurableObject added = ((RoleChange.AddSecurableObject) change).getSecurableObject();
-        updatedObjects.removeIf(existing -> sameMetadataObject(existing, added));
-        updatedObjects.add(added);
-      } else if (change instanceof RoleChange.RemoveSecurableObject) {
-        SecurableObject removed = ((RoleChange.RemoveSecurableObject) change).getSecurableObject();
-        updatedObjects.removeIf(existing -> sameMetadataObject(existing, removed));
-      } else if (change instanceof RoleChange.UpdateSecurableObject) {
-        RoleChange.UpdateSecurableObject update = (RoleChange.UpdateSecurableObject) change;
-        updatedObjects.removeIf(
-            existing -> sameMetadataObject(existing, update.getSecurableObject()));
-        updatedObjects.add(update.getNewSecurableObject());
-      }
-    }
-
-    return new UpdatedRoleView(originalRole, Collections.unmodifiableList(updatedObjects));
   }
 
   private static Set<String> extractRoleNames(List<Role> roles) {
@@ -977,34 +1030,14 @@ public class KafkaAuthorizationPlugin implements AuthorizationPlugin {
     return left.type() == right.type() && Objects.equals(left.name(), right.name());
   }
 
-  private static final class UpdatedRoleView implements Role {
+  private static final class RoleChangeBindings {
 
-    private final Role delegate;
-    private final List<SecurableObject> securableObjects;
+    private final Set<AclBinding> beforeBindings;
+    private final Set<AclBinding> afterBindings;
 
-    private UpdatedRoleView(Role delegate, List<SecurableObject> securableObjects) {
-      this.delegate = delegate;
-      this.securableObjects = securableObjects;
-    }
-
-    @Override
-    public String name() {
-      return delegate.name();
-    }
-
-    @Override
-    public Map<String, String> properties() {
-      return delegate.properties();
-    }
-
-    @Override
-    public List<SecurableObject> securableObjects() {
-      return securableObjects;
-    }
-
-    @Override
-    public Audit auditInfo() {
-      return delegate.auditInfo();
+    private RoleChangeBindings(Set<AclBinding> beforeBindings, Set<AclBinding> afterBindings) {
+      this.beforeBindings = beforeBindings;
+      this.afterBindings = afterBindings;
     }
   }
 }

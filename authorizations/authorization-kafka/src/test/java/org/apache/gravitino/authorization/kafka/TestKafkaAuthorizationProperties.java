@@ -51,6 +51,7 @@ public class TestKafkaAuthorizationProperties {
     Assertions.assertEquals(PatternType.LITERAL, props.getConsumerGroupPatternType());
     Assertions.assertEquals("*", props.getAclHost());
     Assertions.assertTrue(props.isIdempotentWriteAclEnabled());
+    Assertions.assertFalse(props.isGroupAclEnabled());
     Assertions.assertEquals(30000, props.getRequestTimeoutMs());
     Assertions.assertEquals(42L, props.getCatalogId());
     Assertions.assertEquals("User:alice", props.formatUserPrincipal("alice"));
@@ -78,6 +79,7 @@ public class TestKafkaAuthorizationProperties {
             .put("authorization.kafka.consumer-group-pattern-type", "prefixed")
             .put("authorization.kafka.host", "10.0.0.1")
             .put("authorization.kafka.idempotent-write-acl.enabled", "false")
+            .put("authorization.kafka.group-acl.enabled", "true")
             .put("authorization.kafka.request-timeout-ms", "15000")
             .build();
 
@@ -91,6 +93,7 @@ public class TestKafkaAuthorizationProperties {
     Assertions.assertEquals(PatternType.PREFIXED, props.getConsumerGroupPatternType());
     Assertions.assertEquals("10.0.0.1", props.getAclHost());
     Assertions.assertFalse(props.isIdempotentWriteAclEnabled());
+    Assertions.assertTrue(props.isGroupAclEnabled());
     Assertions.assertEquals(15000, props.getRequestTimeoutMs());
   }
 
@@ -126,6 +129,41 @@ public class TestKafkaAuthorizationProperties {
                 "authorization.kafka.request-timeout-ms",
                 "0"));
     Assertions.assertThrows(IllegalArgumentException.class, nonPositiveTimeout::validate);
+
+    KafkaAuthorizationProperties invalidGroupAclBoolean =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "authorization.kafka.group-acl.enabled",
+                "enabled"));
+    Assertions.assertThrows(IllegalArgumentException.class, invalidGroupAclBoolean::validate);
+
+    KafkaAuthorizationProperties wildcardPrincipalType =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "authorization.kafka.user-principal-type",
+                "*"));
+    Assertions.assertThrows(IllegalArgumentException.class, wildcardPrincipalType::validate);
+
+    KafkaAuthorizationProperties validProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "authorization.kafka.group-principal-type",
+                "User"));
+    validProps.validate();
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> validProps.formatUserPrincipal("*"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> validProps.formatUserPrincipal(" * "));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> validProps.formatGroupPrincipal("*"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> validProps.formatGroupPrincipal(" * "));
   }
 
   @Test

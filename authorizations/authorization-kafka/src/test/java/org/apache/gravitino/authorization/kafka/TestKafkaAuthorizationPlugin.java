@@ -32,13 +32,17 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
@@ -59,6 +63,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -272,6 +277,19 @@ public class TestKafkaAuthorizationPlugin {
 
   @Test
   public void testRoleUpdateAndGroupBindings() {
+    KafkaAuthorizationProperties groupEnabledProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                BaseAuthorization.CATALOG_ID,
+                "1",
+                KafkaAuthorizationProperties.GROUP_ACL_ENABLED,
+                "true"));
+    groupEnabledProps.validate();
+    KafkaAuthorizationPlugin groupPlugin =
+        new KafkaAuthorizationPlugin(METALAKE, groupEnabledProps, adminClient, stateProvider, null);
+
     SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
     SecurableObject schemaObj =
         SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
@@ -283,7 +301,7 @@ public class TestKafkaAuthorizationPlugin {
     Role groupRole = testRole("eng_role", initialTopic);
 
     stateProvider.grantRoleToGroup("eng", groupRole);
-    plugin.onGrantedRolesToGroup(Collections.singletonList(groupRole), testGroup("eng"));
+    groupPlugin.onGrantedRolesToGroup(Collections.singletonList(groupRole), testGroup("eng"));
     Assertions.assertTrue(
         brokerAcls.contains(
             acl(
@@ -304,7 +322,7 @@ public class TestKafkaAuthorizationPlugin {
     Role postUpdate = testRole("eng_role", updatedTopic, newTopic);
     stateProvider.grantRoleToGroup("eng", postUpdate);
 
-    plugin.onRoleUpdated(
+    groupPlugin.onRoleUpdated(
         groupRole,
         RoleChange.updateSecurableObject("eng_role", initialTopic, updatedTopic),
         RoleChange.addSecurableObject("eng_role", newTopic));
@@ -342,7 +360,8 @@ public class TestKafkaAuthorizationPlugin {
                 AclOperation.READ,
                 AclPermissionType.ALLOW)));
 
-    plugin.onGroupRemoved(testGroup("eng"));
+    // UserGroupManager invokes onGroupRemoved BEFORE deleting group relations from EntityStore
+    groupPlugin.onGroupRemoved(testGroup("eng"));
     Assertions.assertTrue(brokerAcls.isEmpty());
   }
 
@@ -504,7 +523,7 @@ public class TestKafkaAuthorizationPlugin {
   }
 
   @Test
-  public void testUserRemovedPreservesExternalTransactionalIdAcls() {
+  public void testUserRemovedDeletesOnlyCatalogManagedBindingsAndPreservesExternalAcls() {
     SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
     SecurableObject schemaObj =
         SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
@@ -525,14 +544,32 @@ public class TestKafkaAuthorizationPlugin {
             "User:alice",
             AclOperation.WRITE,
             AclPermissionType.ALLOW);
+    AclBinding externalTopicAcl =
+        acl(
+            ResourceType.TOPIC,
+            "external_unmanaged_topic",
+            "User:alice",
+            AclOperation.READ,
+            AclPermissionType.ALLOW);
+    AclBinding externalClusterActionAcl =
+        acl(
+            ResourceType.CLUSTER,
+            Resource.CLUSTER_NAME,
+            "User:alice",
+            AclOperation.CLUSTER_ACTION,
+            AclPermissionType.ALLOW);
     AclBinding bobTopicAcl =
         acl(ResourceType.TOPIC, "orders", "User:bob", AclOperation.READ, AclPermissionType.ALLOW);
     brokerAcls.add(externalTxnAcl);
+    brokerAcls.add(externalTopicAcl);
+    brokerAcls.add(externalClusterActionAcl);
     brokerAcls.add(bobTopicAcl);
 
     plugin.onUserRemoved(testUser("alice"));
 
-    Assertions.assertEquals(Set.of(externalTxnAcl, bobTopicAcl), brokerAcls);
+    Assertions.assertEquals(
+        Set.of(externalTxnAcl, externalTopicAcl, externalClusterActionAcl, bobTopicAcl),
+        brokerAcls);
   }
 
   @Test
@@ -578,14 +615,17 @@ public class TestKafkaAuthorizationPlugin {
   }
 
   @Test
-  public void testDropTopicCleansOrphanedClusterCreateAcl() {
+  public void testCreateTopicDoesNotEmitClusterCreateAndRespectsTopicDeny() {
     SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
-    SecurableObject schemaObj =
-        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
-    SecurableObject ordersTopic =
+    SecurableObject schemaAllowCreate =
+        SecurableObjects.ofSchema(
+            catalogObj, "default", Collections.singletonList(Privileges.CreateTopic.allow()));
+    SecurableObject topicDenyCreate =
         SecurableObjects.ofTopic(
-            schemaObj, "orders", Collections.singletonList(Privileges.CreateTopic.allow()));
-    Role creatorRole = testRole("creator", ordersTopic);
+            schemaAllowCreate,
+            "restricted_orders",
+            Collections.singletonList(Privileges.CreateTopic.deny()));
+    Role creatorRole = testRole("creator", schemaAllowCreate, topicDenyCreate);
 
     stateProvider.grantRoleToUser("alice", creatorRole);
     plugin.onGrantedRolesToUser(Collections.singletonList(creatorRole), testUser("alice"));
@@ -597,23 +637,48 @@ public class TestKafkaAuthorizationPlugin {
             "User:alice",
             AclOperation.CREATE,
             AclPermissionType.ALLOW);
-    Assertions.assertTrue(brokerAcls.contains(clusterCreateAcl));
+    Assertions.assertFalse(
+        brokerAcls.contains(clusterCreateAcl),
+        "CLUSTER:CREATE must not be emitted because it bypasses topic-level CREATE DENY");
     Assertions.assertTrue(
         brokerAcls.contains(
             acl(
                 ResourceType.TOPIC,
-                "orders",
+                "*",
                 "User:alice",
                 AclOperation.CREATE,
                 AclPermissionType.ALLOW)));
-
-    MetadataObject ordersMetadataObj =
-        MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
-    plugin.onMetadataUpdated(
-        MetadataObjectChange.remove(ordersMetadataObj, Collections.emptyList()));
-
     Assertions.assertTrue(
-        brokerAcls.isEmpty(), "Expected CLUSTER:CREATE ACL to be cleaned up: " + brokerAcls);
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "restricted_orders",
+                "User:alice",
+                AclOperation.CREATE,
+                AclPermissionType.DENY)));
+
+    // Parent catalog ownership also uses TOPIC:* CREATE rather than CLUSTER:CREATE
+    MetadataObject catalogMetadataObj =
+        MetadataObjects.of(Collections.singletonList(CATALOG), MetadataObject.Type.CATALOG);
+    Owner bobOwner = testOwner(Owner.Type.USER, "bob");
+    stateProvider.owners.put(catalogMetadataObj, bobOwner);
+    plugin.onOwnerSet(catalogMetadataObj, null, bobOwner);
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.CLUSTER,
+                Resource.CLUSTER_NAME,
+                "User:bob",
+                AclOperation.CREATE,
+                AclPermissionType.ALLOW)));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "*",
+                "User:bob",
+                AclOperation.CREATE,
+                AclPermissionType.ALLOW)));
   }
 
   @Test
@@ -628,7 +693,9 @@ public class TestKafkaAuthorizationPlugin {
                 KafkaAuthorizationProperties.USER_PRINCIPAL_TYPE,
                 "User",
                 KafkaAuthorizationProperties.GROUP_PRINCIPAL_TYPE,
-                "User"));
+                "User",
+                KafkaAuthorizationProperties.GROUP_ACL_ENABLED,
+                "true"));
     samePrefixProps.validate();
     KafkaAuthorizationPlugin sharedPrefixPlugin =
         new KafkaAuthorizationPlugin(METALAKE, samePrefixProps, adminClient, stateProvider, null);
@@ -660,6 +727,283 @@ public class TestKafkaAuthorizationPlugin {
 
     Assertions.assertFalse(brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders")));
     Assertions.assertTrue(brokerAcls.contains(groupReadAcl));
+  }
+
+  @Test
+  public void testGroupOperationsRejectedByDefaultUnlessEnabled() {
+    SecurableObject catalogUseOnly =
+        SecurableObjects.ofCatalog(
+            CATALOG, Collections.singletonList(Privileges.UseCatalog.allow()));
+    Role metadataOnlyRole = testRole("use_catalog_only", catalogUseOnly);
+
+    // Non-Kafka metadata privileges (such as USE_CATALOG) produce no Kafka ACL bindings and must
+    // not block group operations in multi-catalog metalakes.
+    Assertions.assertTrue(
+        plugin.onGrantedRolesToGroup(
+            Collections.singletonList(metadataOnlyRole), testGroup("analysts")));
+    Assertions.assertTrue(plugin.onGroupRemoved(testGroup("analysts")));
+
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogUseOnly, "default", Collections.emptyList());
+    SecurableObject kafkaTopicObj =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    Role kafkaGroupRole = testRole("kafka_group_reader", kafkaTopicObj);
+
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () ->
+            plugin.onGrantedRolesToGroup(
+                Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () ->
+            plugin.onRevokedRolesFromGroup(
+                Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
+
+    stateProvider.grantRoleToGroup("analysts", metadataOnlyRole);
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () ->
+            plugin.onRoleUpdated(
+                metadataOnlyRole,
+                RoleChange.addSecurableObject("use_catalog_only", kafkaTopicObj)));
+
+    MetadataObject ordersMetadataObj =
+        MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
+    Assertions.assertThrows(
+        AuthorizationPluginException.class,
+        () -> plugin.onOwnerSet(ordersMetadataObj, null, testOwner(Owner.Type.GROUP, "analysts")));
+  }
+
+  @Test
+  public void testOverridePrivilegesMultiCallbackReconcilesAgainstPersistedRole() {
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject topicA =
+        SecurableObjects.ofTopic(
+            schemaObj, "topic_a", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject topicB =
+        SecurableObjects.ofTopic(
+            schemaObj, "topic_b", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject topicC =
+        SecurableObjects.ofTopic(
+            schemaObj, "topic_c", Collections.singletonList(Privileges.ProduceTopic.allow()));
+
+    Role preOverrideRole = testRole("override_role", topicA, topicB);
+    stateProvider.grantRoleToUser("alice", preOverrideRole);
+    plugin.onGrantedRolesToUser(Collections.singletonList(preOverrideRole), testUser("alice"));
+
+    // PermissionManager commits the full post-override role to EntityStore FIRST, then invokes
+    // per-object onRoleUpdated callbacks passing the pre-override role snapshot.
+    Role postOverrideRole = testRole("override_role", topicC);
+    stateProvider.grantRoleToUser("alice", postOverrideRole);
+
+    plugin.onRoleUpdated(
+        preOverrideRole, RoleChange.removeSecurableObject("override_role", topicA));
+    plugin.onRoleUpdated(
+        preOverrideRole, RoleChange.removeSecurableObject("override_role", topicB));
+    plugin.onRoleUpdated(preOverrideRole, RoleChange.addSecurableObject("override_role", topicC));
+
+    Assertions.assertFalse(
+        brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("topic_a")),
+        "topic_a ACLs must be removed: " + brokerAcls);
+    Assertions.assertFalse(
+        brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("topic_b")),
+        "topic_b ACLs must be removed: " + brokerAcls);
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(ResourceType.GROUP, "*", "User:alice", AclOperation.READ, AclPermissionType.ALLOW)),
+        "Orphaned GROUP:* READ must be removed once neither topic_a nor topic_b remains");
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "topic_c",
+                "User:alice",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
+
+    // Now override topic_c -> CONSUME_TOPIC on topic_d across two callbacks (remove topic_c, add
+    // topic_d) and verify shared/new bindings match the persisted post-update role.
+    SecurableObject topicCConsume =
+        SecurableObjects.ofTopic(
+            schemaObj, "topic_c", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject topicDConsume =
+        SecurableObjects.ofTopic(
+            schemaObj, "topic_d", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    Role preMoveRole = testRole("override_role", topicCConsume);
+    stateProvider.grantRoleToUser("alice", preMoveRole);
+    plugin.onRoleUpdated(
+        postOverrideRole, RoleChange.updateSecurableObject("override_role", topicC, topicCConsume));
+
+    Role postMoveRole = testRole("override_role", topicDConsume);
+    stateProvider.grantRoleToUser("alice", postMoveRole);
+    plugin.onRoleUpdated(
+        preMoveRole, RoleChange.removeSecurableObject("override_role", topicCConsume));
+    plugin.onRoleUpdated(
+        preMoveRole, RoleChange.addSecurableObject("override_role", topicDConsume));
+
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(ResourceType.GROUP, "*", "User:alice", AclOperation.READ, AclPermissionType.ALLOW)),
+        "GROUP:* READ must be preserved when moving CONSUME_TOPIC from topic_c to topic_d");
+  }
+
+  @Test
+  public void testSamePrefixUserRevokePreservesGroupGrantWhileRoleDeleteRemovesBoth() {
+    KafkaAuthorizationProperties samePrefixProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                BaseAuthorization.CATALOG_ID,
+                "1",
+                KafkaAuthorizationProperties.USER_PRINCIPAL_TYPE,
+                "User",
+                KafkaAuthorizationProperties.GROUP_PRINCIPAL_TYPE,
+                "User",
+                KafkaAuthorizationProperties.GROUP_ACL_ENABLED,
+                "true"));
+    samePrefixProps.validate();
+    KafkaAuthorizationPlugin sharedPrefixPlugin =
+        new KafkaAuthorizationPlugin(METALAKE, samePrefixProps, adminClient, stateProvider, null);
+
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject ordersProduce =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ProduceTopic.allow()));
+    Role sharedRole = testRole("shared_role", ordersProduce);
+
+    stateProvider.grantRoleToUser("shared", sharedRole);
+    stateProvider.grantRoleToGroup("shared", sharedRole);
+    sharedPrefixPlugin.onGrantedRolesToUser(
+        Collections.singletonList(sharedRole), testUser("shared"));
+    sharedPrefixPlugin.onGrantedRolesToGroup(
+        Collections.singletonList(sharedRole), testGroup("shared"));
+
+    AclBinding writeBinding =
+        acl(
+            ResourceType.TOPIC,
+            "orders",
+            "User:shared",
+            AclOperation.WRITE,
+            AclPermissionType.ALLOW);
+    Assertions.assertTrue(brokerAcls.contains(writeBinding));
+
+    // Revoking sharedRole from user "shared" must preserve User:shared ACLs because group "shared"
+    // still holds sharedRole.
+    stateProvider.revokeRoleFromUser("shared", "shared_role");
+    sharedPrefixPlugin.onRevokedRolesFromUser(
+        Collections.singletonList(sharedRole), testUser("shared"));
+    Assertions.assertTrue(
+        brokerAcls.contains(writeBinding),
+        "Peer group grant must preserve shared Kafka principal ACLs on user revoke");
+
+    // Re-grant to user, then delete sharedRole completely -> both user and group lose sharedRole,
+    // so User:shared ACLs must be deleted.
+    stateProvider.grantRoleToUser("shared", sharedRole);
+    sharedPrefixPlugin.onRoleDeleted(sharedRole);
+    Assertions.assertTrue(brokerAcls.isEmpty(), "Expected all ACLs removed: " + brokerAcls);
+  }
+
+  @Test
+  public void testConcurrentGrantAndRevokeSerializesSharedBindings() throws Exception {
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject ordersConsume =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject paymentsConsume =
+        SecurableObjects.ofTopic(
+            schemaObj, "payments", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    Role ordersRole = testRole("orders_consume", ordersConsume);
+    Role paymentsRole = testRole("payments_consume", paymentsConsume);
+
+    stateProvider.grantRoleToUser("alice", ordersRole);
+    plugin.onGrantedRolesToUser(Collections.singletonList(ordersRole), testUser("alice"));
+
+    // Simulate PermissionManager committing bothEntityStore updates concurrently before callbacks
+    stateProvider.revokeRoleFromUser("alice", "orders_consume");
+    stateProvider.grantRoleToUser("alice", paymentsRole);
+
+    CountDownLatch startGate = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Boolean> revokeFuture =
+          executor.submit(
+              () -> {
+                startGate.await(5, TimeUnit.SECONDS);
+                return plugin.onRevokedRolesFromUser(
+                    Collections.singletonList(ordersRole), testUser("alice"));
+              });
+      Future<Boolean> grantFuture =
+          executor.submit(
+              () -> {
+                startGate.await(5, TimeUnit.SECONDS);
+                return plugin.onGrantedRolesToUser(
+                    Collections.singletonList(paymentsRole), testUser("alice"));
+              });
+      startGate.countDown();
+      Assertions.assertTrue(revokeFuture.get(10, TimeUnit.SECONDS));
+      Assertions.assertTrue(grantFuture.get(10, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(ResourceType.GROUP, "*", "User:alice", AclOperation.READ, AclPermissionType.ALLOW)),
+        "Shared GROUP:* READ must survive concurrent grant + revoke");
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "payments",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+  }
+
+  @Test
+  public void testWildcardIdentityRejectedOnGrantAndIgnoredOnRemove() {
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject ordersTopic =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ProduceTopic.allow()));
+    Role role = testRole("wildcard_test", ordersTopic);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> plugin.onGrantedRolesToUser(Collections.singletonList(role), testUser("*")));
+
+    MetadataObject ordersMetadataObj =
+        MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> plugin.onOwnerSet(ordersMetadataObj, null, testOwner(Owner.Type.USER, "*")));
+
+    AclBinding existingWildcardAcl =
+        acl(ResourceType.TOPIC, "orders", "User:*", AclOperation.READ, AclPermissionType.ALLOW);
+    brokerAcls.add(existingWildcardAcl);
+
+    Assertions.assertTrue(plugin.onUserRemoved(testUser("*")));
+    Assertions.assertTrue(plugin.onGroupRemoved(testGroup("*")));
+    Assertions.assertTrue(brokerAcls.contains(existingWildcardAcl));
   }
 
   @Test
@@ -914,13 +1258,13 @@ public class TestKafkaAuthorizationPlugin {
 
   private static final class InMemoryStateProvider implements KafkaAuthorizationStateProvider {
 
-    final Map<Long, String> catalogNames = new HashMap<>();
-    final Map<String, Map<String, Role>> userRoles = new HashMap<>();
-    final Map<String, Map<String, Role>> groupRoles = new HashMap<>();
-    final Map<MetadataObject, Owner> owners = new HashMap<>();
+    final Map<Long, String> catalogNames = new ConcurrentHashMap<>();
+    final Map<String, Map<String, Role>> userRoles = new ConcurrentHashMap<>();
+    final Map<String, Map<String, Role>> groupRoles = new ConcurrentHashMap<>();
+    final Map<MetadataObject, Owner> owners = new ConcurrentHashMap<>();
 
     void grantRoleToUser(String user, Role role) {
-      userRoles.computeIfAbsent(user, k -> new HashMap<>()).put(role.name(), role);
+      userRoles.computeIfAbsent(user, k -> new ConcurrentHashMap<>()).put(role.name(), role);
     }
 
     void revokeRoleFromUser(String user, String roleName) {
@@ -928,7 +1272,7 @@ public class TestKafkaAuthorizationPlugin {
     }
 
     void grantRoleToGroup(String group, Role role) {
-      groupRoles.computeIfAbsent(group, k -> new HashMap<>()).put(role.name(), role);
+      groupRoles.computeIfAbsent(group, k -> new ConcurrentHashMap<>()).put(role.name(), role);
     }
 
     @Override

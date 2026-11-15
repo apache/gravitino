@@ -329,21 +329,55 @@ public class KafkaAuthorizationIT extends BaseIT {
         .untilAsserted(() -> assertProduceDenied("alice", "alice-secret", ordersTopic));
     assertConsumeDenied("alice", "alice-secret", ordersTopic);
 
-    // 6. Grant CREATE_TOPIC on schema/catalog to creator and verify AdminClient.createTopics
+    // 6. Grant CREATE_TOPIC on schema to creator with topic-level DENY on creator_denied_topic,
+    //    and verify AdminClient.createTopics enforces both ALLOW and topic-level DENY on the
+    //    live StandardAuthorizer broker.
     assertCreateTopicDenied("bob", "bob-secret", "bob_blocked_topic");
+    String deniedCreateTopic = "creator_denied_topic";
+    catalog
+        .asTopicCatalog()
+        .createTopic(
+            NameIdentifier.of("default", deniedCreateTopic),
+            "Pre-created topic for metadata registration",
+            null,
+            ImmutableMap.of("partition-count", "1", "replication-factor", "1"));
+    superAdminClient.deleteTopics(Collections.singletonList(deniedCreateTopic)).all().get();
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .until(
+            () ->
+                !superAdminClient
+                    .listTopics()
+                    .names()
+                    .get(5, TimeUnit.SECONDS)
+                    .contains(deniedCreateTopic));
+
     String creatorRole = GravitinoITUtils.genRandomName("topic_creator");
     metalake.createRole(
         creatorRole,
         Collections.emptyMap(),
-        Collections.singletonList(
+        Arrays.asList(
             SecurableObjects.ofSchema(
-                catalogObj, "default", Collections.singletonList(Privileges.CreateTopic.allow()))));
+                catalogObj, "default", Collections.singletonList(Privileges.CreateTopic.allow())),
+            SecurableObjects.ofTopic(
+                schemaObj,
+                deniedCreateTopic,
+                Collections.singletonList(Privileges.CreateTopic.deny()))));
     metalake.grantRolesToUser(Collections.singletonList(creatorRole), "creator");
 
     String createdTopic = "creator_created_topic";
     Awaitility.await()
         .atMost(15, TimeUnit.SECONDS)
         .untilAsserted(() -> createKafkaTopicAs("creator", "creator-secret", createdTopic));
+    assertCreateTopicDenied("creator", "creator-secret", deniedCreateTopic);
+
+    // Removing user from metalake revokes their pushed Kafka ACLs on the broker
+    Assertions.assertTrue(metalake.removeUser("creator"));
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertCreateTopicDenied("creator", "creator-secret", "creator_post_removal_topic"));
 
     // 7. Set bob as Gravitino owner of orders_topic -> bob can produce, consume, and alterConfigs;
     //    Wait: first revoke bobRole DENY on orders_topic so ALLOW from owner takes effect clearly.

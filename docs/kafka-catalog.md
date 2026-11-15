@@ -95,13 +95,18 @@ By default, the plugin reuses the catalog's `bootstrap.servers` and `gravitino.b
 | `authorization-provider`                          | Set to `kafka` to enable native Kafka ACL authorization push-down.                                                   | (none)        | Yes      |
 | `authorization.kafka.bootstrap.servers`           | Optional override for Kafka bootstrap servers used by the ACL admin client (defaults to catalog `bootstrap.servers`). | (none)        | No       |
 | `authorization.kafka.admin.*`                     | Kafka `AdminClient` settings (with prefix stripped) overriding `gravitino.bypass.*` for authorization RPCs.         | (none)        | No       |
-| `authorization.kafka.user-principal-type`         | Kafka principal type prefix used for Gravitino users (`<type>:<name>`).                                              | `User`        | No       |
-| `authorization.kafka.group-principal-type`        | Kafka principal type prefix used for Gravitino groups (`<type>:<name>`).                                             | `Group`       | No       |
+| `authorization.kafka.user-principal-type`         | Kafka principal type prefix used for Gravitino users (`<type>:<name>`). Wildcard `*` is rejected.                    | `User`        | No       |
+| `authorization.kafka.group-principal-type`        | Kafka principal type prefix used for Gravitino groups (`<type>:<name>`) when `authorization.kafka.group-acl.enabled=true`. Wildcard `*` is rejected. | `Group` | No |
+| `authorization.kafka.group-acl.enabled`           | Whether Gravitino group role grants and group ownership are pushed to Kafka ACLs. Enable only when the Kafka broker uses a custom group-aware `Authorizer` or `KafkaPrincipalBuilder` (vanilla `StandardAuthorizer` does not expand group membership). | `false` | No |
 | `authorization.kafka.consumer-group-pattern`      | Consumer group resource name pattern granted `READ` when `ALLOW CONSUME_TOPIC` or ownership is pushed down.          | `*`           | No       |
 | `authorization.kafka.consumer-group-pattern-type` | Consumer group resource pattern type (`LITERAL` or `PREFIXED`).                                                      | `LITERAL`     | No       |
 | `authorization.kafka.host`                        | Host filter written to Kafka ACL entries.                                                                            | `*`           | No       |
 | `authorization.kafka.idempotent-write-acl.enabled` | Whether `ALLOW PRODUCE_TOPIC` and ownership emit `CLUSTER:IDEMPOTENT_WRITE` (`ALLOW`).                              | `true`        | No       |
 | `authorization.kafka.request-timeout-ms`          | Request and default API timeout in milliseconds for Kafka `AdminClient` ACL operations.                              | `30000`       | No       |
+
+::::note Group ACL Requirements
+Apache Kafka's built-in `StandardAuthorizer` evaluates only the authenticated request `KafkaPrincipal` (`User:<name>` by default) and wildcard `User:*`; it does not expand group memberships on the broker, and Gravitino does not store user-to-group membership relations. By default (`authorization.kafka.group-acl.enabled=false`), granting Kafka privileges or ownership to a Gravitino `Group` is rejected rather than writing ineffective `Group:<name>` ACLs. Set `authorization.kafka.group-acl.enabled=true` only when your Kafka cluster is configured with a group-aware `Authorizer` or `KafkaPrincipalBuilder` that resolves group principals.
+::::
 
 #### Privilege and Ownership Mapping
 
@@ -109,8 +114,8 @@ By default, the plugin reuses the catalog's `bootstrap.servers` and `gravitino.b
 |-------------------------------|--------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------|--------------------------------|
 | `PRODUCE_TOPIC`               | `*` (catalog/schema/metalake) or topic literal   | `TOPIC` (`WRITE`, `DESCRIBE`), plus `CLUSTER:kafka-cluster` (`IDEMPOTENT_WRITE`) if enabled                           | `TOPIC` (`WRITE`)              |
 | `CONSUME_TOPIC`               | `*` (catalog/schema/metalake) or topic literal   | `TOPIC` (`READ`, `DESCRIBE`), plus configured `GROUP` (`READ`)                                                        | `TOPIC` (`READ`)               |
-| `CREATE_TOPIC`                | `*` (catalog/schema/metalake) or topic literal   | `CLUSTER:kafka-cluster` (`CREATE`), `TOPIC` (`CREATE`, `DESCRIBE`)                                                    | `TOPIC` (`CREATE`)             |
-| Ownership (`USER` / `GROUP`)  | `*` (catalog/schema/metalake) or topic literal   | `TOPIC` (`READ`, `WRITE`, `CREATE`, `DELETE`, `ALTER`, `DESCRIBE`, `ALTER_CONFIGS`, `DESCRIBE_CONFIGS`), `GROUP` (`READ`), `CLUSTER` (`IDEMPOTENT_WRITE` if enabled; `CREATE` for catalog/schema/metalake owners) | (none) |
+| `CREATE_TOPIC`                | `*` (catalog/schema/metalake) or topic literal   | `TOPIC` (`CREATE`, `DESCRIBE`)                                                                                        | `TOPIC` (`CREATE`)             |
+| Ownership (`USER`, or `GROUP` when enabled) | `*` (catalog/schema/metalake) or topic literal | `TOPIC` (`READ`, `WRITE`, `CREATE`, `DELETE`, `ALTER`, `DESCRIBE`, `ALTER_CONFIGS`, `DESCRIBE_CONFIGS`), `GROUP` (`READ`), `CLUSTER` (`IDEMPOTENT_WRITE` if enabled) | (none) |
 
 When revoking roles, updating role privileges, transferring ownership, or dropping a topic, shared ACLs still required by another active role or ownership on the same principal are preserved.
 
