@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.iceberg.service.idempotency;
 
+import static org.awaitility.Awaitility.await;
+
 import com.google.common.collect.ImmutableMap;
 import java.io.StringReader;
 import java.nio.file.Files;
@@ -30,7 +32,9 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -40,10 +44,18 @@ import org.apache.gravitino.iceberg.common.idempotency.IdempotencyRecord;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveResult;
 import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStoreFactory;
+import org.apache.gravitino.iceberg.service.idempotency.mapper.IcebergIdempotencyKeyMapper;
+import org.apache.gravitino.iceberg.service.idempotency.po.IcebergIdempotencyKeyPO;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.ibatis.executor.Executor;
 import org.apache.ibatis.jdbc.ScriptRunner;
+import org.apache.ibatis.mapping.MappedStatement;
+import org.apache.ibatis.plugin.Interceptor;
+import org.apache.ibatis.plugin.Intercepts;
+import org.apache.ibatis.plugin.Invocation;
+import org.apache.ibatis.plugin.Signature;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -443,6 +455,195 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
           ReserveResult.RESERVED, migrated.reserve(KEY, BINDING, -1, FAR_FUTURE_MS));
       migrated.finalizeRecord(KEY, -1, 200, "{}");
       Assertions.assertEquals(-1, migrated.load(KEY).orElseThrow().claim());
+    }
+  }
+
+  @TestTemplate
+  void testReserveRetriesWhenPurgeRemovesExpiredRow() throws Exception {
+    reserveDuringPurge(false);
+  }
+
+  @TestTemplate
+  void testReserveRetryPreservesPeerReservation() throws Exception {
+    reserveDuringPurge(true);
+  }
+
+  @TestTemplate
+  void testBlockedPurgePreservesReclaimedRow() throws Exception {
+    store.reserve(KEY, BINDING, 1, now.get());
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try (SqlSession holder =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
+      String sessionIdQuery;
+      switch (backendType) {
+        case "h2":
+          sessionIdQuery = "SELECT SESSION_ID()";
+          break;
+        case "mysql":
+          sessionIdQuery = "SELECT CONNECTION_ID()";
+          break;
+        case "postgresql":
+          sessionIdQuery = "SELECT pg_backend_pid()";
+          break;
+        default:
+          throw new IllegalStateException("Unsupported backend: " + backendType);
+      }
+      long holderId;
+      try (var statement = holder.getConnection().createStatement();
+          var result = statement.executeQuery(sessionIdQuery)) {
+        Assertions.assertTrue(result.next());
+        holderId = result.getLong(1);
+      }
+      Assertions.assertEquals(
+          1,
+          holder
+              .getMapper(IcebergIdempotencyKeyMapper.class)
+              .replaceExpired(
+                  IcebergIdempotencyKeyPO.reserved(KEY, BINDING, 2, now.get(), FAR_FUTURE_MS)));
+      Future<Integer> purge =
+          executor.submit(
+              () -> {
+                try (SqlSession session =
+                    SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession()) {
+                  // Keep the engine timeout above the deadline for observing its row-lock wait.
+                  try (var statement = session.getConnection().createStatement()) {
+                    switch (backendType) {
+                      case "h2":
+                        statement.execute("SET LOCK_TIMEOUT 30000");
+                        break;
+                      case "mysql":
+                        statement.execute("SET SESSION innodb_lock_wait_timeout = 30");
+                        break;
+                      case "postgresql":
+                        statement.execute("SET LOCAL lock_timeout = '30s'");
+                        break;
+                      default:
+                        throw new IllegalStateException("Unsupported backend: " + backendType);
+                    }
+                  }
+                  int deleted =
+                      session
+                          .getMapper(IcebergIdempotencyKeyMapper.class)
+                          .deleteExpiredBatch(now.get(), JdbcIdempotencyStore.PURGE_BATCH_SIZE);
+                  session.commit();
+                  return deleted;
+                }
+              });
+      awaitBlockedPurge(purge, holderId);
+      holder.commit();
+      Assertions.assertEquals(0, purge.get(30, TimeUnit.SECONDS));
+      peer.finalizeRecord(KEY, 2, 201, "renewed");
+      Assertions.assertEquals("renewed", store.load(KEY).orElseThrow().responseSummary());
+    } finally {
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
+  private void reserveDuringPurge(boolean peerWins) throws Exception {
+    store.reserve(KEY, BINDING, 1, now.get());
+    CountDownLatch duplicateInsert = new CountDownLatch(1);
+    CountDownLatch purged = new CountDownLatch(1);
+    SqlSessionFactoryHelper.getInstance()
+        .getSqlSessionFactory()
+        .getConfiguration()
+        .addInterceptor(new PauseReplacement(duplicateInsert, purged));
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<ReserveResult> result =
+          executor.submit(() -> store.reserve(KEY, BINDING, 2, FAR_FUTURE_MS));
+      Assertions.assertTrue(duplicateInsert.await(30, TimeUnit.SECONDS));
+      Assertions.assertEquals(1, peer.purgeExpired(now.get()));
+      if (peerWins) {
+        Assertions.assertEquals(
+            ReserveResult.RESERVED, peer.reserve(KEY, "peer binding", 3, FAR_FUTURE_MS));
+      }
+      purged.countDown();
+      Assertions.assertEquals(
+          peerWins ? ReserveResult.DUPLICATE : ReserveResult.RESERVED,
+          result.get(30, TimeUnit.SECONDS));
+      long claim = peerWins ? 3 : 2;
+      peer.finalizeRecord(KEY, claim, 201, "retained");
+      IdempotencyRecord record = store.load(KEY).orElseThrow();
+      Assertions.assertEquals(claim, record.claim());
+      Assertions.assertEquals(peerWins ? "peer binding" : BINDING, record.operationBinding());
+      Assertions.assertEquals("retained", record.responseSummary());
+    } finally {
+      purged.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+    }
+  }
+
+  private void awaitBlockedPurge(Future<Integer> purge, long holderId) throws Exception {
+    String query;
+    switch (backendType) {
+      case "h2":
+        query = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.SESSIONS WHERE BLOCKER_ID = " + holderId;
+        break;
+      case "mysql":
+        // InnoDB can attribute a wait on an uncommitted index entry to the waiting thread itself.
+        query =
+            "SELECT COUNT(*) FROM performance_schema.data_lock_waits w"
+                + " JOIN performance_schema.threads r ON r.THREAD_ID = w.REQUESTING_THREAD_ID"
+                + " JOIN performance_schema.threads b ON b.THREAD_ID = w.BLOCKING_THREAD_ID"
+                + " WHERE b.PROCESSLIST_ID = "
+                + holderId
+                + " OR b.THREAD_ID = r.THREAD_ID";
+        break;
+      case "postgresql":
+        query =
+            "SELECT COUNT(*) FROM pg_stat_activity a WHERE "
+                + holderId
+                + " = ANY(pg_blocking_pids(a.pid))";
+        break;
+      default:
+        throw new IllegalStateException("Unsupported backend: " + backendType);
+    }
+    try (SqlSession observer =
+        SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true)) {
+      await()
+          .pollInSameThread()
+          .atMost(10, TimeUnit.SECONDS)
+          .pollInterval(10, TimeUnit.MILLISECONDS)
+          .until(
+              () -> {
+                Assertions.assertFalse(
+                    purge.isDone(), "purge must block on the uncommitted replacement");
+                try (var statement = observer.getConnection().createStatement();
+                    var result = statement.executeQuery(query)) {
+                  return result.next() && result.getLong(1) > 0;
+                }
+              });
+    }
+  }
+
+  // Pause only the first replacement, after reserve's real INSERT has failed and rolled back.
+  @Intercepts(
+      @Signature(
+          type = Executor.class,
+          method = "update",
+          args = {MappedStatement.class, Object.class}))
+  private static class PauseReplacement implements Interceptor {
+    private final AtomicBoolean first = new AtomicBoolean(true);
+    private final CountDownLatch duplicateInsert;
+    private final CountDownLatch purged;
+
+    private PauseReplacement(CountDownLatch duplicateInsert, CountDownLatch purged) {
+      this.duplicateInsert = duplicateInsert;
+      this.purged = purged;
+    }
+
+    @Override
+    public Object intercept(Invocation invocation) throws Throwable {
+      if (((MappedStatement) invocation.getArgs()[0])
+              .getId()
+              .equals(IcebergIdempotencyKeyMapper.class.getName() + ".replaceExpired")
+          && first.compareAndSet(true, false)) {
+        duplicateInsert.countDown();
+        Assertions.assertTrue(purged.await(30, TimeUnit.SECONDS));
+      }
+      return invocation.proceed();
     }
   }
 

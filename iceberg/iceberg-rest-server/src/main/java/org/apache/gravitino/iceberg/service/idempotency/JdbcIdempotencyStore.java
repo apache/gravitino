@@ -117,18 +117,24 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     Preconditions.checkArgument(operationBinding != null, "operationBinding should not be null");
     IcebergIdempotencyKeyPO po =
         IcebergIdempotencyKeyPO.reserved(key, operationBinding, claim, clock.millis(), expiresAtMs);
-    try {
-      execute(mapper -> mapper.insert(po));
-      return ReserveResult.RESERVED;
-    } catch (RuntimeException e) {
-      if (!ExceptionUtils.isDuplicateKey(e)) {
-        throw e;
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        execute(mapper -> mapper.insert(po));
+        return ReserveResult.RESERVED;
+      } catch (RuntimeException e) {
+        if (!ExceptionUtils.isDuplicateKey(e)) {
+          throw e;
+        }
       }
+      // The failed insert has rolled back before this update, including on PostgreSQL.
+      // Separate transactions also avoid upgrading duplicate-insert locks on MySQL.
+      if (attempt == 0 && execute(mapper -> mapper.replaceExpired(po)) > 0) {
+        return ReserveResult.RESERVED;
+      }
+      // Purge or release may have removed the row before replacement. Retry INSERT once to
+      // claim a now-free key or observe another owner's reservation without overwriting it.
     }
-    // The failed insert has rolled back before this conditional update, including on PostgreSQL.
-    // Keeping these transactions separate also avoids upgrading duplicate-insert locks on MySQL.
-    int replaced = execute(mapper -> mapper.replaceExpired(po));
-    return replaced > 0 ? ReserveResult.RESERVED : ReserveResult.DUPLICATE;
+    return ReserveResult.DUPLICATE;
   }
 
   @Override

@@ -118,6 +118,8 @@ public class IcebergIdempotencyKeyBaseSQLProvider {
    */
   public String deleteExpiredBatch(
       @Param("beforeMs") long beforeMs, @Param("batchSize") int batchSize) {
+    // The target-row predicate is rechecked after a lock wait by InnoDB and H2. Unlike the
+    // PostgreSQL batch subquery, this statement never selects candidate keys separately.
     return "DELETE FROM " + TABLE_NAME + " WHERE expires_at <= #{beforeMs} LIMIT #{batchSize}";
   }
 }
