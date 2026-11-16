@@ -33,6 +33,11 @@ dependencies {
   constraints {
     implementation(libs.xnio.api)
   }
+  // Raise the nimbus-jose-jwt pulled in by kerb-simplekdc (9.30.1) to the version in the catalog,
+  // which is the one already used by the server.
+  constraints {
+    implementation(libs.nimbus.jose.jwt)
+  }
 
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))

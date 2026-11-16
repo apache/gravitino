@@ -25,7 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -375,7 +374,11 @@ public class SemanticModelIT extends BaseIT {
     assertEquals(
         "TRINO",
         created.definition().datasets()[0].fields()[1].expression().dialects()[0].dialect());
-    assertArrayEquals(new Field[0], created.definition().datasets()[1].fields());
+    assertEquals(
+        List.of("id", "email"),
+        Arrays.stream(created.definition().datasets()[1].fields())
+            .map(Field::name)
+            .collect(Collectors.toList()));
 
     assertThrows(
         SemanticModelAlreadyExistsException.class,
@@ -402,7 +405,7 @@ public class SemanticModelIT extends BaseIT {
     Map<String, String> alteredProperties =
         Map.of("certified", "true", "owner", "analytics", PROPERTY_OSSIE_VERSION, DEFAULT_VERSION);
     assertSemanticModel(RENAMED_MODEL_NAME, "", replacement, alteredProperties, altered);
-    assertNull(altered.definition().datasets()[0].fields());
+    assertEquals("order_id", altered.definition().datasets()[0].fields()[0].name());
     assertArrayEquals(new Field[0], altered.definition().datasets()[1].fields());
     assertArrayEquals(new Relationship[0], altered.definition().relationships());
     assertArrayEquals(new Metric[0], altered.definition().metrics());
@@ -1275,10 +1278,17 @@ public class SemanticModelIT extends BaseIT {
     ObjectNode root = JSON_MAPPER.createObjectNode();
     root.put("version", DEFAULT_VERSION);
     root.put("name", OSSIE_MODEL_NAME);
-    root.putArray("datasets")
+    ObjectNode dataset = root.putArray("datasets").addObject();
+    dataset.put("name", "orders");
+    dataset.put("source", CATALOG_NAME + "." + SCHEMA_NAME + "." + ORDERS_TABLE);
+    ObjectNode field = dataset.putArray("fields").addObject();
+    field.put("name", "order_id");
+    field
+        .putObject("expression")
+        .putArray("dialects")
         .addObject()
-        .put("name", "orders")
-        .put("source", CATALOG_NAME + "." + SCHEMA_NAME + "." + ORDERS_TABLE);
+        .put("dialect", "ANSI_SQL")
+        .put("expression", "order_id");
     return root;
   }
 
@@ -1460,11 +1470,13 @@ public class SemanticModelIT extends BaseIT {
             .withName("orders")
             .withSource(NameIdentifier.of(CATALOG_NAME, SCHEMA_NAME, "missing_table"))
             .build();
-    Dataset missingColumn =
+    // order_time is a real source column, but keys resolve to declared fields, so a dataset
+    // without fields rejects it.
+    Dataset undeclaredKeyField =
         Dataset.builder()
             .withName("orders")
             .withSource(NameIdentifier.of(CATALOG_NAME, SCHEMA_NAME, ORDERS_TABLE))
-            .withPrimaryKey(new String[] {"missing_column"})
+            .withPrimaryKey(new String[] {"order_time"})
             .build();
     return Stream.of(
         Arguments.of(
@@ -1472,9 +1484,11 @@ public class SemanticModelIT extends BaseIT {
             SemanticModelDefinition.builder().withDatasets(new Dataset[] {missingSource}).build(),
             "missing_table does not exist"),
         Arguments.of(
-            "missing column",
-            SemanticModelDefinition.builder().withDatasets(new Dataset[] {missingColumn}).build(),
-            "Dataset orders source has no column missing_column"));
+            "undeclared key field",
+            SemanticModelDefinition.builder()
+                .withDatasets(new Dataset[] {undeclaredKeyField})
+                .build(),
+            "'order_time' is not a declared field of dataset 'orders'"));
   }
 
   private static Stream<Arguments> invalidOssieSourceDocuments() {
@@ -1487,9 +1501,9 @@ public class SemanticModelIT extends BaseIT {
                         ossieSourceDocument("missing_table", null, format),
                         "missing_table does not exist"),
                     Arguments.of(
-                        "missing column " + format,
-                        ossieSourceDocument(ORDERS_TABLE, "missing_column", format),
-                        "Dataset orders source has no column missing_column")));
+                        "undeclared key field " + format,
+                        ossieSourceDocument(ORDERS_TABLE, "order_time", format),
+                        "'order_time' is not a declared field of dataset 'orders'")));
   }
 
   private static OssieDocument ossieSourceDocument(
@@ -1568,6 +1582,16 @@ public class SemanticModelIT extends BaseIT {
             .withDatatype(DataType.DECIMAL)
             .withCustomExtensions(new CustomExtension[] {extension})
             .build();
+    Field orderId =
+        Field.builder()
+            .withName("order_id")
+            .withExpression(expression(Dialects.ANSI_SQL, "order_id"))
+            .build();
+    Field orderCustomer =
+        Field.builder()
+            .withName("customer_id")
+            .withExpression(expression(Dialects.ANSI_SQL, "customer_id"))
+            .build();
     Dataset orders =
         Dataset.builder()
             .withName("orders")
@@ -1576,15 +1600,22 @@ public class SemanticModelIT extends BaseIT {
             .withUniqueKeys(new String[0][])
             .withDescription("Governed order facts")
             .withAIContext(AIContext.of("Use completed orders"))
-            .withFields(new Field[] {orderTime, orderAmount})
+            .withFields(new Field[] {orderTime, orderAmount, orderId, orderCustomer})
             .withCustomExtensions(new CustomExtension[0])
+            .build();
+    Field customerId =
+        Field.builder().withName("id").withExpression(expression(Dialects.ANSI_SQL, "id")).build();
+    Field customerEmail =
+        Field.builder()
+            .withName("email")
+            .withExpression(expression(Dialects.ANSI_SQL, "email"))
             .build();
     Dataset customers =
         Dataset.builder()
             .withName("customers")
             .withSource(NameIdentifier.of(CATALOG_NAME, SCHEMA_NAME, CUSTOMERS_TABLE))
             .withUniqueKeys(new String[][] {{"email"}})
-            .withFields(new Field[0])
+            .withFields(new Field[] {customerId, customerEmail})
             .build();
     Relationship relationship =
         Relationship.builder()
@@ -1615,11 +1646,17 @@ public class SemanticModelIT extends BaseIT {
   }
 
   private static SemanticModelDefinition replacementDefinition() {
+    Field orderId =
+        Field.builder()
+            .withName("order_id")
+            .withExpression(expression(Dialects.ANSI_SQL, "order_id"))
+            .build();
     Dataset orders =
         Dataset.builder()
             .withName("orders")
             .withSource(NameIdentifier.of(CATALOG_NAME, SCHEMA_NAME, ORDERS_TABLE))
             .withPrimaryKey(new String[] {"order_id"})
+            .withFields(new Field[] {orderId})
             .build();
     Dataset customers =
         Dataset.builder()
