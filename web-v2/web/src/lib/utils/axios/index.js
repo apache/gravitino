@@ -175,9 +175,7 @@ const transform = {
   requestInterceptors: async (config, options) => {
     // ** Pre-Request Configuration Handling
 
-    if (config.url === '/configs') {
-      config.headers.delete('Authorization')
-
+    if (config.requestOptions?.withToken === false) {
       return config
     }
 
@@ -195,7 +193,7 @@ const transform = {
         // OAuth auth: use Bearer token from OAuth provider
         const token = await oauthProviderFactory.getAccessToken()
 
-        if (token && config?.requestOptions?.withToken !== false) {
+        if (token) {
           // ** jwt token
           config.headers.Authorization = options.authenticationScheme
             ? `${options.authenticationScheme} ${token}`
@@ -210,7 +208,7 @@ const transform = {
       } else if (authType === 'basic') {
         // Basic auth: use token from sessionStorage
         const token = sessionStorage.getItem('accessToken')
-        if (token && config?.requestOptions?.withToken !== false) {
+        if (token) {
           const isFullAuthHeader = token.startsWith('Basic ') || token.startsWith('Bearer ')
 
           config.headers.Authorization =
@@ -221,7 +219,7 @@ const transform = {
         // Fall back to persisted auth artifacts to avoid spurious 401s.
         // localStorage.accessToken indicates a prior OAuth session (simple auth doesn't persist tokens).
         const persistedToken = localStorage.getItem('accessToken')
-        if (persistedToken && config?.requestOptions?.withToken !== false) {
+        if (persistedToken) {
           config.headers.Authorization = options.authenticationScheme
             ? `${options.authenticationScheme} ${persistedToken}`
             : persistedToken
