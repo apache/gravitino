@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -40,10 +41,12 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
@@ -197,16 +200,48 @@ public class TestHDFSFileSystemProxy {
         // A closed proxy no longer owns its path, even if a file appears there again.
         Files.write(keytabs.get(0).toPath(), new byte[0]);
 
-        // The registered shutdown hook deletes the files of the proxies not closed yet.
+        // The registered shutdown hook leaves the files of the proxies not closed yet to
+        // File.deleteOnExit, which runs after all shutdown hooks.
         Thread cleaner = HDFSFileSystemProxy.keytabCleaner();
         assertTrue(Runtime.getRuntime().removeShutdownHook(cleaner));
         Runtime.getRuntime().addShutdownHook(cleaner);
         cleaner.run();
-        assertTrue(keytabs.get(0).exists());
-        assertFalse(keytabs.get(1).exists());
+        assertTrue(keytabs.get(1).exists());
+        assertTrue(isDeletedOnExit(keytabs.get(1)));
+        assertFalse(isDeletedOnExit(keytabs.get(0)));
       } finally {
         open.close();
       }
+    }
+  }
+
+  @Test
+  public void testKeytabFileThatFailsToDeleteOnCloseIsDeletedOnExit(@TempDir File keytabDir)
+      throws Exception {
+    File lockedDir = new File(keytabDir, "locked");
+    Files.createDirectories(lockedDir.toPath());
+    // Deleting a file from a directory without write permission fails, except for root.
+    boolean lockable = lockedDir.setWritable(false) && !lockedDir.canWrite();
+    lockedDir.setWritable(true);
+    assumeTrue(lockable, "a directory without write permission does not stop root");
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, lockedDir);
+      FileSystem fs = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+      try {
+        lockedDir.setWritable(false);
+        fs.close();
+        verify(client, times(1)).close();
+        assertTrue(keytabs.get(0).exists());
+      } finally {
+        lockedDir.setWritable(true);
+      }
+
+      // The failure may be temporary, so the file is still deleted at exit.
+      assertTrue(HDFSFileSystemProxy.isLiveKeytabFile(keytabs.get(0)));
+      assertTrue(isDeletedOnExit(keytabs.get(0)));
     }
   }
 
@@ -314,6 +349,17 @@ public class TestHDFSFileSystemProxy {
     when(builder.build()).thenReturn(client);
     clients.when(() -> KerberosClient.builder(anyString(), any())).thenReturn(builder);
     return builder;
+  }
+
+  // Whether java.io.DeleteOnExitHook deletes the file at JVM exit. Needs --add-opens
+  // java.base/java.io, which the Gradle test task passes.
+  private static boolean isDeletedOnExit(File file) throws Exception {
+    Class<?> hook = Class.forName("java.io.DeleteOnExitHook");
+    Field files = hook.getDeclaredField("files");
+    files.setAccessible(true);
+    synchronized (hook) {
+      return ((Set<?>) files.get(null)).contains(file.getPath());
+    }
   }
 
   // Writes each fetched keytab into the directory and records it.

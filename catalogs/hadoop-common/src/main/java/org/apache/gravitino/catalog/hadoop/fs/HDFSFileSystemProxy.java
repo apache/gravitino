@@ -64,7 +64,8 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
-  // Keytab files of the proxies not closed yet, deleted when the JVM exits. File.deleteOnExit
+  // Keytab files not deleted yet, because their proxy is still open or failed to delete them on
+  // close. A shutdown hook hands them to File.deleteOnExit, as calling it for every proxy
   // would keep the path of every proxy ever created.
   private static final Set<File> LIVE_KEYTAB_FILES = ConcurrentHashMap.newKeySet();
   private static final AtomicReference<Thread> KEYTAB_CLEANER = new AtomicReference<>();
@@ -248,10 +249,17 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     if (keytabFile != null) {
       try {
         Files.deleteIfExists(keytabFile.toPath());
+        LIVE_KEYTAB_FILES.remove(keytabFile);
       } catch (IOException | RuntimeException e) {
         LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
+        // Deleted at exit instead. The shutdown hook would hand it over too, but a catalog class
+        // loader removes that hook when it is closed. Only failed deletes get here.
+        try {
+          keytabFile.deleteOnExit();
+        } catch (RuntimeException ex) {
+          LOG.warn("Failed to delete the keytab file {} on exit", keytabFile, ex);
+        }
       }
-      LIVE_KEYTAB_FILES.remove(keytabFile);
       keytabFile = null;
     }
   }
@@ -263,7 +271,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     keytabFile = file;
     if (KEYTAB_CLEANER.get() == null) {
       Thread cleaner =
-          new Thread(HDFSFileSystemProxy::deleteLiveKeytabFiles, "gravitino-keytab-cleaner");
+          new Thread(HDFSFileSystemProxy::deleteLiveKeytabFilesOnExit, "gravitino-keytab-cleaner");
       // A catalog class loader removes, when it is closed, the hooks whose context class loader is
       // its own.
       cleaner.setContextClassLoader(HDFSFileSystemProxy.class.getClassLoader());
@@ -284,8 +292,15 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     return KEYTAB_CLEANER.get();
   }
 
-  private static void deleteLiveKeytabFiles() {
-    LIVE_KEYTAB_FILES.forEach(File::delete);
+  @VisibleForTesting
+  static boolean isLiveKeytabFile(File file) {
+    return LIVE_KEYTAB_FILES.contains(file);
+  }
+
+  // Shutdown hooks run concurrently, and the server's own hook still closes file systems that may
+  // log in again. File.deleteOnExit deletes the files after all shutdown hooks finish.
+  private static void deleteLiveKeytabFilesOnExit() {
+    LIVE_KEYTAB_FILES.forEach(File::deleteOnExit);
   }
 
   /**
