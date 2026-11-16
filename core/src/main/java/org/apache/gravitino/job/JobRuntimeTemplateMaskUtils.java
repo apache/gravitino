@@ -29,6 +29,8 @@ import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Display-masks credentials in a Spark job's {@code updater_options} and {@code spark_conf} JSON
@@ -55,6 +57,8 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
  * when unset, is left unchanged.
  */
 public final class JobRuntimeTemplateMaskUtils {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobRuntimeTemplateMaskUtils.class);
 
   /**
    * Argument flags whose following value is a JSON map that may contain credentials.
@@ -165,6 +169,9 @@ public final class JobRuntimeTemplateMaskUtils {
    * unchanged. Does not mutate the input; callers must pass the original list to process execution
    * and use this copy only for display (API, events, or logs).
    *
+   * <p>Masking is per argument: if one JSON value fails, that slot becomes {@link
+   * HiddenPropertyMaskUtils#MASKED_VALUE} and later arguments are still walked and masked.
+   *
    * @param arguments process command tokens or template arguments; may be null
    * @return a masked copy, or null when {@code arguments} is null
    */
@@ -182,7 +189,7 @@ public final class JobRuntimeTemplateMaskUtils {
       if (maskNextJson) {
         maskNextJson = false;
         if (arg != null && !arg.startsWith("--")) {
-          result.add(HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg));
+          result.add(safeMaskSensitiveJsonValue(arg));
           continue;
         }
         // Missing value for the previous flag; this element may itself be a flag.
@@ -212,10 +219,24 @@ public final class JobRuntimeTemplateMaskUtils {
     for (String flag : JSON_ARGUMENT_FLAGS) {
       String prefix = flag + "=";
       if (arg.startsWith(prefix)) {
-        return prefix
-            + HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg.substring(prefix.length()));
+        return prefix + safeMaskSensitiveJsonValue(arg.substring(prefix.length()));
       }
     }
     return null;
+  }
+
+  /**
+   * Masks one JSON argument value. Never throws {@link RuntimeException}: unexpected failures
+   * become {@link HiddenPropertyMaskUtils#MASKED_VALUE} so the argument walk can continue.
+   */
+  private static String safeMaskSensitiveJsonValue(String arg) {
+    try {
+      return HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg);
+    } catch (RuntimeException e) {
+      // Do not log {@code arg}; it may contain credentials.
+      LOG.warn(
+          "Failed to mask a sensitive JSON argument; replacing with placeholder: {}", e.toString());
+      return HiddenPropertyMaskUtils.MASKED_VALUE;
+    }
   }
 }

@@ -193,6 +193,28 @@ public class TestJobRuntimeTemplateMaskUtils {
   }
 
   @Test
+  void testMaskSensitiveArgumentsContinuesAfterOneValueFails() {
+    // Malformed object-looking JSON is replaced with ******; later flags are still masked.
+    List<String> arguments =
+        ImmutableList.of(
+            "--updater-options",
+            "{not-valid-json",
+            "--spark-conf",
+            "{\"password\":\"later-pw\",\"spark.executor.memory\":\"1g\"}",
+            "--table",
+            "db.t");
+
+    List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(arguments);
+
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
+    Assertions.assertEquals("--spark-conf", masked.get(2));
+    Assertions.assertFalse(masked.get(3).contains("later-pw"));
+    Assertions.assertTrue(masked.get(3).contains("1g"));
+    Assertions.assertTrue(masked.get(3).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("db.t", masked.get(5));
+  }
+
+  @Test
   void testMaskSensitiveFieldsCarriesAllSparkDtoFields() {
     AuditDTO audit = AuditDTO.builder().withCreator("alice").build();
     SparkJobTemplateDTO input =
