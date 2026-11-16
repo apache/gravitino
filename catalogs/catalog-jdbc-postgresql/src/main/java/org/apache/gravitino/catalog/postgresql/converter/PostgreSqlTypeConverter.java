@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.postgresql.converter;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Optional;
+import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -47,6 +49,31 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
   @VisibleForTesting static final String ARRAY_TOKEN = "[]";
 
   private static final int MAX_NUMERIC_PRECISION = 1000;
+
+  // Match a type declaration, not an arbitrary SQL fragment. Quoted identifiers may contain SQL
+  // punctuation safely; modifier tokens and array suffixes cannot introduce DDL clauses.
+  private static final String TYPE_IDENTIFIER =
+      "(?:[\\p{L}_][\\p{L}\\p{N}_$]*|\"(?:[^\"]|\"\")++\")";
+  private static final String TYPE_MODIFIER = "(?:[+-]?\\d++|" + TYPE_IDENTIFIER + ")";
+  private static final String TYPE_MODIFIERS =
+      "(?:\\s*\\(\\s*" + TYPE_MODIFIER + "(?:\\s*,\\s*" + TYPE_MODIFIER + ")*+\\s*\\))?";
+  private static final Pattern EXTERNAL_TYPE_DECLARATION =
+      Pattern.compile(
+          "(?:"
+              + TYPE_IDENTIFIER
+              + "(?:\\s*\\.\\s*"
+              + TYPE_IDENTIFIER
+              + ")?"
+              + TYPE_MODIFIERS
+              + "|(?:double\\s+precision|(?:character|char|bit)\\s+varying|national\\s+(?:character|char)(?:\\s+varying)?)"
+              + TYPE_MODIFIERS
+              + "|(?:timestamp|time)"
+              + TYPE_MODIFIERS
+              + "\\s+(?:with|without)\\s+time\\s+zone"
+              + "|interval\\s+(?:year|month|day|hour|minute|second)(?:\\s+to\\s+(?:month|day|hour|minute|second))?"
+              + TYPE_MODIFIERS
+              + ")(?:\\s+ARRAY(?:\\s*\\[\\s*\\d*+\\s*\\])?|(?:\\s*\\[\\s*\\d*+\\s*\\])*+)",
+          Pattern.CASE_INSENSITIVE);
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
@@ -99,8 +126,8 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
         // unsigned representation, for example 2045 for NUMERIC(2, -3).
         // PostgreSQL's numeric_typmod_scale sign-extends the low 11 bits:
         // https://github.com/postgres/postgres/blob/REL_15_0/src/backend/utils/adt/numeric.c#L851-L864
-        // pgjdbc 42.7.11 TypeInfoCache.getScale instead returns the low 16 bits unsigned:
-        // https://github.com/pgjdbc/pgjdbc/blob/REL42.7.11/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L863-L875
+        // pgjdbc 42.7.14 TypeInfoCache.getScale instead returns the low 16 bits unsigned:
+        // https://github.com/pgjdbc/pgjdbc/blob/REL42.7.14/pgjdbc/src/main/java/org/postgresql/jdbc/TypeInfoCache.java#L863-L875
         if (numericScale >= 1024 && numericScale <= 2047) {
           numericScale -= 2048;
         }
@@ -177,11 +204,22 @@ public class PostgreSqlTypeConverter extends JdbcTypeConverter {
     } else if (type instanceof Types.ListType) {
       return fromGravitinoArrayType((ListType) type);
     } else if (type instanceof Types.ExternalType) {
-      return ((Types.ExternalType) type).catalogString();
+      String declaration = ((Types.ExternalType) type).catalogString();
+      Preconditions.checkArgument(
+          isSingleTypeDeclaration(declaration),
+          "PostgreSQL external type must be a single type declaration without DDL clauses: %s",
+          declaration);
+      return declaration;
     }
     throw new IllegalArgumentException(
         String.format(
             "Couldn't convert Gravitino type %s to PostgreSQL type", type.simpleString()));
+  }
+
+  static boolean isSingleTypeDeclaration(@Nullable String declaration) {
+    return declaration != null
+        && declaration.indexOf('\0') < 0
+        && EXTERNAL_TYPE_DECLARATION.matcher(declaration.trim()).matches();
   }
 
   // PG doesn't support the multidimensional array internally. The current implementation does not

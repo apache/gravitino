@@ -19,16 +19,22 @@
 package org.apache.gravitino.maintenance.jobs.iceberg;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
+import org.apache.iceberg.Snapshot;
+import org.apache.iceberg.Table;
+import org.apache.iceberg.spark.Spark3Util;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.slf4j.Logger;
@@ -37,8 +43,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Shared utility methods for Iceberg maintenance jobs.
  *
- * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, and classpath checks
- * used by built-in Iceberg Spark jobs.
+ * <p>Provides SQL escaping, argument parsing, Spark configuration utilities, table/snapshot
+ * helpers, and classpath checks used by built-in Iceberg Spark jobs.
  */
 public final class IcebergJobUtils {
 
@@ -71,7 +77,84 @@ public final class IcebergJobUtils {
    */
   private static final String SPARK_KUBERNETES_PREFIX = "spark.kubernetes.";
 
+  /**
+   * Shared {@code --spark-conf} usage lines aligned with {@link #filterCustomSparkConfigs}. Catalog
+   * and Iceberg extensions are <em>not</em> blocked: CLI jobs register them through spark-conf.
+   */
+  public static final List<String> SPARK_CONF_USAGE_LINES =
+      ImmutableList.of(
+          "  --spark-conf <json>       JSON map of custom Spark configurations",
+          "                              Example: '{\"spark.sql.shuffle.partitions\":\"200\"}'",
+          "                              Note: Ignored when already set by spark-submit: spark.master,",
+          "                              spark.submit.deployMode. Always ignored: spark.kubernetes.*.",
+          "                              CLI jobs must pass Iceberg catalog (and usually extensions)",
+          "                              via spark-conf; those keys are not blocked.");
+
   private IcebergJobUtils() {}
+
+  /**
+   * Prints a consistent CLI usage block to {@code System.err}.
+   *
+   * @param jobSimpleName simple class name shown after {@code Usage:}
+   * @param requiredLines required option lines (already indented)
+   * @param optionalLines optional option lines (already indented); may be empty
+   * @param exampleLines example lines; may be empty to omit the Examples section
+   */
+  public static void printCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    System.err.println(formatCliUsage(jobSimpleName, requiredLines, optionalLines, exampleLines));
+  }
+
+  @VisibleForTesting
+  static String formatCliUsage(
+      String jobSimpleName,
+      List<String> requiredLines,
+      List<String> optionalLines,
+      List<String> exampleLines) {
+    Preconditions.checkArgument(jobSimpleName != null && !jobSimpleName.isEmpty(), "jobSimpleName");
+    Preconditions.checkNotNull(requiredLines, "requiredLines");
+    Preconditions.checkNotNull(optionalLines, "optionalLines");
+    Preconditions.checkNotNull(exampleLines, "exampleLines");
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("Usage: ").append(jobSimpleName).append(" [OPTIONS]\n\n");
+    sb.append("Required Options:\n");
+    appendLines(sb, requiredLines);
+    if (!optionalLines.isEmpty()) {
+      sb.append("\nOptional Options:\n");
+      appendLines(sb, optionalLines);
+    }
+    if (!exampleLines.isEmpty()) {
+      sb.append("\nExamples:\n");
+      appendLines(sb, exampleLines);
+    }
+    return sb.toString();
+  }
+
+  /**
+   * Appends {@link #SPARK_CONF_USAGE_LINES} after job-specific optional option lines.
+   *
+   * @param optionalWithoutSparkConf optional lines excluding {@code --spark-conf}
+   * @return optional lines including the shared spark-conf note
+   */
+  public static List<String> withSparkConfUsage(String... optionalWithoutSparkConf) {
+    return ImmutableList.<String>builder()
+        .add(optionalWithoutSparkConf)
+        .addAll(SPARK_CONF_USAGE_LINES)
+        .build();
+  }
+
+  private static void appendLines(StringBuilder sb, List<String> lines) {
+    for (String line : lines) {
+      sb.append(line);
+      if (!line.endsWith("\n")) {
+        sb.append('\n');
+      }
+    }
+  }
 
   /**
    * Return the given argument value unless it is an unresolved job template placeholder.
@@ -290,6 +373,65 @@ public final class IcebergJobUtils {
       System.exit(1);
       return;
     }
+  }
+
+  /**
+   * Loads an Iceberg table via Spark.
+   *
+   * <p>Catches checked {@link Exception} (not only Spark {@code NoSuchTableException}) so the
+   * Gravitino server can load callers without Spark catalyst on the classpath.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return loaded Iceberg table
+   */
+  public static Table loadIcebergTable(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    try {
+      // Force CatalogManager to load the named catalog first. Spark3Util.catalogAndIdentifier
+      // swallows load failures and falls back to the session catalog (spark_catalog), which then
+      // fails with REQUIRES_SINGLE_PART_NAMESPACE and hides the real REST/config error.
+      spark.sessionState().catalogManager().catalog(catalogName);
+      return Spark3Util.loadIcebergTable(
+          spark, String.format("%s.%s", catalogName, tableIdentifier));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new IllegalStateException(
+          "Failed to load Iceberg table for " + catalogName + "." + tableIdentifier, e);
+    }
+  }
+
+  /**
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id
+   * @throws IllegalStateException when the table has no current snapshot
+   */
+  public static long requireCurrentSnapshotId(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    if (snapshot == null) {
+      throw new IllegalStateException(
+          "Iceberg table has no current snapshot: " + catalogName + "." + tableIdentifier);
+    }
+    return snapshot.snapshotId();
+  }
+
+  /**
+   * After expiry/orphan, HEAD may briefly be empty; report {@code -1} in that case.
+   *
+   * @param spark active Spark session
+   * @param catalogName Iceberg catalog name
+   * @param tableIdentifier fully qualified table name
+   * @return current snapshot id, or {@code -1} when HEAD is empty
+   */
+  public static long currentSnapshotIdOrEmpty(
+      SparkSession spark, String catalogName, String tableIdentifier) {
+    Snapshot snapshot = loadIcebergTable(spark, catalogName, tableIdentifier).currentSnapshot();
+    return snapshot == null ? -1L : snapshot.snapshotId();
   }
 
   /** Visible for unit tests that assert the missing-class error message. */

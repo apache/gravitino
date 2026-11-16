@@ -18,13 +18,16 @@
  */
 package org.apache.gravitino.catalog;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.function.Function;
 import javax.annotation.Nullable;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
@@ -36,9 +39,20 @@ import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.semantic.SemanticModelMetric;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 
-/** Dispatches schema-scoped Semantic Model operations through the server pipeline. */
+/** Dispatches Semantic Model operations through the server pipeline. */
 public interface SemanticModelDispatcher {
+
+  /**
+   * Lists datasets directly associated with a table or View.
+   *
+   * @param source The fully qualified source identifier.
+   * @param sourceType TABLE or VIEW.
+   * @return Fully qualified dataset identifiers sorted by their components.
+   * @throws NoSuchMetadataObjectException If the source does not exist.
+   */
+  NameIdentifier[] listSemanticModelDatasets(NameIdentifier source, Entity.EntityType sourceType);
 
   /**
    * Lists the Semantic Models in a schema namespace.
@@ -98,6 +112,7 @@ public interface SemanticModelDispatcher {
    * @param comment The Semantic Model comment, or {@code null} if it has no comment.
    * @param definition The complete Semantic Model definition.
    * @param properties The Gravitino-specific Semantic Model properties.
+   * @param sourceUpdate The validated complete dataset source associations.
    * @return The created Semantic Model.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws SemanticModelAlreadyExistsException If the Semantic Model already exists.
@@ -107,7 +122,8 @@ public interface SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException;
 
@@ -120,28 +136,32 @@ public interface SemanticModelDispatcher {
    *
    * @param namespace The destination schema namespace.
    * @param document The document to import.
-   * @param sourceValidator The required caller-specific source validator.
+   * @param sourceValidator The required caller-specific source validator, which must return a
+   *     non-null source update.
    * @return The imported Semantic Model.
+   * @throws IllegalArgumentException If the source validator returns {@code null}.
    */
   default SemanticModel importOssieDocument(
       Namespace namespace,
       OssieDocument document,
-      Consumer<SemanticModelDefinition> sourceValidator) {
+      Function<SemanticModelDefinition, SemanticModelSourceUpdate> sourceValidator) {
     Objects.requireNonNull(sourceValidator, "sourceValidator must not be null");
     ParsedSemanticModel model = OssieDocumentConverter.importDocument(document);
-    sourceValidator.accept(model.definition());
+    SemanticModelSourceUpdate sourceUpdate = sourceValidator.apply(model.definition());
+    Preconditions.checkArgument(sourceUpdate != null, "sourceValidator must not return null");
     return importSemanticModel(
         NameIdentifier.of(namespace, model.name()),
         model.comment(),
         model.definition(),
-        model.properties());
+        model.properties(),
+        sourceUpdate);
   }
 
   /**
    * Dispatches a parsed import through normalization and import-specific hooks.
    *
    * <p>This internal entry point is used by {@link #importOssieDocument(Namespace, OssieDocument,
-   * Consumer)} after parsing and source validation. Each decorator implements it separately from
+   * Function)} after parsing and source validation. Each decorator implements it separately from
    * create; only the operation dispatcher reuses the underlying create implementation. The
    * top-level event dispatcher rejects direct calls to this internal entry point.
    *
@@ -149,6 +169,7 @@ public interface SemanticModelDispatcher {
    * @param comment The model comment, or {@code null} if it has no comment.
    * @param definition The parsed native definition whose sources have been validated.
    * @param properties The Gravitino-specific model properties.
+   * @param sourceUpdate The validated complete dataset source associations.
    * @return The imported Semantic Model.
    * @throws UnsupportedOperationException If called directly on the top-level event dispatcher.
    */
@@ -156,7 +177,8 @@ public interface SemanticModelDispatcher {
       NameIdentifier ident,
       @Nullable String comment,
       SemanticModelDefinition definition,
-      Map<String, String> properties);
+      Map<String, String> properties,
+      SemanticModelSourceUpdate sourceUpdate);
 
   /**
    * Exports a Semantic Model as a standalone Apache Ossie document.
@@ -176,6 +198,8 @@ public interface SemanticModelDispatcher {
    * Applies changes atomically to a Semantic Model.
    *
    * @param ident The Semantic Model identifier.
+   * @param sourceUpdate Replace associations for a definition write, or preserve them for metadata
+   *     changes.
    * @param changes The changes to apply.
    * @return The altered Semantic Model.
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
@@ -183,7 +207,8 @@ public interface SemanticModelDispatcher {
    *     Model.
    * @throws IllegalSemanticModelException If a change or the resulting Semantic Model is invalid.
    */
-  SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
+  SemanticModel alterSemanticModel(
+      NameIdentifier ident, SemanticModelSourceUpdate sourceUpdate, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException;
 

@@ -57,6 +57,7 @@ import org.apache.gravitino.catalog.jdbc.operation.DatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
 import org.apache.gravitino.catalog.jdbc.operation.RequireDatabaseOperation;
 import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.catalog.postgresql.converter.PostgreSqlColumnDefaultValueConverter;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -72,6 +73,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
+import org.postgresql.PGConnection;
 
 /** Table operations for PostgreSQL. */
 public class PostgreSqlTableOperations extends JdbcTableOperations
@@ -84,6 +86,16 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   public static final String IS = " IS E'";
   public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
   public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
+
+  private static final String STANDALONE_UNIQUE_INDEX_SQL =
+      "SELECT 1 FROM pg_catalog.pg_index i "
+          + "JOIN pg_catalog.pg_class idx ON idx.oid = i.indexrelid "
+          + "JOIN pg_catalog.pg_class t ON t.oid = i.indrelid "
+          + "JOIN pg_catalog.pg_namespace s ON s.oid = t.relnamespace "
+          + "WHERE s.nspname = ? AND t.relname = ? AND idx.relname = ? AND i.indisunique "
+          + "AND NOT EXISTS (SELECT 1 FROM pg_catalog.pg_constraint c "
+          + "WHERE c.conindid = i.indexrelid AND c.conrelid = i.indrelid "
+          + "AND c.contype IN ('p', 'u'))";
 
   private static final String POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG =
       "PostgreSQL does not support nested column names.";
@@ -365,6 +377,27 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     return "DROP TABLE " + quotedIdentifier(tableName);
   }
 
+  /**
+   * Drops the table by its schema-qualified name. An unqualified name is resolved through the
+   * search path, and PostgreSQL leaves out a schema the catalog user has no USAGE privilege on. The
+   * drop would then report the table as missing instead of refusing it with 42501.
+   *
+   * <p>On {@code branch-1.3}, that missing-table result can cause Gravitino to remove the
+   * registration of a table that still exists. On {@code main}, the registration is already
+   * preserved when the connector returns {@code false}; schema qualification ensures the permission
+   * failure is reported as 403.
+   */
+  @Override
+  protected void dropTable(String schemaName, String tableName) {
+    try (Connection connection = getConnection(schemaName)) {
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          "DROP TABLE " + quotedIdentifier(schemaName) + "." + quotedIdentifier(tableName));
+    } catch (final SQLException se) {
+      throw this.exceptionMapper.toGravitinoException(se);
+    }
+  }
+
   @Override
   protected String generatePurgeTableSql(String tableName) {
     throw new UnsupportedOperationException(
@@ -402,7 +435,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(schemaName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-        alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
+        alterSql.add(updateColumnTypeFieldDefinition(schemaName, updateColumnType, lazyLoadTable));
       } else if (change instanceof TableChange.UpdateColumnComment) {
         alterSql.add(
             updateColumnCommentFieldDefinition(
@@ -440,7 +473,9 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
       } else if (change instanceof TableChange.AddIndex) {
         alterSql.add(addIndexDefinition(tableName, (TableChange.AddIndex) change));
       } else if (change instanceof TableChange.DeleteIndex) {
-        alterSql.add(deleteIndexDefinition(tableName, (TableChange.DeleteIndex) change));
+        TableChange.DeleteIndex deleteIndex = (TableChange.DeleteIndex) change;
+        rejectStandaloneUniqueIndex(schemaName, tableName, deleteIndex.getName());
+        alterSql.add(deleteIndexDefinition(tableName, deleteIndex));
       } else if (change instanceof TableChange.UpdateColumnAutoIncrement) {
         alterSql.add(
             updateColumnAutoIncrementDefinition(
@@ -508,6 +543,26 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
     sqlBuilder.append("(").append(getIndexFieldStr(addIndex.getFieldNames())).append(");");
     return sqlBuilder.toString();
+  }
+
+  private void rejectStandaloneUniqueIndex(String schema, String table, String index) {
+    // The table-scoped constraint drop cannot remove a standalone index. Refuse both strict and
+    // IF EXISTS requests rather than silently succeeding or dropping a schema-scoped index name.
+    // This lookup runs during SQL generation, before borrowing the DDL execution connection.
+    try (Connection connection = getConnection(schema);
+        PreparedStatement statement = connection.prepareStatement(STANDALONE_UNIQUE_INDEX_SQL)) {
+      statement.setString(1, schema);
+      statement.setString(2, table);
+      statement.setString(3, index);
+      try (ResultSet result = statement.executeQuery()) {
+        Preconditions.checkArgument(
+            !result.next(),
+            "Index %s is a standalone unique index, not a table constraint; deleting it through the table index API is not supported",
+            index);
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   private String updateColumnNullabilityDefinition(
@@ -604,7 +659,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   }
 
   private String updateColumnTypeFieldDefinition(
-      TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
+      String schemaName, TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
     if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException(POSTGRESQL_NOT_SUPPORT_NESTED_COLUMN_MSG);
     }
@@ -618,13 +673,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     if (null == column) {
       throw new NoSuchColumnException("Column %s does not exist.", col);
     }
+    Type newType = updateColumnType.getNewDataType();
     StringBuilder sqlBuilder = new StringBuilder(ALTER_TABLE + quotedIdentifier(jdbcTable.name()));
     sqlBuilder
         .append("\n")
         .append(ALTER_COLUMN)
         .append(quotedIdentifier(col))
         .append(" SET DATA TYPE ")
-        .append(typeConverter.fromGravitino(updateColumnType.getNewDataType()));
+        .append(typeConverter.fromGravitino(newType));
+    // SET DATA TYPE resets the column to the new type's default collation. When the column has an
+    // explicit non-default collation and the new type is still collatable text, re-apply it so a
+    // type change does not silently drop the collation. Non-text targets must not carry COLLATE;
+    // PostgreSQL rejects it.
+    if (isCollatableTextType(newType)) {
+      String collation = explicitColumnCollation(schemaName, jdbcTable.name(), col);
+      if (collation != null) {
+        sqlBuilder.append(" COLLATE ").append(collation);
+      }
+    }
     if (!column.nullable()) {
       sqlBuilder
           .append(",\n")
@@ -633,6 +699,57 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           .append(" SET NOT NULL");
     }
     return sqlBuilder.append(";").toString();
+  }
+
+  private static boolean isCollatableTextType(Type type) {
+    return type instanceof Types.StringType
+        || type instanceof Types.VarCharType
+        || type instanceof Types.FixedCharType;
+  }
+
+  /**
+   * Returns the explicit collation of a column as a schema-qualified, quoted identifier (for
+   * example {@code "pg_catalog"."C"}), or null when the column uses the type's default collation.
+   *
+   * <p>A collation is a schema object, so both its schema and name are read and quoted separately.
+   * An unqualified name would fail when the collation's schema is not on the connection's search
+   * path, and would silently rebind the column to a same-named collation in another schema. {@code
+   * information_schema.columns.collation_name} is null for the type default, so a non-null value is
+   * always an explicit collation worth preserving across a type change.
+   */
+  @Nullable
+  private String explicitColumnCollation(String schemaName, String tableName, String columnName) {
+    // No data source means SQL generation without a live connection (for example unit tests that
+    // only assert the generated statement); there is nothing to look up.
+    if (dataSource == null) {
+      return null;
+    }
+    String sql =
+        "SELECT collation_schema, collation_name FROM information_schema.columns "
+            + "WHERE table_schema = ? AND table_name = ? AND column_name = ?";
+    try (Connection connection = dataSource.getConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, schemaName);
+      statement.setString(2, tableName);
+      statement.setString(3, columnName);
+      try (ResultSet rows = statement.executeQuery()) {
+        if (!rows.next()) {
+          return null;
+        }
+        String collationName = rows.getString("collation_name");
+        if (collationName == null) {
+          return null;
+        }
+        String collationSchema = rows.getString("collation_schema");
+        // collation_schema is non-null whenever collation_name is, but quote defensively and fall
+        // back to the bare name if it is ever absent.
+        return collationSchema == null
+            ? quotedIdentifier(collationName)
+            : quotedIdentifier(collationSchema) + "." + quotedIdentifier(collationName);
+      }
+    } catch (SQLException e) {
+      throw exceptionMapper.toGravitinoException(e);
+    }
   }
 
   private String renameColumnFieldDefinition(
@@ -813,7 +930,24 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
     }
 
     boolean needsDeclarations = false;
+    Boolean standardConformingStrings = null;
     while (columns.next()) {
+      String defaultValue = columns.getString("COLUMN_DEF");
+      String escaped =
+          PostgreSqlColumnDefaultValueConverter.withExplicitBackslashEscapes(defaultValue);
+      if (!Objects.equals(defaultValue, escaped)) {
+        if (standardConformingStrings == null) {
+          // pgJDBC's literal escaper uses the cached standard_conforming_strings setting.
+          // A single backslash stays unchanged only in standard mode. This public API also works
+          // with older drivers without the parameter-status API, with no query or session change.
+          standardConformingStrings =
+              "\\".equals(connection.unwrap(PGConnection.class).escapeLiteral("\\"));
+        }
+        if (!standardConformingStrings) {
+          columns.updateString("COLUMN_DEF", escaped);
+          columns.updateRow();
+        }
+      }
       String type = columns.getString("TYPE_NAME");
       if ("varchar".equals(type)
           || "bpchar".equals(type)
@@ -821,7 +955,6 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           || "_bpchar".equals(type)
           || (getAutoIncrementInfo(columns) && columns.getString("COLUMN_DEF") != null)) {
         needsDeclarations = true;
-        break;
       }
     }
     columns.beforeFirst();

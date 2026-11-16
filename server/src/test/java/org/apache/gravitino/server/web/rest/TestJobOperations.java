@@ -29,6 +29,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.codahale.metrics.annotation.ResponseMetered;
@@ -86,6 +87,7 @@ import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -96,6 +98,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 public class TestJobOperations extends JerseyTest {
 
@@ -128,6 +132,7 @@ public class TestJobOperations extends JerseyTest {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JobOperations.class);
     resourceConfig.register(ObjectMapperProvider.class);
+    resourceConfig.register(ParamExceptionMapper.class);
     resourceConfig.register(
         new AbstractBinder() {
           @Override
@@ -1265,6 +1270,40 @@ public class TestJobOperations extends JerseyTest {
     JobResponse jobResp = resp.readEntity(JobResponse.class);
     Assertions.assertEquals(stdout, jobResp.getJob().stdout());
     Assertions.assertEquals(stderr, jobResp.getJob().stderr());
+  }
+
+  /**
+   * Verifies malformed output limits are rejected before the job dispatcher runs.
+   *
+   * @param parameter the query parameter to validate
+   * @param value a non-numeric or out-of-range integer value
+   */
+  @ParameterizedTest
+  @CsvSource({
+    "outputMaxLines, abc",
+    "outputMaxLines, 2147483648",
+    "outputMaxLines, -2147483649",
+    "outputMaxBytes, abc",
+    "outputMaxBytes, 2147483648",
+    "outputMaxBytes, -2147483649"
+  })
+  public void testGetJobWithMalformedOutputLimit(String parameter, String value) {
+    try (Response response =
+        target(jobRunPath())
+            .path("job-test")
+            .queryParam("includeOutput", "true")
+            .queryParam(parameter, value)
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(response.getMediaType().isCompatible(APPLICATION_JSON_TYPE));
+      ErrorResponse error = response.readEntity(ErrorResponse.class);
+      Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, error.getCode());
+      Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), error.getType());
+      Assertions.assertTrue(error.getMessage().contains(parameter));
+      verifyNoInteractions(jobOperationDispatcher);
+    }
   }
 
   @Test

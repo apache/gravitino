@@ -22,6 +22,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.Deque;
+import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -46,9 +47,9 @@ final class RemoteLocationValidator {
     }
     Path lexicalRoot = new Path(tableLocation.toUri().normalize());
     scan = new Path(scan.toUri().normalize());
-    IcebergRemoveOrphanFilesJob.validateLocation(lexicalRoot.toString(), scan.toString());
+    OrphanFileLocationUtils.validateLocation(lexicalRoot.toString(), scan.toString());
     Path root = fs.resolvePath(lexicalRoot);
-    IcebergRemoveOrphanFilesJob.validateLocation(root.toString(), fs.resolvePath(scan).toString());
+    OrphanFileLocationUtils.validateLocation(root.toString(), fs.resolvePath(scan).toString());
     // Inspect the table root itself, but not warehouse parents outside this table. Use the
     // lexical boundary because a warehouse parent symlink can change the resolved root.
     for (Path ancestor = scan; ancestor != null; ancestor = ancestor.getParent()) {

@@ -141,7 +141,7 @@ abstract class AbstractGlueCatalogIT {
 
   private Column[] hiveColumns() {
     return new Column[] {
-      Column.of("id", Types.LongType.get(), "primary key", false, false, null),
+      Column.of("id", Types.LongType.get(), "primary key"),
       Column.of("name", Types.StringType.get(), null),
     };
   }
@@ -168,8 +168,7 @@ abstract class AbstractGlueCatalogIT {
 
   private Column[] partitionedColumns() {
     return new Column[] {
-      Column.of("id", Types.LongType.get(), null, false, false, null),
-      Column.of("dt", Types.DateType.get(), null),
+      Column.of("id", Types.LongType.get(), null), Column.of("dt", Types.DateType.get(), null),
     };
   }
 
@@ -193,6 +192,29 @@ abstract class AbstractGlueCatalogIT {
       rawGlueClient = GlueClientProvider.buildClient(catalogConfig());
     }
     return rawGlueClient;
+  }
+
+  /**
+   * Creates the Glue entry of an Iceberg table directly through the Glue API, as another engine
+   * would. Its metadata file does not exist, so the table can be listed and dropped but not loaded.
+   */
+  private void createExternalIcebergTable(String schema, String name) {
+    glueClient()
+        .createTable(
+            CreateTableRequest.builder()
+                .databaseName(schema)
+                .tableInput(
+                    TableInput.builder()
+                        .name(name)
+                        .tableType(GlueConstants.EXTERNAL_TABLE_TYPE)
+                        .parameters(
+                            Map.of(
+                                GlueConstants.TABLE_TYPE_PARAM,
+                                GlueConstants.ICEBERG_TABLE_TYPE_VALUE,
+                                GlueConstants.METADATA_LOCATION,
+                                "s3://bucket/path/metadata/v1.metadata.json"))
+                        .build())
+                .build());
   }
 
   /** Creates a Presto/Athena style view directly through the Glue API. */
@@ -474,29 +496,27 @@ abstract class AbstractGlueCatalogIT {
   // -------------------------------------------------------------------------
 
   @Test
-  void testCreateIcebergTable() {
+  void testRegisterIcebergTableWithBlankMetadataLocationIsRefused() {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
 
     Map<String, String> props = new HashMap<>();
     props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_tbl"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
-
-    Table loaded = ops.loadTable(tableIdent(schema, "iceberg_tbl"));
-    assertEquals("ICEBERG", loaded.properties().get(GlueConstants.TABLE_FORMAT));
-    assertEquals(
-        "s3://bucket/path/metadata/v1.metadata.json",
-        loaded.properties().get(GlueConstants.METADATA_LOCATION));
-    assertEquals(0, loaded.columns().length);
+    props.put(GlueConstants.METADATA_LOCATION, "   ");
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.createTable(
+                tableIdent(schema, "iceberg_tbl"),
+                new Column[0],
+                null,
+                props,
+                new Transform[0],
+                Distributions.NONE,
+                new SortOrder[0],
+                new Index[0]));
+    assertThrows(
+        NoSuchTableException.class, () -> ops.loadTable(tableIdent(schema, "iceberg_tbl")));
   }
 
   // -------------------------------------------------------------------------
@@ -828,18 +848,7 @@ abstract class AbstractGlueCatalogIT {
     String schema = newSchema();
     ops.createSchema(schemaIdent(schema), null, Collections.emptyMap());
 
-    Map<String, String> props = new HashMap<>();
-    props.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    props.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_drop"),
-        new Column[0],
-        null,
-        props,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    createExternalIcebergTable(schema, "iceberg_drop");
 
     assertTrue(ops.dropTable(tableIdent(schema, "iceberg_drop")));
     assertFalse(ops.dropTable(tableIdent(schema, "iceberg_drop")));
@@ -852,18 +861,7 @@ abstract class AbstractGlueCatalogIT {
 
     createHiveTable(schema, "hive_mixed");
 
-    Map<String, String> icebergProps = new HashMap<>();
-    icebergProps.put(GlueConstants.TABLE_FORMAT, "ICEBERG");
-    icebergProps.put(GlueConstants.METADATA_LOCATION, "s3://bucket/path/metadata/v1.metadata.json");
-    ops.createTable(
-        tableIdent(schema, "iceberg_mixed"),
-        new Column[0],
-        null,
-        icebergProps,
-        new Transform[0],
-        Distributions.NONE,
-        new SortOrder[0],
-        new Index[0]);
+    createExternalIcebergTable(schema, "iceberg_mixed");
 
     List<String> names =
         Arrays.stream(ops.listTables(tableNs(schema)))

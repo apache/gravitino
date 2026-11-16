@@ -32,9 +32,15 @@ from gravitino.api.rel.indexes.index import Index
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.table import Table
 from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.api.semantic.supports_semantic_models import SupportsSemanticModels
 from gravitino.api.stats.statistic import Statistic
 from gravitino.api.stats.statistic_value import StatisticValue
 from gravitino.api.stats.supports_statistics import SupportsStatistics
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.supports_domains import SupportsDomains
+from gravitino.client.metadata_object_domain_operations import (
+    MetadataObjectDomainOperations,
+)
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
@@ -47,6 +53,9 @@ from gravitino.client.metadata_object_role_operations import (
 )
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
+)
+from gravitino.client.metadata_object_semantic_model_operations import (
+    MetadataObjectSemanticModelOperations,
 )
 from gravitino.client.metadata_object_statistics_operations import (
     MetadataObjectStatisticsOperations,
@@ -75,6 +84,7 @@ class RelationalTable(
     SupportsRoles,
     SupportsStatistics,
     SupportsTags,
+    SupportsDomains,
     SupportsPolicies,
     SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors,too-many-instance-attributes
@@ -89,6 +99,12 @@ class RelationalTable(
         table_object = MetadataObjects.parse(
             RelationalTable.table_full_name(namespace, table_dto.name()),
             MetadataObject.Type.TABLE,
+        )
+        self._object_domain_operations = MetadataObjectDomainOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_semantic_model_operations = MetadataObjectSemanticModelOperations(
+            namespace.level(0), table_object, rest_client
         )
         self._object_tag_operations = MetadataObjectTagOperations(
             namespace.level(0), table_object, rest_client
@@ -297,6 +313,9 @@ class RelationalTable(
     ) -> list[str]:
         return self._object_tag_operations.associate_tags(tags_to_add, tags_to_remove)
 
+    def supports_semantic_models(self) -> SupportsSemanticModels:
+        return self._object_semantic_model_operations
+
     def supports_tags(self) -> SupportsTags:
         return self
 
@@ -338,3 +357,12 @@ class RelationalTable(
 
     def get_secrets(self) -> dict[str, str]:
         return self._object_secret_operations.get_secrets()
+
+    def supports_domains(self) -> SupportsDomains:
+        return self
+
+    def list_domains(self) -> list[str]:
+        return self._object_domain_operations.list_domains()
+
+    def list_domains_info(self) -> list[Domain]:
+        return self._object_domain_operations.list_domains_info()

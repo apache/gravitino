@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -46,14 +47,20 @@ import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.DomainChange;
+import org.apache.gravitino.domain.DomainOperations;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
+import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
+import org.apache.gravitino.dto.requests.DomainCreateRequest;
+import org.apache.gravitino.dto.requests.DomainUpdatesRequest;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
@@ -77,6 +84,8 @@ import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
+import org.apache.gravitino.dto.responses.DomainListResponse;
+import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorResponse;
@@ -143,6 +152,7 @@ import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.tag.TagValueConstraint;
 
 /**
@@ -153,6 +163,7 @@ import org.apache.gravitino.tag.TagValueConstraint;
 public class GravitinoMetalake extends MetalakeDTO
     implements SupportsCatalogs,
         TagOperations,
+        DomainOperations,
         SupportsRoles,
         SupportsJobs,
         PolicyOperations,
@@ -163,6 +174,7 @@ public class GravitinoMetalake extends MetalakeDTO
   private static final String API_METALAKES_GROUPS_PATH = "api/metalakes/%s/groups/%s";
   private static final String API_METALAKES_ROLES_PATH = "api/metalakes/%s/roles/%s";
   private static final String API_METALAKES_OWNERS_PATH = "api/metalakes/%s/owners/%s";
+  private static final String API_METALAKES_DOMAINS_PATH = "api/metalakes/%s/domains";
   private static final String API_METALAKES_TAGS_PATH = "api/metalakes/%s/tags";
   private static final String API_METALAKES_JOB_TEMPLATES_PATH = "api/metalakes/%s/jobs/templates";
   private static final String API_METALAKES_JOB_PATH = "api/metalakes/%s/jobs/runs";
@@ -178,8 +190,9 @@ public class GravitinoMetalake extends MetalakeDTO
       String comment,
       Map<String, String> properties,
       AuditDTO auditDTO,
+      @Nullable OwnerDTO owner,
       RESTClient restClient) {
-    super(name, comment, properties, auditDTO);
+    super(name, comment, properties, auditDTO, owner);
     this.restClient = restClient;
     MetadataObject metalakeObject = MetadataObjects.of(null, name, MetadataObject.Type.METALAKE);
     this.metadataObjectRoleOperations =
@@ -216,9 +229,21 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   @Override
   public Catalog[] listCatalogsInfo() throws NoSuchMetalakeException {
-
     Map<String, String> params = new HashMap<>();
     params.put("details", "true");
+    return listCatalogsInfo(params);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Catalog[] listCatalogsInfo(boolean includeProperties) throws NoSuchMetalakeException {
+    Map<String, String> params = new HashMap<>();
+    params.put("details", "true");
+    params.put("includeProperties", Boolean.toString(includeProperties));
+    return listCatalogsInfo(params);
+  }
+
+  private Catalog[] listCatalogsInfo(Map<String, String> params) {
     CatalogListResponse resp =
         restClient.get(
             String.format("api/metalakes/%s/catalogs", RESTUtils.encodeString(this.name())),
@@ -1011,6 +1036,111 @@ public class GravitinoMetalake extends MetalakeDTO
         .toArray(PolicyTagAssociation[]::new);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    NameListResponse response =
+        restClient.get(
+            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name())),
+            NameListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return response.getNames();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    DomainListResponse response =
+        restClient.get(
+            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name())),
+            ImmutableMap.of("details", "true"),
+            DomainListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return Arrays.stream(response.getDomains())
+        .map(dto -> new GenericDomain(dto, restClient, name()))
+        .toArray(Domain[]::new);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain getDomain(String name) {
+    DomainResponse response =
+        restClient.get(
+            GenericDomain.domainPath(name(), name),
+            DomainResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return new GenericDomain(response.getDomain(), restClient, name());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain createDomain(
+      String name,
+      @Nullable String comment,
+      @Nullable Map<String, String> properties,
+      TagValue backingTag,
+      boolean createBackingTag) {
+    Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
+    DomainCreateRequest request =
+        new DomainCreateRequest(
+            name,
+            comment,
+            properties,
+            null,
+            new DomainCreateRequest.BackingTag(
+                backingTag.name(), backingTag.value().orElse(null), createBackingTag));
+    request.validate();
+    DomainResponse response =
+        restClient.post(
+            String.format(API_METALAKES_DOMAINS_PATH, RESTUtils.encodeString(name())),
+            request,
+            DomainResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return new GenericDomain(response.getDomain(), restClient, name());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain alterDomain(String name, DomainChange... changes) {
+    Preconditions.checkArgument(changes != null, "domain changes must not be null");
+    DomainUpdatesRequest request =
+        new DomainUpdatesRequest(
+            Arrays.stream(changes)
+                .map(DTOConverters::toDomainUpdateRequest)
+                .collect(Collectors.toList()));
+    request.validate();
+    DomainResponse response =
+        restClient.put(
+            GenericDomain.domainPath(name(), name),
+            request,
+            DomainResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return new GenericDomain(response.getDomain(), restClient, name());
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean deleteDomain(String name) {
+    DropResponse response =
+        restClient.delete(
+            GenericDomain.domainPath(name(), name),
+            DropResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.domainErrorHandler());
+    response.validate();
+    return response.dropped();
+  }
+
   private String policyTagPath(String tagName) {
     return String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
         + "/"
@@ -1534,7 +1664,7 @@ public class GravitinoMetalake extends MetalakeDTO
                     "roles/%s/%s/%s/grant",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1600,7 +1730,7 @@ public class GravitinoMetalake extends MetalakeDTO
                     "roles/%s/%s/%s/revoke",
                     RESTUtils.encodeString(role),
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             RoleResponse.class,
             Collections.emptyMap(),
@@ -1628,7 +1758,7 @@ public class GravitinoMetalake extends MetalakeDTO
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             OwnerResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.ownerErrorHandler());
@@ -1656,7 +1786,7 @@ public class GravitinoMetalake extends MetalakeDTO
                 String.format(
                     "%s/%s",
                     object.type().name().toLowerCase(Locale.ROOT),
-                    RESTUtils.encodeString(object.fullName()))),
+                    RESTUtils.encodeMetadataObjectName(object))),
             request,
             SetResponse.class,
             Collections.emptyMap(),
@@ -1875,7 +2005,7 @@ public class GravitinoMetalake extends MetalakeDTO
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name must not be null or empty");
       Preconditions.checkArgument(audit != null, "audit must not be null");
 
-      return new GravitinoMetalake(name, comment, properties, audit, restClient);
+      return new GravitinoMetalake(name, comment, properties, audit, owner, restClient);
     }
   }
 

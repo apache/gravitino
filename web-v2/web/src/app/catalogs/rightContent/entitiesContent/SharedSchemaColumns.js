@@ -22,7 +22,6 @@ import React from 'react'
 import Link from 'next/link'
 import { Tooltip, Dropdown } from 'antd'
 import Tags from '@/components/CustomTags'
-import Policies from '@/components/PolicyTag'
 import Icons from '@/components/Icons'
 
 export function buildSchemaColumns({
@@ -60,19 +59,6 @@ export function buildSchemaColumns({
       render: (_, record) =>
         record?.node === 'schema' ? (
           <Tags metadataObjectType={'schema'} metadataObjectFullName={`${record.namespace?.at(-1)}.${record.name}`} />
-        ) : null
-    },
-    {
-      title: 'Policies',
-      dataIndex: 'policies',
-      key: 'policies',
-      ellipsis: true,
-      render: (_, record) =>
-        record?.node === 'schema' ? (
-          <Policies
-            metadataObjectType={'schema'}
-            metadataObjectFullName={`${record.namespace?.at(-1)}.${record.name}`}
-          />
         ) : null
     },
     ...(provider !== 'kafka'

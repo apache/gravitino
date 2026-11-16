@@ -52,7 +52,88 @@ public class TestPostgreSqlTypeConverter {
 
   private static final PostgreSqlTypeConverter POSTGRE_SQL_TYPE_CONVERTER =
       new PostgreSqlTypeConverter();
-  private static final String USER_DEFINED_TYPE = "user-defined";
+  private static final String USER_DEFINED_TYPE = "user_defined";
+
+  @Test
+  void testExternalTypeMustBeASingleDeclaration() {
+    for (String declaration :
+        new String[] {
+          "int); CREATE TABLE injected_marker(id int); --",
+          "int, extra int",
+          "int DEFAULT 1",
+          "int NOT NULL",
+          "int CHECK (true)",
+          "int UNIQUE",
+          "int/*comment*/",
+          "int--comment",
+          "numeric(10,2), extra text",
+          "int;SELECT 1",
+          "geometry(Point,4326), extra int",
+          "geometry(Point,4326) DEFAULT NULL",
+          "geometry(Point,abs(4326))",
+          "geometry(Point,4326 /*comment*/)",
+          "int ARRAY NOT NULL",
+          "\"closed\";SELECT 1",
+          "int\u0000",
+          "",
+          " "
+        }) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+  }
+
+  @Test
+  void testNativeTypeDeclarationsRemainSupported() {
+    for (String declaration :
+        new String[] {
+          "inet",
+          "national character(3)",
+          "national char(3)",
+          "national character varying(3)",
+          "int ARRAY",
+          "int ARRAY[3]",
+          "int ARRAY[]",
+          "geometry(Point,4326)",
+          "public.geometry(PointZ,4326)[]",
+          "geography(LINESTRING,4326)",
+          "numeric",
+          "numeric(1000,0)",
+          "numeric(2,-3)",
+          "numeric(3,5)[]",
+          "pg_catalog.int4",
+          "\"custom schema\".\"custom type\"[]",
+          "\"semi;colon\"",
+          "\"quote\"\"inside\"",
+          "\"user-defined\"",
+          "character varying(12)",
+          "double precision[]",
+          "timestamp(6) without time zone",
+          "time(3) with time zone",
+          "bit varying(8)",
+          "interval day to second(6)",
+          "interval year to month"
+        }) {
+      Assertions.assertEquals(
+          declaration,
+          POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of(declaration)),
+          declaration);
+    }
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(
+                Types.ListType.nullable(Types.ExternalType.of("int, extra int"))));
+  }
+
+  @Test
+  void testLongArrayDeclarationDoesNotOverflowTheValidatorStack() {
+    String declaration = "int" + "[]".repeat(10000);
+    Assertions.assertEquals(
+        declaration, POSTGRE_SQL_TYPE_CONVERTER.fromGravitino(Types.ExternalType.of(declaration)));
+  }
 
   @Test
   void testUnboundedVarcharDriverSentinelMapsToString() {

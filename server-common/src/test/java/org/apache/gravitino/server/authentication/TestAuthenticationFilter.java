@@ -33,6 +33,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
 import java.security.Principal;
 import java.util.Arrays;
 import java.util.Collections;
@@ -108,6 +109,55 @@ public class TestAuthenticationFilter {
     Assertions.assertInstanceOf(UserPrincipal.class, seenDuringChain.get());
     Assertions.assertEquals(
         ActiveRoles.of(Arrays.asList("analyst", "reader")),
+        ((UserPrincipal) seenDuringChain.get()).getActiveRoles());
+  }
+
+  @Test
+  public void testDoFilterRejectsBlankEncodedActiveRoleWith400() throws Exception {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    when(mockRequest.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER)).thenReturn("%20");
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+    StringWriter body = new StringWriter();
+    when(mockResponse.getWriter()).thenReturn(new PrintWriter(body));
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockResponse).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(mockChain, never()).doFilter(any(), any());
+  }
+
+  @Test
+  public void testDoFilterDecodesNonAsciiActiveRoles() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    // Jetty exposes raw UTF-8 header bytes as ISO-8859-1 chars.
+    String rawUtf8 =
+        new String("vrf_角色".getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+    when(mockRequest.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER))
+        .thenReturn(rawUtf8 + ",r%C3%B4le");
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+
+    AtomicReference<Principal> seenDuringChain = new AtomicReference<>();
+    FilterChain capturingChain =
+        (req, resp) -> seenDuringChain.set(PrincipalUtils.getCurrentPrincipal());
+    filter.doFilter(mockRequest, mockResponse, capturingChain);
+
+    Assertions.assertEquals(
+        ActiveRoles.of(Arrays.asList("vrf_角色", "rôle")),
         ((UserPrincipal) seenDuringChain.get()).getActiveRoles());
   }
 

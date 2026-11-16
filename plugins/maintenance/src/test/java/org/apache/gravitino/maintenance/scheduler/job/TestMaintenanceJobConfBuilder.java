@@ -21,8 +21,10 @@ package org.apache.gravitino.maintenance.scheduler.job;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.maintenance.policy.MaintenanceAuthConfigs;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -246,6 +248,27 @@ class TestMaintenanceJobConfBuilder {
     // Path metalake always comes from the policy namespace, never policy updaterOptions.
     Assertions.assertTrue(conf.get("updater_options").contains("\"metalake\":\"ml\""));
     Assertions.assertFalse(conf.get("updater_options").contains("policy-ml"));
+  }
+
+  @Test
+  void testFoldPlaceholdersFillsIcebergCatalogImpl() throws Exception {
+    Map<String, String> jobConf = new HashMap<>();
+    jobConf.put("catalog_type", "rest");
+    jobConf.put("catalog_uri", "http://localhost:9001/iceberg");
+    jobConf.put("warehouse_location", "wh");
+    jobConf.put("spark_conf", "{}");
+
+    MaintenanceJobConfBuilder.foldPlaceholdersIntoSparkConf(jobConf, "iceberg");
+
+    @SuppressWarnings("unchecked")
+    Map<String, String> sparkConf =
+        JsonUtils.anyFieldMapper().readValue(jobConf.get("spark_conf"), Map.class);
+    Assertions.assertEquals(
+        "org.apache.iceberg.spark.SparkCatalog", sparkConf.get("spark.sql.catalog.iceberg"));
+    Assertions.assertEquals("rest", sparkConf.get("spark.sql.catalog.iceberg.type"));
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", sparkConf.get("spark.sql.catalog.iceberg.uri"));
+    Assertions.assertTrue(sparkConf.containsKey("spark.sql.extensions"));
   }
 
   private static Config configWithUri() {

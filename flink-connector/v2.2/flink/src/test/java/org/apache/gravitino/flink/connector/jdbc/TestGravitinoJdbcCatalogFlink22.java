@@ -19,6 +19,11 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import org.apache.flink.table.factories.CatalogFactory;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.flink.connector.PartitionConverter;
+import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink22;
 
@@ -27,5 +32,20 @@ public class TestGravitinoJdbcCatalogFlink22 extends TestGravitinoJdbcCatalog {
   @Override
   protected CatalogCompat catalogCompat() {
     return CatalogCompatFlink22.INSTANCE;
+  }
+
+  @Override
+  protected GravitinoJdbcCatalog createNativeCatalog(
+      CatalogFactory.Context context,
+      String defaultDatabase,
+      SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
+      PartitionConverter partitionConverter) {
+    return new GravitinoJdbcCatalogFlink22(
+        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter) {
+      @Override
+      protected Catalog catalog() {
+        throw new NoSuchCatalogException("Catalog %s does not exist", context.getName());
+      }
+    };
   }
 }

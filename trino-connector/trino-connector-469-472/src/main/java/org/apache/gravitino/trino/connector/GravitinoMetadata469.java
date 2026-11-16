@@ -57,7 +57,7 @@ public class GravitinoMetadata469 extends GravitinoMetadata {
       ConnectorTableHandle tableHandle,
       ColumnMetadata column,
       ColumnPosition position) {
-    GravitinoColumn gravitinoColumn = metadataAdapter.createColumn(column);
+    GravitinoColumn gravitinoColumn = createColumn(tableHandle, column);
     catalogConnectorMetadata.addColumn(getTableName(tableHandle), gravitinoColumn);
   }
 

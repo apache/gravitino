@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.lance;
 
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_ALLOW_EXTERNAL_TABLE_PURGE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
@@ -167,7 +168,7 @@ public class TestLanceTableOperations {
     }
   }
 
-  /** Legacy registration flags also protect drop and overwrite, while purge remains destructive. */
+  /** Legacy registrations retain their data unless the catalog explicitly permits purging it. */
   @ParameterizedTest
   @CsvSource(
       value = {
@@ -232,17 +233,111 @@ public class TestLanceTableOperations {
                       new Index[0]));
       Assertions.assertEquals("true", replaced.properties().get(Table.PROPERTY_EXTERNAL));
     } else if ("purge".equals(operation)) {
-      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      Assertions.assertThrowsExactly(
+          UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
     } else {
       Assertions.assertTrue(lanceTableOps.dropTable(ident));
     }
-    verify(store).delete(ident, Entity.EntityType.TABLE);
-    if ("purge".equals(operation)) {
-      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
-    } else {
+    verify(store, Mockito.times("purge".equals(operation) ? 0 : 1))
+        .delete(ident, Entity.EntityType.TABLE);
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource(
+      value = {"true,NULL", "true,false", "true,true", "false,NULL", "false,false", "false,true"},
+      nullValues = "NULL")
+  void testPurgeRequiresCatalogPermissionForExternalData(boolean external, String catalogPermission)
+      throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "purge_policy");
+    String location = tempDir.resolve("purge_policy").toString();
+    try (Dataset ignored =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      // Purge must preserve both a real dataset and its metadata when the policy rejects it.
+    }
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_TABLE_FORMAT,
+            "lance",
+            Table.PROPERTY_LOCATION,
+            location,
+            Table.PROPERTY_EXTERNAL,
+            Boolean.toString(external),
+            LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+            "true");
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity(ident, List.of(), properties));
+    when(store.delete(ident, Entity.EntityType.TABLE)).thenReturn(true);
+    if (catalogPermission != null) {
+      lanceTableOps.setCatalogProperties(
+          Map.of(LANCE_ALLOW_EXTERNAL_TABLE_PURGE, catalogPermission));
+    }
+
+    if (external && !Boolean.parseBoolean(catalogPermission)) {
+      UnsupportedOperationException error =
+          Assertions.assertThrowsExactly(
+              UnsupportedOperationException.class, () -> lanceTableOps.purgeTable(ident));
+      Assertions.assertTrue(error.getMessage().contains(LANCE_ALLOW_EXTERNAL_TABLE_PURGE));
+      verify(store, never()).delete(any(), any());
       try (Dataset dataset = Dataset.open().uri(location).build()) {
         Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
       }
+    } else {
+      Assertions.assertTrue(lanceTableOps.purgeTable(ident));
+      verify(store).delete(ident, Entity.EntityType.TABLE);
+      Assertions.assertFalse(Files.exists(Paths.get(location, "_versions")));
+    }
+  }
+
+  @Test
+  void testOverwriteCannotPurgeExternalDataWithoutCatalogPermission() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "protected_table");
+    String location = tempDir.resolve("protected_table").toString();
+    Column[] columns = {Column.of("id", Types.IntegerType.get())};
+    try (Dataset ignored = lanceTableOps.createDataset(location, columns, Map.of())) {
+      // The existing external dataset is not owned by this overwrite request.
+    }
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(
+            tableEntity(
+                ident,
+                List.of(),
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    location,
+                    Table.PROPERTY_EXTERNAL,
+                    "true")));
+    String replacement = tempDir.resolve("replacement").toString();
+    Assertions.assertThrowsExactly(
+        UnsupportedOperationException.class,
+        () ->
+            lanceTableOps.createTable(
+                ident,
+                columns,
+                null,
+                Map.of(
+                    Table.PROPERTY_TABLE_FORMAT,
+                    "lance",
+                    Table.PROPERTY_LOCATION,
+                    replacement,
+                    LANCE_CREATION_MODE,
+                    "OVERWRITE",
+                    LANCE_ALLOW_EXTERNAL_TABLE_PURGE,
+                    "true"),
+                new Transform[0],
+                null,
+                new SortOrder[0],
+                new Index[0]));
+    verify(store, never()).delete(any(), any());
+    verify(store, never()).put(any(), anyBoolean());
+    Assertions.assertFalse(Files.exists(Paths.get(replacement)));
+    try (Dataset dataset = Dataset.open().uri(location).build()) {
+      Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
   }
 
@@ -1442,12 +1537,20 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testAddBlobColumnChecksFileFormatVersion() {
-    String location = tempDir.resolve("add-blob").toString();
-    try (Dataset ignored =
+  public void testAddBlobV2ColumnRejectedOnLegacyFileFormatVersion() {
+    // The dataset's file format version is pinned to 2.1 through its legacy blob column rather
+    // than relying on Lance's default, which has changed across lance-core releases (it is 2.2 as
+    // of 12.0.0). What is under test is the version check, not Lance's choice of default.
+    String location = tempDir.resolve("add-blob-legacy-dataset").toString();
+    try (Dataset dataset =
         lanceTableOps.createDataset(
-            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
-      // A dataset without blob columns uses Lance's default file format version.
+            location,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("legacy_image", Types.ExternalType.of("lance.blob.legacy"))
+            },
+            Map.of())) {
+      Assertions.assertEquals("2.1", dataset.getLanceFileFormatVersion());
     }
     Table table = mock(Table.class);
     when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
@@ -1462,19 +1565,75 @@ public class TestLanceTableOperations {
                       TableChange.addColumn(
                           new String[] {"image"}, Types.ExternalType.of("lance.blob"))
                     }));
-    Assertions.assertTrue(exception.getMessage().contains("2.2"), exception.getMessage());
+    // Both rejection messages mention 2.2, so assert the clause that tells them apart.
+    Assertions.assertTrue(
+        exception.getMessage().contains("requires Lance file format version 2.2 or later"),
+        exception.getMessage());
+    Assertions.assertTrue(
+        exception.getMessage().contains("the dataset uses 2.1"), exception.getMessage());
+  }
+
+  @Test
+  public void testAddLegacyBlobColumnRejectedOnBlobV2FileFormatVersion() {
+    // Mirror case: a 2.2 dataset rejects the legacy blob encoding. A table created without blob
+    // columns also lands on 2.2 with lance-core 12.0.0, so this is the path such a table takes.
+    String location = tempDir.resolve("add-blob-v2-dataset").toString();
+    try (Dataset dataset =
+        lanceTableOps.createDataset(
+            location,
+            new Column[] {
+              Column.of("id", Types.IntegerType.get()),
+              Column.of("image", Types.ExternalType.of("lance.blob"))
+            },
+            Map.of())) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(
+                          new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+                    }));
+    // Mirror assertion: this message mentions 2.2 twice, so match the distinguishing clause.
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("is not supported by Lance file format version 2.2 or later"),
+        exception.getMessage());
+  }
+
+  @Test
+  public void testAddBlobV2ColumnSucceedsOnDefaultFileFormatVersion() {
+    // Unlike the two tests above, this one deliberately depends on Lance's default: the default is
+    // what decides whether a table created without blob columns later accepts lance.blob, and
+    // docs/lakehouse-generic-lance-table.md states that behaviour as user-facing. The version
+    // assertion is therefore a canary - if a lance-core upgrade moves the default below 2.2 this
+    // fails, and the documented behaviour has to be revisited rather than quietly flipped.
+    String location = tempDir.resolve("add-blob-default").toString();
+    try (Dataset dataset =
+        lanceTableOps.createDataset(
+            location, new Column[] {Column.of("id", Types.IntegerType.get())}, Map.of())) {
+      Assertions.assertEquals("2.2", dataset.getLanceFileFormatVersion());
+    }
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, location));
 
     lanceTableOps.handleLanceTableChange(
         table,
         new TableChange[] {
-          TableChange.addColumn(
-              new String[] {"legacy_image"}, Types.ExternalType.of("lance.blob.legacy"))
+          TableChange.addColumn(new String[] {"image"}, Types.ExternalType.of("lance.blob"))
         });
     try (Dataset dataset = lanceTableOps.openDataset(location, Map.of())) {
       Assertions.assertEquals(
-          Types.ExternalType.of("lance.blob.legacy"),
-          LanceDataTypeConverter.CONVERTER.toGravitino(
-              dataset.getSchema().findField("legacy_image")));
+          Types.ExternalType.of("lance.blob"),
+          LanceDataTypeConverter.CONVERTER.toGravitino(dataset.getSchema().findField("image")));
     }
   }
 

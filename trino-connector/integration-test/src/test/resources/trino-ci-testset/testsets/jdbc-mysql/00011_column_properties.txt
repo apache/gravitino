@@ -1,5 +1,5 @@
 "CREATE TABLE gt_mysql.gt_mysql_test_column_properties.demo_all_data_types_default_value (
-   col_bit boolean,
+   col_bit boolean WITH (default = 'true'),
    col_tinyint tinyint WITH (default = '0'),
    col_smallint smallint WITH (default = '-1'),
    col_mediumint integer,
@@ -27,7 +27,7 @@
    col_enum varchar,
    col_set varchar,
    col_json json,
-   col_boolean boolean,
+   col_boolean boolean WITH (default = 'true'),
    col_geometry varbinary,
    col_point varbinary
 )

@@ -34,6 +34,7 @@ import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
 import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.meta.TopicEntity;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listTopics(Namespace)}) are
@@ -74,9 +75,12 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   public Topic createTopic(
       NameIdentifier ident, String comment, DataLayout dataLayout, Map<String, String> properties)
       throws NoSuchSchemaException, TopicAlreadyExistsException {
-    // Check the comment before the underlying catalog creates the topic.
+    // Apply the catalog capability first, since it may reject the name with a more specific
+    // message, then check the name and comment before the underlying catalog creates the topic.
+    NameIdentifier normalizedIdent = normalizeNameIdentifier(ident);
+    TopicEntity.NAME.validate(normalizedIdent.name(), Entity.EntityType.TOPIC);
     checkCommentLength(comment);
-    return dispatcher.createTopic(normalizeNameIdentifier(ident), comment, dataLayout, properties);
+    return dispatcher.createTopic(normalizedIdent, comment, dataLayout, properties);
   }
 
   @Override

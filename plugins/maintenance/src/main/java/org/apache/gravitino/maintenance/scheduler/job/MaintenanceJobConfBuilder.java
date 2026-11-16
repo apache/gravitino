@@ -242,6 +242,15 @@ public final class MaintenanceJobConfBuilder {
     putIfAbsentSparkFromPlaceholder(jobConf, sparkConf, "catalog_uri", catalogPrefix + ".uri");
     putIfAbsentSparkFromPlaceholder(
         jobConf, sparkConf, "warehouse_location", catalogPrefix + ".warehouse");
+    // IcebergMaintenanceJob builds SparkSession from spark_conf JSON alone in some executors;
+    // without the catalog impl class, Spark falls back to spark_catalog and multipart names fail.
+    if (sparkConf.containsKey(catalogPrefix + ".type")
+        || sparkConf.containsKey(catalogPrefix + ".uri")
+        || sparkConf.containsKey(catalogPrefix + ".warehouse")) {
+      sparkConf.putIfAbsent(catalogPrefix, "org.apache.iceberg.spark.SparkCatalog");
+      sparkConf.putIfAbsent(
+          "spark.sql.extensions", IcebergSparkConfigUtils.ICEBERG_SPARK_EXTENSIONS);
+    }
     if (!sparkConf.isEmpty()) {
       jobConf.put("spark_conf", writeJson(sparkConf, "spark_conf"));
     }
