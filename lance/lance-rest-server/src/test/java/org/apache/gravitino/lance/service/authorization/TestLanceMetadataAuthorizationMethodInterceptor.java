@@ -375,6 +375,29 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  void testTableOverwriteIsRecognizedWhateverSpacingTheClientSends() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    // Create-table and register-table read their mode through CommonUtil.normalizeToken, so each
+    // of these reaches the catalog as OVERWRITE. Authorization must read it the same way, or
+    // CREATE_TABLE alone would be enough to replace a table owned by somebody else.
+    for (String mode : new String[] {" overwrite", "overwrite ", " OverWrite ", "\toverwrite\n"}) {
+      MethodInvocation create = createTableInvocation(tableId(), mode);
+      assertErrorResponse(
+          interceptor.invoke(create),
+          Response.Status.FORBIDDEN,
+          "create-table mode '" + mode + "' must be authorized as an overwrite");
+      verify(create, never()).proceed();
+      MethodInvocation register = registerTableInvocation(tableId(), mode);
+      assertErrorResponse(
+          interceptor.invoke(register),
+          Response.Status.FORBIDDEN,
+          "register-table mode '" + mode + "' must be authorized as an overwrite");
+      verify(register, never()).proceed();
+    }
+  }
+
+  @Test
   void testTableOverwriteRejectsIdentifiersOfTheWrongDepth() throws Throwable {
     when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
     allow(Privilege.Name.values());

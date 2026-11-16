@@ -53,6 +53,126 @@ import org.opentest4j.AssertionFailedError;
 public class TestSQLScripts extends TestJDBCBackend {
 
   @TestTemplate
+  void testReimportedIdentifiersWithFreshAndUpgradedSchemas() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    List<String> inserts = externalEntityInsertStatements();
+    for (String initialVersion : List.of("1.3.0", "2.0.0")) {
+      dropAllTables();
+      executeScript(scripts.resolve("schema-" + initialVersion + suffix).toFile());
+      executeStatements(inserts, "initial registrations");
+      if (initialVersion.equals("1.3.0")) {
+        executeScript(upgrade);
+      }
+      for (int generation = 1; generation <= 2; generation++) {
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          executeStatements(
+              List.of(
+                  "UPDATE "
+                      + entity
+                      + "_meta SET deleted_at = "
+                      + generation
+                      + " WHERE deleted_at = 0"),
+              "retire registration");
+        }
+        executeStatements(inserts, "reimport the same external IDs");
+        try (SqlSession session =
+                SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+            Connection connection = session.getConnection();
+            Statement statement = connection.createStatement()) {
+          for (String insert : inserts) {
+            String conflictingPath =
+                insert
+                    .replace("'schema'", "'other_schema'")
+                    .replace("'table'", "'other_table'")
+                    .replace("'topic'", "'other_topic'")
+                    .replace("'view'", "'other_view'")
+                    .replace(", 2,", ", 3,");
+            Assertions.assertThrows(
+                SQLException.class,
+                () -> statement.executeUpdate(conflictingPath),
+                "A duplicate active identity must still fail");
+          }
+        }
+        if (initialVersion.equals("1.3.0")) {
+          executeScript(upgrade);
+        }
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          String table = entity + "_meta";
+          assertExternalIdentityPrimaryKey(table, entity + "_id");
+          try (SqlSession session =
+                  SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+              Connection connection = session.getConnection();
+              Statement statement = connection.createStatement();
+              ResultSet result =
+                  statement.executeQuery(
+                      "SELECT COUNT(*), SUM(CASE WHEN deleted_at = 0 THEN 1 ELSE 0 END) FROM "
+                          + table)) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(
+                generation + 1, result.getInt(1), "History must remain after a migration retry");
+            Assertions.assertEquals(1, result.getInt(2), "Only one registration can be active");
+          }
+        }
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeEarlierTwoZeroIdentifierKeys() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-2.0.0" + suffix).toFile());
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      String table = entity + "_meta";
+      String dropPrimaryKey =
+          backendType.equalsIgnoreCase("postgresql")
+              ? " DROP CONSTRAINT " + table + "_pkey"
+              : " DROP PRIMARY KEY";
+      executeStatements(
+          List.of(
+              "ALTER TABLE " + table + dropPrimaryKey,
+              "ALTER TABLE " + table + " ADD PRIMARY KEY (" + entity + "_id)"),
+          "simulate the earlier 2.0 identifier-only primary keys");
+    }
+    executeStatements(externalEntityInsertStatements(), "live 2.0 registrations");
+    seedExternalGovernance(1);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      executeScript(upgrade);
+      assertExternalGovernanceCount(4);
+      for (String entity : List.of("schema", "table", "topic", "view")) {
+        assertExternalIdentityPrimaryKey(entity + "_meta", entity + "_id");
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeClearsRetiredGovernanceAndPreservesReimportedGovernance()
+      throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-1.3.0" + suffix).toFile());
+    executeStatements(externalEntityInsertStatements(), "legacy registrations");
+    seedExternalGovernance(1);
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      executeStatements(
+          List.of("UPDATE " + entity + "_meta SET deleted_at = 42"), "retire legacy registrations");
+    }
+    executeScript(upgrade);
+    assertExternalGovernanceCount(0);
+
+    executeStatements(externalEntityInsertStatements(), "reimport external IDs");
+    seedExternalGovernance(2);
+    executeScript(upgrade);
+    assertExternalGovernanceCount(4);
+  }
+
+  @TestTemplate
   public void testSQLScripts() throws SQLException, IOException {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     Assertions.assertNotNull(gravitinoHome, "GRAVITINO_HOME environment variable is not set");
@@ -604,6 +724,86 @@ public class TestSQLScripts extends TestJDBCBackend {
           readSchemaIndexes(Set.of("table_version_info")).stream()
               .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
           "Failed conversion must preserve the existing indexes");
+    }
+  }
+
+  private void seedExternalGovernance(int generation) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      Map<Long, String> objects = Map.of(11L, "SCHEMA", 12L, "TABLE", 13L, "TOPIC", 14L, "VIEW");
+      for (Map.Entry<Long, String> object : objects.entrySet()) {
+        long id = object.getKey();
+        String type = object.getValue();
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO owner_meta (metalake_id, owner_id, owner_type, metadata_object_id, metadata_object_type, audit_info) VALUES (1, 101, 'USER', %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO role_meta_securable_object (role_id, metadata_object_id, type, privilege_names, privilege_conditions) VALUES (101, %d, '%s', '[]', '[]')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, audit_info) VALUES (102, %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO statistic_meta (statistic_id, statistic_name, metalake_id, statistic_value, metadata_object_id, metadata_object_type, audit_info) VALUES (%d, 'row_count', 1, '{}', %d, '%s', '{}')",
+                id + generation * 1000L, id, type));
+      }
+    }
+  }
+
+  private void assertExternalGovernanceCount(int expected) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table :
+          List.of(
+              "owner_meta", "role_meta_securable_object", "tag_relation_meta", "statistic_meta")) {
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM "
+                    + table
+                    + " WHERE deleted_at = 0 AND metadata_object_id IN (11, 12, 13, 14)")) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(expected, result.getInt(1), table);
+        }
+      }
+    }
+  }
+
+  private List<String> externalEntityInsertStatements() {
+    return List.of(
+        "INSERT INTO schema_meta (schema_id, schema_name, metalake_id, catalog_id, audit_info) VALUES (11, 'schema', 1, 2, '{}')",
+        "INSERT INTO table_meta (table_id, table_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (12, 'table', 1, 2, 11, '{}')",
+        "INSERT INTO topic_meta (topic_id, topic_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (13, 'topic', 1, 2, 11, '{}')",
+        "INSERT INTO view_meta (view_id, view_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (14, 'view', 1, 2, 11, '{}')");
+  }
+
+  private void assertExternalIdentityPrimaryKey(String table, String idColumn) throws SQLException {
+    String actualTable =
+        readSchemaColumns().keySet().stream()
+            .filter(name -> name.equalsIgnoreCase(table))
+            .findFirst()
+            .orElseThrow();
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        ResultSet keys =
+            connection
+                .getMetaData()
+                .getPrimaryKeys(connection.getCatalog(), connection.getSchema(), actualTable)) {
+      Map<Short, String> columns = new TreeMap<>();
+      while (keys.next()) {
+        columns.put(
+            keys.getShort("KEY_SEQ"), keys.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+      }
+      Assertions.assertEquals(
+          List.of(idColumn, "deleted_at"), new ArrayList<>(columns.values()), table);
     }
   }
 

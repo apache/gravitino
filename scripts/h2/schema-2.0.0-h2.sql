@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `schema_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'schema last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'schema deleted at',
-    PRIMARY KEY (schema_id),
+    PRIMARY KEY (schema_id, deleted_at),
     CONSTRAINT uk_cid_sn_del UNIQUE (catalog_id, schema_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_smid (metalake_id)
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS `table_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'table last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deleted at',
-    PRIMARY KEY (table_id),
+    PRIMARY KEY (table_id, deleted_at),
     CONSTRAINT uk_sid_tn_del UNIQUE (schema_id, table_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tmid (metalake_id),
@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS `topic_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'topic last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'topic deleted at',
-    PRIMARY KEY (topic_id),
+    PRIMARY KEY (topic_id, deleted_at),
     CONSTRAINT uk_cid_tn_del UNIQUE (schema_id, topic_name, deleted_at),
     -- Aliases are used here, and indexes with the same name in H2 can only be created once.
     KEY idx_tvmid (metalake_id),
@@ -545,7 +545,7 @@ CREATE TABLE IF NOT EXISTS `view_meta` (
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'view last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'view deleted at',
-    PRIMARY KEY (`view_id`),
+    PRIMARY KEY (view_id, deleted_at),
     UNIQUE KEY `uk_sid_vn_del` (`schema_id`, `view_name`, `deleted_at`),
     KEY `idx_vemid` (`metalake_id`),
     KEY `idx_vecid` (`catalog_id`)

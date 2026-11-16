@@ -35,6 +35,7 @@ import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
 import javax.ws.rs.HeaderParam;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -43,6 +44,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -51,6 +53,7 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergNamespaceOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -84,13 +87,16 @@ public class IcebergNamespaceOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergNamespaceOperationDispatcher namespaceOperationDispatcher;
+  private IcebergIdempotencyManager idempotencyManager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
   public IcebergNamespaceOperations(
-      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher) {
+      IcebergNamespaceOperationDispatcher namespaceOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
     this.namespaceOperationDispatcher = namespaceOperationDispatcher;
+    this.idempotencyManager = idempotencyManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
@@ -215,7 +221,16 @@ public class IcebergNamespaceOperations {
   public Response dropNamespace(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
-          String namespace) {
+          String namespace,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.DELETE, uriInfo),
+        () -> doDropNamespace(prefix, namespace));
+  }
+
+  private Response doDropNamespace(String prefix, String namespace) {
     // todo check if table exists in namespace after table ops is added
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -246,8 +261,17 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @IcebergAuthorizationMetadata(
               type = IcebergAuthorizationMetadata.RequestType.CREATE_NAMESPACE)
-          CreateNamespaceRequest createNamespaceRequest) {
+          CreateNamespaceRequest createNamespaceRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(createNamespaceRequest, "CreateNamespaceRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doCreateNamespace(prefix, createNamespaceRequest));
+  }
+
+  private Response doCreateNamespace(String prefix, CreateNamespaceRequest createNamespaceRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Create Iceberg namespace, catalog: {}, createNamespaceRequest: {}",
@@ -280,9 +304,21 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
+      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(
         updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doUpdateNamespace(prefix, namespace, updateNamespacePropertiesRequest));
+  }
+
+  private Response doUpdateNamespace(
+      String prefix,
+      String namespace,
+      UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -324,8 +360,21 @@ public class IcebergNamespaceOperations {
           String namespace,
       @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.REGISTER_TABLE)
           RegisterTableRequest registerTableRequest,
-      @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+      @HeaderParam(IcebergTableOperations.X_ICEBERG_ACCESS_DELEGATION) String accessDelegation,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(registerTableRequest, "RegisterTableRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doRegisterTable(prefix, namespace, registerTableRequest, accessDelegation));
+  }
+
+  private Response doRegisterTable(
+      String prefix,
+      String namespace,
+      RegisterTableRequest registerTableRequest,
+      String accessDelegation) {
     boolean isCredentialVending = IcebergTableOperations.isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
@@ -366,8 +415,18 @@ public class IcebergNamespaceOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      RegisterViewRequest registerViewRequest) {
+      RegisterViewRequest registerViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
     IcebergRESTUtils.validateRequest(registerViewRequest, "RegisterViewRequest");
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doRegisterView(prefix, namespace, registerViewRequest));
+  }
+
+  private Response doRegisterView(
+      String prefix, String namespace, RegisterViewRequest registerViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -430,8 +489,6 @@ public class IcebergNamespaceOperations {
 
   private String SerializeUpdateNamespacePropertiesRequest(
       UpdateNamespacePropertiesRequest updateNamespacePropertiesRequest) {
-    IcebergRESTUtils.validateRequest(
-        updateNamespacePropertiesRequest, "UpdateNamespacePropertiesRequest");
     try {
       return icebergObjectMapper.writeValueAsString(updateNamespacePropertiesRequest);
     } catch (JsonProcessingException e) {

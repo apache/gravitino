@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -41,6 +42,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.domain.Domain;
@@ -51,7 +53,9 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -604,6 +608,56 @@ public class TestDomainMetaService extends TestJDBCBackend {
 
     // The deleted domain row is a stale observation now.
     Assertions.assertFalse(domainMetaService.deleteDomain(treasury.nameIdentifier(), stalePO));
+  }
+
+  @TestTemplate
+  void testSharedMemberAcrossDomainBatches() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "shared");
+    TagEntity firstTag = newTag("first");
+    TagEntity lastTag = newTag("last");
+    backend.insert(firstTag, false);
+    backend.insert(lastTag, false);
+    DomainEntity first =
+        newDomain(METALAKE_NAME, "First", null).toBuilder().withBackingTagId(firstTag.id()).build();
+    DomainEntity last =
+        newDomain(METALAKE_NAME, "Last", null).toBuilder().withBackingTagId(lastTag.id()).build();
+    backend.insert(first, false);
+    backend.insert(last, false);
+    TagMetaService tags = TagMetaService.getInstance();
+    tags.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {firstTag.nameIdentifier(), lastTag.nameIdentifier()},
+        new NameIdentifier[0]);
+    List<DomainEntity> scope = new ArrayList<>();
+    scope.add(first);
+    // Intervening IDs no longer present in the database put the two live domains in separate
+    // batches.
+    for (int i = 1; i < 5_000; i++) {
+      scope.add(
+          newDomain(METALAKE_NAME, "Removed" + i, null).toBuilder()
+              .withBackingTagId(firstTag.id())
+              .build());
+    }
+    scope.add(last);
+    GenericEntity selectedObject =
+        GenericEntity.builder()
+            .withId(catalog.id())
+            .withName("name-from-first-read")
+            .withEntityType(Entity.EntityType.CATALOG)
+            .build();
+    Map<Long, List<GenericEntity>> assignments =
+        tags.listDomainAssignments(
+            METALAKE_NAME,
+            scope,
+            Set.of(MetadataObject.Type.CATALOG),
+            Map.of(first.id(), List.of(selectedObject)));
+    Assertions.assertEquals(Set.of(first.id(), last.id()), assignments.keySet());
+    Assertions.assertEquals(
+        List.of(catalog.id()),
+        assignments.get(first.id()).stream().map(GenericEntity::id).collect(Collectors.toList()));
+    Assertions.assertSame(selectedObject, assignments.get(last.id()).get(0));
   }
 
   @TestTemplate

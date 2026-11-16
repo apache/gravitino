@@ -368,7 +368,11 @@ public class TableMetaService {
                 TableMetaMapper.class,
                 mapper ->
                     mapper.softDeleteTableMetasByTableId(
-                        observedTablePO.getTableId(), observedTablePO.getCurrentVersion())),
+                        observedTablePO.getTableId(),
+                        observedTablePO.getCurrentVersion(),
+                        observedTablePO.getCatalogId(),
+                        observedTablePO.getSchemaId(),
+                        observedTablePO.getTableName())),
         () -> tableWriteFailure(identifier, observedTablePO));
   }
 

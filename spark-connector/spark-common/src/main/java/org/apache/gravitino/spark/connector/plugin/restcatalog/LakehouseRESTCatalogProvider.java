@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 
 /** Provides format-specific discovery and Spark configuration for lakehouse REST catalogs. */
 public interface LakehouseRESTCatalogProvider {
@@ -31,6 +32,23 @@ public interface LakehouseRESTCatalogProvider {
    * @return the format token
    */
   String format();
+
+  /**
+   * Normalizes and validates explicitly configured catalog properties in place.
+   *
+   * @param properties mutable catalog properties
+   */
+  default void normalizeCatalogProperties(Map<String, String> properties) {}
+
+  /**
+   * Supplies defaults for discovery and auto-registered catalogs.
+   *
+   * @param properties mutable global properties with explicit values already normalized
+   * @param authType configured Gravitino authentication type
+   * @param sparkUser user resolved by Spark, if available
+   */
+  default void applyCatalogDefaults(
+      Map<String, String> properties, String authType, @Nullable String sparkUser) {}
 
   /**
    * Lists the catalog names discovered from the format's REST server.

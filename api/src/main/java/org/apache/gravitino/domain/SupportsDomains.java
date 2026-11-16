@@ -21,9 +21,9 @@ package org.apache.gravitino.domain;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * Interface for listing the domains of a leaf metadata object, such as a table, view or fileset.
- * Catalogs and schemas do not support it, since they are never members of a domain; the domain a
- * catalog or schema passes down to the objects under it is visible from its tags.
+ * Interface for listing the domains of a leaf metadata object, such as a table, view or fileset. A
+ * directly tagged catalog or schema appears in the domain's default member listing. This reverse
+ * lookup is available only on leaf objects.
  *
  * <p>The domains listed are all the domains visible to the caller whose scope contains the object:
  * the domains whose backing tag the object's effective tags match, and the parents of those that

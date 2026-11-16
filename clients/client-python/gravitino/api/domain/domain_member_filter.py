@@ -31,14 +31,25 @@ class DomainMemberFilter:
     Empty options do not narrow the result. Domains select the union of the named
     scopes: the listed domain itself (including visible children), or its children.
     Unknown or invisible scope names are ignored by the server.
+
+    By default, objects that carry a backing tag themselves are listed, including
+    catalogs and schemas, each once. With ``expand=True``, a catalog or schema is
+    replaced by the recorded leaf objects under it that inherit the backing tag, and
+    ``types`` must then name leaf types only.
     """
 
     types: tuple[MetadataObject.Type, ...] = ()
     name_contains: Optional[str] = None
     domains: Sequence[str] = ()
+    expand: bool = False
 
     def _criteria(self) -> tuple:
-        return frozenset(self.types), self.name_contains, frozenset(self.domains)
+        return (
+            frozenset(self.types),
+            self.name_contains,
+            frozenset(self.domains),
+            self.expand,
+        )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, DomainMemberFilter):
@@ -49,6 +60,9 @@ class DomainMemberFilter:
         return hash(self._criteria())
 
     def __post_init__(self) -> None:
+        Precondition.check_argument(
+            isinstance(self.expand, bool), "expand must be a boolean"
+        )
         Precondition.check_argument(self.types is not None, "types must not be None")
         Precondition.check_argument(
             self.domains is not None, "domains must not be None"
@@ -57,8 +71,17 @@ class DomainMemberFilter:
         domains = (self.domains,) if isinstance(self.domains, str) else self.domains
         object.__setattr__(self, "domains", tuple(dict.fromkeys(domains)))
         Precondition.check_argument(
-            all(t in DomainMember.SUPPORTED_TYPES for t in self.types),
-            "Only leaf metadata types can be domain members",
+            all(
+                t in DomainMember.SUPPORTED_TYPES or t in DomainMember.CONTAINER_TYPES
+                for t in self.types
+            ),
+            "Only leaf, catalog and schema metadata types can be domain members",
+        )
+        Precondition.check_argument(
+            not self.expand
+            or all(t not in DomainMember.CONTAINER_TYPES for t in self.types),
+            "An expanded listing has only leaf members, catalog and schema types "
+            "are not supported with expand",
         )
         Precondition.check_argument(
             self.name_contains is None
