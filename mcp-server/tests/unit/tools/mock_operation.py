@@ -19,6 +19,7 @@ from typing import Optional
 
 from mcp_server.client import (
     CatalogOperation,
+    DomainOperation,
     GravitinoOperation,
     ModelOperation,
     PolicyOperation,
@@ -59,6 +60,9 @@ class MockOperation(GravitinoOperation):
 
     def as_model_operation(self) -> ModelOperation:
         return MockModelOperation()
+
+    def as_domain_operation(self) -> DomainOperation:
+        return MockDomainOperation()
 
     def as_tag_operation(self) -> TagOperation:
         return MockTagOperation()
@@ -546,3 +550,30 @@ class MockSemanticModelOperation(SemanticModelOperation):
         self, catalog_name: str, schema_name: str, semantic_model_name: str
     ) -> str:
         return "true"
+
+
+class MockDomainOperation(DomainOperation):
+    async def list_of_domains(self, details: bool = True) -> str:
+        return "[]"
+
+    async def get_domain_by_name(self, domain_name: str) -> str:
+        return "{}"
+
+    async def list_subdomains(
+        self, domain_name: str, details: bool = True
+    ) -> str:
+        return "[]"
+
+    async def list_domain_members(
+        self,
+        domain_name: str,
+        types: list[str] | None = None,
+        domains: list[str] | None = None,
+        name_contains: str | None = None,
+    ) -> str:
+        return "[]"
+
+    async def list_domains_for_metadata(
+        self, metadata_full_name: str, metadata_type: str, details: bool = True
+    ) -> str:
+        return "[]"

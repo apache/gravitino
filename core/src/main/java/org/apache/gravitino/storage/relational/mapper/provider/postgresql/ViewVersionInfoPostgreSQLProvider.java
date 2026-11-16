@@ -22,6 +22,7 @@ import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
+import org.apache.gravitino.storage.relational.mapper.provider.MetadataObjectSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewVersionInfoBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -43,13 +44,15 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE view_id IN (SELECT view_id FROM "
+        + " WHERE view_id IN (SELECT vm.view_id FROM "
         + ViewMetaMapper.TABLE_NAME
-        + " WHERE schema_id IN ("
+        + " vm WHERE vm.schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
         + "</foreach>"
-        + ")) AND deleted_at = 0"
+        + ")"
+        + MetadataObjectSQL.excludeOtherActiveSchemas(ViewMetaMapper.TABLE_NAME, "view_id", "vm")
+        + ") AND deleted_at = 0"
         + "</script>";
   }
 
@@ -59,9 +62,11 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE view_id IN (SELECT view_id FROM "
+        + " WHERE view_id IN (SELECT vm.view_id FROM "
         + ViewMetaMapper.TABLE_NAME
-        + " WHERE catalog_id = #{catalogId}) AND deleted_at = 0";
+        + " vm WHERE vm.catalog_id = #{catalogId}"
+        + MetadataObjectSQL.excludeOtherActiveCatalogs(ViewMetaMapper.TABLE_NAME, "view_id", "vm")
+        + ") AND deleted_at = 0";
   }
 
   @Override
@@ -70,9 +75,11 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE view_id IN (SELECT view_id FROM "
+        + " WHERE view_id IN (SELECT vm.view_id FROM "
         + ViewMetaMapper.TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId}) AND deleted_at = 0";
+        + " vm WHERE vm.metalake_id = #{metalakeId}"
+        + MetadataObjectSQL.excludeOtherActiveMetalakes(ViewMetaMapper.TABLE_NAME, "view_id", "vm")
+        + ") AND deleted_at = 0";
   }
 
   @Override

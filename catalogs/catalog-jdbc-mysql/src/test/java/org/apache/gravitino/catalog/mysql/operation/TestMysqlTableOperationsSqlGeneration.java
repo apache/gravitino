@@ -23,9 +23,10 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
-import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
+import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.utils.ConnectionCountingDataSource;
+import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
@@ -44,10 +45,12 @@ import org.junit.jupiter.params.provider.MethodSource;
 public class TestMysqlTableOperationsSqlGeneration {
 
   private static class TestableMysqlTableOperations extends MysqlTableOperations {
+    private JdbcColumn[] columns = new JdbcColumn[0];
+
     public TestableMysqlTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new MysqlTypeConverter();
-      super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      super.columnDefaultValueConverter = new MysqlColumnDefaultValueConverter();
     }
 
     private TestableMysqlTableOperations(ConnectionCountingDataSource connections) {
@@ -77,8 +80,30 @@ public class TestMysqlTableOperationsSqlGeneration {
     @Override
     protected JdbcTable getOrCreateTable(
         String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
-      return JdbcTable.builder().withName(tableName).build();
+      return JdbcTable.builder().withName(tableName).withColumns(columns).build();
     }
+  }
+
+  @Test
+  void testAlterColumnCommentPreservesLoadedZeroDateDefault() {
+    TestableMysqlTableOperations ops = new TestableMysqlTableOperations();
+    ops.columns =
+        new JdbcColumn[] {
+          JdbcColumn.builder()
+              .withName("legacy_date")
+              .withType(Types.DateType.get())
+              .withDefaultValue(
+                  new MysqlColumnDefaultValueConverter()
+                      .toGravitino(
+                          new JdbcTypeConverter.JdbcTypeBean("DATE"), "0000-00-00", false, true))
+              .build()
+        };
+
+    String sql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.updateColumnComment(new String[] {"legacy_date"}, "legacy default"));
+    Assertions.assertTrue(sql.contains("DEFAULT '0000-00-00' COMMENT 'legacy default'"), sql);
   }
 
   @ParameterizedTest
@@ -161,7 +186,7 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
-    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    MysqlColumnDefaultValueConverter converter = new MysqlColumnDefaultValueConverter();
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT '' but was: " + sql);
@@ -180,7 +205,7 @@ public class TestMysqlTableOperationsSqlGeneration {
             .build();
 
     String sql = ops.createTableSql(tableName, new JdbcColumn[] {col1});
-    JdbcColumnDefaultValueConverter converter = new JdbcColumnDefaultValueConverter();
+    MysqlColumnDefaultValueConverter converter = new MysqlColumnDefaultValueConverter();
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);

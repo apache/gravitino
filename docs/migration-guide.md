@@ -11,6 +11,47 @@ existing deployments. For database backup, schema scripts, and rollback commands
 
 ## Upgrading from Gravitino 1.3 to 2.0
 
+### External catalog re-registration
+
+Apply the 1.3.0-to-2.0.0 database upgrade before starting the new server. The upgrade changes
+schema, table, topic, and view primary keys to `(entity_id, deleted_at)`, allowing deleted
+registrations and a new active registration to retain the same external identifier.
+Each external identifier can have only one active registration; importing it through another
+catalog or schema is rejected.
+
+Earlier 2.0.0 snapshots with identifier-only primary keys also require these primary-key changes.
+Apply the updated 1.3.0-to-2.0.0 upgrade script using the backup and shutdown procedure below;
+the existing 2.0.0 version label does not mean the database already has composite primary keys.
+
+Table and view imports do not automatically move registrations after an external rename.
+Schema imports retain the existing same-catalog rename handling: a registration can move only
+after confirming that its old source path no longer exists. An ID active in another catalog
+cannot be moved by an import. There is no per-object metadata-only unregister API; recovery from
+unresolved identity conflicts requires catalog re-registration as described below.
+
+Dropping a catalog clears owner, privilege, tag, and statistic associations for the catalog
+and its descendants. The upgrade also soft-deletes orphaned associations for retained schema,
+table, topic, and view IDs that have no active registration. Associations for IDs with an
+active registration are preserved. Metalake-level user, role, tag, and policy definitions
+are retained.
+
+After dropping and recreating an external catalog, its objects can be imported again without
+removing their external identifiers. Their deleted governance associations are not restored;
+explicitly reapply the associations needed by the new registration. Follow the database backup
+and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying the migration.
+
+### Domains
+
+- Domains add business groupings within a metalake, backed by explicit tag bindings. Existing tags
+  and assignments are preserved; they are not automatically converted into domains.
+- Complete the standard 1.3-to-2.0 database schema upgrade before using Domain APIs. The H2, MySQL
+  and PostgreSQL upgrade scripts include the Domain metadata and hierarchy tables. Use matching
+  server and client versions; a client upgrade alone does not add server-side Domain support.
+- With authorization enabled, grant `MANAGE_DOMAIN` or `USE_DOMAIN` separately from tag and data
+  permissions. Existing tag/data privileges do not grant Domain management or discovery.
+- See [Manage domains](./manage-domains-in-gravitino.md) for the workflow and
+  [Upgrade Gravitino](./how-to-upgrade.md) for the database upgrade procedure.
+
 ### Audit client address behind a reverse proxy
 
 - Gravitino 1.3 used the first `X-Forwarded-For` entry as the audit client address whenever

@@ -36,6 +36,7 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
@@ -51,6 +52,7 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
+import org.apache.gravitino.storage.relational.po.DomainPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FunctionPO;
 import org.apache.gravitino.storage.relational.po.JobTemplatePO;
@@ -99,6 +101,7 @@ public class MetadataObjectService {
               .put(
                   MetadataObject.Type.JOB_TEMPLATE,
                   MetadataObjectService::getJobTemplateObjectsFullName)
+              .put(MetadataObject.Type.DOMAIN, MetadataObjectService::getDomainObjectsFullName)
               .build();
 
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =
@@ -181,6 +184,23 @@ public class MetadataObjectService {
     tagPOs.forEach(tagPO -> tagIdAndNameMap.put(tagPO.getTagId(), tagPO.getTagName()));
 
     return tagIdAndNameMap;
+  }
+
+  private static Map<Long, String> getDomainObjectsFullName(List<Long> domainIds) {
+    if (domainIds == null || domainIds.isEmpty()) {
+      return Maps.newHashMap();
+    }
+
+    List<DomainPO> domainPOs =
+        SessionUtils.getWithoutCommit(
+            DomainMetaMapper.class, mapper -> mapper.listDomainPOsByDomainIds(domainIds));
+
+    HashMap<Long, String> domainIdAndNameMap = new HashMap<>();
+    if (domainPOs != null) {
+      domainPOs.forEach(
+          domainPO -> domainIdAndNameMap.put(domainPO.domainId(), domainPO.domainName()));
+    }
+    return domainIdAndNameMap;
   }
 
   private MetadataObjectService() {}

@@ -18,6 +18,33 @@
 --
 
 
+-- Preserve retired registrations while keeping each external ID unique among active rows.
+EXECUTE IMMEDIATE 'ALTER TABLE `schema_meta` DROP CONSTRAINT IF EXISTS "' ||
+    COALESCE((SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA AND UPPER(TABLE_NAME) = UPPER('schema_meta')
+        AND CONSTRAINT_TYPE = 'PRIMARY KEY'), 'schema_meta_pkey') || '"';
+ALTER TABLE `schema_meta` ADD PRIMARY KEY (`schema_id`, `deleted_at`);
+
+EXECUTE IMMEDIATE 'ALTER TABLE `table_meta` DROP CONSTRAINT IF EXISTS "' ||
+    COALESCE((SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA AND UPPER(TABLE_NAME) = UPPER('table_meta')
+        AND CONSTRAINT_TYPE = 'PRIMARY KEY'), 'table_meta_pkey') || '"';
+ALTER TABLE `table_meta` ADD PRIMARY KEY (`table_id`, `deleted_at`);
+
+EXECUTE IMMEDIATE 'ALTER TABLE `topic_meta` DROP CONSTRAINT IF EXISTS "' ||
+    COALESCE((SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA AND UPPER(TABLE_NAME) = UPPER('topic_meta')
+        AND CONSTRAINT_TYPE = 'PRIMARY KEY'), 'topic_meta_pkey') || '"';
+ALTER TABLE `topic_meta` ADD PRIMARY KEY (`topic_id`, `deleted_at`);
+
+EXECUTE IMMEDIATE 'ALTER TABLE `view_meta` DROP CONSTRAINT IF EXISTS "' ||
+    COALESCE((SELECT CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE TABLE_SCHEMA = CURRENT_SCHEMA AND UPPER(TABLE_NAME) = UPPER('view_meta')
+        AND CONSTRAINT_TYPE = 'PRIMARY KEY'), 'view_meta_pkey') || '"';
+ALTER TABLE `view_meta` ADD PRIMARY KEY (`view_id`, `deleted_at`);
+
+
+
 
 
 -- Preserve policy_relation_meta from pre-2.0 installations, including its existing data.
@@ -247,6 +274,154 @@ CREATE INDEX IF NOT EXISTS `idx_smsr_model` ON `semantic_model_source_rel` (`sem
 CREATE INDEX IF NOT EXISTS `idx_smsr_source` ON `semantic_model_source_rel` (`metalake_id`, `source_type`, `source_id`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_smsr_deleted_at` ON `semantic_model_source_rel` (`deleted_at`);
 
+-- Clear governance attached to retired external registrations before their IDs can be reused.
+-- A retry must preserve relationships attached to a new active registration of the same ID.
+UPDATE owner_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000),
+    updated_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE role_meta_securable_object r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE tag_relation_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
+UPDATE statistic_meta r
+SET deleted_at = ((UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000)
+WHERE r.deleted_at = 0 AND EXISTS (
+    SELECT 1 FROM schema_meta retired
+    WHERE r.metadata_object_type = 'SCHEMA' AND retired.schema_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM schema_meta live
+                      WHERE live.schema_id = retired.schema_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM table_meta retired
+    WHERE r.metadata_object_type = 'TABLE' AND retired.table_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM table_meta live
+                      WHERE live.table_id = retired.table_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM topic_meta retired
+    WHERE r.metadata_object_type = 'TOPIC' AND retired.topic_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM topic_meta live
+                      WHERE live.topic_id = retired.topic_id AND live.deleted_at = 0)
+    UNION ALL
+    SELECT 1 FROM view_meta retired
+    WHERE r.metadata_object_type = 'VIEW' AND retired.view_id = r.metadata_object_id
+      AND retired.deleted_at > 0
+      AND NOT EXISTS (SELECT 1 FROM view_meta live
+                      WHERE live.view_id = retired.view_id AND live.deleted_at = 0)
+);
+
 -- Align the location and uri name widths with the MySQL and PostgreSQL schemas.
 ALTER TABLE `fileset_version_info` ALTER COLUMN `storage_location_name` VARCHAR(256) NOT NULL DEFAULT 'default';
 ALTER TABLE `model_version_info` ALTER COLUMN `model_version_uri_name` VARCHAR(256) NOT NULL;
+
+CREATE TABLE IF NOT EXISTS `domain_meta` (
+    `domain_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'domain id',
+    `domain_name` VARCHAR(128) NOT NULL COMMENT 'domain name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `domain_comment` VARCHAR(256) DEFAULT '' COMMENT 'domain comment',
+    `domain_status` VARCHAR(16) NOT NULL DEFAULT 'DRAFT' COMMENT 'domain status, DRAFT or PUBLISHED',
+    `backing_tag_id` BIGINT(20) UNSIGNED DEFAULT NULL COMMENT 'id of the backing tag, NULL if the domain has none',
+    `backing_tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'value of the backing tag, NULL binds the tag without a value',
+    `properties` CLOB DEFAULT NULL COMMENT 'domain properties',
+    `audit_info` CLOB NOT NULL COMMENT 'domain audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain deleted at',
+    PRIMARY KEY (`domain_id`),
+    UNIQUE KEY `uk_mi_dn_del` (`metalake_id`, `domain_name`, `deleted_at`),
+    KEY `domain_meta_idx_backing_tag` (`metalake_id`, `backing_tag_id`, `backing_tag_value`, `deleted_at`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `domain_rel` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `parent_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'parent domain id',
+    `child_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'sub-domain id',
+    `audit_info` CLOB NOT NULL COMMENT 'domain relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'domain relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'domain relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_dr_ci_del` (`child_id`, `deleted_at`),
+    KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
+    KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
+) ENGINE=InnoDB;

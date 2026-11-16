@@ -1126,7 +1126,7 @@ Copyright 2021 The fast_float authors. Apache 2.0 License.
 bigint <https://github.com/tbuktu/bigint/tree/floatfft> (only using code from the  BSD License source files)
 Copyright 2020 Tim Buktu. 2-clause BSD License
 
-Code included in Micrometer 1.12.2
+Code included in Micrometer 1.15.12
 
 This product contains a modified portion of 'io.netty.util.internal.logging',
 in the Netty/Common library distributed by The Netty Project:
