@@ -292,6 +292,9 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, String version)
       throws NoSuchTableException {
+    if (isDataSourceReference(ident)) {
+      throw new NoSuchTableException(ident);
+    }
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, version);
@@ -312,6 +315,9 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   @Override
   public org.apache.spark.sql.connector.catalog.Table loadTable(Identifier ident, long timestamp)
       throws NoSuchTableException {
+    if (isDataSourceReference(ident)) {
+      throw new NoSuchTableException(ident);
+    }
     try {
       org.apache.gravitino.rel.Table gravitinoTable = loadGravitinoTable(ident);
       org.apache.spark.sql.connector.catalog.Table sparkTable = loadSparkTable(ident, timestamp);

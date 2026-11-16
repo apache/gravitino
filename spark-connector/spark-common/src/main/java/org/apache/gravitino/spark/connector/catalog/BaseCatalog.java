@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.catalog;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.Sets;
@@ -318,6 +319,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
+    if (isDataSourceReference(ident)) {
+      // This is Spark's DataSource shortcut syntax, e.g. SELECT * FROM parquet.`path`; yield to
+      // the analyzer's SQL-on-file resolver instead of forwarding the path to the server.
+      throw new NoSuchTableException(ident);
+    }
     org.apache.gravitino.rel.Table gravitinoTable;
     try {
       gravitinoTable = loadGravitinoTable(ident);
@@ -348,7 +354,53 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
       throws NoSuchTableException {
+    if (isDataSourceReference(ident)) {
+      throw new NoSuchTableException(ident);
+    }
     return loadTableForWriting(ident);
+  }
+
+  /**
+   * Detects Spark's DataSource shortcut syntax after the analyzer expands the identifier against
+   * this catalog as the current catalog, for example {@code SELECT * FROM parquet.`path`} or {@code
+   * SELECT * FROM csv.`s3a://bucket/file.csv`}. The expanded identifier has a single-part namespace
+   * (the format name) and the table name itself is a file path.
+   *
+   * <p>Such a lookup must not reach the Gravitino table APIs: the path may contain dots, so the
+   * server splits the full name into more than three parts and {@code MetadataObjects.of(TABLE,
+   * names)} throws {@code IllegalArgumentException}, which the Spark analyzer does not treat as
+   * non-existence. Reporting "not found" lets the analyzer fall back to its SQL-on-file resolver,
+   * the same path vanilla Spark takes.
+   *
+   * <p>The path characters ({@code /} or {@code \}) are only a cheap structural prefilter: some
+   * Gravitino backends (for example PostgreSQL quoted identifiers) allow them in table names. The
+   * decisive check is that the single-part namespace names no Gravitino schema, so a real table
+   * reference such as {@code db."a/b"} keeps resolving when the schema exists. Only the prefiltered
+   * identifiers pay the extra schema lookup.
+   */
+  @VisibleForTesting
+  protected boolean isDataSourceReference(Identifier ident) {
+    if (!looksLikeDataSourceReference(ident)) {
+      return false;
+    }
+    try {
+      gravitinoCatalog().asSchemas().loadSchema(ident.namespace()[0]);
+      // The namespace is a real Gravitino schema, so this is a table reference even though the
+      // table name contains a path separator.
+      return false;
+    } catch (NoSuchSchemaException e) {
+      return true;
+    }
+  }
+
+  /** Cheap structural prefilter for {@link #isDataSourceReference} without a server call. */
+  @VisibleForTesting
+  static boolean looksLikeDataSourceReference(Identifier ident) {
+    if (ident.namespace().length != 1) {
+      return false;
+    }
+    String name = ident.name();
+    return name.indexOf('/') >= 0 || name.indexOf('\\') >= 0;
   }
 
   @Override
@@ -422,6 +474,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean tableExists(Identifier ident) {
+    if (isDataSourceReference(ident)) {
+      // DataSource shortcut such as parquet.`path`; answer "no" so the analyzer falls back to its
+      // SQL-on-file resolver instead of forwarding the path identifier to the Gravitino server.
+      return false;
+    }
     // Gravitino uses loadTable() to verify table existence, which requires LOAD_TABLE privilege.
     // For CREATE TABLE IF NOT EXISTS operations, users may only have CREATE_TABLE privilege.
     // When ForbiddenException is thrown (lacking LOAD_TABLE privilege), we return false to allow
