@@ -564,6 +564,20 @@ public class TestPartitionUtils {
   }
 
   @Test
+  void testIdentityFloatingHexFloatEmitsCanonicalLiteral() {
+    // Jerry P2: Double.parseDouble accepts 0X1P0, but Spark 3.5.3 tokenizes that spelling as a
+    // column name. Emit Double.toString so the predicate stays numeric.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("score", "0X1P0"));
+    Column[] columns = new Column[] {column("score", Types.DoubleType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("score")};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("score = 1.0", where);
+  }
+
+  @Test
   void testIdentityOnDateColumnIsFormattedAsDateLiteral() {
     Column[] columns = new Column[] {column("dt", Types.DateType.get())};
 

@@ -307,15 +307,20 @@ public class PartitionUtils {
     }
   }
 
+  /**
+   * Parses floating partition values and emits a canonical numeric literal.
+   *
+   * <p>{@link Double#parseDouble(String)} accepts Java hex floats such as {@code 0X1P0}, but Spark
+   * SQL tokenizes that spelling as an identifier. Re-emit via {@link Double#toString(double)} so
+   * the predicate always uses a numeric literal Spark can parse.
+   */
   private static String formatFloatingLiteral(String rawValue) {
-    String trimmed = rawValue.trim();
     try {
-      double parsed = Double.parseDouble(trimmed);
+      double parsed = Double.parseDouble(rawValue.trim());
       if (Double.isInfinite(parsed) || Double.isNaN(parsed)) {
         throw new NumberFormatException("non-finite");
       }
-      // Keep the producer spelling after validation (avoid Double.toString reformatting).
-      return trimmed;
+      return Double.toString(parsed);
     } catch (NumberFormatException e) {
       throw new IllegalArgumentException(
           "Partition value for floating type must be a finite number, but got: " + rawValue, e);

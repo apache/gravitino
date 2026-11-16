@@ -25,6 +25,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
+import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
@@ -90,6 +91,41 @@ public class TestGravitinoCompactionJobAdapter {
 
     Assertions.assertEquals(
         "(`catalog`.system.days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
+  }
+
+  @Test
+  public void testWhereClauseUsesSubmitterSparkCatalogWhenNamesDiffer() {
+    // Gravitino table catalog "lake" vs Spark CALL catalog_name "ice" from jobSubmitterConfig.
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("ts")
+              .withDataType(Types.TimestampType.withoutTimeZone())
+              .build()
+        };
+    Transform[] partitioning = new Transform[] {Transforms.day("ts")};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-01-01"))));
+    CompactionJobContext context =
+        new CompactionJobContext(
+            NameIdentifier.of("lake", "db", "events"),
+            Map.of("target_file_size_bytes", "1073741824"),
+            "compaction-job-template",
+            "binpack",
+            "",
+            columns,
+            partitioning,
+            partitions);
+    OptimizerConfig config =
+        new OptimizerConfig(
+            Map.of(OptimizerConfig.JOB_SUBMITTER_CONFIG_PREFIX + "catalog_name", "ice"));
+
+    Map<String, String> conf =
+        GravitinoJobSubmitter.buildJobConfig(config, context, new GravitinoCompactionJobAdapter());
+
+    Assertions.assertEquals("ice", conf.get("catalog_name"));
+    Assertions.assertEquals(
+        "(`ice`.system.days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {

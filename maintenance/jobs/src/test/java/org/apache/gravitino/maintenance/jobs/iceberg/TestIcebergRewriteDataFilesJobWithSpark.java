@@ -668,50 +668,66 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   /**
    * With catalog {@code default-namespace}, unqualified {@code years(ts)} is rewritten to {@code
    * catalog.<ns>.years}; {@code catalog.system.years} stays a system function.
+   *
+   * <p>Uses a fresh Spark catalog alias configured with {@code default-namespace} before first use
+   * (setting it on an already-cached catalog is ignored).
    */
   @Test
   public void testCatalogSystemYearsWithDefaultNamespace() {
-    String table = catalogName + ".db.pu_years_dns";
-    spark.sql("DROP TABLE IF EXISTS " + table);
-    spark.sql(
-        "CREATE TABLE "
-            + table
-            + " (id INT, ts TIMESTAMP) USING iceberg PARTITIONED BY (years(ts))");
-    List<Row> rows = new ArrayList<>();
-    for (int i = 0; i < 20; i++) {
-      rows.add(RowFactory.create(i, java.sql.Timestamp.valueOf("2024-06-15 12:00:00")));
-    }
-    StructType schema =
-        new StructType()
-            .add("id", DataTypes.IntegerType, false)
-            .add("ts", DataTypes.TimestampType, false);
-    spark
-        .createDataFrame(rows, schema)
-        .write()
-        .format("iceberg")
-        .mode(SaveMode.Append)
-        .saveAsTable(table);
-
-    String where =
-        PartitionUtils.getWhereClauseForPartitions(
-            Collections.singletonList(
-                PartitionPath.of(List.of(new PartitionEntryImpl("ts_year", "54")))),
-            new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
-            new Transform[] {Transforms.year("ts")},
-            catalogName);
-    assertEquals("(`" + catalogName + "`.system.years(ts) = 54)", where);
-
-    spark.conf().set("spark.sql.defaultCatalog", catalogName);
-    spark.conf().set("spark.sql.catalog." + catalogName + ".default-namespace", "db");
+    String dnsCatalog = "dns_catalog";
+    String table = dnsCatalog + ".db.pu_years_dns";
+    // Register before any use so default-namespace is applied at catalog init.
+    spark.conf().set("spark.sql.catalog." + dnsCatalog, "org.apache.iceberg.spark.SparkCatalog");
+    spark.conf().set("spark.sql.catalog." + dnsCatalog + ".type", "hadoop");
+    spark.conf().set("spark.sql.catalog." + dnsCatalog + ".warehouse", warehousePath);
+    spark.conf().set("spark.sql.catalog." + dnsCatalog + ".default-namespace", "db");
+    spark.conf().set("spark.sql.defaultCatalog", dnsCatalog);
     try {
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + dnsCatalog + ".db");
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, ts TIMESTAMP) USING iceberg PARTITIONED BY (years(ts))");
+      List<Row> rows = new ArrayList<>();
+      for (int i = 0; i < 20; i++) {
+        rows.add(RowFactory.create(i, java.sql.Timestamp.valueOf("2024-06-15 12:00:00")));
+      }
+      StructType schema =
+          new StructType()
+              .add("id", DataTypes.IntegerType, false)
+              .add("ts", DataTypes.TimestampType, false);
+      spark
+          .createDataFrame(rows, schema)
+          .write()
+          .format("iceberg")
+          .mode(SaveMode.Append)
+          .saveAsTable(table);
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("ts_year", "54")))),
+              new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
+              new Transform[] {Transforms.year("ts")},
+              dnsCatalog);
+      assertEquals("(`" + dnsCatalog + "`.system.years(ts) = 54)", where);
+
+      // Prefer CatalogManager over SQL current_namespace(): with default-namespace set, Spark may
+      // resolve the SQL function under catalog.db and fail UNRESOLVED_ROUTINE.
+      String[] currentNs = spark.sessionState().catalogManager().currentNamespace();
+      assertTrue(
+          Arrays.asList(currentNs).contains("db"),
+          "default-namespace must be active before CALL, got: " + Arrays.toString(currentNs));
+
       String sql =
           IcebergRewriteDataFilesJob.buildProcedureCall(
-              catalogName, "db.pu_years_dns", "binpack", null, where, null);
+              dnsCatalog, "db.pu_years_dns", "binpack", null, where, null);
       assertDoesNotThrow(() -> spark.sql(sql).collect());
     } finally {
-      spark.conf().unset("spark.sql.catalog." + catalogName + ".default-namespace");
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.conf().set("spark.sql.defaultCatalog", catalogName);
     }
-    spark.sql("DROP TABLE IF EXISTS " + table);
   }
 
   private static void withAnsiModes(
