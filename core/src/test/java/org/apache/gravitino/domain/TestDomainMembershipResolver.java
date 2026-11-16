@@ -233,7 +233,7 @@ class TestDomainMembershipResolver {
             eq(METALAKE),
             eq(Arrays.asList(finance, tax, trading)),
             any(),
-            eq(Collections.emptySet()));
+            eq(Collections.emptyMap()));
 
     // A sub-domain lists its own assignments as direct.
     DomainMember[] tradingMembers =
@@ -304,6 +304,7 @@ class TestDomainMembershipResolver {
     DomainEntity tax = domain(3, "Tax", "Finance", 30L, "tax");
     candidate(20, TABLE);
     valuedCandidate(30, "tax", TABLE, SCHEMA);
+    assign(TABLE, tag(20, "trading"), tag(30, "dept", "tax"));
     DomainMember[] members =
         resolver.listMembers(
             METALAKE,
@@ -318,8 +319,10 @@ class TestDomainMembershipResolver {
         members[0].relations());
     verify(domainOperations)
         .listDomainAssignments(
-            eq(METALAKE), eq(List.of(parent, tax, trading)), any(), eq(Set.of(trading.id())));
-    verify(domainOperations, never()).listDirectTagsByObjectIds(anyString(), any(), anyList());
+            eq(METALAKE), eq(List.of(trading)), any(), eq(Collections.emptyMap()));
+    verify(domainOperations)
+        .listDirectTagsByObjectIds(
+            METALAKE, MetadataObject.Type.TABLE, List.of(objectIds.get(TABLE)));
   }
 
   @Test
@@ -372,8 +375,9 @@ class TestDomainMembershipResolver {
             .length);
     verify(domainOperations, times(3))
         .listDomainAssignments(
-            eq(METALAKE), eq(List.of(children[0])), any(), eq(Collections.emptySet()));
-    verify(domainOperations).listDomainAssignments(eq(METALAKE), anyList(), any(), eq(Set.of(2L)));
+            eq(METALAKE), eq(List.of(children[0])), any(), eq(Collections.emptyMap()));
+    verify(domainOperations)
+        .listDomainAssignments(eq(METALAKE), anyList(), any(), eq(Map.of(2L, candidates.get(2L))));
   }
 
   @Test
@@ -413,7 +417,7 @@ class TestDomainMembershipResolver {
         members[0].relations());
     verify(domainOperations, times(2))
         .listDomainAssignments(
-            eq(METALAKE), eq(List.of(trading)), any(), eq(Collections.emptySet()));
+            eq(METALAKE), eq(List.of(trading)), any(), eq(Collections.emptyMap()));
   }
 
   @Test

@@ -280,7 +280,8 @@ public class TagMetaService {
    * @param metalake The metalake containing the domains.
    * @param domains Selected domains with backing tags.
    * @param types The candidate metadata object types.
-   * @param candidateDomainIds Restrict objects to assignments in these domains, or empty for all.
+   * @param selectedAssignments Previously resolved objects by selected domain ID. An empty map
+   *     resolves names; otherwise only these objects can match, and their names are reused.
    * @return Assigned objects keyed by domain ID.
    * @throws IOException If the assignments cannot be read.
    */
@@ -288,15 +289,21 @@ public class TagMetaService {
       String metalake,
       List<DomainEntity> domains,
       Set<MetadataObject.Type> types,
-      Set<Long> candidateDomainIds)
+      Map<Long, List<GenericEntity>> selectedAssignments)
       throws IOException {
     Map<Long, List<GenericEntity>> result = new LinkedHashMap<>();
     if (types.isEmpty()) {
       return result;
     }
+    Table<String, Long, GenericEntity> knownObjects = HashBasedTable.create();
+    for (List<GenericEntity> assignments : selectedAssignments.values()) {
+      for (GenericEntity object : assignments) {
+        knownObjects.put(object.type().name(), object.id(), object);
+      }
+    }
     // The candidate semijoin limits the returned objects even for a wide domain batch.
     int domainBatchSize =
-        candidateDomainIds.isEmpty() ? MEMBERSHIP_LOOKUP_BATCH_SIZE : JOINED_DOMAIN_BATCH_SIZE;
+        selectedAssignments.isEmpty() ? MEMBERSHIP_LOOKUP_BATCH_SIZE : JOINED_DOMAIN_BATCH_SIZE;
     for (List<DomainEntity> batch : Lists.partition(domains, domainBatchSize)) {
       Map<Long, DomainEntity> selected =
           batch.stream().collect(Collectors.toMap(DomainEntity::id, Function.identity()));
@@ -305,7 +312,7 @@ public class TagMetaService {
               TagMetadataObjectRelMapper.class,
               mapper ->
                   mapper.listDomainAssignments(
-                      metalake, selected.keySet(), types, candidateDomainIds));
+                      metalake, selected.keySet(), types, selectedAssignments.keySet()));
       // Compare with the caller's stable binding and enforce case-sensitive value matching
       // independently of the database collation.
       List<DomainAssignmentPO> matching =
@@ -318,9 +325,12 @@ public class TagMetaService {
                             || domain.backingTagValue().equals(row.getTagValue()));
                   })
               .collect(Collectors.toList());
-      Table<String, Long, GenericEntity> objects = HashBasedTable.create();
-      for (GenericEntity object : metadataObjectsForRelations(matching)) {
-        objects.put(object.type().name(), object.id(), object);
+      Table<String, Long, GenericEntity> objects = knownObjects;
+      if (selectedAssignments.isEmpty()) {
+        objects = HashBasedTable.create();
+        for (GenericEntity object : metadataObjectsForRelations(matching)) {
+          objects.put(object.type().name(), object.id(), object);
+        }
       }
       Map<Long, Set<GenericEntity>> byDomain = new LinkedHashMap<>();
       for (DomainAssignmentPO row : matching) {

@@ -256,7 +256,8 @@ public interface SupportsDomainOperations {
    * @param metalake The metalake containing the domains.
    * @param domains Selected domains with backing tags.
    * @param types The candidate metadata object types.
-   * @param candidateDomainIds Restrict objects to assignments in these domains, or empty for all.
+   * @param selectedAssignments Previously resolved objects by selected domain ID. An empty map
+   *     resolves names; otherwise only these objects can match, and their names are reused.
    * @return Assigned objects keyed by domain ID.
    * @throws IOException If the assignments cannot be read.
    */
@@ -264,7 +265,7 @@ public interface SupportsDomainOperations {
       String metalake,
       List<DomainEntity> domains,
       Set<MetadataObject.Type> types,
-      Set<Long> candidateDomainIds)
+      Map<Long, List<GenericEntity>> selectedAssignments)
       throws IOException;
 
   /**

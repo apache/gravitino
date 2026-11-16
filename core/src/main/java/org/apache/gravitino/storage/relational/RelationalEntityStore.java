@@ -558,9 +558,9 @@ public class RelationalEntityStore
       String metalake,
       List<DomainEntity> domains,
       Set<MetadataObject.Type> types,
-      Set<Long> candidateDomainIds)
+      Map<Long, List<GenericEntity>> selectedAssignments)
       throws IOException {
-    return backend.listDomainAssignments(metalake, domains, types, candidateDomainIds);
+    return backend.listDomainAssignments(metalake, domains, types, selectedAssignments);
   }
 
   @Override

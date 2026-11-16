@@ -142,34 +142,25 @@ final class DomainMembershipResolver {
     try {
       Set<MetadataObject.Type> types =
           filter.types().isEmpty() ? DIRECT_MEMBER_TYPES : filter.types();
-      List<DomainEntity> lookupDomains = joinPaths ? scopeDomains : selectedDomains;
-      Map<Long, List<GenericEntity>> assigned;
-      if (joinPaths
-          && scopeDomains.stream()
-                  .filter(d -> d.backingTagId() != null)
-                  .limit(MEMBERSHIP_LOOKUP_BATCH_SIZE + 1)
-                  .count()
-              > MEMBERSHIP_LOOKUP_BATCH_SIZE) {
-        assigned =
-            new HashMap<>(
-                listAssignments(metalake, selectedDomains, types, Collections.emptySet()));
-        if (assigned.values().stream().allMatch(List::isEmpty)) {
-          return members;
-        }
+      List<DomainEntity> lookupDomains = selectedDomains;
+      Map<Long, List<GenericEntity>> assigned =
+          listAssignments(metalake, selectedDomains, types, Collections.emptyMap());
+      if (assigned.values().stream().allMatch(List::isEmpty)) {
+        return members;
+      }
+      if (joinPaths) {
         List<DomainEntity> remaining =
             scopeDomains.stream()
                 .filter(d -> d.backingTagId() != null && !selectedIds.contains(d.id()))
                 .collect(Collectors.toList());
         joinPaths = fewerDomainBatches(assigned, remaining.size());
         if (joinPaths) {
-          assigned.putAll(listAssignments(metalake, remaining, types, selectedIds));
-        } else {
-          lookupDomains = selectedDomains;
+          Map<Long, List<GenericEntity>> otherAssignments =
+              listAssignments(metalake, remaining, types, assigned);
+          assigned = new HashMap<>(assigned);
+          assigned.putAll(otherAssignments);
+          lookupDomains = scopeDomains;
         }
-      } else {
-        assigned =
-            listAssignments(
-                metalake, lookupDomains, types, joinPaths ? selectedIds : Collections.emptySet());
       }
       for (DomainEntity domain : lookupDomains) {
         if (domain.backingTagId() == null) {
@@ -259,7 +250,7 @@ final class DomainMembershipResolver {
               ? DIRECT_MEMBER_TYPES
               : Sets.union(filter.types(), DomainMember.CONTAINER_TYPES);
       Map<Long, List<GenericEntity>> assigned =
-          listAssignments(metalake, selectedDomains, types, Collections.emptySet());
+          listAssignments(metalake, selectedDomains, types, Collections.emptyMap());
       // A container assigned to several selected domains needs to be expanded only once.
       Set<MetadataObject> roots = new LinkedHashSet<>();
       assigned
@@ -398,18 +389,22 @@ final class DomainMembershipResolver {
     long domainBatches =
         (remainingDomains + (long) JOINED_DOMAIN_BATCH_SIZE - 1) / JOINED_DOMAIN_BATCH_SIZE;
     Map<Entity.EntityType, Set<Long>> idsByType = new EnumMap<>(Entity.EntityType.class);
-    // A join can require another name lookup for each matching type. Allow one object-ID
-    // batch per type before counting the extra batches a domain join could save.
-    long extraObjectBatches = 0;
+    int distinctObjects = 0;
+    long objectBatches = 0;
     for (List<GenericEntity> assignments : selected.values()) {
       for (GenericEntity assignment : assignments) {
         Set<Long> ids = idsByType.computeIfAbsent(assignment.type(), ignored -> new HashSet<>());
-        if (ids.add(assignment.id())
-            && ids.size() > 1
-            && (ids.size() - 1) % MEMBERSHIP_LOOKUP_BATCH_SIZE == 0) {
-          if (++extraObjectBatches > domainBatches) {
-            return true;
-          }
+        if (!ids.add(assignment.id())) {
+          continue;
+        }
+        distinctObjects++;
+        if ((ids.size() - 1) % MEMBERSHIP_LOOKUP_BATCH_SIZE == 0) {
+          objectBatches++;
+        }
+        // A semijoin may scan unrelated assignments. Prefer indexed lookups for small
+        // selections, even when several object types would require separate statements.
+        if (distinctObjects > MEMBERSHIP_LOOKUP_BATCH_SIZE && objectBatches > domainBatches) {
+          return true;
         }
       }
     }
@@ -504,7 +499,7 @@ final class DomainMembershipResolver {
       String metalake,
       List<DomainEntity> domains,
       Set<MetadataObject.Type> types,
-      Set<Long> candidateDomainIds)
+      Map<Long, List<GenericEntity>> selectedAssignments)
       throws IOException {
     List<DomainEntity> bound =
         domains.stream().filter(d -> d.backingTagId() != null).collect(Collectors.toList());
@@ -512,7 +507,7 @@ final class DomainMembershipResolver {
         ? Collections.emptyMap()
         : store
             .domainOperations()
-            .listDomainAssignments(metalake, bound, types, candidateDomainIds);
+            .listDomainAssignments(metalake, bound, types, selectedAssignments);
   }
 
   private static MetadataObject assignedObject(GenericEntity assignment) {

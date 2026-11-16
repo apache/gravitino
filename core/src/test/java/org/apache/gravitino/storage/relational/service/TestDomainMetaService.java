@@ -641,14 +641,23 @@ public class TestDomainMetaService extends TestJDBCBackend {
               .build());
     }
     scope.add(last);
+    GenericEntity selectedObject =
+        GenericEntity.builder()
+            .withId(catalog.id())
+            .withName("name-from-first-read")
+            .withEntityType(Entity.EntityType.CATALOG)
+            .build();
     Map<Long, List<GenericEntity>> assignments =
         tags.listDomainAssignments(
-            METALAKE_NAME, scope, Set.of(MetadataObject.Type.CATALOG), Set.of(first.id()));
+            METALAKE_NAME,
+            scope,
+            Set.of(MetadataObject.Type.CATALOG),
+            Map.of(first.id(), List.of(selectedObject)));
     Assertions.assertEquals(Set.of(first.id(), last.id()), assignments.keySet());
     Assertions.assertEquals(
         List.of(catalog.id()),
         assignments.get(first.id()).stream().map(GenericEntity::id).collect(Collectors.toList()));
-    Assertions.assertEquals(assignments.get(first.id()), assignments.get(last.id()));
+    Assertions.assertSame(selectedObject, assignments.get(last.id()).get(0));
   }
 
   @TestTemplate
