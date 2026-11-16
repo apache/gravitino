@@ -395,16 +395,21 @@ public class TestBaseGVFSOperationsSecrets {
   @Test
   void testNestedOperationsInstancesDoNotShareScope() throws Exception {
     ScopeProbeOps outer = new ScopeProbeOps(probeCatalog("outer"));
-    ScopeProbeOps inner = new ScopeProbeOps(probeCatalog("inner"));
+    Catalog innerCatalog = probeCatalog("inner");
+    FilesetCatalog innerFilesetCatalog = innerCatalog.asFilesetCatalog();
+    ScopeProbeOps inner = new ScopeProbeOps(innerCatalog);
     outer.inner = inner;
+    clearInvocations(innerFilesetCatalog);
 
     outer.getActualFileSystemByLocationName(PROBE_IDENT, "default");
 
-    // Expected values: each instance resolves its own fileset, and the outer one loads its catalog
-    // once within its scope.
+    // Expected values: each instance resolves its own fileset within its own scope, so each loads
+    // its catalog and its fileset once.
     assertEquals("outer", outer.props.get(0).get("probe"));
     assertEquals("inner", inner.props.get(0).get("probe"));
     verify(outer.client, times(1)).loadCatalog("catalog");
+    verify(inner.client, times(1)).loadCatalog("catalog");
+    verify(innerFilesetCatalog, times(1)).loadFileset(NameIdentifier.of("schema", "fs"));
 
     // A later resolution on the same thread opens a new scope and loads the catalog again.
     outer.inner = null;

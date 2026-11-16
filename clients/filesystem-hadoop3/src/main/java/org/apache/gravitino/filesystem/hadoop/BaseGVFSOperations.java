@@ -165,8 +165,11 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   private final boolean autoCreateLocation;
 
-  // The operation scope open on the current thread, if any.
-  private static final ThreadLocal<OperationScope> CURRENT_SCOPE = new ThreadLocal<>();
+  // The operation scope this instance has open on the current thread, if any. Each instance keeps
+  // its own, so an instance called inside another instance's operation still shares its loads. The
+  // value is removed when the outermost scope closes, so no value outlives an operation.
+  @SuppressWarnings("ThreadLocalUsage")
+  private final ThreadLocal<OperationScope> currentScope = new ThreadLocal<>();
 
   /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
   public static class FileSystemCacheKey {
@@ -605,11 +608,11 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   /**
    * Shares the catalogs and filesets loaded from the server among the calls made until the scope is
-   * closed. Only the outermost scope on a thread takes effect, and only for the instance that
-   * opened it.
+   * closed. Only the outermost scope this instance opens on a thread takes effect, and closing it
+   * removes the thread-local value.
    */
   final class OperationScope implements AutoCloseable {
-    private final boolean outermost = CURRENT_SCOPE.get() == null;
+    private final boolean outermost = currentScope.get() == null;
     private final Map<NameIdentifier, Catalog> catalogs = new HashMap<>();
     // Keyed by the catalog object a fileset was loaded from, so that a fileset loaded through an
     // overriding getFilesetCatalog is not reused for a load from another catalog.
@@ -618,18 +621,14 @@ public abstract class BaseGVFSOperations implements Closeable {
 
     private OperationScope() {
       if (outermost) {
-        CURRENT_SCOPE.set(this);
+        currentScope.set(this);
       }
-    }
-
-    private BaseGVFSOperations owner() {
-      return BaseGVFSOperations.this;
     }
 
     @Override
     public void close() {
       if (outermost) {
-        CURRENT_SCOPE.remove();
+        currentScope.remove();
       }
     }
   }
@@ -642,18 +641,12 @@ public abstract class BaseGVFSOperations implements Closeable {
     return new OperationScope();
   }
 
-  @Nullable
-  private OperationScope currentScope() {
-    OperationScope scope = CURRENT_SCOPE.get();
-    return scope != null && scope.owner() == this ? scope : null;
-  }
-
   private Catalog loadCatalog(NameIdentifier catalogIdent) {
     return getFilesetMetadataCache()
         .map(cache -> cache.getCatalog(catalogIdent))
         .orElseGet(
             () -> {
-              OperationScope scope = currentScope();
+              OperationScope scope = currentScope.get();
               return scope == null
                   ? getGravitinoClient().loadCatalog(catalogIdent.name())
                   : scope.catalogs.computeIfAbsent(
@@ -664,7 +657,7 @@ public abstract class BaseGVFSOperations implements Closeable {
   private Fileset loadFileset(NameIdentifier filesetIdent, FilesetCatalog filesetCatalog) {
     NameIdentifier ident =
         NameIdentifier.of(filesetIdent.namespace().level(2), filesetIdent.name());
-    OperationScope scope = currentScope();
+    OperationScope scope = currentScope.get();
     return scope == null
         ? filesetCatalog.loadFileset(ident)
         : scope
@@ -771,7 +764,9 @@ public abstract class BaseGVFSOperations implements Closeable {
    * @return the fileset catalog.
    */
   protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
-    return loadCatalog(catalogIdent).asFilesetCatalog();
+    return getFilesetMetadataCache()
+        .map(cache -> cache.getFilesetCatalog(catalogIdent))
+        .orElseGet(() -> loadCatalog(catalogIdent).asFilesetCatalog());
   }
 
   /**
