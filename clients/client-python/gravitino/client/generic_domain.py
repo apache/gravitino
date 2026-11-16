@@ -218,6 +218,8 @@ class GenericDomain(Domain):
         if member_filter.domains:
             # Send each domain scope as a separate query parameter.
             params["domains"] = list(member_filter.domains)
+        if member_filter.expand:
+            params["expand"] = "true"
         response = self._client.get(
             self._path + "/objects", params=params, error_handler=DOMAIN_ERROR_HANDLER
         )
