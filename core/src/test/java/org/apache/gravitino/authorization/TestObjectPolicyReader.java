@@ -24,8 +24,6 @@ import static org.apache.gravitino.authorization.TagPolicyTestUtils.policy;
 import static org.apache.gravitino.authorization.TagPolicyTestUtils.tag;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -47,6 +45,7 @@ import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -55,7 +54,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /** Tests assignment and policy-binding reads through the entity-store relation API. */
-class TestEntityStoreTagPolicyReader {
+class TestObjectPolicyReader {
   private static final MetadataObject TABLE =
       MetadataObjects.of("catalog.finance", "orders", MetadataObject.Type.TABLE);
   private static final MetadataObject SCHEMA =
@@ -64,7 +63,7 @@ class TestEntityStoreTagPolicyReader {
       MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
 
   private SupportsRelationOperations relations;
-  private EntityStoreTagPolicyReader reader;
+  private TagPolicyReader reader;
   private TagEntity gold;
   private TagEntity bronze;
   private PolicyEntity access;
@@ -74,7 +73,7 @@ class TestEntityStoreTagPolicyReader {
     EntityStore store = mock(EntityStore.class);
     relations = mock(SupportsRelationOperations.class);
     when(store.relationOperations()).thenReturn(relations);
-    reader = new EntityStoreTagPolicyReader(store);
+    reader = new ObjectPolicyResolver(store);
     gold = tag(1L, "certified", TagAssignment.ofValues("gold"));
     bronze = tag(1L, "certified", TagAssignment.ofValues("bronze"));
     access = policy(10L, true, List.of(Privilege.Name.SELECT_TABLE), List.of("analyst"));
@@ -171,36 +170,44 @@ class TestEntityStoreTagPolicyReader {
   }
 
   @Test
-  void testMissingTargetOrAncestorFailsClosedForTheRequest() throws Exception {
-    TagPolicyResolver resolver = new TagPolicyResolver(reader);
+  void testMissingObjectHasNoDirectTags() throws Exception {
     for (MetadataObject missing : Arrays.asList(TABLE, SCHEMA, CATALOG)) {
-      stubTags(TABLE, List.of(bronze));
-      stubTags(SCHEMA, Collections.emptyList());
-      stubTags(CATALOG, List.of(gold));
-      NoSuchEntityException failure = new NoSuchEntityException("Missing object %s", missing);
       when(relations.listEntitiesByRelation(
               SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
               MetadataObjectUtil.toEntityIdent(METALAKE, missing),
               MetadataObjectUtil.toEntityType(missing)))
-          .thenThrow(failure);
-      AuthorizationRequestContext context = new AuthorizationRequestContext();
-      Assertions.assertSame(
-          failure,
-          Assertions.assertThrows(
-              NoSuchEntityException.class, () -> resolver.resolve(METALAKE, TABLE, context)));
-      stubTags(missing, Collections.emptyList());
-      Assertions.assertSame(
-          failure,
-          Assertions.assertThrows(
-              NoSuchEntityException.class, () -> resolver.resolve(METALAKE, TABLE, context)));
-      Assertions.assertTrue(
-          resolver.resolve(METALAKE, TABLE, new AuthorizationRequestContext()).isEmpty());
+          .thenThrow(new NoSuchEntityException("Missing object %s", missing));
+      Assertions.assertTrue(reader.loadTags(METALAKE, missing).isEmpty());
     }
-    verify(relations, times(3))
-        .batchListEntitiesByRelation(
-            SupportsRelationOperations.Type.POLICY_TAG_REL,
-            List.of(bronze.nameIdentifier()),
-            Entity.EntityType.TAG);
+    Assertions.assertTrue(
+        new TagPolicyResolver(reader)
+            .resolve(METALAKE, TABLE, new AuthorizationRequestContext())
+            .isEmpty());
+  }
+
+  @Test
+  void testMissingObjectDoesNotPreventInheritedPolicyResolution() throws Exception {
+    stubTags(CATALOG, List.of(gold));
+    stubBindings(List.of(relation(null)));
+    for (MetadataObject missing : Arrays.asList(TABLE, SCHEMA)) {
+      stubTags(TABLE, Collections.emptyList());
+      stubTags(SCHEMA, Collections.emptyList());
+      when(relations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(METALAKE, missing),
+              MetadataObjectUtil.toEntityType(missing)))
+          .thenThrow(new NoSuchEntityException("Missing object %s", missing));
+
+      List<ResolvedTagPolicy> bindings =
+          new TagPolicyResolver(reader).resolve(METALAKE, TABLE, new AuthorizationRequestContext());
+      Assertions.assertEquals(1, bindings.size());
+      Assertions.assertTrue(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), bindings)
+              .isPresent());
+      Assertions.assertTrue(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("unrelated"), bindings)
+              .isEmpty());
+    }
   }
 
   @Test

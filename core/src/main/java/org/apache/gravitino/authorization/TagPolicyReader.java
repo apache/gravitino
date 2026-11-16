@@ -30,7 +30,7 @@ public interface TagPolicyReader {
    *
    * @param metalake the containing metalake
    * @param object the canonical object whose direct assignments are requested
-   * @return direct assignments, empty if none exist
+   * @return direct assignments, empty if none exist or the object is missing
    * @throws RuntimeException if the assignments cannot be read
    */
   List<TagEntity> loadTags(String metalake, MetadataObject object);
