@@ -42,6 +42,7 @@ class DomainOperation(ABC):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        *,
         expand: bool = False,
     ) -> str:
         """List domain members and all applicable relations.

@@ -66,6 +66,7 @@ class PlainRESTClientDomainOperation(DomainOperation):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        *,
         expand: bool = False,
     ) -> str:
         params = []

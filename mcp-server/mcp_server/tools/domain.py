@@ -82,6 +82,7 @@ def load_domain_tools(mcp: FastMCP):
         types: list[str] | None = None,
         domains: list[str] | None = None,
         name_contains: str | None = None,
+        *,
         expand: bool = False,
     ) -> str:
         """List domain members and all applicable relations.
@@ -101,7 +102,7 @@ def load_domain_tools(mcp: FastMCP):
         """
         client = ctx.request_context.lifespan_context.rest_client()
         return await client.as_domain_operation().list_domain_members(
-            domain_name, types, domains, name_contains, expand
+            domain_name, types, domains, name_contains, expand=expand
         )
 
     @mcp.tool(
