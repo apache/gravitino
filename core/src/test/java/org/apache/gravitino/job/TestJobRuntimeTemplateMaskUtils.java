@@ -265,6 +265,7 @@ public class TestJobRuntimeTemplateMaskUtils {
   void testMaskSensitiveArgumentsMasksNonSingleJsonObjectBags() {
     String concatenated = "{} {\"password\":\"concat-secret\"}";
     String scalarThenObject = "true {\"password\":\"scalar-secret\"}";
+    String duplicateField = "{\"config\":{\"password\":\"dup-secret\"},\"config\":{}}";
     List<String> masked =
         JobRuntimeTemplateMaskUtils.maskSensitiveArguments(
             ImmutableList.of(
@@ -272,14 +273,18 @@ public class TestJobRuntimeTemplateMaskUtils {
                 concatenated,
                 "--spark-conf",
                 scalarThenObject,
+                "--updater-options",
+                duplicateField,
                 "--table",
                 "db.t"));
 
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(3));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(5));
     Assertions.assertFalse(masked.get(1).contains("concat-secret"));
     Assertions.assertFalse(masked.get(3).contains("scalar-secret"));
-    Assertions.assertEquals("db.t", masked.get(5));
+    Assertions.assertFalse(masked.get(5).contains("dup-secret"));
+    Assertions.assertEquals("db.t", masked.get(7));
   }
 
   @Test

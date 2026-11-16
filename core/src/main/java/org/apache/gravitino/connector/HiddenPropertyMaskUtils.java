@@ -77,14 +77,17 @@ public final class HiddenPropertyMaskUtils {
    * Mapper for nest-JSON masking. Uses {@link JsonNode} with big-decimal floats so rewritten JSON
    * keeps numeric fidelity better than {@code Map}/{@code List} round-trips. {@link
    * DeserializationFeature#FAIL_ON_TRAILING_TOKENS} rejects concatenated values (for example {@code
-   * {} {"password":"secret"}}), so a no-op first object cannot leave a trailing secret in the
-   * original string.
+   * {} {"password":"secret"}}), and {@link DeserializationFeature#FAIL_ON_READING_DUP_TREE_KEY}
+   * rejects duplicate object fields (for example {@code {"config":{"password":"x"},"config":{}}}),
+   * so a dropped earlier field cannot leave a secret in the original string when the walk sees only
+   * the last value.
    */
   private static final ObjectMapper NEST_JSON_MAPPER =
       JsonUtils.anyFieldMapper()
           .copy()
           .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
-          .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+          .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
 
   private HiddenPropertyMaskUtils() {}
 
@@ -214,8 +217,8 @@ public final class HiddenPropertyMaskUtils {
    *
    * @param value JSON string to mask; may be null
    * @return masked JSON object, {@link #MASKED_VALUE} when the value is not exactly one JSON object
-   *     (parse failure, trailing tokens, array, or scalar), the original value when blank, or null
-   *     when {@code value} is null
+   *     (parse failure, trailing tokens, duplicate fields, array, or scalar), the original value
+   *     when blank, or null when {@code value} is null
    */
   @Nullable
   public static String maskSensitiveJsonValue(@Nullable String value) {
@@ -229,8 +232,8 @@ public final class HiddenPropertyMaskUtils {
    * Parses {@code value} as exactly one JSON object (no trailing tokens) and masks sensitive-named
    * keys recursively through nested objects and arrays inside that object. Blank strings are
    * returned unchanged. Anything else — malformed JSON, concatenated values such as {@code {}
-   * {"password":"secret"}}, {@code true {...}}, root arrays, or scalars — becomes {@link
-   * #MASKED_VALUE}.
+   * {"password":"secret"}}, duplicate object fields, {@code true {...}}, root arrays, or scalars —
+   * becomes {@link #MASKED_VALUE}.
    */
   private static String maskNestedJsonValue(String value) {
     // Empty / whitespace-only values carry no secret (common for unresolved {{spark_conf:-}}).
@@ -246,7 +249,7 @@ public final class HiddenPropertyMaskUtils {
       MaskedJson masked = maskJsonNode(root);
       return masked.changed ? NEST_JSON_MAPPER.writeValueAsString(masked.value) : value;
     } catch (Exception ignored) {
-      // Malformed / trailing-token JSON — do not leave a secret blob.
+      // Malformed / trailing-token / duplicate-key JSON — do not leave a secret blob.
       // Fixed message only: Jackson exception text can embed the input (and credentials).
       LOG.warn("Replacing malformed nest JSON with masked placeholder after parse failure");
       return MASKED_VALUE;

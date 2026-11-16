@@ -259,6 +259,12 @@ public class TestHiddenPropertyMaskUtils {
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         HiddenPropertyMaskUtils.maskSensitiveJsonValue("true {\"password\":\"secret\"}"));
+    // Duplicate fields: Jackson would keep only the last value; reject so the dropped secret
+    // cannot remain in the original argument when the walk sees a no-op last field.
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue(
+            "{\"config\":{\"password\":\"example\"},\"config\":{}}"));
   }
 
   @Test
