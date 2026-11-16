@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.junit.jupiter.api.Assertions;
@@ -44,7 +45,10 @@ public class TestKafkaTopicPropertiesMetadata {
             KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_PARTITION_BY,
             KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE,
             KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD,
-            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE);
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE,
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE,
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE,
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE);
 
     for (String key : autoMqKeys) {
       PropertyEntry<?> entry = entries.get(key);
@@ -80,10 +84,47 @@ public class TestKafkaTopicPropertiesMetadata {
             .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "id,tenant_id")
             .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_PARTITION_BY, "day(event_ts)")
             .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD, "_op")
-            .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE, "all")
+            .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE, "invalid_data")
+            .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE, "string")
+            .put(
+                KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE,
+                " by_schema_id ")
+            .put(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE, "debezium")
             .build();
     Assertions.assertDoesNotThrow(
         () -> KafkaTopicPropertiesMetadata.validateTableTopicProperties(validProps));
+
+    // Bracketed column list format '[col1, col2]' used in AutoMQ documentation
+    Map<String, String> bracketedIdProps =
+        ImmutableMap.of(
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE,
+            "true",
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD,
+            "_op",
+            KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS,
+            "[id, tenant_id]");
+    Assertions.assertDoesNotThrow(
+        () -> KafkaTopicPropertiesMetadata.validateTableTopicProperties(bracketedIdProps));
+
+    // Locale-safe enum decoding under Turkish locale ('i'.toUpperCase(tr_TR) == 'İ')
+    Locale previous = Locale.getDefault();
+    try {
+      Locale.setDefault(Locale.forLanguageTag("tr-TR"));
+      Assertions.assertDoesNotThrow(
+          () ->
+              KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                  ImmutableMap.of(
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE,
+                      "topic_name",
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE,
+                      "invalid_data",
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE,
+                      "string",
+                      KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE,
+                      "by_schema_id")));
+    } finally {
+      Locale.setDefault(previous);
+    }
   }
 
   @Test
@@ -186,6 +227,67 @@ public class TestKafkaTopicPropertiesMetadata {
             KafkaTopicPropertiesMetadata.validateTableTopicProperties(
                 ImmutableMap.of(
                     KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "id, id")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "[id")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "id]")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "[]")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "[id, [nested]]")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS, "[id, id]")));
+
+    IllegalArgumentException cdcError =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                    ImmutableMap.of(
+                        KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ENABLE,
+                        "true",
+                        KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CDC_FIELD,
+                        "_op")));
+    Assertions.assertTrue(
+        cdcError.getMessage().contains(KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_ID_COLUMNS));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE, "avro")));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            KafkaTopicPropertiesMetadata.validateTableTopicProperties(
+                ImmutableMap.of(
+                    KafkaTopicPropertiesMetadata.AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE, "   ")));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,

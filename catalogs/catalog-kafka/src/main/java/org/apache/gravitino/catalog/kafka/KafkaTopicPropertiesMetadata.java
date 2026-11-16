@@ -21,11 +21,13 @@ package org.apache.gravitino.catalog.kafka;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.connector.BasePropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 
@@ -65,6 +67,18 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
   /** Deserialization error tolerance policy for AutoMQ Table Topic ingestion. */
   public static final String AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE =
       "automq.table.topic.errors.tolerance";
+
+  /** Key conversion strategy for AutoMQ Table Topic record deserialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE =
+      "automq.table.topic.convert.key.type";
+
+  /** Value conversion strategy for AutoMQ Table Topic record deserialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE =
+      "automq.table.topic.convert.value.type";
+
+  /** Value transformation type applied during AutoMQ Table Topic record materialization. */
+  public static final String AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE =
+      "automq.table.topic.transform.value.type";
 
   /** Synthetic read-only property indicating whether Table Topic materialization is enabled. */
   public static final String TABLE_TOPIC_ENABLED = "table-topic.enabled";
@@ -106,8 +120,22 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
   public enum TableTopicErrorsTolerance {
     /** Fail immediately on record conversion errors. */
     NONE,
-    /** Tolerate and skip invalid records during ingestion. */
+    /** Skip malformed or schema-mismatched records while failing on unexpected system errors. */
+    INVALID_DATA,
+    /** Tolerate and skip all record conversion and transformation errors during ingestion. */
     ALL
+  }
+
+  /** Supported AutoMQ Table Topic key/value record conversion strategies. */
+  public enum TableTopicConvertType {
+    /** Treat record bytes as raw binary payload. */
+    RAW,
+    /** Decode record bytes as UTF-8 string payload. */
+    STRING,
+    /** Decode record payload using the schema ID embedded in the wire format. */
+    BY_SCHEMA_ID,
+    /** Decode record payload using the latest registered subject schema. */
+    BY_LATEST_SCHEMA
   }
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA;
@@ -140,20 +168,15 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
                 nonBlankStringPropertyEntry(
                     AUTOMQ_TABLE_TOPIC_NAMESPACE,
                     "Target Iceberg namespace (schema) for the materialized AutoMQ Table Topic"),
-                PropertyEntry.enumPropertyEntry(
+                localeSafeEnumPropertyEntry(
                     AUTOMQ_TABLE_TOPIC_SCHEMA_TYPE,
                     "Schema mode for AutoMQ Table Topic conversion (schemaless, schema,"
                         + " record_name, or topic_name)",
-                    false /* required */,
-                    false /* immutable */,
-                    TableTopicSchemaType.class,
-                    null /* default value */,
-                    false /* hidden */,
-                    false /* reserved */),
+                    TableTopicSchemaType.class),
                 columnListPropertyEntry(
                     AUTOMQ_TABLE_TOPIC_ID_COLUMNS,
-                    "Comma-separated primary key column names for Iceberg equality deletes and"
-                        + " upserts"),
+                    "Primary key column names (comma-separated or bracketed list) for Iceberg"
+                        + " equality deletes and upserts"),
                 nonBlankStringPropertyEntry(
                     AUTOMQ_TABLE_TOPIC_PARTITION_BY,
                     "Iceberg partition transform expressions for the materialized Table Topic"),
@@ -164,16 +187,25 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
                     AUTOMQ_TABLE_TOPIC_CDC_FIELD,
                     "Field name carrying the CDC operation code for AutoMQ Table Topic"
                         + " materialization"),
-                PropertyEntry.enumPropertyEntry(
+                localeSafeEnumPropertyEntry(
                     AUTOMQ_TABLE_TOPIC_ERRORS_TOLERANCE,
                     "Error tolerance policy when converting records for an AutoMQ Table Topic"
-                        + " (none or all)",
-                    false /* required */,
-                    false /* immutable */,
-                    TableTopicErrorsTolerance.class,
-                    null /* default value */,
-                    false /* hidden */,
-                    false /* reserved */),
+                        + " (none, invalid_data, or all)",
+                    TableTopicErrorsTolerance.class),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_CONVERT_KEY_TYPE,
+                    "Key conversion strategy for AutoMQ Table Topic records (raw, string,"
+                        + " by_schema_id, or by_latest_schema)",
+                    TableTopicConvertType.class),
+                localeSafeEnumPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_CONVERT_VALUE_TYPE,
+                    "Value conversion strategy for AutoMQ Table Topic records (raw, string,"
+                        + " by_schema_id, or by_latest_schema)",
+                    TableTopicConvertType.class),
+                nonBlankStringPropertyEntry(
+                    AUTOMQ_TABLE_TOPIC_TRANSFORM_VALUE_TYPE,
+                    "Value transformation type applied when materializing AutoMQ Table Topic"
+                        + " records"),
                 PropertyEntry.stringReservedPropertyEntry(
                     TABLE_TOPIC_ENABLED,
                     "Synthetic read-only flag indicating whether AutoMQ Table Topic"
@@ -226,15 +258,18 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
     boolean tableTopicEnabled =
         tableTopicEnable != null && "true".equalsIgnoreCase(tableTopicEnable.trim());
     String upsertEnable = properties.get(AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE);
-    if (tableTopicEnabled && upsertEnable != null && "true".equalsIgnoreCase(upsertEnable.trim())) {
+    boolean upsertEnabled = upsertEnable != null && "true".equalsIgnoreCase(upsertEnable.trim());
+    boolean cdcFieldSet = !isBlank(properties.get(AUTOMQ_TABLE_TOPIC_CDC_FIELD));
+    if (tableTopicEnabled && (upsertEnabled || cdcFieldSet)) {
       String idColumns = properties.get(AUTOMQ_TABLE_TOPIC_ID_COLUMNS);
       if (isBlank(idColumns)) {
         throw new IllegalArgumentException(
             "Property "
                 + AUTOMQ_TABLE_TOPIC_ID_COLUMNS
                 + " is required when "
-                + AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE
-                + " is true");
+                + (upsertEnabled
+                    ? AUTOMQ_TABLE_TOPIC_UPSERT_ENABLE + " is true"
+                    : AUTOMQ_TABLE_TOPIC_CDC_FIELD + " is set"));
       }
     }
   }
@@ -332,6 +367,42 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
         .build();
   }
 
+  private static <T extends Enum<T>> PropertyEntry<T> localeSafeEnumPropertyEntry(
+      String name, String description, Class<T> enumClass) {
+    return new PropertyEntry.Builder<T>()
+        .withName(name)
+        .withDescription(description)
+        .withRequired(false)
+        .withImmutable(false)
+        .withJavaType(enumClass)
+        .withDefaultValue(null)
+        .withDecoder(
+            value -> {
+              if (isBlank(value)) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must not be null or blank");
+              }
+              String normalized = value.trim().toUpperCase(Locale.ROOT);
+              try {
+                return Enum.valueOf(enumClass, normalized);
+              } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    String.format(
+                        "Invalid value '%s' for property %s; valid values are: %s",
+                        value,
+                        name,
+                        Arrays.stream(enumClass.getEnumConstants())
+                            .map(constant -> constant.name().toLowerCase(Locale.ROOT))
+                            .collect(Collectors.joining(", "))),
+                    e);
+              }
+            })
+        .withEncoder(v -> v.name().toLowerCase(Locale.ROOT))
+        .withHidden(false)
+        .withReserved(false)
+        .build();
+  }
+
   private static PropertyEntry<String> columnListPropertyEntry(String name, String description) {
     return new PropertyEntry.Builder<String>()
         .withName(name)
@@ -346,13 +417,36 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
                 throw new IllegalArgumentException(
                     "Property " + name + " must not be null or blank");
               }
-              String[] columns = value.split(",", -1);
+              String trimmedValue = value.trim();
+              boolean startsWithBracket = trimmedValue.startsWith("[");
+              boolean endsWithBracket = trimmedValue.endsWith("]");
+              if (startsWithBracket != endsWithBracket) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " has unbalanced brackets: '" + value + "'");
+              }
+              String inner =
+                  startsWithBracket
+                      ? trimmedValue.substring(1, trimmedValue.length() - 1).trim()
+                      : trimmedValue;
+              if (inner.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Property " + name + " must contain at least one column name: '" + value + "'");
+              }
+              String[] columns = inner.split(",", -1);
               Set<String> seen = new HashSet<>();
               for (String column : columns) {
                 String trimmed = column.trim();
                 if (trimmed.isEmpty()) {
                   throw new IllegalArgumentException(
                       "Property " + name + " contains a blank column name: '" + value + "'");
+                }
+                if (trimmed.indexOf('[') >= 0 || trimmed.indexOf(']') >= 0) {
+                  throw new IllegalArgumentException(
+                      "Property "
+                          + name
+                          + " contains unexpected brackets in column '"
+                          + trimmed
+                          + "'");
                 }
                 if (!seen.add(trimmed)) {
                   throw new IllegalArgumentException(
@@ -365,7 +459,7 @@ public class KafkaTopicPropertiesMetadata extends BasePropertiesMetadata {
                           + "'");
                 }
               }
-              return value.trim();
+              return trimmedValue;
             })
         .withEncoder(v -> v)
         .withHidden(false)

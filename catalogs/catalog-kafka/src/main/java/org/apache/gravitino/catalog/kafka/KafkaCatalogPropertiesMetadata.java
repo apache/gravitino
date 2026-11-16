@@ -62,7 +62,7 @@ public class KafkaCatalogPropertiesMetadata extends BaseCatalogPropertiesMetadat
                   TABLE_TOPIC_DEFAULT_NAMESPACE,
                   "The default Iceberg namespace (schema) used when an AutoMQ Table Topic does"
                       + " not specify automq.table.topic.namespace",
-                  "default" /* default value */))
+                  null /* default value */))
           .build();
 
   @Override

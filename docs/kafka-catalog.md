@@ -22,7 +22,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `bootstrap.servers`           | The Kafka broker(s) to connect to, allowing for multiple brokers by comma-separating them.                                                                                                                    | (none)        | Yes      |
 | `gravitino.bypass.`           | Property name with this prefix passed down to the underlying Kafka Admin client for use. (refer to [Kafka Admin Configs](https://kafka.apache.org/34/documentation.html#adminclientconfigs) for more details) | (none)        | No       |
 | `table-topic.iceberg-catalog` | Optional name of the Iceberg catalog in the same metalake where AutoMQ Table Topics are materialized. Used to compute read-only Iceberg linkage properties on topics.                                          | (none)        | No       |
-| `table-topic.default-namespace` | Default Iceberg namespace (schema) written to `automq.table.topic.namespace` when creating or enabling an AutoMQ Table Topic through Gravitino without specifying `automq.table.topic.namespace`.              | `default`     | No       |
+| `table-topic.default-namespace` | Default Iceberg namespace (schema) written to `automq.table.topic.namespace` when creating or enabling an AutoMQ Table Topic through Gravitino without specifying `automq.table.topic.namespace`. If unset, Gravitino does not write `automq.table.topic.namespace` and AutoMQ uses its built-in `default` namespace. | (none) | No |
 
 ### Catalog Operations
 
@@ -81,11 +81,14 @@ workaround.
 | `automq.table.topic.commit.interval.ms`| Commit interval in milliseconds for materializing AutoMQ Table Topic records (must be `> 0`).   | (none)                                                                              | No       |
 | `automq.table.topic.namespace`         | Target Iceberg namespace (schema) for the materialized Table Topic.                             | (none)                                                                              | No       |
 | `automq.table.topic.schema.type`       | Schema mode for Table Topic conversion (`schemaless`, `schema`, `record_name`, or `topic_name`).| (none)                                                                              | No       |
-| `automq.table.topic.id.columns`        | Comma-separated primary key column names for Iceberg equality deletes/upserts. Required when both `automq.table.topic.enable=true` and `automq.table.topic.upsert.enable=true`. | (none) | No |
+| `automq.table.topic.id.columns`        | Primary key column names (comma-separated `col1,col2` or bracketed `[col1, col2]`) for Iceberg equality deletes/upserts. Required when `automq.table.topic.enable=true` and either `automq.table.topic.upsert.enable=true` or `automq.table.topic.cdc.field` is set. | (none) | No |
 | `automq.table.topic.partition.by`      | Iceberg partition transform expressions for the materialized Table Topic.                       | (none)                                                                              | No       |
 | `automq.table.topic.upsert.enable`     | Whether upsert mode is enabled for the materialized AutoMQ Table Topic.                         | (none)                                                                              | No       |
 | `automq.table.topic.cdc.field`         | Field name carrying the CDC operation code for AutoMQ Table Topic materialization.              | (none)                                                                              | No       |
-| `automq.table.topic.errors.tolerance`  | Error tolerance policy when converting records (`none` or `all`).                               | (none)                                                                              | No       |
+| `automq.table.topic.errors.tolerance`  | Error tolerance policy when converting records (`none`, `invalid_data`, or `all`).              | (none)                                                                              | No       |
+| `automq.table.topic.convert.key.type`  | Key conversion strategy for AutoMQ Table Topic records (`raw`, `string`, `by_schema_id`, or `by_latest_schema`). | (none)                                                                     | No       |
+| `automq.table.topic.convert.value.type`| Value conversion strategy for AutoMQ Table Topic records (`raw`, `string`, `by_schema_id`, or `by_latest_schema`). | (none)                                                                   | No       |
+| `automq.table.topic.transform.value.type` | Value transformation type applied when materializing AutoMQ Table Topic records (for example `debezium`). | (none)                                                                    | No       |
 
 Pass other topic configurations to the topic properties. Refer to [Topic Configs](https://kafka.apache.org/34/documentation.html#topicconfigs) for more details.
 
@@ -101,7 +104,7 @@ When `automq.table.topic.enable` is set to `true`, Gravitino populates the follo
 | `table-topic.iceberg-table`   | Target Iceberg table name (matching the Kafka topic name).                                                                 |
 | `table-topic.iceberg-ident`   | Qualified Iceberg table identifier (`<metalake>.<iceberg-catalog>.<namespace>.<table>`, or `<namespace>.<table>` if catalog is unset). |
 
-Gravitino's MCP server exposes `get_topic_iceberg_linkage` to retrieve this linked Iceberg identifier and Table Topic configuration for a topic.
+Gravitino's MCP server exposes `get_topic_iceberg_linkage` to retrieve this linked Iceberg identifier and Table Topic configuration for a topic. Note that AutoMQ creates the target Iceberg table asynchronously on the first commit interval after valid records arrive, so `table-topic.iceberg-ident` may exist on the topic before `load_table` finds the Iceberg table.
 
 ### Topic Operations
 

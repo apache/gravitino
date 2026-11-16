@@ -179,6 +179,79 @@ class TestTopicTool(unittest.TestCase):
 
         asyncio.run(_test(self.mcp))
 
+    def test_topic_tool_annotations_and_whitespace_normalization(self):
+        topic_payload = json.dumps(
+            {
+                "name": " orders_whitespace ",
+                "properties": {
+                    "automq.table.topic.enable": " true ",
+                    "automq.table.topic.namespace": "   ",
+                    "table-topic.iceberg-catalog": "  iceberg_lakehouse  ",
+                    "automq.table.topic.schema.type": " by_schema ",
+                    "automq.table.topic.id.columns": "   ",
+                    "automq.table.topic.errors.tolerance": " invalid_data ",
+                    "automq.table.topic.convert.key.type": " string ",
+                    "automq.table.topic.convert.value.type": " by_schema_id ",
+                    "automq.table.topic.transform.value.type": " debezium ",
+                },
+            }
+        )
+
+        async def _test(mcp_server):
+            with patch.object(
+                MockTopicOperation,
+                "load_topic",
+                new=AsyncMock(return_value=topic_payload),
+            ):
+                async with Client(mcp_server) as client:
+                    tools = {t.name: t for t in await client.list_tools()}
+                    for readonly_name in (
+                        "list_of_topics",
+                        "load_topic",
+                        "get_topic_iceberg_linkage",
+                    ):
+                        ann = tools[readonly_name].annotations
+                        self.assertIsNotNone(ann)
+                        self.assertTrue(ann.readOnlyHint)
+                        self.assertFalse(ann.destructiveHint)
+                        self.assertTrue(ann.idempotentHint)
+
+                    result = await client.call_tool(
+                        "get_topic_iceberg_linkage",
+                        {
+                            "catalog_name": "kafka_cat",
+                            "schema_name": "default",
+                            "topic_name": "orders_whitespace",
+                        },
+                    )
+                    payload = json.loads(result.content[0].text)
+                    self.assertEqual("orders_whitespace", payload["topic_name"])
+                    self.assertTrue(payload["table_topic_enabled"])
+                    self.assertEqual(
+                        "iceberg_lakehouse", payload["iceberg_catalog"]
+                    )
+                    self.assertEqual("default", payload["iceberg_namespace"])
+                    self.assertEqual(
+                        "orders_whitespace", payload["iceberg_table"]
+                    )
+                    self.assertEqual(
+                        "mock_metalake.iceberg_lakehouse.default.orders_whitespace",
+                        payload["iceberg_ident"],
+                    )
+                    self.assertIsNone(payload["id_columns"])
+                    self.assertEqual(
+                        "invalid_data", payload["errors_tolerance"]
+                    )
+                    self.assertEqual("string", payload["convert_key_type"])
+                    self.assertEqual(
+                        "by_schema_id", payload["convert_value_type"]
+                    )
+                    self.assertEqual(
+                        "debezium", payload["transform_value_type"]
+                    )
+
+        asyncio.run(_test(self.mcp))
+
     def test_get_topic_iceberg_linkage_enabled_fallbacks(self):
         topic_payload = json.dumps(
             {

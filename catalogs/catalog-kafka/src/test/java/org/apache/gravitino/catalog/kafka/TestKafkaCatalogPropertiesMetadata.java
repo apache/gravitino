@@ -50,7 +50,7 @@ public class TestKafkaCatalogPropertiesMetadata {
     Assertions.assertFalse(defaultNsEntry.isImmutable());
     Assertions.assertFalse(defaultNsEntry.isHidden());
     Assertions.assertFalse(defaultNsEntry.isReserved());
-    Assertions.assertEquals("default", defaultNsEntry.getDefaultValue());
+    Assertions.assertNull(defaultNsEntry.getDefaultValue());
     Assertions.assertEquals("analytics", defaultNsEntry.decode(" analytics "));
     Assertions.assertThrows(IllegalArgumentException.class, () -> defaultNsEntry.decode(""));
     Assertions.assertThrows(IllegalArgumentException.class, () -> defaultNsEntry.decode("   "));

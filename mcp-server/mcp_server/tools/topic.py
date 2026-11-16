@@ -16,12 +16,26 @@
 # under the License.
 
 import json
+from typing import Optional
 
 from fastmcp import Context, FastMCP
 
+_READONLY_TOOL_ANNOTATIONS = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    "idempotentHint": True,
+}
+
+
+def _clean_optional_str(value) -> Optional[str]:
+    if value is None:
+        return None
+    stripped = str(value).strip()
+    return stripped if stripped else None
+
 
 def load_topic_tools(mcp: FastMCP):
-    @mcp.tool(tags={"topic"})
+    @mcp.tool(tags={"topic"}, annotations=_READONLY_TOOL_ANNOTATIONS)
     async def list_of_topics(
         ctx: Context,
         catalog_name: str,
@@ -90,7 +104,7 @@ def load_topic_tools(mcp: FastMCP):
             catalog_name, schema_name
         )
 
-    @mcp.tool(tags={"topic"})
+    @mcp.tool(tags={"topic"}, annotations=_READONLY_TOOL_ANNOTATIONS)
     async def load_topic(
         ctx: Context,
         catalog_name: str,
@@ -225,7 +239,7 @@ def load_topic_tools(mcp: FastMCP):
             catalog_name, schema_name, topic_name
         )
 
-    @mcp.tool(tags={"topic"})
+    @mcp.tool(tags={"topic"}, annotations=_READONLY_TOOL_ANNOTATIONS)
     async def get_topic_iceberg_linkage(
         ctx: Context, catalog_name: str, schema_name: str, topic_name: str
     ) -> dict:
@@ -252,7 +266,9 @@ def load_topic_tools(mcp: FastMCP):
             json.loads(raw_topic) if isinstance(raw_topic, str) else raw_topic
         )
         props = topic.get("properties") or {}
-        resolved_topic_name = topic.get("name", topic_name)
+        resolved_topic_name = (
+            _clean_optional_str(topic.get("name")) or topic_name
+        )
         table_topic_enabled = (
             str(
                 props.get(
@@ -265,16 +281,23 @@ def load_topic_tools(mcp: FastMCP):
             == "true"
         )
         if table_topic_enabled:
-            iceberg_catalog = props.get("table-topic.iceberg-catalog")
+            iceberg_catalog = _clean_optional_str(
+                props.get("table-topic.iceberg-catalog")
+            )
             iceberg_namespace = (
-                props.get("table-topic.iceberg-namespace")
-                or props.get("automq.table.topic.namespace")
+                _clean_optional_str(props.get("table-topic.iceberg-namespace"))
+                or _clean_optional_str(
+                    props.get("automq.table.topic.namespace")
+                )
                 or "default"
             )
             iceberg_table = (
-                props.get("table-topic.iceberg-table") or resolved_topic_name
+                _clean_optional_str(props.get("table-topic.iceberg-table"))
+                or resolved_topic_name
             )
-            iceberg_ident = props.get("table-topic.iceberg-ident") or (
+            iceberg_ident = _clean_optional_str(
+                props.get("table-topic.iceberg-ident")
+            ) or (
                 f"{ctx.request_context.lifespan_context.resolve_metalake()}."
                 f"{iceberg_catalog}.{iceberg_namespace}.{iceberg_table}"
                 if iceberg_catalog
@@ -293,9 +316,11 @@ def load_topic_tools(mcp: FastMCP):
             "iceberg_namespace": iceberg_namespace,
             "iceberg_table": iceberg_table,
             "iceberg_ident": iceberg_ident,
-            "schema_type": props.get("automq.table.topic.schema.type"),
-            "commit_interval_ms": props.get(
-                "automq.table.topic.commit.interval.ms"
+            "schema_type": _clean_optional_str(
+                props.get("automq.table.topic.schema.type")
+            ),
+            "commit_interval_ms": _clean_optional_str(
+                props.get("automq.table.topic.commit.interval.ms")
             ),
             "upsert_enabled": (
                 str(props.get("automq.table.topic.upsert.enable", "false"))
@@ -305,10 +330,25 @@ def load_topic_tools(mcp: FastMCP):
                 if table_topic_enabled
                 else False
             ),
-            "id_columns": props.get("automq.table.topic.id.columns"),
-            "partition_by": props.get("automq.table.topic.partition.by"),
-            "cdc_field": props.get("automq.table.topic.cdc.field"),
-            "errors_tolerance": props.get(
-                "automq.table.topic.errors.tolerance"
+            "id_columns": _clean_optional_str(
+                props.get("automq.table.topic.id.columns")
+            ),
+            "partition_by": _clean_optional_str(
+                props.get("automq.table.topic.partition.by")
+            ),
+            "cdc_field": _clean_optional_str(
+                props.get("automq.table.topic.cdc.field")
+            ),
+            "errors_tolerance": _clean_optional_str(
+                props.get("automq.table.topic.errors.tolerance")
+            ),
+            "convert_key_type": _clean_optional_str(
+                props.get("automq.table.topic.convert.key.type")
+            ),
+            "convert_value_type": _clean_optional_str(
+                props.get("automq.table.topic.convert.value.type")
+            ),
+            "transform_value_type": _clean_optional_str(
+                props.get("automq.table.topic.transform.value.type")
             ),
         }
