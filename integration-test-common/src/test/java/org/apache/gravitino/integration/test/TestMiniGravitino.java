@@ -22,26 +22,89 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.RESTClient;
+import org.apache.gravitino.storage.relational.database.H2Database;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestMiniGravitino {
 
   @TempDir private Path mockConfDir;
+
+  @ParameterizedTest
+  @NullSource
+  @ValueSource(strings = "jdbc:h2")
+  void testDefaultH2UsesSynchronousWrites(@Nullable String templateUrl) throws Exception {
+    Properties properties = rewriteConfig(templateUrl, Collections.emptyMap());
+    Config config = new Config(false) {};
+    config.loadFromProperties(properties);
+    String jdbcUrl = H2Database.getConnectionUrl(config);
+    assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + mockConfDir.resolve("metadata") + ";"));
+    assertTrue(Class.forName("org.h2.mvstore.RandomAccessStore").desiredAssertionStatus());
+
+    try (Connection connection = DriverManager.getConnection(jdbcUrl, "sa", "");
+        Statement statement = connection.createStatement()) {
+      try (ResultSet settings =
+          statement.executeQuery(
+              "SELECT SETTING_VALUE FROM INFORMATION_SCHEMA.SETTINGS WHERE SETTING_NAME = 'WRITE_DELAY'")) {
+        assertTrue(settings.next());
+        do {
+          assertEquals("0", settings.getString(1));
+        } while (settings.next());
+      } finally {
+        statement.execute("SHUTDOWN");
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:h2:file:/tmp/custom-metadata",
+        "jdbc:h2:file:/tmp/custom-metadata;WRITE_DELAY=100",
+        "jdbc:mysql://localhost/gravitino",
+        "jdbc:postgresql://localhost/gravitino"
+      })
+  void testPreservesExplicitJdbcUrls(String jdbcUrl) throws Exception {
+    Properties properties =
+        rewriteConfig("jdbc:h2", Map.of(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, jdbcUrl));
+    assertEquals(jdbcUrl, properties.getProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY));
+  }
+
+  @Test
+  void testPreservesJdbcUrlFromTemplate() throws Exception {
+    String jdbcUrl = "jdbc:h2:file:/tmp/template-metadata;WRITE_DELAY=100";
+    Properties properties = rewriteConfig(jdbcUrl, Collections.emptyMap());
+    assertEquals(jdbcUrl, properties.getProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY));
+  }
 
   @Test
   void testContextLaunchesTheOpenSourceServerByDefault() {
@@ -95,6 +158,34 @@ class TestMiniGravitino {
     assertEquals(1, exception.getSuppressed().length);
     assertSame(closeFailure, exception.getSuppressed()[0]);
     assertFalse(Files.exists(mockConfDir));
+  }
+
+  private Properties rewriteConfig(@Nullable String templateUrl, Map<String, String> overrides)
+      throws IOException {
+    Properties template = new Properties();
+    template.setProperty(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
+        mockConfDir.resolve("metadata").toString());
+    if (templateUrl != null) {
+      template.setProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, templateUrl);
+    }
+    Path templateFile = mockConfDir.resolve("gravitino.conf.template");
+    try (OutputStream output = Files.newOutputStream(templateFile)) {
+      template.store(output, null);
+    }
+    Path configFile = mockConfDir.resolve("gravitino.conf");
+    MiniGravitino miniGravitino =
+        new MiniGravitino(
+            new MiniGravitinoContext(overrides, true, true),
+            mockConfDir.toFile(),
+            mock(ExecutorService.class),
+            null);
+    miniGravitino.customizeConfigFile(templateFile.toString(), configFile.toString());
+    Properties properties = new Properties();
+    try (InputStream input = Files.newInputStream(configFile)) {
+      properties.load(input);
+    }
+    return properties;
   }
 
   private MiniGravitino createMiniGravitino(ExecutorService executor, RESTClient restClient)
