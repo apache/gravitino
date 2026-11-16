@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -59,6 +60,7 @@ public class MaintenanceJobManager {
   private static volatile MaintenanceJobManager instance;
 
   private final JobOperationDispatcher jobOperationDispatcher;
+  @Nullable private final OwnerDispatcher ownerDispatcher;
 
   /**
    * Returns the shared TMS job manager for the server process.
@@ -69,15 +71,21 @@ public class MaintenanceJobManager {
     if (instance == null) {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
-          instance = new MaintenanceJobManager(GravitinoEnv.getInstance().jobOperationDispatcher());
+          GravitinoEnv env = GravitinoEnv.getInstance();
+          instance =
+              new MaintenanceJobManager(
+                  env.jobOperationDispatcher(), env.internalOwnerDispatcher());
         }
       }
     }
     return instance;
   }
 
-  private MaintenanceJobManager(JobOperationDispatcher jobOperationDispatcher) {
+  @VisibleForTesting
+  MaintenanceJobManager(
+      JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
+    this.ownerDispatcher = ownerDispatcher;
   }
 
   /**
@@ -101,15 +109,14 @@ public class MaintenanceJobManager {
 
     Long jobId = null;
     try {
-      OwnerDispatcher owners = GravitinoEnv.getInstance().internalOwnerDispatcher();
       JobEntity job;
-      if (owners == null) {
+      if (ownerDispatcher == null) {
         // Ownership disabled: JobManager skips setOwner.
         job =
             jobOperationDispatcher.runJob(
                 metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
       } else {
-        String ownerUser = requireMetalakeOwnerUser(owners, metalake);
+        String ownerUser = requireMetalakeOwnerUser(ownerDispatcher, metalake);
         try {
           job =
               PrincipalUtils.doAs(
