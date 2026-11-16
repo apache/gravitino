@@ -128,13 +128,11 @@ final class DomainMembershipResolver {
     boolean needsOtherBindings =
         scopeDomains.stream()
             .anyMatch(d -> d.backingTagId() != null && !selectedIds.contains(d.id()));
-    // A selective name filter can discard most candidates after name resolution. In that case
-    // only fetch additional paths for the remaining objects. Bound the IN list for large scopes.
+    // Bound the selected-domain IN list in the candidate semijoin.
     boolean joinPaths =
         needsOtherBindings
             && !selectedIds.isEmpty()
-            && selectedIds.size() <= MEMBERSHIP_LOOKUP_BATCH_SIZE
-            && !filter.nameContains().isPresent();
+            && selectedIds.size() <= MEMBERSHIP_LOOKUP_BATCH_SIZE;
     Map<MetadataObject.Type, Map<Long, MetadataObject>> candidates =
         new EnumMap<>(MetadataObject.Type.class);
     Table<MetadataObject.Type, Long, DirectMemberPaths> relations = HashBasedTable.create();
@@ -153,7 +151,13 @@ final class DomainMembershipResolver {
             scopeDomains.stream()
                 .filter(d -> d.backingTagId() != null && !selectedIds.contains(d.id()))
                 .collect(Collectors.toList());
-        joinPaths = fewerDomainBatches(assigned, remaining.size());
+        // The semijoin restricts by selected domain, so use it only if every name matches.
+        joinPaths =
+            fewerDomainBatches(assigned, remaining.size())
+                && (!filter.nameContains().isPresent()
+                    || assigned.values().stream()
+                        .flatMap(List::stream)
+                        .allMatch(row -> matchesFilter(assignedObject(row), filter)));
         if (joinPaths) {
           Map<Long, List<GenericEntity>> otherAssignments =
               listAssignments(metalake, remaining, types, assigned);

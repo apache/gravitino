@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
@@ -378,6 +379,49 @@ class TestDomainMembershipResolver {
             eq(METALAKE), eq(List.of(children[0])), any(), eq(Collections.emptyMap()));
     verify(domainOperations)
         .listDomainAssignments(eq(METALAKE), anyList(), any(), eq(Map.of(2L, candidates.get(2L))));
+  }
+
+  @Test
+  void testNameFilterAllowsJoinOnlyWhenEveryCandidateMatches() throws Exception {
+    DomainEntity parent = domain(1, "Finance", null, 10L, null);
+    DomainEntity child = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity[] children = {child};
+    MetadataObject[] tables = new MetadataObject[502];
+    for (int i = 0; i < tables.length; i++) {
+      String prefix = i == 501 ? "other" : "subset";
+      tables[i] = object("cat.sales." + prefix + i, MetadataObject.Type.TABLE);
+      assign(tables[i], tag(20, "trading"));
+    }
+    candidate(20, tables);
+    candidate(10, tables[0]);
+    assign(tables[0], tag(10, "finance"), tag(20, "trading"));
+    DomainMember[] all =
+        resolver.listMembers(
+            METALAKE,
+            parent,
+            children,
+            direct().withDomains("Trading").withNameContains("CAT.SALES").build());
+    assertEquals(502, all.length);
+    verify(domainOperations)
+        .listDomainAssignments(
+            eq(METALAKE), eq(List.of(parent)), any(), eq(Map.of(child.id(), candidates.get(20L))));
+    verify(domainOperations, never()).listDirectTagsByObjectIds(anyString(), any(), anyList());
+
+    DomainMember[] subset =
+        resolver.listMembers(
+            METALAKE,
+            parent,
+            children,
+            direct().withDomains("Trading").withNameContains("subset").build());
+    assertEquals(501, subset.length);
+    verify(domainOperations)
+        .listDirectTagsByObjectIds(
+            eq(METALAKE), eq(MetadataObject.Type.TABLE), argThat(ids -> ids.size() == 501));
+    assertEquals(tables[0], subset[0].object());
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.direct(), DomainRelation.viaSubdomain("Trading")},
+        subset[0].relations());
+    assertArrayEquals(subset[0].relations(), all[1].relations());
   }
 
   @Test
