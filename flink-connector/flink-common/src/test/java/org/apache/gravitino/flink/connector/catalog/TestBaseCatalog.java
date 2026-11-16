@@ -566,7 +566,7 @@ public abstract class TestBaseCatalog {
     List<Column> computed =
         Arrays.asList(
             Column.physical("a", DataTypes.INT()),
-            Column.computed("b", resolvedExpression(DataTypes.INT())));
+            Column.computed("b", resolvedExpression("a", DataTypes.INT())));
     ResolvedCatalogTable computedTable =
         resolvedCatalogTable(resolvedSchema(computed, Collections.emptyList()));
     Assertions.assertThrows(
@@ -592,7 +592,7 @@ public abstract class TestBaseCatalog {
     // watermark spec on a timestamp column
     List<WatermarkSpec> watermarkSpecs =
         Collections.singletonList(
-            WatermarkSpec.of("a", resolvedExpression(DataTypes.TIMESTAMP_LTZ(3))));
+            WatermarkSpec.of("a", resolvedExpression("a", DataTypes.TIMESTAMP_LTZ(3))));
     ResolvedCatalogTable watermarkedTable =
         resolvedCatalogTable(
             resolvedSchema(
@@ -636,8 +636,8 @@ public abstract class TestBaseCatalog {
                 new ObjectPath("db", "t"),
                 existing,
                 Collections.singletonList(
-                    org.apache.flink.table.catalog.TableChange.add(
-                        Column.computed("b", resolvedExpression(DataTypes.INT())))),
+                    TableChange.add(
+                        Column.computed("b", resolvedExpression("a", DataTypes.INT())))),
                 false));
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -646,8 +646,7 @@ public abstract class TestBaseCatalog {
                 new ObjectPath("db", "t"),
                 existing,
                 Collections.singletonList(
-                    org.apache.flink.table.catalog.TableChange.add(
-                        Column.metadata("m", DataTypes.INT(), null, false))),
+                    TableChange.add(Column.metadata("m", DataTypes.INT(), null, false))),
                 false));
 
     Assertions.assertDoesNotThrow(
@@ -655,9 +654,7 @@ public abstract class TestBaseCatalog {
             catalog.alterTable(
                 new ObjectPath("db", "t"),
                 existing,
-                Collections.singletonList(
-                    org.apache.flink.table.catalog.TableChange.add(
-                        Column.physical("c", DataTypes.INT()))),
+                Collections.singletonList(TableChange.add(Column.physical("c", DataTypes.INT()))),
                 false));
   }
 
@@ -686,7 +683,7 @@ public abstract class TestBaseCatalog {
                     resolvedCatalogTable(
                         resolvedSchema(
                             Collections.singletonList(
-                                Column.computed("b", resolvedExpression(DataTypes.INT()))),
+                                Column.computed("b", resolvedExpression("a", DataTypes.INT()))),
                             Collections.emptyList())),
                     false));
     Assertions.assertFalse(
@@ -701,7 +698,7 @@ public abstract class TestBaseCatalog {
                     resolvedCatalogTable(
                         resolvedSchema(
                             Collections.singletonList(
-                                Column.computed("b", resolvedExpression(DataTypes.INT()))),
+                                Column.computed("b", resolvedExpression("a", DataTypes.INT()))),
                             Collections.emptyList())),
                     false));
     Assertions.assertTrue(
@@ -713,7 +710,7 @@ public abstract class TestBaseCatalog {
             resolvedSchema(
                 Collections.singletonList(Column.physical("ts", DataTypes.TIMESTAMP_LTZ(3))),
                 Collections.singletonList(
-                    WatermarkSpec.of("ts", resolvedExpression(DataTypes.TIMESTAMP_LTZ(3))))));
+                    WatermarkSpec.of("ts", resolvedExpression("ts", DataTypes.TIMESTAMP_LTZ(3))))));
     UnsupportedOperationException plainWatermarkError =
         Assertions.assertThrows(
             UnsupportedOperationException.class,
@@ -738,10 +735,10 @@ public abstract class TestBaseCatalog {
     return handle;
   }
 
-  private static ResolvedExpression resolvedExpression(DataType dataType) {
+  private static ResolvedExpression resolvedExpression(String column, DataType dataType) {
     ResolvedExpression expression = Mockito.mock(ResolvedExpression.class);
     Mockito.when(expression.getOutputDataType()).thenReturn(dataType);
-    Mockito.when(expression.asSerializableString()).thenReturn("`a`");
+    Mockito.when(expression.asSerializableString()).thenReturn("`" + column + "`");
     return expression;
   }
 
@@ -774,7 +771,9 @@ public abstract class TestBaseCatalog {
     schema
         .getWatermarkSpecs()
         .forEach(
-            w -> builder.watermark(w.getRowtimeAttribute(), "`" + w.getRowtimeAttribute() + "`"));
+            w ->
+                builder.watermark(
+                    w.getRowtimeAttribute(), w.getWatermarkExpression().asSerializableString()));
     CatalogTable unresolved =
         catalogCompat()
             .createCatalogTable(
