@@ -234,6 +234,9 @@ class GenericDomain implements Domain {
       params.put("types", filter.types().stream().map(Enum::name).collect(Collectors.joining(",")));
     }
     filter.nameContains().ifPresent(value -> params.put("nameContains", value));
+    if (filter.expand()) {
+      params.put("expand", "true");
+    }
     // Send each domain scope as a separate query parameter.
     String scopes =
         filter.domains().stream()

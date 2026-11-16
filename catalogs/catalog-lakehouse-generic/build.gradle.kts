@@ -57,7 +57,13 @@ dependencies {
   testImplementation(libs.hadoop3.common)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
-  testImplementation(libs.lance) // Included in the test runtime classpath for test only
+  // Included in the test runtime classpath for test only. The distribution excludes
+  // io.opentelemetry from lance-core (see core/build.gradle.kts), so exclude it here too: a test
+  // classpath that still carries it would hide a new reference to org.lance.otel.* that then
+  // fails at runtime with NoClassDefFoundError.
+  testImplementation(libs.lance) {
+    exclude(group = "io.opentelemetry", module = "*")
+  }
   testImplementation(libs.mockito.core)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)

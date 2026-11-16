@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -70,30 +69,43 @@ public class ITUtils {
     return path.split(File.separator);
   }
 
+  /**
+   * Loads a properties template, applies overrides, and writes the effective configuration.
+   *
+   * @param configTempFileName The template properties file.
+   * @param configFileName The destination properties file.
+   * @param configMap The configuration overrides.
+   * @throws IOException If reading or writing the configuration fails.
+   */
   public static void rewriteConfigFile(
       String configTempFileName, String configFileName, Map<String, String> configMap)
       throws IOException {
     Properties props = new Properties();
-    try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName));
-        OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
+    try (InputStream inputStream = Files.newInputStream(Paths.get(configTempFileName))) {
       props.load(inputStream);
-      props.putAll(configMap);
-      for (String key : props.stringPropertyNames()) {
-        String value = props.getProperty(key);
-        // Use customized write functions to avoid escaping `:` into `\:`.
-        outputStream.write((key + " = " + value + "\n").getBytes(StandardCharsets.UTF_8));
-      }
     }
+    props.putAll(configMap);
+    overwriteConfigFile(configFileName, props);
   }
 
+  /**
+   * Writes effective string properties, including inherited defaults, in the format read by {@link
+   * Properties#load(InputStream)}.
+   *
+   * @param configFileName The destination properties file.
+   * @param props The properties to write.
+   * @throws IOException If writing the configuration fails.
+   */
   public static void overwriteConfigFile(String configFileName, Properties props)
       throws IOException {
+    Properties propertiesToWrite = new Properties();
+    for (String key : props.stringPropertyNames()) {
+      propertiesToWrite.setProperty(key, props.getProperty(key));
+    }
     try (OutputStream outputStream = Files.newOutputStream(Paths.get(configFileName))) {
-      for (String key : props.stringPropertyNames()) {
-        String value = props.getProperty(key);
-        // Use customized write functions to avoid escaping `:` into `\:`.
-        outputStream.write((key + " = " + value + "\n").getBytes(StandardCharsets.UTF_8));
-      }
+      // Pair the writer with Properties.load(InputStream) used by server startup. Escaping also
+      // preserves Unicode paths and literal backslashes through subsequent configuration rewrites.
+      propertiesToWrite.store(outputStream, null);
     }
   }
 

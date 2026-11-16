@@ -115,6 +115,8 @@ public abstract class BaseCatalog extends AbstractCatalog {
   private final PartitionConverter partitionConverter;
   private final Map<String, String> catalogOptions;
 
+  private volatile LoadedCatalog loadedCatalog;
+
   protected BaseCatalog(
       String catalogName,
       Map<String, String> catalogOptions,
@@ -1216,7 +1218,22 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   protected Catalog catalog() {
-    return GravitinoCatalogManager.get().getGravitinoCatalogInfo(getName());
+    // The Gravitino client has no catalog cache and Flink calls catalog() before nearly every
+    // schema or table request, so load the catalog once per instance. Load it again when the
+    // shared manager has been replaced, since the handle keeps using the REST client of the
+    // manager that loaded it.
+    GravitinoCatalogManager manager = GravitinoCatalogManager.get();
+    LoadedCatalog loaded = loadedCatalog;
+    if (loaded == null || loaded.manager != manager) {
+      synchronized (this) {
+        loaded = loadedCatalog;
+        if (loaded == null || loaded.manager != manager) {
+          loaded = new LoadedCatalog(manager, manager.getGravitinoCatalogInfo(getName()));
+          loadedCatalog = loaded;
+        }
+      }
+    }
+    return loaded.catalog;
   }
 
   protected String catalogName() {
@@ -1229,5 +1246,16 @@ public abstract class BaseCatalog extends AbstractCatalog {
 
   protected Map<String, String> fromGravitinoDistribution(Distribution distribution) {
     return Collections.emptyMap();
+  }
+
+  /** A Gravitino catalog handle together with the manager that loaded it. */
+  private static final class LoadedCatalog {
+    private final GravitinoCatalogManager manager;
+    private final Catalog catalog;
+
+    private LoadedCatalog(GravitinoCatalogManager manager, Catalog catalog) {
+      this.manager = manager;
+      this.catalog = catalog;
+    }
   }
 }

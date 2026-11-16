@@ -20,18 +20,44 @@ package org.apache.gravitino.job;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 import org.apache.gravitino.job.JobTemplate.JobType;
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.LogEvent;
+import org.apache.logging.log4j.core.LoggerContext;
+import org.apache.logging.log4j.core.appender.AbstractAppender;
+import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestJobRuntimeTemplateMaskUtils {
+
+  private static final class LogCollector extends AbstractAppender {
+    private final List<LogEvent> events = new CopyOnWriteArrayList<>();
+
+    private LogCollector() {
+      super(
+          "jobRuntimeTemplateMaskUtilsLogCollector",
+          null,
+          PatternLayout.createDefaultLayout(),
+          true,
+          null);
+    }
+
+    @Override
+    public void append(LogEvent event) {
+      events.add(event.toImmutable());
+    }
+  }
 
   @Test
   void testMaskSensitiveFieldsMasksUpdaterOptionsAndSparkConf() {
@@ -125,35 +151,213 @@ public class TestJobRuntimeTemplateMaskUtils {
             .withJobType(JobType.SHELL)
             .withExecutable("/bin/sh")
             .withArguments(
-                ImmutableList.of(
-                    "-c",
-                    command,
-                    "--password",
-                    "my secret pass",
-                    "--conf",
-                    "spark.jdbc.password=my pass",
-                    "--where",
-                    where))
+                ImmutableList.of("-c", command, "--password", "my secret pass", "--where", where))
             .build();
 
     ShellJobTemplateDTO shell =
         (ShellJobTemplateDTO) JobRuntimeTemplateMaskUtils.maskSensitiveFields(input);
     Assertions.assertEquals(
-        ImmutableList.of(
-            "-c",
-            command,
-            "--password",
-            "my secret pass",
-            "--conf",
-            "spark.jdbc.password=my pass",
-            "--where",
-            where),
+        ImmutableList.of("-c", command, "--password", "my secret pass", "--where", where),
         shell.arguments());
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsMasksSensitiveConf() {
+    List<String> command =
+        ImmutableList.of(
+            "/path/to/spark-submit",
+            "--conf",
+            "spark.executor.memory=2g",
+            "--conf",
+            "spark.sql.catalog.ice.rest.auth.basic.password=catalog-pw",
+            "--conf=spark.hadoop.fs.s3a.secret.key=s3-secret",
+            "--conf",
+            "--spark-conf",
+            "{\"password\":\"bag-pw\"}",
+            "local:///app.jar");
+
+    List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(command);
+
+    Assertions.assertEquals("spark.executor.memory=2g", masked.get(2));
+    Assertions.assertEquals(
+        "spark.sql.catalog.ice.rest.auth.basic.password=" + HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(4));
+    Assertions.assertEquals(
+        "--conf=spark.hadoop.fs.s3a.secret.key=" + HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(5));
+    // Missing --conf value; next flag is still walked.
+    Assertions.assertEquals("--spark-conf", masked.get(7));
+    Assertions.assertFalse(masked.get(8).contains("bag-pw"));
+    Assertions.assertTrue(command.get(4).contains("catalog-pw"));
+    Assertions.assertTrue(command.get(5).contains("s3-secret"));
   }
 
   @Test
   void testMaskSensitiveFieldsNull() {
     Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveFields(null));
+    Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(null));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsOnFullSparkSubmitCommand() {
+    // Same shape as SparkProcessBuilder.generateSparkSubmitCommand: mask for INFO logs only.
+    List<String> command =
+        ImmutableList.of(
+            "/path/to/spark-submit",
+            "--class",
+            "org.example.App",
+            "--conf",
+            "spark.executor.memory=2g",
+            "--conf",
+            "spark.sql.catalog.ice.rest.auth.basic.password=catalog-pw",
+            "local:///app.jar",
+            "--updater-options",
+            "{\"password\":\"arg-pw\",\"gravitino_uri\":\"http://localhost\"}",
+            "--spark-conf",
+            "{\"spark.sql.catalog.ice.rest.auth.basic.password\":\"jdbc-pw\","
+                + "\"spark.executor.memory\":\"1g\"}",
+            "--table",
+            "db.t");
+
+    List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(command);
+
+    Assertions.assertEquals(command.size(), masked.size());
+    Assertions.assertEquals("/path/to/spark-submit", masked.get(0));
+    Assertions.assertEquals("spark.executor.memory=2g", masked.get(4));
+    Assertions.assertEquals(
+        "spark.sql.catalog.ice.rest.auth.basic.password=" + HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(6));
+    Assertions.assertFalse(masked.get(9).contains("arg-pw"));
+    Assertions.assertTrue(masked.get(9).contains("http://localhost"));
+    Assertions.assertTrue(masked.get(9).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertFalse(masked.get(11).contains("jdbc-pw"));
+    Assertions.assertTrue(masked.get(11).contains("1g"));
+    Assertions.assertEquals("db.t", masked.get(13));
+    // Original list used for ProcessBuilder must stay plaintext.
+    Assertions.assertTrue(command.get(6).contains("catalog-pw"));
+    Assertions.assertTrue(command.get(9).contains("arg-pw"));
+    Assertions.assertTrue(command.get(11).contains("jdbc-pw"));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsContinuesAfterOneValueFails() {
+    // Malformed object-looking JSON is replaced with ******; later flags are still masked.
+    List<String> arguments =
+        ImmutableList.of(
+            "--updater-options",
+            "{not-valid-json",
+            "--spark-conf",
+            "{\"password\":\"later-pw\",\"spark.executor.memory\":\"1g\"}",
+            "--table",
+            "db.t");
+
+    List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(arguments);
+
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
+    Assertions.assertEquals("--spark-conf", masked.get(2));
+    Assertions.assertFalse(masked.get(3).contains("later-pw"));
+    Assertions.assertTrue(masked.get(3).contains("1g"));
+    Assertions.assertTrue(masked.get(3).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertEquals("db.t", masked.get(5));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsMasksNonSingleJsonObjectBags() {
+    String concatenated = "{} {\"password\":\"concat-secret\"}";
+    String scalarThenObject = "true {\"password\":\"scalar-secret\"}";
+    String duplicateField = "{\"config\":{\"password\":\"dup-secret\"},\"config\":{}}";
+    List<String> masked =
+        JobRuntimeTemplateMaskUtils.maskSensitiveArguments(
+            ImmutableList.of(
+                "--updater-options",
+                concatenated,
+                "--spark-conf",
+                scalarThenObject,
+                "--updater-options",
+                duplicateField,
+                "--table",
+                "db.t"));
+
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(3));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(5));
+    Assertions.assertFalse(masked.get(1).contains("concat-secret"));
+    Assertions.assertFalse(masked.get(3).contains("scalar-secret"));
+    Assertions.assertFalse(masked.get(5).contains("dup-secret"));
+    Assertions.assertEquals("db.t", masked.get(7));
+  }
+
+  @Test
+  void testMalformedCredentialJsonDoesNotLeakInMaskingLogs() {
+    // Regression for review on #14979: Jackson exception text must not reach WARN logs.
+    String malformed = "{\"password\":\"malformed-credential-secret\",";
+    List<String> arguments =
+        ImmutableList.of("--updater-options", malformed, "--spark-conf", malformed);
+
+    List<LogEvent> events =
+        captureMaskingLogs(
+            () -> {
+              List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(arguments);
+              Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
+              Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(3));
+            });
+
+    Assertions.assertFalse(events.isEmpty(), "expected a WARN from malformed nest JSON masking");
+    for (LogEvent event : events) {
+      String rendered = renderLogEvent(event);
+      Assertions.assertFalse(
+          rendered.contains("malformed-credential-secret"),
+          () -> "masking log leaked credential input: " + rendered);
+      Assertions.assertFalse(
+          rendered.contains(malformed),
+          () -> "masking log leaked malformed JSON input: " + rendered);
+    }
+  }
+
+  private static List<LogEvent> captureMaskingLogs(Runnable action) {
+    LoggerContext context =
+        (LoggerContext)
+            LogManager.getContext(JobRuntimeTemplateMaskUtils.class.getClassLoader(), false);
+    var jobMaskLogger = context.getLogger(JobRuntimeTemplateMaskUtils.class.getName());
+    var hiddenMaskLogger = context.getLogger(HiddenPropertyMaskUtils.class.getName());
+    LogCollector collector = new LogCollector();
+    collector.start();
+    synchronized (jobMaskLogger) {
+      synchronized (hiddenMaskLogger) {
+        Level previousJob = jobMaskLogger.getLevel();
+        Level previousHidden = hiddenMaskLogger.getLevel();
+        jobMaskLogger.addAppender(collector);
+        hiddenMaskLogger.addAppender(collector);
+        jobMaskLogger.setLevel(Level.DEBUG);
+        hiddenMaskLogger.setLevel(Level.DEBUG);
+        try {
+          action.run();
+        } finally {
+          jobMaskLogger.removeAppender(collector);
+          hiddenMaskLogger.removeAppender(collector);
+          jobMaskLogger.setLevel(previousJob);
+          hiddenMaskLogger.setLevel(previousHidden);
+          collector.stop();
+        }
+      }
+    }
+    return List.copyOf(collector.events);
+  }
+
+  private static String renderLogEvent(LogEvent event) {
+    List<String> parts = new ArrayList<>();
+    if (event.getMessage() != null) {
+      parts.add(event.getMessage().getFormattedMessage());
+    }
+    Throwable thrown = event.getThrown();
+    while (thrown != null) {
+      parts.add(String.valueOf(thrown));
+      if (thrown.getMessage() != null) {
+        parts.add(thrown.getMessage());
+      }
+      thrown = thrown.getCause();
+    }
+    return String.join("\n", parts);
   }
 
   @Test
