@@ -70,11 +70,17 @@ function evaluateExecution(pr, run, jobs, baseSha) {
     return { status: running ? 'in_progress' : 'queued',
       title: running ? 'Fork CI is running' : 'Fork CI is queued, waiting for a runner' };
   }
-  const failed = jobs.filter(job => job.name !== FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion))
+  // Full reruns can resolve a newer base. Required CI jobs for older contexts must not
+  // override the exact context selected above; its successful result is still mandatory.
+  const currentJobs = jobs.filter(job => !job.name.startsWith('Required CI / ') || job === required);
+  const failed = currentJobs.filter(job => job.name !== FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion))
     .map(job => job.name);
-  // A run that failed only because of the watcher is judged by its suites below.
-  const watcherOnly = run.conclusion === 'failure' && !failed.length &&
-    jobs.some(job => job.name === FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion));
+  // Partial reruns can retain a cancelled watcher, keeping the whole run cancelled even
+  // after its suites recover. Ignore only that observer's result, then verify Required CI
+  // and all required suites below. Any other unfinished or unsuccessful job still blocks.
+  const watcherOnly = ['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
+    currentJobs.some(job => job.name === FAIL_FAST && ['failure', 'timed_out', 'cancelled'].includes(job.conclusion)) &&
+    currentJobs.every(job => job.name === FAIL_FAST || ['success', 'skipped'].includes(job.conclusion));
   if (run.conclusion !== 'success' && !watcherOnly) {
     // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
     if (failed.length) return { status: 'completed', conclusion: 'failure',

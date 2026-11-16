@@ -496,6 +496,136 @@ test('partial reruns retain successful callers but use each job newest result', 
   assert.equal((await createService(github).mirror(p)).result.conclusion, 'action_required');
 });
 
+function partialRerunJobs(p) {
+  return [
+    ...jobs(p).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1,
+      conclusion: job.name === requiredName(p) ? 'failure' : job.conclusion })),
+    { name: FAIL_FAST, id: 100, run_attempt: 1, conclusion: 'cancelled' },
+    { name: 'backend / BackendIT (mysql)', id: 101, run_attempt: 1, conclusion: 'failure' },
+    { name: 'spark / SparkIT', id: 102, run_attempt: 1, conclusion: 'cancelled' },
+    { name: 'backend / BackendIT (mysql)', id: 200, run_attempt: 2, conclusion: 'success' },
+    { name: requiredName(p), id: 201, run_attempt: 2, conclusion: 'failure' },
+    { name: 'spark / SparkIT', id: 202, run_attempt: 2, conclusion: 'failure' },
+    { name: 'spark / SparkIT', id: 300, run_attempt: 3, conclusion: 'success' },
+    { name: requiredName(p), id: 301, run_attempt: 3, conclusion: 'success' }
+  ];
+}
+
+test('scheduled publication turns a failed partial rerun green once its suites recover', async () => withPublisher(async ({ ctx, core }) => {
+  // Only MySQL is retried in attempt 2, then Spark and Required CI in attempt 3.
+  // GitHub retains the cancelled watcher and reports the whole run as cancelled.
+  const rerun = { ...run(), run_attempt: 3, conclusion: 'cancelled' };
+  const { github, statuses } = publisherMock({ rerun,
+    latest: forkStatus('failure', 'Failed: spark / SparkIT', url(1, 2)) });
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  github.rest.pulls.get = async () => ({ data: recent });
+  const listPulls = github.rest.pulls.list;
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (endpoint === listPulls) return [recent];
+    if (args.run_id !== 1) return paginate(endpoint, args);
+    assert.equal(endpoint, 'GET /repos/{owner}/{repo}/actions/runs/{run_id}/jobs');
+    assert.equal(args.filter, 'all');
+    return partialRerunJobs(pr()).reverse();
+  };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.deepEqual(statuses, [{ owner: 'apache', repo: 'gravitino', sha: A, context: 'Fork CI', state: 'success',
+    description: 'All required suites passed', target_url: url(1, 3) }]);
+}));
+
+test('partial reruns use only the latest available suite result', async () => {
+  for (const conclusion of ['failure', 'timed_out', 'cancelled', 'skipped', null]) {
+    const forkJobs = partialRerunJobs(pr());
+    forkJobs.find(job => job.id === 300).conclusion = conclusion;
+    // A successful execution from a later attempt must not be used yet.
+    forkJobs.push({ name: 'spark / SparkIT', id: 400, run_attempt: 4, conclusion: 'success' });
+    const github = serviceMock({ forkJobs });
+    github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
+      event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion: 'cancelled' }] : [] } });
+    const { result } = await createService(github).mirror(pr());
+    if (conclusion === 'skipped') {
+      // Path-based skips remain allowed when the caller's changes job succeeded.
+      assert.equal(result.conclusion, 'success');
+    } else {
+      assert.notEqual(result.conclusion, 'success', `Latest Spark result: ${conclusion}`);
+      if (['failure', 'timed_out'].includes(conclusion)) assert.equal(result.title, 'Failed: spark / SparkIT');
+    }
+  }
+});
+
+test('a partial rerun with a cancelled watcher still requires the exact Required CI result', () => {
+  const p = pr(), cancelled = { ...run(), run_attempt: 3, conclusion: 'cancelled' };
+  for (const conclusion of ['failure', 'timed_out', 'cancelled', 'skipped', null]) {
+    const current = [...jobs(p), { name: FAIL_FAST, conclusion: 'cancelled' }];
+    current[0].conclusion = conclusion;
+    assert.notEqual(evaluate(p, cancelled, current).conclusion, 'success');
+  }
+  for (const change of [q => q.head.sha = C, q => q.base.sha = C, q => q.base.ref = 'branch-1.3']) {
+    const q = pr(); change(q);
+    assert.equal(evaluate(q, cancelled, [...jobs(p), { name: FAIL_FAST, conclusion: 'cancelled' }]).conclusion, 'action_required');
+  }
+  for (const status of ['queued', 'in_progress']) {
+    assert.notEqual(evaluate(p, { ...cancelled, status, conclusion: null }, jobs(p)).status, 'completed');
+  }
+});
+
+test('watcher-only cancellation and timeouts still verify every caller and prerequisite', () => {
+  const p = pr();
+  for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
+    const stopped = { ...run(), conclusion };
+    const complete = [...jobs(p), { name: FAIL_FAST, conclusion }];
+    assert.equal(evaluate(p, stopped, complete).conclusion, 'success');
+    for (const suite of SUITES) {
+      assert.equal(evaluate(p, stopped, complete.filter(job => !job.name.startsWith(suite + ' / '))).conclusion, 'action_required');
+    }
+    assert.equal(evaluate(p, stopped, complete.filter(job => job.name !== requiredName(p))).conclusion, 'action_required');
+    for (const blocked of ['failure', 'timed_out', 'cancelled', null]) {
+      assert.notEqual(evaluate(p, stopped, [...complete,
+        { name: 'Resolve fork CI eligibility', conclusion: blocked }]).conclusion, 'success');
+    }
+  }
+});
+
+test('a recovered rerun ignores failed Required CI jobs for an obsolete base', async () => {
+  const p = pr();
+  const forkJobs = partialRerunJobs(p).map(job => job.name === requiredName(p)
+    ? { ...job, name: requiredName(p, C) } : job);
+  forkJobs.push({ name: requiredName(p), id: 50, run_attempt: 1, conclusion: 'failure' });
+  const github = serviceMock({ forkJobs });
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
+    event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion: 'cancelled' }] : [] } });
+  github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+  workflowSource(github, SUITES, C);
+  const mirror = await createService(github).mirror(p);
+  assert.equal(mirror.base, C);
+  assert.equal(mirror.result.conclusion, 'success');
+});
+
+test('trusted partial reruns also recover with a cancelled watcher', async () => {
+  const github = serviceMock({ trusted: true, trustedJobs: partialRerunJobs(pr()) });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => {
+    const response = await list(args);
+    if (args.event === 'workflow_dispatch') Object.assign(response.data.workflow_runs[0],
+      { run_attempt: 3, conclusion: 'cancelled' });
+    return response;
+  };
+  const mirror = await createService(github).mirror(pr());
+  assert.equal(mirror.trusted, true);
+  assert.equal(mirror.result.conclusion, 'success');
+});
+
+test('recovered cancelled runs still require trusted verification for changed CI definitions', async () => {
+  const forkJobs = [...jobs(pr()), { name: FAIL_FAST, conclusion: 'cancelled' }];
+  const github = serviceMock({ changed: true, forkJobs });
+  github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
+    event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion: 'cancelled' }] : [] } });
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(result.title, TRUSTED_REQUIRED);
+  assert.equal(statusState(result), 'pending');
+});
+
 test('allowlist signals find fork PRs by head branch', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'fork-ci-allowlist-test-'));
   const output = {};
