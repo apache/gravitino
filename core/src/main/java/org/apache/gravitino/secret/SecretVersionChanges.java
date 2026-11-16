@@ -27,8 +27,9 @@ import javax.annotation.Nullable;
  *
  * <p>Created by {@link SecretManager#stageSecrets}, which the {@code
  * SecretAlterChanges.prepare*Changes} methods call. After the entity create or alter commits,
- * {@link SecretManager#commitSecrets} applies them; if it fails, {@link
- * SecretManager#rollbackSecrets(SecretVersionChanges)} deletes the written versions.
+ * {@link SecretManager#commitSecrets} applies them. If the create or alter fails, {@link
+ * SecretManager#rollbackSecrets(SecretVersionChanges)} deletes the written versions, except after a
+ * failed create that leaves behind a catalog, schema, or fileset that may still reference them.
  */
 public final class SecretVersionChanges {
 

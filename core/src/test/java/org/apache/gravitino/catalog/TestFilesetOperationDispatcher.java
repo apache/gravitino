@@ -37,6 +37,7 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -52,6 +53,8 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.Mockito;
 
 public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
@@ -419,25 +422,44 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     }
   }
 
-  @Test
-  public void testCreateKeepsSecretsOnceFilesetIsCreated() throws Exception {
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testCreateKeepsSecretsOnceFilesetIsCreated(boolean failInCatalogCall)
+      throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
-      AtomicLong nextId = new AtomicLong(9100L);
+      AtomicLong nextId = new AtomicLong(failInCatalogCall ? 9200L : 9100L);
       IdGenerator ids = nextId::getAndIncrement;
+      String schemaName = "schema_secret_created" + (failInCatalogCall ? "_call" : "_mask");
       new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
           .createSchema(
-              NameIdentifier.of(metalake, catalog, "schema_secret_created"),
+              NameIdentifier.of(metalake, catalog, schemaName),
               "comment",
               ImmutableMap.of("k1", "v1"));
       FilesetOperationDispatcher filesets =
           Mockito.spy(new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets));
-      // Masking reloads the catalog after the create, which fails once the manager is closed.
-      Mockito.doThrow(new IllegalStateException("CatalogManager is already closed"))
-          .when(filesets)
-          .getMaskAndOmitKeys(Mockito.any(NameIdentifier.class), Mockito.any(), Mockito.any());
+      if (failInCatalogCall) {
+        // doWithCatalog throws after the catalog created the fileset, as a failed detach or lease
+        // release would.
+        Mockito.doAnswer(
+                invocation -> {
+                  invocation.callRealMethod();
+                  throw new IllegalStateException("injected failure after the catalog create");
+                })
+            .when(filesets)
+            .doWithCatalog(
+                Mockito.any(NameIdentifier.class),
+                Mockito.any(),
+                Mockito.eq(NoSuchSchemaException.class),
+                Mockito.eq(FilesetAlreadyExistsException.class));
+      } else {
+        // Masking reloads the catalog after the create, which fails once the manager is closed.
+        Mockito.doThrow(new IllegalStateException("CatalogManager is already closed"))
+            .when(filesets)
+            .getMaskAndOmitKeys(Mockito.any(NameIdentifier.class), Mockito.any(), Mockito.any());
+      }
 
       NameIdentifier ident =
-          NameIdentifier.of(metalake, catalog, "schema_secret_created", "fileset_secret_created");
+          NameIdentifier.of(metalake, catalog, schemaName, "fileset_secret_created");
       long entityId = nextId.get();
       Assertions.assertThrows(
           IllegalStateException.class,

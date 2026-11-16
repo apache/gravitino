@@ -197,8 +197,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Write secrets before createSchema: create paths that resolve URNs (e.g. Fileset FS
     // mergeUpLevelConfigurations, catalog createBaseCatalog) require secrets to exist first.
-    // Roll back secrets only if external creation has not succeeded. Once the source schema
-    // exists, it may reference these secrets even if registration fails.
+    // Roll back secrets only if the catalog has not created the schema; once it has, the schema may
+    // reference them even if a later step fails.
     SecretVersionChanges stagedSecrets =
         secretManager.stageSecrets(null, entityProperties, "schema", uid, secretPlaintexts);
     AtomicBoolean createdInCatalog = new AtomicBoolean();
@@ -302,8 +302,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                             schema.properties()));
               });
     } catch (RuntimeException e) {
-      // An externally created schema may already reference these URNs. Keep its credentials
-      // available for reconciliation when only the entity-store registration failed.
+      // Once the catalog created the schema, the schema may reference these URNs, so keep its
+      // secrets even if a later step, such as the entity-store registration, fails.
       if (!createdInCatalog.get()) {
         secretManager.rollbackSecrets(stagedSecrets);
       }

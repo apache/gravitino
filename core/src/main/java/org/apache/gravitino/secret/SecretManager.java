@@ -45,7 +45,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * SecretManager owns write-through / external-reference secret lifecycle against configured
- * providers, and rolls back write-through secrets when entity create fails.
+ * providers. For an entity create or alter, it stages the write-through secret versions for the
+ * caller to commit or roll back.
  */
 public class SecretManager implements Closeable {
 

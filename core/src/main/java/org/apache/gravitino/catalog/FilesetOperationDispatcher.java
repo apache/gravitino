@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -203,6 +204,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     // catalog create fails; once it returns, the fileset references these secrets.
     SecretVersionChanges stagedSecrets =
         secretManager.stageSecrets(null, entityProperties, "fileset", uid, secretPlaintexts);
+    AtomicBoolean createdInCatalog = new AtomicBoolean();
     Fileset createdFileset;
     try {
       createdFileset =
@@ -217,13 +219,19 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                       catalogIdent,
                       c ->
                           c.doWithFilesetOps(
-                              f ->
-                                  f.createMultipleLocationFileset(
-                                      ident, comment, type, storageLocations, updatedProperties)),
+                              f -> {
+                                Fileset created =
+                                    f.createMultipleLocationFileset(
+                                        ident, comment, type, storageLocations, updatedProperties);
+                                createdInCatalog.set(true);
+                                return created;
+                              }),
                       NoSuchSchemaException.class,
                       FilesetAlreadyExistsException.class));
     } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(stagedSecrets);
+      if (!createdInCatalog.get()) {
+        secretManager.rollbackSecrets(stagedSecrets);
+      }
       throw e;
     }
     secretManager.commitSecrets(stagedSecrets);

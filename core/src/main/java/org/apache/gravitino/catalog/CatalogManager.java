@@ -936,10 +936,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 }
               }
             } catch (RuntimeException re) {
-              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get());
+              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get(), re);
               throw re;
             } catch (Exception ex) {
-              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get());
+              rollbackFailedCatalogCreate(ident, stagedSecrets, entityStored.get(), ex);
               LOG.error("Failed to create catalog {}", ident, ex);
               throw new RuntimeException(ex);
             }
@@ -2354,20 +2354,34 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Rolls back secrets written for a catalog create attempt and, when {@code store.put} succeeded,
-   * removes the catalog entity left behind by a failed publication.
+   * Cleans up a failed catalog create by rolling back its staged secrets. When {@code store.put}
+   * succeeded, the stored catalog entity is removed first; if it cannot be removed, its secrets are
+   * kept because it still references them.
+   *
+   * @throws GravitinoRuntimeException if the stored catalog entity cannot be removed, with {@code
+   *     failure} as the cause and the delete failure suppressed
    */
   private void rollbackFailedCatalogCreate(
-      NameIdentifier ident, SecretVersionChanges stagedSecrets, boolean entityStored) {
+      NameIdentifier ident,
+      SecretVersionChanges stagedSecrets,
+      boolean entityStored,
+      Exception failure) {
+    if (entityStored) {
+      catalogCache.invalidate(ident);
+      try {
+        store.delete(ident, EntityType.CATALOG, true);
+      } catch (IOException | RuntimeException e) {
+        LOG.error("Failed to clean up catalog {}; keeping the secrets it references", ident, e);
+        GravitinoRuntimeException leftover =
+            new GravitinoRuntimeException(
+                failure,
+                "Failed to create catalog %s, and failed to remove the catalog entity it stored;"
+                    + " drop the catalog with force before creating it again",
+                ident);
+        leftover.addSuppressed(e);
+        throw leftover;
+      }
+    }
     secretManager.rollbackSecrets(stagedSecrets);
-    if (!entityStored) {
-      return;
-    }
-    catalogCache.invalidate(ident);
-    try {
-      store.delete(ident, EntityType.CATALOG, true);
-    } catch (IOException e) {
-      LOG.error("Failed to clean up catalog {}", ident, e);
-    }
   }
 }

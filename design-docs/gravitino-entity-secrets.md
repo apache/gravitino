@@ -492,7 +492,8 @@ Create runs the same steps with no start properties, so it releases nothing. Its
 entity id and have no current version, so each new version is current once written and commit has
 nothing to switch. If the create fails, rollback deletes those versions. A schema already created in
 the external catalog, or a fileset the catalog already created, keeps them even if a later step
-fails.
+fails. A stored catalog whose create then fails keeps them if its entity cannot be removed, and the
+create fails with an error that asks to drop the catalog with force.
 
 An alter releases a write-through URN of the entity when the final properties no longer hold it,
 for example after `removeProperty`, `setSecretReference`, or a binding to another provider. Working
