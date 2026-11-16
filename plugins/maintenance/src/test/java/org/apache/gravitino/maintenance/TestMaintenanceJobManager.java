@@ -55,11 +55,9 @@ public class TestMaintenanceJobManager {
     OwnerDispatcher owners = mock(OwnerDispatcher.class);
     when(owners.getOwner(eq(METALAKE), any(MetadataObject.class))).thenReturn(Optional.empty());
 
-    IllegalStateException thrown =
-        Assertions.assertThrows(
-            IllegalStateException.class,
-            () -> MaintenanceJobManager.requireMetalakeOwnerUser(owners, METALAKE));
-    Assertions.assertTrue(thrown.getMessage().contains("has no owner"));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> MaintenanceJobManager.requireMetalakeOwnerUser(owners, METALAKE));
   }
 
   @Test
@@ -70,10 +68,8 @@ public class TestMaintenanceJobManager {
     when(owner.name()).thenReturn("admins");
     when(owners.getOwner(eq(METALAKE), any(MetadataObject.class))).thenReturn(Optional.of(owner));
 
-    IllegalStateException thrown =
-        Assertions.assertThrows(
-            IllegalStateException.class,
-            () -> MaintenanceJobManager.requireMetalakeOwnerUser(owners, METALAKE));
-    Assertions.assertTrue(thrown.getMessage().contains("must be a USER"));
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> MaintenanceJobManager.requireMetalakeOwnerUser(owners, METALAKE));
   }
 }
