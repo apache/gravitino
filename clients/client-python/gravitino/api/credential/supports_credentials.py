@@ -31,6 +31,12 @@ class SupportsCredentials(ABC):
     def get_credentials(self) -> List[Credential]:
         """Retrieves a List of Credential objects.
 
+        With authorization enabled, catalog credentials require metadata access
+        plus both USE_SECRETS and INCLUDE_CREDENTIAL_SECRETS, or metalake
+        ownership. Catalog credentials carry the source account's permissions,
+        not individual Gravitino table grants. Fileset credentials use path-based
+        authorization.
+
         Returns:
             A List of Credential objects. In most cases the array only contains
         one credential. If the object like Fileset contains multiple locations
@@ -40,6 +46,8 @@ class SupportsCredentials(ABC):
         for the catalog, like S3 token credential provider only generate
         credential for the specific object like Fileset,Table. There will be at
         most one credential for one credential type.
+        Raises:
+            ForbiddenException: If the caller lacks the required credential privileges.
         """
         pass
 
@@ -52,6 +60,7 @@ class SupportsCredentials(ABC):
         Returns:
             An Credential object with the specified credential type.
         Raises:
+            ForbiddenException: If the caller lacks the privileges required by get_credentials.
             NoSuchCredentialException If the specific credential cannot be found.
             IllegalStateException if multiple credential can be found.
         """

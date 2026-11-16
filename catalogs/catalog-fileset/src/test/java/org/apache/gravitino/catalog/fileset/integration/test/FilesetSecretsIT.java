@@ -25,13 +25,19 @@ import java.nio.file.Files;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
+import org.apache.gravitino.integration.test.util.ITUtils;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -39,7 +45,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * IT covering fileset create-time secretBindings with the in-memory secret provider and getSecrets.
+ * IT covering fileset create-time secretBindings and schema secret alters with the in-memory secret
+ * provider and getSecrets.
  */
 public class FilesetSecretsIT extends BaseIT {
 
@@ -112,5 +119,60 @@ public class FilesetSecretsIT extends BaseIT {
     Map<String, String> secrets = fileset.supportsSecrets().getSecrets();
     Assertions.assertEquals("mem-plaintext", secrets.get("custom-secret"));
     Assertions.assertFalse(secrets.containsKey("visible-key"));
+  }
+
+  @Test
+  public void testAlterSchemaSecretBinding() throws IOException {
+    String name = GravitinoITUtils.genRandomName("secret_schema");
+    catalog
+        .asSchemas()
+        .createSchema(
+            name,
+            "comment",
+            ImmutableMap.of("location", baseLocation + "/" + name),
+            ImmutableMap.of("schema-secret", new SecretBinding("memory", "old")),
+            ImmutableMap.of());
+    try {
+      catalog
+          .asSchemas()
+          .alterSchema(
+              name,
+              SchemaChange.setSecretBinding("schema-secret", new SecretBinding("memory", "new")));
+      Assertions.assertEquals(
+          "new",
+          catalog.asSchemas().loadSchema(name).supportsSecrets().getSecrets().get("schema-secret"));
+
+      // The server shares this JVM only in embedded mode, so only then can the test read the URN.
+      SecretUrn urn = null;
+      if (ITUtils.EMBEDDED_TEST_MODE.equals(testMode)) {
+        urn =
+            SecretUrn.parse(
+                GravitinoEnv.getInstance()
+                    .entityStore()
+                    .get(
+                        NameIdentifier.of(metalakeName, catalogName, name),
+                        Entity.EntityType.SCHEMA,
+                        SchemaEntity.class)
+                    .properties()
+                    .get("schema-secret"));
+        Assertions.assertEquals("new", GravitinoEnv.getInstance().secretManager().readSecret(urn));
+      }
+      catalog.asSchemas().alterSchema(name, SchemaChange.removeProperty("schema-secret"));
+      Assertions.assertFalse(
+          catalog
+              .asSchemas()
+              .loadSchema(name)
+              .supportsSecrets()
+              .getSecrets()
+              .containsKey("schema-secret"));
+      if (urn != null) {
+        SecretUrn removed = urn;
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> GravitinoEnv.getInstance().secretManager().readSecret(removed));
+      }
+    } finally {
+      catalog.asSchemas().dropSchema(name, true);
+    }
   }
 }

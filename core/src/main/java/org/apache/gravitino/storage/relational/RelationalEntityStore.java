@@ -48,6 +48,7 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
+import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.CacheFactory;
@@ -56,14 +57,19 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.EntityChangeLogMetricsSource;
 import org.apache.gravitino.semantic.SemanticModelMetric;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -82,7 +88,10 @@ import org.slf4j.LoggerFactory;
  * ExceptionUtils#isLockWaitTimeout}.
  */
 public class RelationalEntityStore
-    implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsDomainOperations,
+        SupportsEntityChangeLog {
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -108,6 +117,25 @@ public class RelationalEntityStore
   @VisibleForTesting
   public EntityCache getCache() {
     return cache;
+  }
+
+  /**
+   * Wraps a relational backend for offline migration without caches or background workers.
+   *
+   * <p>The caller initializes the SQL session factory and owns transaction boundaries. Closing the
+   * returned store also closes the backend. All servers sharing the database must be stopped.
+   *
+   * @param backend The backend using the caller's SQL session factory.
+   * @param config The configuration for the uncached store.
+   * @return A store that participates in the current thread's SQL transaction.
+   */
+  public static RelationalEntityStore forOfflineMigration(
+      RelationalBackend backend, Config config) {
+    RelationalEntityStore store = new RelationalEntityStore();
+    store.backend = backend;
+    store.cache = new NoOpsCache(config);
+    EntityIdService.initialize(new RelationalEntityStoreIdResolver());
+    return store;
   }
 
   @Override
@@ -206,6 +234,11 @@ public class RelationalEntityStore
       throw new RuntimeException(
           "Failed to create and initialize RelationalBackend by name: " + backendName, e);
     }
+  }
+
+  @Override
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    return backend.listDescendantSchemas(identifier);
   }
 
   @Override
@@ -422,6 +455,112 @@ public class RelationalEntityStore
   }
 
   @Override
+  public SupportsDomainOperations domainOperations() {
+    return this;
+  }
+
+  @Override
+  public void insertDomainWithBackingTag(
+      DomainEntity domain, TagValue backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      backend.insertDomainWithBackingTag(domain, backingTag, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, Entity.EntityType.DOMAIN, domain.nameIdentifier());
+    }
+  }
+
+  @Override
+  public void insertDomainWithNewBackingTag(
+      DomainEntity domain, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      backend.insertDomainWithNewBackingTag(domain, backingTag, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(
+          re, Entity.EntityType.DOMAIN, domain.nameIdentifier());
+    }
+    // Tags are cached; the new tag must not be shadowed by an entry cached for its name.
+    invalidateCache(backingTag.nameIdentifier(), Entity.EntityType.TAG);
+  }
+
+  @Override
+  public boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check)
+      throws IOException {
+    try {
+      return backend.deleteDomain(ident, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    } finally {
+      invalidateCache(ident, Entity.EntityType.DOMAIN);
+    }
+  }
+
+  @Override
+  public DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier ident,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.updateDomainBackingTagAndGet(ident, backingTag, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public DomainEntity setDomainParentAndGet(
+      NameIdentifier ident,
+      NameIdentifier parentIdent,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.setDomainParentAndGet(ident, parentIdent, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public DomainEntity removeDomainParentAndGet(
+      NameIdentifier ident, Consumer<LockedDomainState> check) throws IOException {
+    try {
+      return backend.removeDomainParentAndGet(ident, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public DomainEntity updateDomainStatusAndGet(
+      NameIdentifier ident,
+      Domain.Status status,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    try {
+      return backend.updateDomainStatusAndGet(ident, status, auditInfo, check);
+    } catch (RuntimeException re) {
+      throw ExceptionUtils.lockWaitTimeoutAsConflict(re, Entity.EntityType.DOMAIN, ident);
+    }
+  }
+
+  @Override
+  public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException {
+    return backend.listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
+  public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) throws IOException {
+    return backend.listSubDomains(parentIdent);
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(
       Type relType, NameIdentifier nameIdentifier, Entity.EntityType identType, boolean allFields)
       throws IOException {
@@ -549,7 +688,7 @@ public class RelationalEntityStore
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
       throws IOException {
-    if (query.relationValue().isPresent()) {
+    if (query.anchorId().isPresent() || query.relationValue().isPresent()) {
       return backend.listEntitiesByRelation(query);
     }
 

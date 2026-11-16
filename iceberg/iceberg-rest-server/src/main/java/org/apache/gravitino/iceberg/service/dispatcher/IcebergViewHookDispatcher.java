@@ -19,6 +19,7 @@
 package org.apache.gravitino.iceberg.service.dispatcher;
 
 import java.io.IOException;
+import java.time.Instant;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -27,6 +28,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.iceberg.catalog.Namespace;
@@ -46,7 +48,8 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This is the key integration point between Iceberg REST views and Gravitino's view management
  * system. When a view is created or loaded through Iceberg REST, this dispatcher ensures that
- * Gravitino is aware of the view by calling {@link ViewDispatcher#loadView}.
+ * Gravitino is aware of the view by calling {@link ViewDispatcher#importView(NameIdentifier,
+ * AuditInfo)}.
  */
 public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher {
 
@@ -72,15 +75,11 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
     LoadViewResponse response = dispatcher.createView(context, namespace, createViewRequest);
 
     // Then import it into Gravitino so Gravitino is aware of the view
-    importView(context.catalogName(), namespace, createViewRequest.name());
-    IcebergEntityAuditUtils.recordCreator(
-        IcebergIdentifierUtils.toGravitinoTableIdentifier(
-            metalake,
-            context.catalogName(),
-            TableIdentifier.of(namespace, createViewRequest.name()),
-            HierarchicalSchemaUtil.schemaSeparator()),
-        Entity.EntityType.VIEW,
-        context.userName());
+    importView(
+        context.catalogName(),
+        namespace,
+        createViewRequest.name(),
+        AuditInfo.builder().withCreator(context.userName()).withCreateTime(Instant.now()).build());
 
     // Set ownership for the newly created view.
     IcebergOwnershipUtils.setViewOwner(
@@ -184,9 +183,9 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
   /**
    * Import a view into Gravitino's metadata catalog by loading it through the ViewDispatcher.
    *
-   * <p>This method calls {@link ViewDispatcher#loadView} which delegates to the underlying
-   * catalog's ViewCatalog implementation. This ensures Gravitino is aware of the view and can apply
-   * authorization policies to it.
+   * <p>This method calls {@link ViewDispatcher#importView(NameIdentifier, AuditInfo)} which loads
+   * the existing view and registers it in Gravitino's entity store so authorization policies can
+   * apply to it.
    *
    * <p>This is a best-effort operation - if it fails, we log a warning but don't fail the Iceberg
    * REST operation, as the view was successfully created in the underlying catalog.
@@ -196,15 +195,21 @@ public class IcebergViewHookDispatcher implements IcebergViewOperationDispatcher
    * @param viewName The name of the view.
    */
   private void importView(String catalogName, Namespace namespace, String viewName) {
+    importView(catalogName, namespace, viewName, AuditInfo.EMPTY);
+  }
+
+  private void importView(
+      String catalogName, Namespace namespace, String viewName, AuditInfo auditInfo) {
     ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
     if (viewDispatcher != null) {
       try {
-        viewDispatcher.loadView(
+        viewDispatcher.importView(
             IcebergIdentifierUtils.toGravitinoTableIdentifier(
                 metalake,
                 catalogName,
                 TableIdentifier.of(namespace, viewName),
-                HierarchicalSchemaUtil.schemaSeparator()));
+                HierarchicalSchemaUtil.schemaSeparator()),
+            auditInfo);
         LOG.info(
             "Successfully imported view into Gravitino: {}.{}.{}.{}",
             metalake,

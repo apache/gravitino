@@ -29,7 +29,9 @@ import {
   updatePolicyApi,
   enableOrDisablePolicyApi,
   getPolicyDetailsApi,
-  associatePolicyApi
+  getPoliciesForTagApi,
+  addPolicyForTagApi,
+  removePolicyFromTagApi
 } from '@/lib/api/policies'
 
 export const fetchPolicies = createAsyncThunk('policies/fetchPolicies', async ({ metalake, details }) => {
@@ -106,12 +108,32 @@ export const deletePolicy = createAsyncThunk('policies/deletePolicy', async ({ m
   return res
 })
 
-export const associatePolicy = createAsyncThunk(
-  'policies/associatePolicy',
-  async ({ metalake, metadataObjectType, metadataObjectFullName, data }) => {
-    const [err, res] = await to(associatePolicyApi({ metalake, metadataObjectType, metadataObjectFullName, data }))
+export const getPoliciesForTag = createAsyncThunk('policies/getPoliciesForTag', async ({ metalake, tag }) => {
+  const [err, res] = await to(getPoliciesForTagApi({ metalake, tag }))
 
-    if (err || !res) {
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  return res.associations?.map(association => ({ ...association.policy, selector: association.selector })) || []
+})
+
+export const addPolicyForTag = createAsyncThunk('policies/addPolicyForTag', async ({ metalake, tag, policy }) => {
+  const [err, res] = await to(addPolicyForTagApi({ metalake, tag, policy }))
+
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  return res
+})
+
+export const removePolicyFromTag = createAsyncThunk(
+  'policies/removePolicyFromTag',
+  async ({ metalake, tag, policy }) => {
+    const [err, res] = await to(removePolicyFromTagApi({ metalake, tag, policy }))
+
+    if (err) {
       throw new Error(err)
     }
 
@@ -172,7 +194,17 @@ const policiesSlice = createSlice({
           toast.error(action.error.message)
         }
       })
-      .addCase(associatePolicy.rejected, (state, action) => {
+      .addCase(getPoliciesForTag.rejected, (state, action) => {
+        if (!action.error.message.includes('CanceledError')) {
+          toast.error(action.error.message)
+        }
+      })
+      .addCase(addPolicyForTag.rejected, (state, action) => {
+        if (!action.error.message.includes('CanceledError')) {
+          toast.error(action.error.message)
+        }
+      })
+      .addCase(removePolicyFromTag.rejected, (state, action) => {
         if (!action.error.message.includes('CanceledError')) {
           toast.error(action.error.message)
         }

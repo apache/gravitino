@@ -65,6 +65,12 @@ public class IcebergSnapshotExpirationContent extends AbstractExecutablePolicyCo
   public static final long DEFAULT_RETAIN_LAST = 1;
   /** Default stream-results flag. */
   public static final boolean DEFAULT_STREAM_RESULTS = false;
+  /** TMS S0 metric: snapshot number before expire. */
+  public static final String SNAPSHOT_NUMBER_METRIC = "custom-snapshot-number";
+  /** TMS S1 metric: snapshots present in S0 but absent after expire. */
+  public static final String EXPIRED_SNAPSHOT_NUMBER_METRIC = "custom-expired-snapshot-number";
+  /** TMS S1 metric: content-file bytes present in S0 but absent after expire. */
+  public static final String EXPIRED_FILE_SIZE_METRIC = "custom-expired-file-size";
 
   private final long olderThanDays;
   private final long retainLast;

@@ -198,14 +198,23 @@ class Privilege(ABC):
         MODIFY_FUNCTION = (0, 1 << 32)
         """The privilege to alter a function's metadata."""
 
+        PROBE_TABLE_LIKE = (0, 1 << 33)
+        """The privilege to probe whether a table-like object exists."""
+
         VIEW_SECRET_PROVIDERS = (0, 1 << 36)
         """The privilege to list configured secrets providers."""
 
         USE_SECRETS = (0, 1 << 37)
-        """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRETS."""
+        """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
         INCLUDE_CREDENTIAL_SECRETS = (0, 1 << 38)
-        """With USE_SECRETS, include cloud credential secrets in the getSecrets result."""
+        """With USE_SECRETS, include cloud credential secrets in getSecrets.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
         CREATE_SEMANTIC_MODEL = (0, 1 << 39)
         """The privilege to create a Semantic Model."""
@@ -215,6 +224,12 @@ class Privilege(ABC):
 
         MODIFY_SEMANTIC_MODEL = (0, 1 << 41)
         """The privilege to rename a Semantic Model or alter its definition and metadata."""
+
+        MANAGE_DOMAIN = (0, 1 << 42)
+        """The privilege to manage domains, including drafts."""
+
+        USE_DOMAIN = (0, 1 << 43)
+        """The privilege to discover published domains and their accessible members."""
 
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
@@ -1666,6 +1681,46 @@ class ModifyFunction(GenericPrivilege):
         return obj_type in Privileges.FUNCTION_SUPPORTED_TYPES
 
 
+class ProbeTableLike(GenericPrivilege):
+    """
+    The privilege to probe whether a table-like object exists.
+    """
+
+    _ALLOW_INSTANCE: Optional[ProbeTableLike] = None
+    _DENY_INSTANCE: Optional[ProbeTableLike] = None
+
+    @staticmethod
+    def allow() -> ProbeTableLike:
+        """
+        Retrieve the instance with allow condition of the privilege.
+
+        Returns:
+            Privilege: The instance with allow condition of the privilege.
+        """
+        if ProbeTableLike._ALLOW_INSTANCE is None:
+            ProbeTableLike._ALLOW_INSTANCE = ProbeTableLike(
+                Privilege.Condition.ALLOW, Privilege.Name.PROBE_TABLE_LIKE
+            )
+        return ProbeTableLike._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ProbeTableLike:
+        """
+        Retrieve the instance with deny condition of the privilege.
+
+        Returns:
+            Privilege: The instance with deny condition of the privilege.
+        """
+        if ProbeTableLike._DENY_INSTANCE is None:
+            ProbeTableLike._DENY_INSTANCE = ProbeTableLike(
+                Privilege.Condition.DENY, Privilege.Name.PROBE_TABLE_LIKE
+            )
+        return ProbeTableLike._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.TABLE_LIKE_SUPPORTED_TYPES
+
+
 class CreateSemanticModel(GenericPrivilege):
     """The privilege to create a Semantic Model."""
 
@@ -1777,7 +1832,10 @@ class ViewSecretProviders(GenericPrivilege):
 
 
 class UseSecrets(GenericPrivilege):
-    """Required to call getSecrets; cloud AK/SK omitted without INCLUDE_CREDENTIAL_SECRETS."""
+    """Required to call getSecrets; cloud AK/SK need INCLUDE_CREDENTIAL_SECRETS.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
     _ALLOW_INSTANCE: Optional["UseSecrets"] = None
     _DENY_INSTANCE: Optional["UseSecrets"] = None
@@ -1803,7 +1861,10 @@ class UseSecrets(GenericPrivilege):
 
 
 class IncludeCredentialSecrets(GenericPrivilege):
-    """With USE_SECRETS, include cloud credential secrets in the getSecrets result."""
+    """With USE_SECRETS, include cloud credential secrets in getSecrets.
+
+    Catalog getCredentials also requires both privileges unless the caller owns the metalake.
+    """
 
     _ALLOW_INSTANCE: Optional["IncludeCredentialSecrets"] = None
     _DENY_INSTANCE: Optional["IncludeCredentialSecrets"] = None
@@ -1826,6 +1887,62 @@ class IncludeCredentialSecrets(GenericPrivilege):
 
     def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
         return obj_type in Privileges.SECRET_SUPPORTED_TYPES
+
+
+class ManageDomain(GenericPrivilege):
+    """The privilege to manage domains, including drafts."""
+
+    _ALLOW_INSTANCE: Optional[ManageDomain] = None
+    _DENY_INSTANCE: Optional[ManageDomain] = None
+
+    @staticmethod
+    def allow() -> ManageDomain:
+        """Return the privilege with the allow condition."""
+        if ManageDomain._ALLOW_INSTANCE is None:
+            ManageDomain._ALLOW_INSTANCE = ManageDomain(
+                Privilege.Condition.ALLOW, Privilege.Name.MANAGE_DOMAIN
+            )
+        return ManageDomain._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ManageDomain:
+        """Return the privilege with the deny condition."""
+        if ManageDomain._DENY_INSTANCE is None:
+            ManageDomain._DENY_INSTANCE = ManageDomain(
+                Privilege.Condition.DENY, Privilege.Name.MANAGE_DOMAIN
+            )
+        return ManageDomain._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
+
+
+class UseDomain(GenericPrivilege):
+    """The privilege to discover published domains and accessible members."""
+
+    _ALLOW_INSTANCE: Optional[UseDomain] = None
+    _DENY_INSTANCE: Optional[UseDomain] = None
+
+    @staticmethod
+    def allow() -> UseDomain:
+        """Return the privilege with the allow condition."""
+        if UseDomain._ALLOW_INSTANCE is None:
+            UseDomain._ALLOW_INSTANCE = UseDomain(
+                Privilege.Condition.ALLOW, Privilege.Name.USE_DOMAIN
+            )
+        return UseDomain._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> UseDomain:
+        """Return the privilege with the deny condition."""
+        if UseDomain._DENY_INSTANCE is None:
+            UseDomain._DENY_INSTANCE = UseDomain(
+                Privilege.Condition.DENY, Privilege.Name.USE_DOMAIN
+            )
+        return UseDomain._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
 
 
 class Privileges:
@@ -1865,18 +1982,30 @@ class Privileges:
         Privilege.Name.REGISTER_FUNCTION: RegisterFunction,
         Privilege.Name.EXECUTE_FUNCTION: ExecuteFunction,
         Privilege.Name.MODIFY_FUNCTION: ModifyFunction,
+        Privilege.Name.PROBE_TABLE_LIKE: ProbeTableLike,
         Privilege.Name.CREATE_SEMANTIC_MODEL: CreateSemanticModel,
         Privilege.Name.USE_SEMANTIC_MODEL: UseSemanticModel,
         Privilege.Name.MODIFY_SEMANTIC_MODEL: ModifySemanticModel,
+        Privilege.Name.MANAGE_DOMAIN: ManageDomain,
+        Privilege.Name.USE_DOMAIN: UseDomain,
         Privilege.Name.USE_SECRETS: UseSecrets,
         Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
     }
+
+    DOMAIN_SUPPORTED_TYPES = {MetadataObject.Type.METALAKE, MetadataObject.Type.DOMAIN}
 
     TABLE_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,
         MetadataObject.Type.TABLE,
+    }
+    TABLE_LIKE_SUPPORTED_TYPES = {
+        MetadataObject.Type.METALAKE,
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+        MetadataObject.Type.VIEW,
     }
     MODEL_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,
@@ -1925,6 +2054,7 @@ class Privileges:
         MetadataObject.Type.MODEL,
     }
     MANAGE_GRANTS_SUPPORTED_TYPES = {
+        MetadataObject.Type.DOMAIN,
         MetadataObject.Type.METALAKE,
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,

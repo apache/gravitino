@@ -28,15 +28,18 @@ public class TestPostgreSqlCatalogCapability {
   private final PostgreSqlCatalogCapability capability = new PostgreSqlCatalogCapability();
 
   @Test
-  void testNativeDeletionNamesRemainDistinctFromCreationNames() {
+  void testNativeNamesRemainDistinctFromCreationNames() {
     for (Capability.Scope scope :
-        new Capability.Scope[] {Capability.Scope.TABLE, Capability.Scope.SCHEMA}) {
+        new Capability.Scope[] {
+          Capability.Scope.TABLE, Capability.Scope.SCHEMA, Capability.Scope.COLUMN
+        }) {
       Assertions.assertTrue(
           capability.specificationOnExistingName(scope, "native\"name").supported());
       Assertions.assertFalse(capability.specificationOnName(scope, "native\"name").supported());
       Assertions.assertFalse(
           capability.specificationOnExistingName(scope, "bad\0name").supported());
       Assertions.assertFalse(capability.specificationOnExistingName(scope, "").supported());
+      Assertions.assertFalse(capability.specificationOnExistingName(scope, "*").supported());
       Assertions.assertFalse(
           capability.specificationOnExistingName(scope, "表".repeat(22)).supported());
     }

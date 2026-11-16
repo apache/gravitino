@@ -42,5 +42,8 @@ public class LanceConstants {
   public static final String LANCE_TABLE_DECLARED = "lance.declared";
   public static final String LANCE_SCHEMA_REFRESH_MODE = "lance.schema-refresh-mode";
 
+  /** Catalog-only opt-in for physically deleting external or registered Lance datasets. */
+  public static final String LANCE_ALLOW_EXTERNAL_TABLE_PURGE = "lance.allow-external-table-purge";
+
   public static final String LANCE_TABLE_FORMAT = "lance";
 }

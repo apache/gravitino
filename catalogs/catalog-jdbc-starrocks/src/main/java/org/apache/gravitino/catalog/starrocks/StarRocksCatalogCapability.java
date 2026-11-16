@@ -18,10 +18,30 @@
  */
 package org.apache.gravitino.catalog.starrocks;
 
+import org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils;
+import org.apache.gravitino.catalog.starrocks.utils.StarRocksUtils;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 
 public class StarRocksCatalogCapability implements Capability {
   // StarRocks best practice mention that the name should be in lowercase, separated by underscores
   // We can use the more general DEFAULT_NAME_PATTERN for StarRocks and update as needed in the
   // future
+  /** {@inheritDoc} */
+  @Override
+  public CapabilityResult specificationOnExistingName(Scope scope, String name) {
+    if (scope == Scope.TABLE || scope == Scope.COLUMN) {
+      CapabilityResult result = StarRocksUtils.checkIdentifier(name);
+      if (!result.supported()) {
+        return result;
+      }
+    }
+    if (scope == Scope.TABLE) {
+      return JdbcConnectorUtils.existingQuotedTableName(name);
+    }
+    if (scope == Scope.COLUMN) {
+      return JdbcConnectorUtils.existingQuotedColumnName(name);
+    }
+    return specificationOnName(scope, name);
+  }
 }

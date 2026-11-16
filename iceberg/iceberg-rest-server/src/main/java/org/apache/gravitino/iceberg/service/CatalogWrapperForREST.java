@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
 import java.net.URI;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CatalogCredentialManager;
@@ -44,6 +46,7 @@ import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
+import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCache;
 import org.apache.gravitino.iceberg.service.cache.ScanPlanCacheKey;
 import org.apache.gravitino.storage.GCSProperties;
@@ -53,8 +56,10 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.DeleteFile;
 import org.apache.iceberg.FileScanTask;
+import org.apache.iceberg.HasTableOperations;
 import org.apache.iceberg.IncrementalAppendScan;
 import org.apache.iceberg.Scan;
+import org.apache.iceberg.Schema;
 import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
@@ -66,6 +71,7 @@ import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceFailureException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.exceptions.ValidationException;
+import org.apache.iceberg.expressions.Expression;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
@@ -79,6 +85,7 @@ import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
+import org.apache.iceberg.util.SnapshotUtil;
 
 /** Process Iceberg REST specific operations, like credential vending. */
 public class CatalogWrapperForREST extends IcebergCatalogWrapper {
@@ -122,6 +129,31 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
     this.scanPlanCache = loadScanPlanCache(config);
+  }
+
+  /**
+   * Validates server settings required by this catalog before it serves requests.
+   *
+   * @param serverContext the REST server context
+   */
+  public void validateServerContext(IcebergRESTServerContext serverContext) {}
+
+  /**
+   * Reports whether this catalog forwards the caller's access token to a remote catalog.
+   *
+   * @return {@code false} for a local catalog backend
+   */
+  public boolean forwardsUserToken() {
+    return false;
+  }
+
+  /**
+   * Reports whether this server can enqueue file cleanup after dropping a table.
+   *
+   * @return {@code true} for a local catalog backend
+   */
+  public boolean supportsAsyncPurge() {
+    return true;
   }
 
   public LoadTableResponse createTable(
@@ -171,10 +203,21 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @Override
   public LoadTableResponse updateTable(
       TableIdentifier tableIdentifier, UpdateTableRequest updateTableRequest) {
+    UpdateTableRequest request =
+        IcebergCommitValidation.assignPartitionFieldIds(
+            updateTableRequest, () -> currentMetadata(tableIdentifier));
     return super.updateTable(
         tableIdentifier,
         IcebergCommitValidation.withValidation(
-            updateTableRequest, () -> getCatalog().loadTable(tableIdentifier).io()));
+            request, () -> getCatalog().loadTable(tableIdentifier).io()));
+  }
+
+  @Nullable
+  private TableMetadata currentMetadata(TableIdentifier tableIdentifier) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    return table instanceof HasTableOperations
+        ? ((HasTableOperations) table).operations().current()
+        : null;
   }
 
   public LoadTableResponse registerTable(
@@ -509,10 +552,28 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
         LOG.info("Using cached scan plan for table: {}", tableIdentifier);
         response = cachedResponse.get();
       } else {
+        Schema residualFrom = null;
+        Schema residualTo = null;
+        Expression extraResidual = null;
         List<FileScanTask> fileScanTasks = new ArrayList<>();
-
         try (CloseableIterable<FileScanTask> scanTasks =
             createFilePlanScanTasks(table, tableIdentifier, scanRequest)) {
+          // Recompute whether names were rewritten so residuals can be mapped back to the request
+          // schema. createFilePlanScanTasks applies the same rewrite rules.
+          if (scanRequest.snapshotId() != null && !scanRequest.useSnapshotSchema()) {
+            long snapshotId = scanRequest.snapshotId();
+            Optional<String> branch = IcebergScanPlanHelper.branchAt(table, snapshotId);
+            if (!branch.isPresent()) {
+              residualFrom = SnapshotUtil.schemaFor(table, snapshotId);
+              residualTo = table.schema();
+              // Keep the complete client filter as a residual. Extracting only
+              // post-snapshot predicates by replacing others with always-true
+              // collapses OR/NOT (e.g. id=1 OR new_col=2 → true).
+              if (scanRequest.filter() != null) {
+                extraResidual = scanRequest.filter();
+              }
+            }
+          }
           for (FileScanTask fileScanTask : scanTasks) {
             fileScanTasks.add(fileScanTask);
           }
@@ -520,6 +581,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
           LOG.error("Failed to close scan task iterator for table: {}", tableIdentifier, e);
           throw new RuntimeException("Failed to plan scan tasks: " + e.getMessage(), e);
         }
+        fileScanTasks =
+            IcebergScanPlanHelper.prepareTasksForResponse(
+                fileScanTasks,
+                table.specs(),
+                residualTo,
+                residualFrom,
+                extraResidual,
+                scanRequest.caseSensitive());
 
         if (fileScanTasks.isEmpty()) {
           LOG.info(
@@ -547,9 +616,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       }
       return response;
 
-    } catch (IllegalArgumentException | ValidationException e) {
-      // A filter is bound to the schema only while files are planned, so an unknown column or a
-      // value of the wrong type surfaces here as a ValidationException.
+    } catch (IllegalArgumentException | ValidationException | DateTimeParseException e) {
+      // A filter is bound to the schema only while files are planned. Unknown columns and wrong
+      // literal types usually surface as ValidationException; a timestamp without a zone compared
+      // to timestamptz surfaces as DateTimeParseException. Broader DateTimeException is not
+      // caught so unrelated server-side date/time bugs stay 5xx.
       LOG.info("Invalid scan request for table {}: {}", tableIdentifier, e.getMessage());
       throw new IllegalArgumentException(
           "Invalid scan parameters: " + withoutSchemaStruct(e.getMessage()), e);
@@ -595,8 +666,14 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    * Inject vended credentials into a scan response using the already-loaded table, avoiding a
    * redundant {@code loadTable} call. Follows the same eligibility logic as {@link
    * #shouldGenerateCredential} and the same credential generation as {@link #getCredential}.
+   *
+   * @param tableIdentifier the table identifier
+   * @param table the loaded table
+   * @param response the scan response to add credentials to
+   * @param privilege the caller's privilege on the table
+   * @return the response with credentials, or unchanged if none could be generated
    */
-  private PlanTableScanResponse injectScanCredentials(
+  protected PlanTableScanResponse injectScanCredentials(
       TableIdentifier tableIdentifier,
       Table table,
       PlanTableScanResponse response,
@@ -634,10 +711,11 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   @SuppressWarnings("deprecation")
   private static PlanTableScanResponse buildCompletedPlanTableScanResponse(
       Table table, List<FileScanTask> fileScanTasks) {
-    return PlanTableScanResponse.builder()
+    return IcebergRESTUtils.scanPlanResponseBuilder(
+            IcebergScanPlanHelper.sanitizeSpecsForSerialization(
+                table.specs(), fileScanTasks, table.schemas().values()))
         .withPlanStatus(PlanStatus.COMPLETED)
         .withFileScanTasks(fileScanTasks)
-        .withSpecsById(table.specs())
         .build();
   }
 
@@ -646,6 +724,12 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
    *
    * <p>If both start and end snapshot IDs are provided, uses IncrementalAppendScan. Otherwise, uses
    * regular TableScan.
+   *
+   * <p>With {@code use-snapshot-schema} false (the REST default, sent for branch scans) and a
+   * {@code snapshot-id}, the request is written against the current table schema. A branch that
+   * points at the snapshot is scanned with {@code useRef}, which binds to the current schema like a
+   * client-side branch scan. If no branch points there any more, the snapshot is scanned and the
+   * request's column names are mapped to the snapshot schema by field id.
    *
    * @param table The table to scan
    * @param tableIdentifier The table identifier for logging
@@ -678,12 +762,28 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       return incrementalScan.planFiles();
     } else {
       TableScan tableScan = table.newScan();
+      PlanTableScanRequest requestToApply = scanRequest;
       // Snapshot ID 0 has no special meaning in Iceberg, so we only apply if not null
       if (scanRequest.snapshotId() != null) {
-        tableScan = tableScan.useSnapshot(scanRequest.snapshotId());
-        LOG.debug("Applied snapshot filter: snapshot-id={}", scanRequest.snapshotId());
+        long snapshotId = scanRequest.snapshotId();
+        Optional<String> branch =
+            scanRequest.useSnapshotSchema()
+                ? Optional.empty()
+                : IcebergScanPlanHelper.branchAt(table, snapshotId);
+        if (branch.isPresent()) {
+          tableScan = tableScan.useRef(branch.get());
+          LOG.debug("Applied branch {} for snapshot-id={}", branch.get(), snapshotId);
+        } else {
+          tableScan = tableScan.useSnapshot(snapshotId);
+          if (!scanRequest.useSnapshotSchema()) {
+            requestToApply =
+                IcebergScanPlanHelper.rewriteForSnapshot(
+                    scanRequest, table.schema(), SnapshotUtil.schemaFor(table, snapshotId));
+          }
+          LOG.debug("Applied snapshot filter: snapshot-id={}", snapshotId);
+        }
       }
-      tableScan = applyScanRequest(tableScan, scanRequest);
+      tableScan = applyScanRequest(tableScan, requestToApply);
       return tableScan.planFiles();
     }
   }
@@ -703,8 +803,9 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   private <T extends Scan> T applyScanFilter(T scan, PlanTableScanRequest scanRequest) {
     if (scanRequest.filter() != null) {
       try {
-        scan = (T) scan.filter(scanRequest.filter());
-        LOG.debug("Applied filter expression: {}", scanRequest.filter());
+        Expression filter = scanRequest.filter();
+        scan = (T) scan.filter(filter);
+        LOG.debug("Applied filter expression: {}", filter);
       } catch (Exception e) {
         LOG.error("Failed to apply filter expression: {}", e.getMessage(), e);
         throw new IllegalArgumentException("Invalid filter expression: " + e.getMessage(), e);

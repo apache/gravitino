@@ -592,18 +592,6 @@ export default function SchemaDetailsPage() {
           ) : null
       },
       {
-        title: 'Policies',
-        dataIndex: 'policies',
-        key: 'policies',
-        render: (_, record) =>
-          record?.node === entityType ? (
-            <Policies
-              metadataObjectType={entityType}
-              metadataObjectFullName={`${record.namespace.at(-2)}.${record.namespace.at(-1)}.${record.name}`}
-            />
-          ) : null
-      },
-      {
         title: 'Actions',
         dataIndex: 'action',
         key: 'action',

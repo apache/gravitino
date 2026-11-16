@@ -55,7 +55,9 @@ class TestGravitinoStrategyProvider {
     when(table.supportsPolicies()).thenReturn(supportsPolicies);
     when(supportsPolicies.listPolicyInfos()).thenReturn(new Policy[] {policy1, null, policy2});
     when(policy1.name()).thenReturn("policy1");
+    when(policy1.enabled()).thenReturn(true);
     when(policy2.name()).thenReturn("policy2");
+    when(policy2.enabled()).thenReturn(true);
 
     GravitinoStrategyProvider provider = new GravitinoStrategyProvider();
     FieldUtils.writeField(provider, "gravitinoClient", client, true);
@@ -67,5 +69,51 @@ class TestGravitinoStrategyProvider {
         strategies.stream().map(Strategy::name).toArray(String[]::new));
     verify(supportsPolicies).listPolicyInfos();
     verifyNoMoreInteractions(supportsPolicies);
+  }
+
+  @Test
+  void testStrategiesSkipDisabledPolicies() throws IllegalAccessException {
+    GravitinoClient client = mock(GravitinoClient.class);
+    Catalog catalog = mock(Catalog.class);
+    TableCatalog tableCatalog = mock(TableCatalog.class);
+    Table table = mock(Table.class);
+    SupportsPolicies supportsPolicies = mock(SupportsPolicies.class);
+    Policy enabled = mock(Policy.class);
+    Policy disabled = mock(Policy.class);
+    NameIdentifier identifier = NameIdentifier.of("catalog", "schema", "table");
+
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+    when(catalog.asTableCatalog()).thenReturn(tableCatalog);
+    when(tableCatalog.loadTable(NameIdentifier.of("schema", "table"))).thenReturn(table);
+    when(table.supportsPolicies()).thenReturn(supportsPolicies);
+    when(supportsPolicies.listPolicyInfos()).thenReturn(new Policy[] {enabled, disabled});
+    when(enabled.name()).thenReturn("enabled");
+    when(enabled.enabled()).thenReturn(true);
+    when(disabled.name()).thenReturn("disabled");
+    when(disabled.enabled()).thenReturn(false);
+
+    GravitinoStrategyProvider provider = new GravitinoStrategyProvider();
+    FieldUtils.writeField(provider, "gravitinoClient", client, true);
+
+    List<Strategy> strategies = provider.strategies(identifier);
+
+    Assertions.assertArrayEquals(
+        new String[] {"enabled"}, strategies.stream().map(Strategy::name).toArray(String[]::new));
+  }
+
+  @Test
+  void testStrategyByNameRejectsDisabledPolicy() throws IllegalAccessException {
+    GravitinoClient client = mock(GravitinoClient.class);
+    Policy disabled = mock(Policy.class);
+    when(client.getPolicy("disabled")).thenReturn(disabled);
+    when(disabled.enabled()).thenReturn(false);
+
+    GravitinoStrategyProvider provider = new GravitinoStrategyProvider();
+    FieldUtils.writeField(provider, "gravitinoClient", client, true);
+
+    IllegalArgumentException thrown =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> provider.strategy("disabled"));
+    Assertions.assertTrue(thrown.getMessage().contains("disabled"));
   }
 }

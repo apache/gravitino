@@ -626,9 +626,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
    */
   public Map<String, String> propertiesWithCredentialProviders() {
     // Entity storage keeps secret URNs; resolve to plaintext when SecretManager is available.
+    // toPlaintextOrMasked so a deleted/rotated secret does not block catalog load (disable, drop,
+    // list, re-bind). Unresolved secrets become the masked placeholder.
     Map<String, String> props = Maps.newHashMap(entity().getProperties());
     if (secretManager != null) {
-      props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
+      props = Maps.newHashMap(secretManager.toPlaintextOrMasked(props));
     }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       // Explicit credential-providers wins: do not auto-append detected static providers (e.g.

@@ -50,6 +50,7 @@ For detailed information on available operations, see [Manage Relational Metadat
 | `location`                  | Root storage path for all schemas and tables                                                                                                                                                                                                                                                                              | `s3://bucket/lakehouse` | No       |
 | `table-location-provider`   | Name of the [table location provider](#pluggable-table-location-provider) that provisions and unprovisions the locations of this catalog's tables. Defaults to `default`, which resolves the location from the table, schema and catalog `location` properties as described below. Immutable once the catalog is created. | `default`               | No       |
 | `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes.                                                                                                            | `DECLARED_AND_EMPTY`    | No       |
+| `lance.allow-external-table-purge` | Allow physical deletion of external or registered Lance tables, including Lance REST `DropTable` and create `OVERWRITE`. Catalog-only; table properties cannot enable it. Does not validate ownership of storage locations. | `false` | No |
 
 #### Pluggable table location provider
 
@@ -180,12 +181,15 @@ location back would invite it to delete exactly the data the catalog just promis
 leak is recoverable and a deletion is not, so `unprovisionTableLocation` is not called when a table
 whose `external` property is true is dropped.
 
-A purge is the opposite request. `LanceTableOperations.purgeTable` deletes the external dataset that
-its `dropTable` leaves alone, so by the time the callback would run the data is gone and the reason
-to skip has gone with it; the location is handed back.
+For Lance, an external-table purge requires `lance.allow-external-table-purge=true` in the catalog.
+Without it, purge fails before removing table metadata or deleting data, and the provider callback is
+not invoked.
+When allowed, purge deletes the external dataset that drop leaves alone; after successful deletion,
+the location is handed back.
 
 The callback is therefore reached in exactly three situations: a dropped managed table, a purged
-managed table, and a purged external one. There is deliberately no flag distinguishing them, because
+managed table, and an external one whose purge was permitted by its table format. There is deliberately
+no flag distinguishing them, because
 the invariant they share is about the location rather than the table: **nothing anyone needs is under
 the location named in the context**. In all three the table format has already deleted the data under
 it. The catalog makes the drop-versus-purge and external distinctions rather than passing them on,

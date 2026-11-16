@@ -54,7 +54,9 @@ public class CatalogHiveABSIT extends CatalogHive2IT {
             "ABS_ACCOUNT_KEY",
             ABS_USER_ACCOUNT_KEY,
             HiveContainer.HIVE_RUNTIME_VERSION,
-            HiveContainer.HIVE3);
+            HiveContainer.HIVE3,
+            HiveContainer.ENABLE_SERDE_SCHEMA_TESTS,
+            "true");
 
     containerSuite.startHiveContainerWithS3(hiveContainerEnv);
 

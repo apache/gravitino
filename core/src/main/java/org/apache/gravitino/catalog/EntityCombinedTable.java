@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog;
 
 import java.util.Collections;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
@@ -56,6 +57,10 @@ public final class EntityCombinedTable implements Table {
   // This is used for tag/access control related purposes, only the imported entities have the
   // unique id, and based on this id, we can label and control the access to the entities.
   private boolean imported;
+
+  // Present only when this create request inserted the metadata object. Loading an existing table
+  // (including EXIST_OK) must never make its caller the owner, even if that table has no owner.
+  private OptionalLong createdTableId = OptionalLong.empty();
 
   // The columns to report instead of the catalog's, set only when the catalog reports none.
   private Column[] columnsOverride;
@@ -96,6 +101,21 @@ public final class EntityCombinedTable implements Table {
   public EntityCombinedTable withImported(boolean imported) {
     this.imported = imported;
     return this;
+  }
+
+  EntityCombinedTable withCreatedTableId(long id) {
+    this.createdTableId = OptionalLong.of(id);
+    return this;
+  }
+
+  /**
+   * Returns the ID inserted by this create request, or empty for an existing table or a read. This
+   * server-internal outcome is not a table property and is not serialized to clients.
+   *
+   * @return the newly created metadata object's ID, if this request created it
+   */
+  public OptionalLong createdTableId() {
+    return createdTableId;
   }
 
   MaskAndOmitKeys hiddenProperties() {

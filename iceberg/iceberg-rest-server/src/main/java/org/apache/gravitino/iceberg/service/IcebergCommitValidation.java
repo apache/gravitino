@@ -18,9 +18,13 @@
  */
 package org.apache.gravitino.iceberg.service;
 
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +38,7 @@ import org.apache.iceberg.ManifestFile;
 import org.apache.iceberg.MetadataUpdate;
 import org.apache.iceberg.PartitionField;
 import org.apache.iceberg.PartitionSpec;
+import org.apache.iceberg.PartitionSpecParser;
 import org.apache.iceberg.RetryableValidationException;
 import org.apache.iceberg.Schema;
 import org.apache.iceberg.Snapshot;
@@ -42,6 +47,7 @@ import org.apache.iceberg.SnapshotRefType;
 import org.apache.iceberg.SortField;
 import org.apache.iceberg.SortOrder;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.UnboundPartitionSpec;
 import org.apache.iceberg.UpdateRequirement;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.ValidationException;
@@ -50,6 +56,7 @@ import org.apache.iceberg.rest.requests.UpdateTableRequest;
 import org.apache.iceberg.types.Type;
 import org.apache.iceberg.types.TypeUtil;
 import org.apache.iceberg.types.Types;
+import org.apache.iceberg.util.JsonUtil;
 
 /**
  * Checks a table commit against the metadata it is applied to, before Iceberg applies it.
@@ -123,6 +130,131 @@ public final class IcebergCommitValidation implements UpdateRequirement {
       requirements.add(new IcebergCommitValidation(request.updates(), fileIO));
     }
     return new UpdateTableRequest(requirements.build(), request.updates());
+  }
+
+  /**
+   * Gives partition fields that an add-spec sends without a {@code field-id} the id the table
+   * assigns: the id of the same field (source and transform) in an earlier spec, or the next id
+   * above {@code last-partition-id}. The REST spec makes {@code field-id} optional, but Iceberg's
+   * metadata builder numbers such fields from 1000 again, so they would take the ids of existing
+   * partition fields.
+   *
+   * @param request the table commit request
+   * @param current supplies the table's current metadata, or null if it cannot be loaded; called
+   *     only when a field needs an id
+   * @return the request with every added partition field carrying an id
+   */
+  public static UpdateTableRequest assignPartitionFieldIds(
+      UpdateTableRequest request, Supplier<TableMetadata> current) {
+    if (request == null
+        || request.updates() == null
+        || request.requirements().stream()
+            .anyMatch(UpdateRequirement.AssertTableDoesNotExist.class::isInstance)) {
+      // A create starts from no partition fields, so numbering from 1000 is right.
+      return request;
+    }
+    boolean missingIds = false;
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddPartitionSpec) {
+        for (Object field : fields(((MetadataUpdate.AddPartitionSpec) update).spec())) {
+          missingIds |= partitionId(field) == null;
+        }
+      }
+    }
+    if (!missingIds) {
+      return request;
+    }
+    TableMetadata base = current.get();
+    if (base == null || base.formatVersion() < 2) {
+      return request;
+    }
+
+    Map<String, Integer> knownIds = new HashMap<>();
+    for (PartitionSpec spec : base.specs()) {
+      for (PartitionField field : spec.fields()) {
+        knownIds.putIfAbsent(
+            partitionFieldKey(field.sourceId(), field.transform().toString()), field.fieldId());
+      }
+    }
+    int lastAssigned = Math.max(base.lastAssignedPartitionId(), PARTITION_DATA_ID_START - 1);
+    for (MetadataUpdate update : request.updates()) {
+      if (update instanceof MetadataUpdate.AddPartitionSpec) {
+        for (Object field : fields(((MetadataUpdate.AddPartitionSpec) update).spec())) {
+          Integer id = partitionId(field);
+          if (id != null) {
+            knownIds.putIfAbsent(partitionFieldKey(field), id);
+            lastAssigned = Math.max(lastAssigned, id);
+          }
+        }
+      }
+    }
+
+    List<MetadataUpdate> updates = new ArrayList<>();
+    for (MetadataUpdate update : request.updates()) {
+      if (!(update instanceof MetadataUpdate.AddPartitionSpec)) {
+        updates.add(update);
+        continue;
+      }
+      UnboundPartitionSpec spec = ((MetadataUpdate.AddPartitionSpec) update).spec();
+      ObjectNode specNode = JsonUtil.mapper().createObjectNode();
+      specNode.put("spec-id", spec.specId());
+      ArrayNode fields = specNode.putArray("fields");
+      for (Object field : fields(spec)) {
+        Integer id = partitionId(field);
+        if (id == null) {
+          String key = partitionFieldKey(field);
+          id = knownIds.get(key);
+          if (id == null) {
+            id = ++lastAssigned;
+            knownIds.put(key, id);
+          }
+        }
+        fields
+            .addObject()
+            .put("name", (String) fieldValue(field, "name"))
+            .put("transform", (String) fieldValue(field, "transformAsString"))
+            .put("source-id", (Integer) fieldValue(field, "sourceId"))
+            .put("field-id", id);
+      }
+      updates.add(new MetadataUpdate.AddPartitionSpec(PartitionSpecParser.fromJson(specNode)));
+    }
+    return request.identifier() == null
+        ? new UpdateTableRequest(request.requirements(), updates)
+        : UpdateTableRequest.create(request.identifier(), request.requirements(), updates);
+  }
+
+  private static List<?> fields(UnboundPartitionSpec spec) {
+    return spec.fields();
+  }
+
+  @Nullable
+  private static Integer partitionId(Object unboundField) {
+    return (Integer) fieldValue(unboundField, "partitionId");
+  }
+
+  private static String partitionFieldKey(Object unboundField) {
+    return partitionFieldKey(
+        (Integer) fieldValue(unboundField, "sourceId"),
+        (String) fieldValue(unboundField, "transformAsString"));
+  }
+
+  /**
+   * Reads an accessor of {@code UnboundPartitionSpec.UnboundPartitionField}. Its accessors are
+   * public but the class is package-private in Iceberg 1.11, and no public API exposes whether a
+   * field was sent without a {@code field-id}.
+   */
+  private static Object fieldValue(Object unboundField, String accessor) {
+    try {
+      Method method = unboundField.getClass().getMethod(accessor);
+      method.setAccessible(true);
+      return method.invoke(unboundField);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalStateException("Cannot read partition field " + accessor, e);
+    }
+  }
+
+  private static String partitionFieldKey(int sourceId, String transform) {
+    return sourceId + ":" + transform;
   }
 
   @Override
@@ -225,11 +357,24 @@ public final class IcebergCommitValidation implements UpdateRequirement {
   }
 
   /**
-   * An added schema must keep the data already written readable: a field id that exists in the
-   * current schema keeps its kind and may only change type by an allowed promotion, a field id not
-   * in the current schema must be new (above last-column-id) or identical to the field that had the
-   * id before, and a new required field needs a default. A replace (which removes main) starts from
-   * no data, so only the id rule applies to it.
+   * An added schema must follow the Iceberg Table Spec schema-evolution rules
+   * (https://iceberg.apache.org/spec/#schema-evolution): a field id that exists in the current
+   * schema keeps its kind, may only change type by an allowed promotion, and cannot go from
+   * optional to required; a field id not in the current schema must be new (above last-column-id)
+   * or identical to the field that had the id before; and a new required field needs a default. The
+   * same rules are what Iceberg's {@code UpdateSchema} / {@code SchemaUpdate} enforce, and what the
+   * Gravitino API path applies.
+   *
+   * <p>Per that Table Spec section (and {@code SchemaUpdate}), these rules do <em>not</em> depend
+   * on whether the table has snapshots: incompatible evolution is rejected on empty tables unless
+   * {@code allowIncompatibleChanges()} is set. The Iceberg REST commit API likewise defines no
+   * {@code hasData} exemption. Dropping IRC's old {@code hasData} gate is therefore the
+   * Table-Spec-compatible behavior; empty-table clients that previously got 200 for illegal
+   * evolutions may now get 4xx.
+   *
+   * <p>A replace that removes {@code main} is not schema evolution under the Table Spec: it starts
+   * from no retained data, so only the field-id reuse rule applies and create-then-replace / staged
+   * create still succeed.
    */
   private void checkSchemas(TableMetadata base, TableMetadata updated) {
     boolean replacesTable =
@@ -241,7 +386,6 @@ public final class IcebergCommitValidation implements UpdateRequirement {
                                 ((MetadataUpdate.RemoveSnapshotRef) u).name()))
             && (updated.currentSnapshot() == null
                 || base.snapshot(updated.currentSnapshot().snapshotId()) == null);
-    boolean hasData = !base.snapshots().isEmpty();
     Map<Integer, Types.NestedField> current = TypeUtil.indexById(base.schema().asStruct());
     for (MetadataUpdate update : updates) {
       if (!(update instanceof MetadataUpdate.AddSchema)) {
@@ -250,10 +394,12 @@ public final class IcebergCommitValidation implements UpdateRequirement {
       Schema schema = ((MetadataUpdate.AddSchema) update).schema();
       for (Types.NestedField field : TypeUtil.indexById(schema.asStruct()).values()) {
         Types.NestedField existing = current.get(field.fieldId());
+        // Table Spec schema evolution (no hasData exemption); same as UpdateSchema / Gravitino API.
         if (existing == null) {
-          checkNewField(base, field, hasData && !replacesTable);
-        } else if (hasData && !replacesTable) {
-          checkTypeChange(existing, field);
+          checkNewField(base, field, !replacesTable);
+        } else if (!replacesTable) {
+          checkTypeChange(existing, field, updated.formatVersion());
+          checkNullabilityChange(existing, field);
         }
       }
     }
@@ -276,10 +422,19 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     }
     if (checkRequired && field.isRequired() && field.initialDefault() == null) {
       throw new ValidationException(
-          "Invalid schema: required field %s has no initial default, so existing rows cannot be"
-              + " read",
-          field.name());
+          "Invalid schema: required field %s has no initial default", field.name());
     }
+  }
+
+  /**
+   * The v3 table spec also allows date to timestamp and date to timestamp_ns (without time zone),
+   * which Iceberg's {@link TypeUtil#isPromotionAllowed} does not implement.
+   */
+  private static boolean isV3DatePromotion(Type from, Type to, int formatVersion) {
+    return formatVersion >= 3
+        && from.typeId() == Type.TypeID.DATE
+        && (Types.TimestampType.withoutZone().equals(to)
+            || Types.TimestampNanoType.withoutZone().equals(to));
   }
 
   private static Types.NestedField previousField(TableMetadata base, int fieldId) {
@@ -292,20 +447,34 @@ public final class IcebergCommitValidation implements UpdateRequirement {
     return null;
   }
 
-  private static void checkTypeChange(Types.NestedField existing, Types.NestedField field) {
+  private static void checkTypeChange(
+      Types.NestedField existing, Types.NestedField field, int formatVersion) {
     Type from = existing.type();
     Type to = field.type();
     if (from.equals(to)) {
       return;
     }
     if (from.isPrimitiveType() && to.isPrimitiveType()) {
-      if (!TypeUtil.isPromotionAllowed(from, to.asPrimitiveType())) {
+      if (!TypeUtil.isPromotionAllowed(from, to.asPrimitiveType())
+          && !isV3DatePromotion(from, to, formatVersion)) {
         throw new ValidationException(
             "Invalid schema: field %s cannot change type from %s to %s", field.name(), from, to);
       }
     } else if (from.typeId() != to.typeId()) {
       throw new ValidationException(
           "Invalid schema: field %s cannot change from %s to %s", field.name(), from, to);
+    }
+  }
+
+  /**
+   * An optional field cannot become required: the same rule as Iceberg's {@code
+   * UpdateSchema#requireColumn}, which refuses the change unless incompatible changes are
+   * explicitly allowed.
+   */
+  private static void checkNullabilityChange(Types.NestedField existing, Types.NestedField field) {
+    if (existing.isOptional() && field.isRequired()) {
+      throw new ValidationException(
+          "Invalid schema: field %s cannot change from optional to required", field.name());
     }
   }
 

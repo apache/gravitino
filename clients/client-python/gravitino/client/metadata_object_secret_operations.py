@@ -21,7 +21,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.dto.responses.secrets_response import SecretsResponse
 from gravitino.exceptions.handlers.secret_error_handler import SECRET_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import encode_metadata_object_name, encode_string
 from gravitino.utils import HTTPClient
 
 
@@ -37,10 +37,9 @@ class MetadataObjectSecretOperations(SupportsSecrets):
     ):
         self._rest_client = rest_client
         metadata_object_type = metadata_object.type().value
-        metadata_object_fullname = metadata_object.full_name()
         self._request_path = (
             f"api/metalakes/{encode_string(metalake_name)}/objects/{metadata_object_type}/"
-            f"{encode_string(metadata_object_fullname)}/secrets"
+            f"{encode_metadata_object_name(metadata_object)}/secrets"
         )
 
     def get_secrets(self) -> Dict[str, str]:

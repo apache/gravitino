@@ -127,6 +127,19 @@ public class TestMetadataObjectRoleOperations extends JerseyTest {
     return resourceConfig;
   }
 
+  /** Hides role listings for internal tags before dispatch. */
+  @Test
+  public void testInternalTagRolesAreHidden() {
+    try (Response response =
+        target("/metalakes/metalake1/objects/tag/GRAVITINO_HIDDEN_123/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get()) {
+      Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+    }
+    Mockito.verifyNoInteractions(manager);
+  }
+
   @Test
   public void testListRoleNames() throws IOException {
     when(manager.listRoleNamesByObject(any(), any())).thenReturn(new String[] {"role"});

@@ -63,6 +63,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 
 public class TestIcebergNamespaceOperationExecutor {
@@ -227,10 +229,77 @@ public class TestIcebergNamespaceOperationExecutor {
   }
 
   @Test
+  public void testRegisterTablePropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/missing/v1.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation))
+        .thenThrow(
+            new BadRequestException("Metadata location %s does not exist", metadataLocation));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerTable(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper, never()).registerTable(any(), any(), any(Boolean.class));
+  }
+
+  @Test
+  public void testRegisterViewPropagatesMissingMetadataLocationBadRequest() {
+    Namespace namespace = Namespace.of("test_namespace");
+    RegisterViewRequest request = mock(RegisterViewRequest.class);
+    when(request.name()).thenReturn("ghost");
+    when(request.metadataLocation()).thenReturn("file:/tmp/missing/v1.metadata.json");
+    when(mockCatalogWrapper.registerView(namespace, request))
+        .thenThrow(
+            new BadRequestException(
+                "Cannot register view ghost: metadata location file:/tmp/missing/v1.metadata.json"
+                    + " does not exist"));
+
+    BadRequestException thrown =
+        Assertions.assertThrows(
+            BadRequestException.class,
+            () -> executor.registerView(mockContext, namespace, request));
+
+    Assertions.assertTrue(thrown.getMessage().contains("does not exist"), thrown.getMessage());
+    verify(mockCatalogWrapper).registerView(namespace, request);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      ints = {EntityFieldLimits.MAX_NAME_LENGTH + 1, EntityFieldLimits.MAX_COLUMN_NAME_LENGTH})
+  void testExpandedColumnNamesReachRegister(int length) {
+    Namespace namespace = Namespace.of("test_namespace");
+    String metadataLocation = "file:/tmp/test.metadata.json";
+    RegisterTableRequest request = mock(RegisterTableRequest.class);
+    when(request.name()).thenReturn("test_table");
+    when(request.metadataLocation()).thenReturn(metadataLocation);
+    Schema schema = new Schema(NestedField.required(1, "a".repeat(length), StringType.get()));
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            schema, PartitionSpec.unpartitioned(), "file:/tmp/table", Collections.emptyMap());
+    when(mockCatalogWrapper.loadTableMetadataFromLocation(metadataLocation)).thenReturn(metadata);
+
+    executor.registerTable(mockContext, namespace, request);
+
+    verify(mockCatalogWrapper).loadTableMetadataFromLocation(metadataLocation);
+    verify(mockCatalogWrapper).registerTable(namespace, request, false);
+  }
+
+  @Test
   public void testRejectsOversizedColumnNameBeforeRegister() {
-    String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+    String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
     Schema schema = new Schema(NestedField.required(1, oversizedName, StringType.get()));
-    assertRegisterRejectsSchema(schema, "The name of the column must not exceed 128 characters");
+    assertRegisterRejectsSchema(
+        schema,
+        "The name of the column must not exceed "
+            + EntityFieldLimits.MAX_COLUMN_NAME_LENGTH
+            + " characters");
   }
 
   @Test
@@ -270,15 +339,17 @@ public class TestIcebergNamespaceOperationExecutor {
       String originalMetadataLocation =
           writeMetadata(
               tempDir.resolve("v1.metadata.json"),
-              new Schema(NestedField.required(1, "id", StringType.get())));
+              new Schema(
+                  NestedField.required(
+                      1, "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH), StringType.get())));
       RegisterTableRequest originalRequest =
           ImmutableRegisterTableRequest.builder()
               .name("test_table")
               .metadataLocation(originalMetadataLocation)
               .build();
-      catalogWrapper.registerTable(namespace, originalRequest, false);
+      executor.registerTable(mockContext, namespace, originalRequest);
 
-      String oversizedName = "a".repeat(EntityFieldLimits.MAX_NAME_LENGTH + 1);
+      String oversizedName = "a".repeat(EntityFieldLimits.MAX_COLUMN_NAME_LENGTH + 1);
       String invalidMetadataLocation =
           writeMetadata(
               tempDir.resolve("v2.metadata.json"),

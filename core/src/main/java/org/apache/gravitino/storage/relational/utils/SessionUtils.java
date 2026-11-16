@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.gravitino.storage.relational.session.SqlSessions;
+import org.apache.ibatis.session.SqlSession;
 
 /**
  * This class provides utility methods to perform database operations with MyBatis mappers in the
@@ -77,6 +78,32 @@ public class SessionUtils {
   }
 
   /**
+   * Performs a read after clearing the current session's local query cache.
+   *
+   * <p>Use at full-role authorization read boundaries so subsequent ID-to-name queries observe peer
+   * commits at READ_COMMITTED. Clearing applies to all local query results in the shared session,
+   * including reads cached earlier by an enclosing write transaction. Previously cached reads may
+   * therefore execute again. The operation uses the same connection without committing or rolling
+   * back; uncommitted writes, JDBC isolation, and session ownership are preserved. Other reads
+   * continue to use the default session cache between fresh-read boundaries.
+   *
+   * @param mapperClazz the mapper class
+   * @param func the read operation
+   * @param <T> the mapper type
+   * @param <R> the result type
+   * @return the read result
+   */
+  public static <T, R> R getWithoutCommitFresh(Class<T> mapperClazz, Function<T, R> func) {
+    SqlSession session = SqlSessions.getSqlSession();
+    try {
+      session.clearCache();
+      return getWithoutCommit(mapperClazz, func);
+    } finally {
+      SqlSessions.closeSqlSession();
+    }
+  }
+
+  /**
    * Performs a database operation without a commit. Can be used standalone or nested within other
    * transactions. This method is for operations that do not return a result.
    */
@@ -104,6 +131,20 @@ public class SessionUtils {
     } catch (Throwable t) {
       SqlSessions.rollbackAndCloseSqlSession();
       throw t;
+    }
+  }
+
+  /**
+   * Clears MyBatis's first-level cache of the current session. A read earlier in the session, for
+   * example by a caller's outer transaction, may be cached; a read that must see the database as it
+   * is now, such as one that follows a locking read, calls this first.
+   */
+  public static void clearSessionCache() {
+    SqlSession session = SqlSessions.getSqlSession();
+    try {
+      session.clearCache();
+    } finally {
+      SqlSessions.closeSqlSession();
     }
   }
 

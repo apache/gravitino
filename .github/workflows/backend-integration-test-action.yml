@@ -126,6 +126,7 @@ jobs:
           path: |
             build/reports
             iceberg/iceberg-rest-server/build/*.log
+            iceberg/iceberg-rest-server-experiment/build/*.log
             distribution/package/logs/*.out
             distribution/package/logs/*.log
             catalogs/**/*.log

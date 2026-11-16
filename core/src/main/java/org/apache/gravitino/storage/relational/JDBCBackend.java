@@ -34,6 +34,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -50,9 +51,12 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
 import org.apache.gravitino.cache.BaseEntityCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
 import org.apache.gravitino.meta.GenericEntity;
@@ -76,6 +80,8 @@ import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterF
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
+import org.apache.gravitino.storage.relational.service.DomainMetaService;
+import org.apache.gravitino.storage.relational.service.DomainRelService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
 import org.apache.gravitino.storage.relational.service.GroupMetaService;
@@ -92,6 +98,7 @@ import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.service.SemanticModelMetricService;
+import org.apache.gravitino.storage.relational.service.SemanticModelSourceService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
 import org.apache.gravitino.storage.relational.service.TableColumnMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
@@ -127,6 +134,11 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     jdbcDatabase = startJDBCDatabaseIfNecessary(config);
     SqlSessionFactoryHelper.getInstance().init(config);
     SQLExceptionConverterFactory.initConverter(config);
+  }
+
+  @Override
+  public List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    return SchemaMetaService.getInstance().listDescendantSchemas(identifier);
   }
 
   @Override
@@ -181,6 +193,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().listJobTemplatesByNamespace(namespace);
+      case DOMAIN:
+        return (List<E>) DomainMetaService.getInstance().listDomainsByNamespace(namespace);
       case JOB:
         return (List<E>) JobMetaService.getInstance().listJobsByNamespace(namespace);
       case TABLE_STATISTIC:
@@ -294,6 +308,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) PolicyMetaService.getInstance().getPolicyByIdentifier(ident);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().getJobTemplateByIdentifier(ident);
+      case DOMAIN:
+        return (E) DomainMetaService.getInstance().getDomainByIdentifier(ident);
       case JOB:
         return (E) JobMetaService.getInstance().getJobByIdentifier(ident);
       case VIEW:
@@ -344,6 +360,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
         return (List<E>)
             JobTemplateMetaService.getInstance().batchGetJobTemplateByIdentifier(identifiers);
+      case DOMAIN:
+        return (List<E>) DomainMetaService.getInstance().batchGetDomainByIdentifier(identifiers);
       case USER:
         // TODO: Add true batch SQL operations for users, roles, and views
         List<E> users = Lists.newArrayList();
@@ -535,6 +553,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return SemanticModelMetaService.getInstance()
             .deleteSemanticModelMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case DOMAIN:
+        return DomainMetaService.getInstance()
+            .deleteDomainMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -572,6 +594,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB_TEMPLATE:
       case JOB:
       case VIEW:
+      case DOMAIN:
         // These entity types have not implemented multi-versions, so we can skip.
         return 0;
 
@@ -721,6 +744,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      case SEMANTIC_MODEL_SOURCE_REL:
+        return (List<E>)
+            SemanticModelSourceService.getInstance().listForSource(nameIdentifier, identType);
       case POLICY_TAG_REL:
         return (List<E>)
             PolicyTagRelService.getInstance()
@@ -749,6 +775,75 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  @Override
+  public void insertDomainWithBackingTag(
+      DomainEntity domain, TagValue backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    DomainMetaService.getInstance().insertDomainWithBackingTag(domain, backingTag, check);
+  }
+
+  @Override
+  public void insertDomainWithNewBackingTag(
+      DomainEntity domain, TagEntity backingTag, Consumer<LockedDomainState> check)
+      throws IOException {
+    DomainMetaService.getInstance().insertDomainWithNewBackingTag(domain, backingTag, check);
+  }
+
+  @Override
+  public boolean deleteDomain(NameIdentifier ident, Consumer<DomainEntity> check)
+      throws IOException {
+    return DomainMetaService.getInstance().deleteDomain(ident, check);
+  }
+
+  @Override
+  public DomainEntity updateDomainBackingTagAndGet(
+      NameIdentifier ident,
+      @Nullable TagValue backingTag,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainMetaService.getInstance()
+        .updateDomainBackingTagAndGet(ident, backingTag, auditInfo, check);
+  }
+
+  @Override
+  public DomainEntity setDomainParentAndGet(
+      NameIdentifier ident,
+      NameIdentifier parentIdent,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainRelService.getInstance()
+        .setDomainParentAndGet(ident, parentIdent, auditInfo, check);
+  }
+
+  @Override
+  public DomainEntity removeDomainParentAndGet(
+      NameIdentifier ident, Consumer<LockedDomainState> check) throws IOException {
+    return DomainRelService.getInstance().removeDomainParentAndGet(ident, check);
+  }
+
+  @Override
+  public DomainEntity updateDomainStatusAndGet(
+      NameIdentifier ident,
+      Domain.Status status,
+      AuditInfo auditInfo,
+      Consumer<LockedDomainState> check)
+      throws IOException {
+    return DomainRelService.getInstance().updateDomainStatusAndGet(ident, status, auditInfo, check);
+  }
+
+  @Override
+  public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException {
+    return DomainMetaService.getInstance().listDomainsByBackingTagIds(metalake, backingTagIds);
+  }
+
+  @Override
+  public List<DomainEntity> listSubDomains(NameIdentifier parentIdent) {
+    return DomainRelService.getInstance().listSubDomains(parentIdent);
   }
 
   @Override
@@ -815,6 +910,20 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   @Override
   public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
       throws IOException {
+    if (query.anchorId().isPresent()) {
+      Preconditions.checkArgument(
+          query.relationType() == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL
+              && query.anchorEntityType() == Entity.EntityType.TAG,
+          "ID anchor is only supported when listing metadata objects for a tag");
+      return (List<E>)
+          TagMetaService.getInstance()
+              .listAssociatedMetadataObjectsForTagId(
+                  query
+                      .anchorMetalake()
+                      .orElseThrow(() -> new IllegalArgumentException("Missing anchor metalake")),
+                  query.anchorId().get(),
+                  query.relationValue().orElse(null));
+    }
     if (!query.relationValue().isPresent()) {
       return listEntitiesByRelation(
           query.relationType(),
@@ -851,7 +960,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                     update.sourceIdentifier(),
                     update.sourceEntityType(),
                     toTagValues(update.targetsToAdd()),
-                    toTagValues(update.targetsToRemove()));
+                    toTagValues(update.targetsToRemove()),
+                    update.auditInfo().orElse(null));
       case POLICY_TAG_REL:
         Preconditions.checkArgument(
             update.sourceEntityType() == Entity.EntityType.TAG,
@@ -859,7 +969,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>)
             PolicyTagRelService.getInstance()
                 .updateRelations(
-                    update.sourceIdentifier(), update.targetsToAdd(), update.targetsToRemove());
+                    update.sourceIdentifier(),
+                    update.targetsToAdd(),
+                    update.targetsToRemove(),
+                    update.auditInfo().orElse(null));
       default:
         Preconditions.checkArgument(
             !update.hasRelationValues(),
@@ -1046,6 +1159,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
     } else if (e instanceof JobTemplateEntity) {
       JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
+    } else if (e instanceof DomainEntity) {
+      DomainMetaService.getInstance().insertDomain((DomainEntity) e, overwritten);
     } else if (e instanceof JobEntity) {
       JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
     } else if (e instanceof ViewEntity) {
@@ -1097,6 +1212,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
+      case DOMAIN:
+        return (E) DomainMetaService.getInstance().updateDomain(ident, updater);
       case JOB:
         return (E) JobMetaService.getInstance().updateJob(ident, updater);
       case VIEW:
@@ -1142,6 +1259,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return PolicyMetaService.getInstance().deletePolicy(ident);
       case JOB_TEMPLATE:
         return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
+      case DOMAIN:
+        return DomainMetaService.getInstance().deleteDomain(ident);
       case JOB:
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:
