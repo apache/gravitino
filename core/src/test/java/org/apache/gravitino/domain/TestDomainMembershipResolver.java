@@ -132,7 +132,7 @@ class TestDomainMembershipResolver {
     metadataObjects
         .when(() -> MetadataObjectUtil.checkMetadataObject(anyString(), any()))
         .thenAnswer(call -> null);
-    when(domainOperations.listDomainAssignments(eq(METALAKE), anyList(), any()))
+    when(domainOperations.listDomainAssignments(eq(METALAKE), anyList(), any(), any()))
         .thenAnswer(
             call -> {
               Map<Long, List<GenericEntity>> result = new HashMap<>();
@@ -229,7 +229,11 @@ class TestDomainMembershipResolver {
             any(NameIdentifier.class),
             any(Entity.EntityType.class));
     verify(domainOperations)
-        .listDomainAssignments(eq(METALAKE), eq(Arrays.asList(finance, tax, trading)), any());
+        .listDomainAssignments(
+            eq(METALAKE),
+            eq(Arrays.asList(finance, tax, trading)),
+            any(),
+            eq(Collections.emptySet()));
 
     // A sub-domain lists its own assignments as direct.
     DomainMember[] tradingMembers =
@@ -294,12 +298,37 @@ class TestDomainMembershipResolver {
   }
 
   @Test
+  void testFilteredListingKeepsAllPathsOnlyForSelectedObjects() throws Exception {
+    DomainEntity parent = domain(1, "Finance", null, 10L, null);
+    DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity tax = domain(3, "Tax", "Finance", 30L, "tax");
+    candidate(20, TABLE);
+    valuedCandidate(30, "tax", TABLE, SCHEMA);
+    DomainMember[] members =
+        resolver.listMembers(
+            METALAKE,
+            parent,
+            new DomainEntity[] {trading, tax},
+            direct().withDomains("Trading").build());
+    assertArrayEquals(new MetadataObject[] {TABLE}, objects(members));
+    assertArrayEquals(
+        new DomainRelation[] {
+          DomainRelation.viaSubdomain("Tax"), DomainRelation.viaSubdomain("Trading")
+        },
+        members[0].relations());
+    verify(domainOperations)
+        .listDomainAssignments(
+            eq(METALAKE), eq(List.of(parent, tax, trading)), any(), eq(Set.of(trading.id())));
+    verify(domainOperations, never()).listDirectTagsByObjectIds(anyString(), any(), anyList());
+  }
+
+  @Test
   void testFilteredListingOnlyEnumeratesSelectedDomain() throws Exception {
     DomainEntity finance = domain(1, "Finance", null, 10L, null);
     DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
     DomainEntity tax = domain(3, "Tax", "Finance", 30L, "tax");
     DomainEntity[] children = {trading, tax};
-    DomainMemberFilter filter = direct().withDomains("Trading").build();
+    DomainMemberFilter filter = direct().withDomains("Trading").withNameContains("cat.db").build();
     assertEquals(0, resolver.listMembers(METALAKE, finance, children, filter).length);
     verify(relations, never())
         .listEntitiesByRelation(
@@ -329,7 +358,8 @@ class TestDomainMembershipResolver {
         },
         members[0].relations());
     verify(domainOperations, times(2))
-        .listDomainAssignments(eq(METALAKE), eq(List.of(trading)), any());
+        .listDomainAssignments(
+            eq(METALAKE), eq(List.of(trading)), any(), eq(Collections.emptySet()));
   }
 
   @Test
@@ -393,7 +423,7 @@ class TestDomainMembershipResolver {
                 METALAKE, finance, new DomainEntity[0], direct().withDomains("unknown").build())
             .length);
     verifyNoInteractions(relations);
-    when(domainOperations.listDomainAssignments(anyString(), anyList(), any()))
+    when(domainOperations.listDomainAssignments(anyString(), anyList(), any(), any()))
         .thenThrow(new IOException("storage"));
     assertInstanceOf(
         IOException.class,
@@ -674,7 +704,7 @@ class TestDomainMembershipResolver {
     assertThrows(
         NoSuchMetadataObjectException.class,
         () -> listDomains(METALAKE, TABLE, new DomainEntity[] {domain}));
-    when(domainOperations.listDomainAssignments(anyString(), anyList(), any()))
+    when(domainOperations.listDomainAssignments(anyString(), anyList(), any(), any()))
         .thenThrow(new IOException("storage"));
     assertInstanceOf(
         IOException.class,

@@ -278,11 +278,15 @@ public class TagMetaService {
    * @param metalake The metalake containing the domains.
    * @param domains Selected domains with backing tags.
    * @param types The candidate metadata object types.
+   * @param candidateDomainIds Restrict objects to assignments in these domains, or empty for all.
    * @return Assigned objects keyed by domain ID.
    * @throws IOException If the assignments cannot be read.
    */
   public Map<Long, List<GenericEntity>> listDomainAssignments(
-      String metalake, List<DomainEntity> domains, Set<MetadataObject.Type> types)
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Set<Long> candidateDomainIds)
       throws IOException {
     Map<Long, List<GenericEntity>> result = new LinkedHashMap<>();
     if (types.isEmpty()) {
@@ -294,7 +298,9 @@ public class TagMetaService {
       List<DomainAssignmentPO> rows =
           SessionUtils.getWithoutCommit(
               TagMetadataObjectRelMapper.class,
-              mapper -> mapper.listDomainAssignments(metalake, selected.keySet(), types));
+              mapper ->
+                  mapper.listDomainAssignments(
+                      metalake, selected.keySet(), types, candidateDomainIds));
       // Compare with the caller's stable binding and enforce case-sensitive value matching
       // independently of the database collation.
       List<DomainAssignmentPO> matching =

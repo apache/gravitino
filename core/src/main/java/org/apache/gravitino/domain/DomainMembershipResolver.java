@@ -28,6 +28,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -122,6 +123,15 @@ final class DomainMembershipResolver {
     boolean needsOtherBindings =
         scopeDomains.stream()
             .anyMatch(d -> d.backingTagId() != null && !selectedIds.contains(d.id()));
+    // A selective name filter can discard most candidates after name resolution. In that case
+    // only fetch additional paths for the remaining objects. Bound the IN list for large scopes.
+    boolean joinPaths =
+        needsOtherBindings
+            && !selectedIds.isEmpty()
+            && selectedIds.size() <= 500
+            && !filter.nameContains().isPresent();
+    List<DomainEntity> lookupDomains = joinPaths ? scopeDomains : selectedDomains;
+    Set<MetadataObject> selectedObjects = new HashSet<>();
     Map<MetadataObject.Type, Map<Long, MetadataObject>> candidates =
         new EnumMap<>(MetadataObject.Type.class);
     Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
@@ -130,9 +140,10 @@ final class DomainMembershipResolver {
       Map<Long, List<GenericEntity>> assigned =
           listAssignments(
               metalake,
-              selectedDomains,
-              filter.types().isEmpty() ? DIRECT_MEMBER_TYPES : filter.types());
-      for (DomainEntity domain : selectedDomains) {
+              lookupDomains,
+              filter.types().isEmpty() ? DIRECT_MEMBER_TYPES : filter.types(),
+              joinPaths ? selectedIds : Collections.emptySet());
+      for (DomainEntity domain : lookupDomains) {
         if (domain.backingTagId() == null) {
           continue;
         }
@@ -145,17 +156,24 @@ final class DomainMembershipResolver {
             assigned.getOrDefault(domain.id(), Collections.emptyList())) {
           MetadataObject object = assignedObject(assignment);
           if (DIRECT_MEMBER_TYPES.contains(object.type()) && matchesFilter(object, filter)) {
-            if (needsOtherBindings) {
+            if (needsOtherBindings && !joinPaths) {
               candidates
                   .computeIfAbsent(object.type(), t -> new LinkedHashMap<>())
                   .put(assignment.id(), object);
             } else {
               relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
+              if (joinPaths && selectedIds.contains(domain.id())) {
+                selectedObjects.add(object);
+              }
             }
           }
         }
       }
 
+      // SQL comparison can be broader than exact Java binding-value equality on some collations.
+      if (joinPaths) {
+        relations.keySet().retainAll(selectedObjects);
+      }
       relations.forEach(
           (object, paths) ->
               members.add(new DomainMemberInfo(object, paths.toArray(new DomainRelation[0]))));
@@ -205,7 +223,8 @@ final class DomainMembershipResolver {
           filter.types().isEmpty()
               ? DIRECT_MEMBER_TYPES
               : Sets.union(filter.types(), DomainMember.CONTAINER_TYPES);
-      Map<Long, List<GenericEntity>> assigned = listAssignments(metalake, selectedDomains, types);
+      Map<Long, List<GenericEntity>> assigned =
+          listAssignments(metalake, selectedDomains, types, Collections.emptySet());
       // A container assigned to several selected domains needs to be expanded only once.
       Set<MetadataObject> roots = new LinkedHashSet<>();
       assigned
@@ -417,13 +436,18 @@ final class DomainMembershipResolver {
   }
 
   private Map<Long, List<GenericEntity>> listAssignments(
-      String metalake, List<DomainEntity> domains, Set<MetadataObject.Type> types)
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Set<Long> candidateDomainIds)
       throws IOException {
     List<DomainEntity> bound =
         domains.stream().filter(d -> d.backingTagId() != null).collect(Collectors.toList());
     return bound.isEmpty()
         ? Collections.emptyMap()
-        : store.domainOperations().listDomainAssignments(metalake, bound, types);
+        : store
+            .domainOperations()
+            .listDomainAssignments(metalake, bound, types, candidateDomainIds);
   }
 
   private static MetadataObject assignedObject(GenericEntity assignment) {

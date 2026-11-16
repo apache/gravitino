@@ -555,9 +555,12 @@ public class RelationalEntityStore
 
   @Override
   public Map<Long, List<GenericEntity>> listDomainAssignments(
-      String metalake, List<DomainEntity> domains, Set<MetadataObject.Type> types)
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Set<Long> candidateDomainIds)
       throws IOException {
-    return backend.listDomainAssignments(metalake, domains, types);
+    return backend.listDomainAssignments(metalake, domains, types, candidateDomainIds);
   }
 
   @Override

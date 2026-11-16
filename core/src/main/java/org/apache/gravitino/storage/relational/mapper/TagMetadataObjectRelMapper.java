@@ -42,6 +42,7 @@ public interface TagMetadataObjectRelMapper {
    * @param metalake The containing metalake.
    * @param domainIds Selected domain IDs.
    * @param types Selected object types.
+   * @param candidateDomainIds Domains supplying the candidate objects, or empty for all.
    * @return Assignment rows with the matching domain ID.
    */
   @Select({
@@ -58,12 +59,21 @@ public interface TagMetadataObjectRelMapper {
     "<foreach collection='domainIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
     "AND r.metadata_object_type IN",
     "<foreach collection='types' item='type' open='(' separator=',' close=')'>#{type}</foreach>",
+    "<if test='candidateDomainIds.size > 0'>",
+    "AND EXISTS (SELECT 1 FROM domain_meta sd JOIN tag_relation_meta sr ON sr.tag_id = sd.backing_tag_id",
+    "WHERE sd.metalake_id = m.metalake_id AND sd.deleted_at = 0 AND sr.deleted_at = 0",
+    "AND sr.metadata_object_id = r.metadata_object_id AND sr.metadata_object_type = r.metadata_object_type",
+    "AND (sd.backing_tag_value IS NULL OR sd.backing_tag_value = sr.tag_value)",
+    "AND sd.domain_id IN",
+    "<foreach collection='candidateDomainIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>)",
+    "</if>",
     "</script>"
   })
   List<DomainAssignmentPO> listDomainAssignments(
       @Param("metalake") String metalake,
       @Param("domainIds") Set<Long> domainIds,
-      @Param("types") Set<MetadataObject.Type> types);
+      @Param("types") Set<MetadataObject.Type> types,
+      @Param("candidateDomainIds") Set<Long> candidateDomainIds);
 
   @SelectProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
