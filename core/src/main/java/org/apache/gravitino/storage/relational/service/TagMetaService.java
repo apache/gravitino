@@ -249,28 +249,13 @@ public class TagMetaService {
                       columns.stream().map(NameIdentifier::name).collect(Collectors.toList()));
           columns.forEach(column -> identifiersById.put(ids.get(column.name()), column));
         });
-    List<TagRelationTagPO> rows = new ArrayList<>();
-    String metadataObjectType =
-        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType)
-            .type()
-            .toString();
-    for (List<Long> batch : Lists.partition(new ArrayList<>(identifiersById.keySet()), 500)) {
-      rows.addAll(
-          SessionUtils.getWithoutCommit(
-              TagMetadataObjectRelMapper.class,
-              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(batch, metadataObjectType)));
-    }
-    Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
-    rows.forEach(
-        row ->
-            rowsByObject
-                .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
-                .add(row));
+    MetadataObject.Type type =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType).type();
     List<RelationalEntity<?>> result = new ArrayList<>();
-    rowsByObject.forEach(
-        (id, tagRows) ->
-            tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))
-                .forEach(
+    listDirectTagsByObjectIds(metalake, type, new ArrayList<>(identifiersById.keySet()))
+        .forEach(
+            (id, tags) ->
+                tags.forEach(
                     tag ->
                         result.add(
                             new RelationalEntity<>(
@@ -278,6 +263,35 @@ public class TagMetaService {
                                 identifiersById.get(id),
                                 objectType,
                                 tag))));
+    return result;
+  }
+
+  /**
+   * Reads direct tag assignments in bounded batches without resolving object names to IDs.
+   *
+   * @param metalake The metalake containing the objects.
+   * @param type The metadata object type.
+   * @param objectIds Stable metadata object IDs.
+   * @return Tags with assignment values keyed by object ID.
+   */
+  public Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) {
+    Map<Long, List<TagEntity>> result = new LinkedHashMap<>();
+    for (List<Long> batch : Lists.partition(objectIds, 500)) {
+      List<TagRelationTagPO> rows =
+          SessionUtils.getWithoutCommit(
+              TagMetadataObjectRelMapper.class,
+              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(metalake, batch, type.name()));
+      Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
+      rows.forEach(
+          row ->
+              rowsByObject
+                  .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
+                  .add(row));
+      rowsByObject.forEach(
+          (id, tagRows) ->
+              result.put(id, tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))));
+    }
     return result;
   }
 

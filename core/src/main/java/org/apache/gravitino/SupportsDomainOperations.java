@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
@@ -240,6 +241,18 @@ public interface SupportsDomainOperations {
    */
   List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
       throws IOException;
+
+  /**
+   * Reads direct tag assignments for recorded domain member candidates of one type.
+   *
+   * @param metalake The metalake containing the objects.
+   * @param type The metadata object type.
+   * @param objectIds The stable IDs returned by the assignment lookup.
+   * @return Directly assigned tags and their values keyed by object ID.
+   * @throws IOException If the assignments cannot be read.
+   */
+  Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) throws IOException;
 
   /** The domains involved in a change, as read under the change's row locks. */
   final class LockedDomainState {

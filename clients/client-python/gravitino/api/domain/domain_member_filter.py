@@ -60,6 +60,9 @@ class DomainMemberFilter:
         return hash(self._criteria())
 
     def __post_init__(self) -> None:
+        Precondition.check_argument(
+            isinstance(self.expand, bool), "expand must be a boolean"
+        )
         Precondition.check_argument(self.types is not None, "types must not be None")
         Precondition.check_argument(
             self.domains is not None, "domains must not be None"

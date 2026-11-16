@@ -466,8 +466,8 @@ paths:
       description: >-
         Lists members in the domain's scope, including subdomains, once each with all applicable
         relations. By default, lists the objects that directly carry the backing tag of the domain
-        or a visible subdomain, including catalogs and schemas; a catalog or schema member includes
-        its children and is listed once, with DIRECT or VIA_SUBDOMAIN relations only. With
+        or a visible subdomain, including catalogs and schemas. Directly tagged descendants appear
+        even when their container matches. Relations are DIRECT or VIA_SUBDOMAIN. With
         expand=true, tagged catalogs and schemas expand to the recorded leaves that inherit the tag,
         with INHERITED relations where they apply; an empty result does not imply that unrecorded
         external objects are not members. Filters intersect.
@@ -679,7 +679,7 @@ components:
 
     MemberObject:
       type: object
-      description: A member metadata object serialized by the server. A catalog or schema member, listed only without expand, includes its children.
+      description: A member metadata object serialized by the server. Direct listings can include a catalog or schema alongside its directly tagged descendants.
       required: [fullName, type]
       properties:
         fullName:

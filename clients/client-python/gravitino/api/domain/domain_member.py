@@ -27,8 +27,8 @@ class DomainMember:
     """An object and every applicable relation to the listed domain.
 
     By default a listing returns direct members: objects that carry a backing tag
-    themselves, including catalogs and schemas (``CONTAINER_TYPES``). A catalog or
-    schema member includes its children. An expanded listing returns only leaf
+    themselves, including catalogs and schemas (``CONTAINER_TYPES``). A directly tagged descendant
+    is listed even when its catalog or schema also matches. An expanded listing returns only leaf
     objects (``SUPPORTED_TYPES``).
     """
 

@@ -271,10 +271,10 @@ public interface Domain extends Auditable {
    *
    * <p>By default the direct members are listed: the objects that carry a backing tag in the scope
    * themselves, which are leaf objects of the {@link DomainMember#SUPPORTED_TYPES supported types},
-   * catalogs and schemas. A catalog or schema member includes its children and is listed once,
-   * without listing the objects under it. The relations are {@link DomainRelation.Type#DIRECT} for
-   * this domain's own assignments and {@link DomainRelation.Type#VIA_SUBDOMAIN} for those of its
-   * sub-domains.
+   * catalogs and schemas. A directly tagged descendant is listed even when its catalog or schema
+   * also matches. Descendants that match only through inheritance require expansion. The relations
+   * are {@link DomainRelation.Type#DIRECT} for this domain's own assignments and {@link
+   * DomainRelation.Type#VIA_SUBDOMAIN} for those of its sub-domains.
    *
    * <p>When the filter {@link DomainMemberFilter#expand() expands} the listing, a catalog or schema
    * that carries a backing tag is expanded to the leaf objects under it that Gravitino has

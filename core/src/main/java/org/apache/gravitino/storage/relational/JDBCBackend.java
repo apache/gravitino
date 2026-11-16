@@ -836,6 +836,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) throws IOException {
+    return TagMetaService.getInstance().listDirectTagsByObjectIds(metalake, type, objectIds);
+  }
+
+  @Override
   public List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
       throws IOException {
     return DomainMetaService.getInstance().listDomainsByBackingTagIds(metalake, backingTagIds);

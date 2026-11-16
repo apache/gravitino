@@ -611,8 +611,8 @@ for creating constrained tags and assigning them to catalogs or schemas.
 ### Assign a Backing Tag to an Object
 
 Assign the Finance backing-tag value to the model using normal tag permissions. The same API
-works for leaf, schema and catalog assignments; a tagged catalog or schema is listed as one member
-that includes its children, and is expanded into its recorded leaves with `expand=true`.
+works for leaf, schema and catalog assignments. A tagged container and its directly tagged descendants
+appear separately. Use `expand=true` to include recorded leaves that inherit the binding.
 Tag-value requests use `application/vnd.gravitino.v2+json`; Domain endpoints use the v1 API.
 
 <Tabs groupId='language' queryString>
@@ -683,9 +683,8 @@ model.supports_tags().assign_tags(
 ### List Domain Members
 
 List the accessible objects that directly carry the backing tag of the domain or its visible
-children. Leaves, catalogs and schemas are returned; a catalog or schema member includes its
-children and is listed once. Each object occurs once with all applicable relations and complete
-sources. An empty query returns an empty member array.
+children. A directly tagged schema and a directly tagged table under it both appear. Each matching
+object occurs once with all applicable direct and subdomain relations.
 
 <Tabs groupId='language' queryString>
 <TabItem value="shell" label="REST">

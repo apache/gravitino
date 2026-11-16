@@ -734,6 +734,9 @@ class TestDomainClient(unittest.TestCase):
                 with self.assertRaises(IllegalArgumentException):
                     TagValue(name, value)
         for kwargs in (
+            {"expand": "false"},
+            {"expand": 1},
+            {"expand": None},
             {"types": None},
             {"types": [None]},
             {"types": [MetadataObject.Type.FUNCTION]},

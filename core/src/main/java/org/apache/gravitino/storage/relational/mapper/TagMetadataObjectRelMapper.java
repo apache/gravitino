@@ -42,6 +42,7 @@ public interface TagMetadataObjectRelMapper {
   /**
    * Selects tag assignment rows for multiple objects of one type.
    *
+   * @param metalakeName the metalake containing the objects
    * @param metadataObjectIds the source object IDs
    * @param metadataObjectType the source object type
    * @return the tag rows with source IDs
@@ -50,6 +51,7 @@ public interface TagMetadataObjectRelMapper {
       type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "listTagPOsByMetadataObjectIdsAndType")
   List<TagRelationTagPO> listTagPOsByMetadataObjectIdsAndType(
+      @Param("metalakeName") String metalakeName,
       @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 

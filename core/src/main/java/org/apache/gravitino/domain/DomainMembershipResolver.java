@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -41,7 +42,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationQuery;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.DomainEntity;
@@ -114,6 +114,13 @@ final class DomainMembershipResolver {
       List<DomainEntity> scopeDomains,
       List<DomainEntity> selectedDomains,
       DomainMemberFilter filter) {
+    Set<Long> selectedIds =
+        selectedDomains.stream().map(DomainEntity::id).collect(Collectors.toSet());
+    boolean needsOtherBindings =
+        scopeDomains.stream()
+            .anyMatch(d -> d.backingTagId() != null && !selectedIds.contains(d.id()));
+    Map<MetadataObject.Type, Map<Long, MetadataObject>> candidates =
+        new EnumMap<>(MetadataObject.Type.class);
     Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
     List<DomainMember> members = new ArrayList<>();
     try {
@@ -126,43 +133,48 @@ final class DomainMembershipResolver {
             Objects.equals(queriedDomain.id(), domain.id())
                 ? DomainRelation.direct()
                 : DomainRelation.viaSubdomain(domain.name());
-        for (MetadataObject object : listAssignedObjects(metalake, domain)) {
+        for (GenericEntity assignment : listAssignedObjects(metalake, domain)) {
+          MetadataObject object = assignedObject(assignment);
           if (DIRECT_MEMBER_TYPES.contains(object.type()) && matchesFilter(object, filter)) {
-            relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
+            if (needsOtherBindings) {
+              candidates
+                  .computeIfAbsent(object.type(), t -> new LinkedHashMap<>())
+                  .put(assignment.id(), object);
+            } else {
+              relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
+            }
           }
         }
       }
 
-      for (Map.Entry<MetadataObject, Set<DomainRelation>> entry : relations.entrySet()) {
-        MetadataObject object = entry.getKey();
-        if (selectedDomains.size() == scopeDomains.size()) {
-          members.add(
-              new DomainMemberInfo(object, entry.getValue().toArray(new DomainRelation[0])));
-          continue;
-        }
-
-        // Read only this candidate's direct tags to recover all visible membership paths.
-        // The assignment may have been removed since candidate enumeration.
-        try {
-          List<TagEntity> directTags =
-              store
-                  .relationOperations()
-                  .listEntitiesByRelation(
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                      MetadataObjectUtil.toEntityIdent(metalake, object),
-                      MetadataObjectUtil.toEntityType(object));
-          ResolvedTag[] assignments =
-              directTags.stream()
-                  .map(tag -> new ResolvedTag(tag, object))
-                  .toArray(ResolvedTag[]::new);
-          DomainRelation[] current =
-              resolveRelations(queriedDomain, scopeDomains, object, assignments);
-          if (Arrays.stream(current).anyMatch(entry.getValue()::contains)) {
-            members.add(new DomainMemberInfo(object, current));
-          }
-        } catch (NoSuchEntityException e) {
-          LOG.debug("Skipping missing member candidate {} in metalake {}", object, metalake, e);
-        }
+      relations.forEach(
+          (object, paths) ->
+              members.add(new DomainMemberInfo(object, paths.toArray(new DomainRelation[0]))));
+      for (Map.Entry<MetadataObject.Type, Map<Long, MetadataObject>> group :
+          candidates.entrySet()) {
+        Map<Long, MetadataObject> objects = group.getValue();
+        Map<Long, List<TagEntity>> directTags =
+            store
+                .domainOperations()
+                .listDirectTagsByObjectIds(
+                    metalake, group.getKey(), new ArrayList<>(objects.keySet()));
+        directTags.forEach(
+            (id, tags) -> {
+              MetadataObject object = objects.get(id);
+              ResolvedTag[] assignments =
+                  tags.stream()
+                      .map(tag -> new ResolvedTag(tag, object))
+                      .toArray(ResolvedTag[]::new);
+              // A candidate can lose its selected assignment between enumeration and the batch
+              // read.
+              if (selectedDomains.stream()
+                  .anyMatch(d -> resolveOwnRelation(d, object, assignments) != null)) {
+                members.add(
+                    new DomainMemberInfo(
+                        object,
+                        resolveRelations(queriedDomain, scopeDomains, object, assignments)));
+              }
+            });
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to list members of domain " + queriedDomain.name(), e);
@@ -189,8 +201,8 @@ final class DomainMembershipResolver {
           continue;
         }
 
-        for (MetadataObject assigned : listAssignedObjects(metalake, selectedDomain)) {
-          collectCandidates(metalake, assigned, filter, candidates);
+        for (GenericEntity assigned : listAssignedObjects(metalake, selectedDomain)) {
+          collectCandidates(metalake, assignedObject(assigned), filter, candidates);
         }
       }
     } catch (IOException e) {
@@ -351,21 +363,19 @@ final class DomainMembershipResolver {
     return null;
   }
 
-  private List<MetadataObject> listAssignedObjects(String metalake, DomainEntity domain)
+  private List<GenericEntity> listAssignedObjects(String metalake, DomainEntity domain)
       throws IOException {
     // Query by stable ID so a recreated tag with the same name cannot take over the binding.
     // The store matches a binding value exactly and returns only live objects.
-    List<GenericEntity> assigned =
-        store
-            .relationOperations()
-            .listEntitiesByRelation(
-                RelationQuery.forTagId(metalake, domain.backingTagId(), domain.backingTagValue()));
-    return assigned.stream()
-        .map(
-            assignment ->
-                MetadataObjects.parse(
-                    assignment.name(), MetadataObject.Type.valueOf(assignment.type().name())))
-        .collect(Collectors.toList());
+    return store
+        .relationOperations()
+        .listEntitiesByRelation(
+            RelationQuery.forTagId(metalake, domain.backingTagId(), domain.backingTagValue()));
+  }
+
+  private static MetadataObject assignedObject(GenericEntity assignment) {
+    return MetadataObjects.parse(
+        assignment.name(), MetadataObject.Type.valueOf(assignment.type().name()));
   }
 
   private static boolean matchesFilter(MetadataObject object, DomainMemberFilter filter) {

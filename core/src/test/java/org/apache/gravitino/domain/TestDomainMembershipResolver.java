@@ -93,6 +93,8 @@ class TestDomainMembershipResolver {
   private DomainMembershipResolver resolver;
   private SupportsDomainOperations domainOperations;
   private MockedStatic<MetadataObjectUtil> metadataObjects;
+  private final Map<MetadataObject, Long> objectIds = new HashMap<>();
+  private final Map<Long, MetadataObject> candidateObjects = new HashMap<>();
   private final Map<String, List<TagEntity>> assignments = new HashMap<>();
   private final Map<Long, List<GenericEntity>> candidates = new HashMap<>();
   private final Map<String, List<GenericEntity>> valuedCandidates = new HashMap<>();
@@ -111,6 +113,21 @@ class TestDomainMembershipResolver {
     when(store.relationOperations()).thenReturn(relations);
     domainOperations = mock(SupportsDomainOperations.class);
     when(store.domainOperations()).thenReturn(domainOperations);
+    when(domainOperations.listDirectTagsByObjectIds(eq(METALAKE), any(), anyList()))
+        .thenAnswer(
+            call -> {
+              Map<Long, List<TagEntity>> result = new HashMap<>();
+              for (long id : call.<List<Long>>getArgument(2)) {
+                MetadataObject object = candidateObjects.get(id);
+                assertEquals(object.type(), call.getArgument(1));
+                List<TagEntity> tags =
+                    assignments.get(MetadataObjectUtil.toEntityIdent(METALAKE, object).toString());
+                if (tags != null) {
+                  result.put(id, tags);
+                }
+              }
+              return result;
+            });
     resolver = new DomainMembershipResolver(store);
     metadataObjects = mockStatic(MetadataObjectUtil.class, CALLS_REAL_METHODS);
     metadataObjects
@@ -273,10 +290,22 @@ class TestDomainMembershipResolver {
             any(NameIdentifier.class),
             any(Entity.EntityType.class));
 
-    candidate(20, TABLE);
+    verifyNoInteractions(domainOperations);
+    MetadataObject second = object("cat.db.volumes", MetadataObject.Type.TABLE);
+    MetadataObject removed = object("cat.db.removed", MetadataObject.Type.TABLE);
+    candidate(20, TABLE, second, removed);
     assign(TABLE, tag(20, "trading"), tag(30, "dept", "tax"));
+    assign(second, tag(20, "trading"));
+    assign(removed, tag(30, "dept", "tax"));
     DomainMember[] members = resolver.listMembers(METALAKE, finance, children, filter);
-    assertArrayEquals(new MetadataObject[] {TABLE}, objects(members));
+    verify(domainOperations)
+        .listDirectTagsByObjectIds(
+            METALAKE,
+            MetadataObject.Type.TABLE,
+            Arrays.asList(objectIds.get(TABLE), objectIds.get(second), objectIds.get(removed)));
+    assertArrayEquals(new MetadataObject[] {TABLE, second}, objects(members));
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, members[1].relations());
     assertArrayEquals(
         new DomainRelation[] {
           DomainRelation.viaSubdomain("Tax"), DomainRelation.viaSubdomain("Trading")
@@ -287,6 +316,24 @@ class TestDomainMembershipResolver {
     for (RelationQuery query : queries.getAllValues()) {
       assertEquals(20L, query.anchorId().get().longValue());
     }
+  }
+
+  @Test
+  void testFilteredListingSkipsTagLookupWhenOtherDomainsAreUnbound() {
+    DomainEntity finance = domain(1, "Finance", null, null, null);
+    DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity tax = domain(3, "Tax", "Finance", null, null);
+    candidate(20, TABLE);
+    DomainMember[] members =
+        resolver.listMembers(
+            METALAKE,
+            finance,
+            new DomainEntity[] {trading, tax},
+            direct().withDomains("Trading").build());
+    assertArrayEquals(new MetadataObject[] {TABLE}, objects(members));
+    assertArrayEquals(
+        new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, members[0].relations());
+    verifyNoInteractions(domainOperations);
   }
 
   @Test
@@ -682,12 +729,14 @@ class TestDomainMembershipResolver {
     valuedCandidates.put(tagId + "=" + value, entities(objects));
   }
 
-  private static List<GenericEntity> entities(MetadataObject... objects) {
+  private List<GenericEntity> entities(MetadataObject... objects) {
     List<GenericEntity> entities = new ArrayList<>();
     for (MetadataObject object : objects) {
+      long id = objectIds.computeIfAbsent(object, ignored -> 100L + objectIds.size());
+      candidateObjects.put(id, object);
       entities.add(
           GenericEntity.builder()
-              .withId(100L + entities.size())
+              .withId(id)
               .withName(object.fullName())
               .withEntityType(Entity.EntityType.valueOf(object.type().name()))
               .build());

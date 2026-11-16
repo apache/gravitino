@@ -35,8 +35,8 @@ A member query has two modes:
 
 - **Direct members** (the default) are the objects that carry the backing tag themselves: leaves
   (**table, view, fileset, topic, model and semantic model**) as well as **catalogs and schemas**.
-  A tagged catalog or schema is returned once and includes its children; the objects under it are
-  not listed. This mode reads only tag assignments and does not resolve each leaf's effective tags.
+  A tagged schema and a directly tagged table under it are both listed. Descendants that match
+  only through inheritance appear in expanded listings. This mode reads only tag assignments and does not resolve each leaf's effective tags.
 - **Expanded members** (`expand=true`) are leaves only. A tagged catalog or schema is replaced by the
   recorded leaves under it whose effective tags match the binding, following the inheritance rules
   below. Only objects already recorded by Gravitino are enumerated: a tag on an external catalog is
