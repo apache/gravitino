@@ -160,17 +160,24 @@ public interface TableMetaMapper {
       @Param("newSchemaId") Long newSchemaId);
 
   /**
-   * Soft-deletes a table only if its version has not changed since the caller read it.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the table changed or disappeared
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
+   * @return the number of affected rows
    */
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
   Integer softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion);
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,

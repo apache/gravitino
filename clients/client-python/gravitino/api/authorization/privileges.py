@@ -225,6 +225,12 @@ class Privilege(ABC):
         MODIFY_SEMANTIC_MODEL = (0, 1 << 41)
         """The privilege to rename a Semantic Model or alter its definition and metadata."""
 
+        MANAGE_DOMAIN = (0, 1 << 42)
+        """The privilege to manage domains, including drafts."""
+
+        USE_DOMAIN = (0, 1 << 43)
+        """The privilege to discover published domains and their accessible members."""
+
         def __init__(self, high_bits: int, low_bits: int) -> None:
             """
             Initialize the Name with the high and low bits.
@@ -1883,6 +1889,62 @@ class IncludeCredentialSecrets(GenericPrivilege):
         return obj_type in Privileges.SECRET_SUPPORTED_TYPES
 
 
+class ManageDomain(GenericPrivilege):
+    """The privilege to manage domains, including drafts."""
+
+    _ALLOW_INSTANCE: Optional[ManageDomain] = None
+    _DENY_INSTANCE: Optional[ManageDomain] = None
+
+    @staticmethod
+    def allow() -> ManageDomain:
+        """Return the privilege with the allow condition."""
+        if ManageDomain._ALLOW_INSTANCE is None:
+            ManageDomain._ALLOW_INSTANCE = ManageDomain(
+                Privilege.Condition.ALLOW, Privilege.Name.MANAGE_DOMAIN
+            )
+        return ManageDomain._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> ManageDomain:
+        """Return the privilege with the deny condition."""
+        if ManageDomain._DENY_INSTANCE is None:
+            ManageDomain._DENY_INSTANCE = ManageDomain(
+                Privilege.Condition.DENY, Privilege.Name.MANAGE_DOMAIN
+            )
+        return ManageDomain._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
+
+
+class UseDomain(GenericPrivilege):
+    """The privilege to discover published domains and accessible members."""
+
+    _ALLOW_INSTANCE: Optional[UseDomain] = None
+    _DENY_INSTANCE: Optional[UseDomain] = None
+
+    @staticmethod
+    def allow() -> UseDomain:
+        """Return the privilege with the allow condition."""
+        if UseDomain._ALLOW_INSTANCE is None:
+            UseDomain._ALLOW_INSTANCE = UseDomain(
+                Privilege.Condition.ALLOW, Privilege.Name.USE_DOMAIN
+            )
+        return UseDomain._ALLOW_INSTANCE
+
+    @staticmethod
+    def deny() -> UseDomain:
+        """Return the privilege with the deny condition."""
+        if UseDomain._DENY_INSTANCE is None:
+            UseDomain._DENY_INSTANCE = UseDomain(
+                Privilege.Condition.DENY, Privilege.Name.USE_DOMAIN
+            )
+        return UseDomain._DENY_INSTANCE
+
+    def can_bind_to(self, obj_type: MetadataObject.Type) -> bool:
+        return obj_type in Privileges.DOMAIN_SUPPORTED_TYPES
+
+
 class Privileges:
     _PRIVILEGE_TYPES = {
         Privilege.Name.CREATE_CATALOG: CreateCatalog,
@@ -1924,9 +1986,13 @@ class Privileges:
         Privilege.Name.CREATE_SEMANTIC_MODEL: CreateSemanticModel,
         Privilege.Name.USE_SEMANTIC_MODEL: UseSemanticModel,
         Privilege.Name.MODIFY_SEMANTIC_MODEL: ModifySemanticModel,
+        Privilege.Name.MANAGE_DOMAIN: ManageDomain,
+        Privilege.Name.USE_DOMAIN: UseDomain,
         Privilege.Name.USE_SECRETS: UseSecrets,
         Privilege.Name.INCLUDE_CREDENTIAL_SECRETS: IncludeCredentialSecrets,
     }
+
+    DOMAIN_SUPPORTED_TYPES = {MetadataObject.Type.METALAKE, MetadataObject.Type.DOMAIN}
 
     TABLE_SUPPORTED_TYPES = {
         MetadataObject.Type.METALAKE,
@@ -1988,6 +2054,7 @@ class Privileges:
         MetadataObject.Type.MODEL,
     }
     MANAGE_GRANTS_SUPPORTED_TYPES = {
+        MetadataObject.Type.DOMAIN,
         MetadataObject.Type.METALAKE,
         MetadataObject.Type.CATALOG,
         MetadataObject.Type.SCHEMA,

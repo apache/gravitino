@@ -134,6 +134,20 @@ public class SessionUtils {
     }
   }
 
+  /**
+   * Clears MyBatis's first-level cache of the current session. A read earlier in the session, for
+   * example by a caller's outer transaction, may be cached; a read that must see the database as it
+   * is now, such as one that follows a locking read, calls this first.
+   */
+  public static void clearSessionCache() {
+    SqlSession session = SqlSessions.getSqlSession();
+    try {
+      session.clearCache();
+    } finally {
+      SqlSessions.closeSqlSession();
+    }
+  }
+
   public static void beginTransaction() {
     SqlSessions.getSqlSession();
   }

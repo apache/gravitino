@@ -79,6 +79,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -182,6 +183,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.MockedConstruction;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -2616,7 +2618,9 @@ public class TestFilesetCatalogOperations {
 
     try (FilesetCatalogOperations ops =
         Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
-      doReturn(fileSystem).when(ops).getFileSystem(Mockito.eq(path), Mockito.anyMap());
+      doReturn(fileSystem)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString());
       ConnectionFailedException failure =
           Assertions.assertThrows(
               ConnectionFailedException.class,
@@ -2653,6 +2657,103 @@ public class TestFilesetCatalogOperations {
           exception.getMessage().contains("location (location is not a directory)"));
       Assertions.assertFalse(exception.getMessage().contains(fileLocation.toURI().toString()));
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  public void testGetFileSystemUsesRequestUserOnPoolThread(boolean cached) throws Exception {
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      Path path = new Path(TEST_ROOT_PATH, "pool_thread_user");
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            if (cached) {
+              // ops.close() closes the cached file system.
+              ops.getFileSystemWithCache(path, ImmutableMap.of());
+            } else {
+              ops.getFileSystem(path, ImmutableMap.of()).close();
+            }
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
+    }
+  }
+
+  @Test
+  public void testTestConnectionUsesRequestUserOnPoolThread() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/pool-thread-user");
+    FileUtils.forceMkdir(location);
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, location.toURI().toString()),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      List<String> users = recordFileSystemUsers(ops);
+      startPoolThreadsAs(ops, "alice");
+
+      PrincipalUtils.doAs(
+          new UserPrincipal("bob"),
+          () -> {
+            ops.testConnection(NameIdentifier.of("metalake", "catalog"));
+            return null;
+          });
+
+      Assertions.assertEquals(Collections.singletonList("bob on alice"), users);
+    }
+  }
+
+  @Test
+  public void testHdfsFileSystemProxyUsesGivenUser() throws Exception {
+    List<ImpersonationHDFSFileSystemProxy.ProxyUserHandler> handlers = new ArrayList<>();
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager);
+        MockedConstruction<ImpersonationHDFSFileSystemProxy> ignored =
+            Mockito.mockConstruction(
+                ImpersonationHDFSFileSystemProxy.class,
+                (proxy, context) ->
+                    handlers.add(
+                        (ImpersonationHDFSFileSystemProxy.ProxyUserHandler)
+                            context.arguments().get(2)))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Called directly: construction mocks only intercept on the current thread.
+      ops.createFileSystem(
+          new Path("hdfs://localhost:8020/proxy_user"), ImmutableMap.of(), "hdfs", null, "bob");
+
+      Assertions.assertEquals(1, handlers.size());
+      Assertions.assertEquals(
+          "bob", PrincipalUtils.doAs(new UserPrincipal("alice"), handlers.get(0)::getProxyUser));
+    }
+  }
+
+  private static List<String> recordFileSystemUsers(FilesetCatalogOperations ops)
+      throws IOException {
+    List<String> users = new CopyOnWriteArrayList<>();
+    Mockito.doAnswer(
+            invocation -> {
+              // The requested user, and the user whose Subject the pool thread carries.
+              users.add(invocation.getArgument(4) + " on " + PrincipalUtils.getCurrentUserName());
+              return invocation.callRealMethod();
+            })
+        .when(ops)
+        .createFileSystem(any(), any(), any(), any(), any());
+    return users;
+  }
+
+  // The tests rely on a thread started inside Subject.doAs keeping that Subject, as it does up to
+  // JDK 22. Revisit them when PrincipalUtils moves off Subject.getSubject, which later JDKs no
+  // longer support. Keep the threads alive so that bob's request does not start new ones.
+  private static void startPoolThreadsAs(FilesetCatalogOperations ops, String user)
+      throws Exception {
+    ops.fileSystemExecutor.allowCoreThreadTimeOut(false);
+    PrincipalUtils.doAs(
+        new UserPrincipal(user), () -> ops.fileSystemExecutor.prestartAllCoreThreads());
   }
 
   @Test
@@ -3408,7 +3509,7 @@ public class TestFilesetCatalogOperations {
       String subPath = "/test/test.parquet";
       when(mockOps.getFileLocation(filesetIdent, subPath)).thenCallRealMethod();
       when(mockOps.getFileLocation(filesetIdent, subPath, null)).thenCallRealMethod();
-      when(mockOps.getFileSystem(any(), any()))
+      when(mockOps.getFileSystem(any(), any(), any()))
           .thenReturn(FileSystem.getLocal(new Configuration()));
       when(mockOps.getFileSystemWithCache(any(), any())).thenCallRealMethod();
       String fileLocation = mockOps.getFileLocation(filesetIdent, subPath);
@@ -3421,6 +3522,7 @@ public class TestFilesetCatalogOperations {
       FileSystem fs2 =
           mockOps.getFileSystemWithCache(new Path("file:///dir1/subdir/file2"), mockOps.getConf());
 
+      Assertions.assertNotNull(fs1);
       Assertions.assertSame(fs1, fs2);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -3952,7 +4054,9 @@ public class TestFilesetCatalogOperations {
           randomCatalogInfo("m1", "c1"),
           FILESET_PROPERTIES_METADATA);
       ops.fileSystemCache.invalidateAll();
-      Mockito.doThrow(cause).when(ops).getFileSystem(Mockito.eq(path), Mockito.eq(conf));
+      Mockito.doThrow(cause)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.eq(conf), Mockito.anyString());
 
       GravitinoRuntimeException e =
           Assertions.assertThrows(

@@ -173,10 +173,7 @@ public class IcebergTableOperations {
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
   @AuthorizationExpression(
-      expression =
-          "ANY(OWNER, METALAKE, CATALOG) || "
-              + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-              + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_TABLE",
+      expression = AuthorizationExpressionConstants.CREATE_TABLE_AUTHORIZATION_EXPRESSION,
       accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createTable(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
@@ -226,7 +223,8 @@ public class IcebergTableOperations {
           String namespace,
       @AuthorizationMetadata(type = Entity.EntityType.TABLE) @Encoded() @PathParam("table")
           String table,
-      UpdateTableRequest updateTableRequest) {
+      @IcebergAuthorizationMetadata(type = IcebergAuthorizationMetadata.RequestType.UPDATE_TABLE)
+          UpdateTableRequest updateTableRequest) {
     IcebergRESTUtils.validateRequest(updateTableRequest, "UpdateTableRequest");
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =

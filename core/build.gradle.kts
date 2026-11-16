@@ -109,12 +109,27 @@ val testJar by tasks.registering(Jar::class) {
   from(sourceSets["test"].output)
 }
 
+// Modules weave MethodMonitorAspect into their own @Monitored methods from this jar. The shaded
+// jar cannot be used as the aspect path: relocation rewrites the constant pool of woven classes and
+// breaks their AspectJ attributes, which makes ajc fail. The jar is written outside build/libs so
+// that the distribution, which copies every jar in build/libs, does not ship a second copy of the
+// aspect.
+val aspectJar by tasks.registering(Jar::class) {
+  archiveClassifier.set("aspects")
+  destinationDirectory.set(layout.buildDirectory.dir("aspects"))
+  from(sourceSets["main"].output) {
+    include("org/apache/gravitino/metrics/MethodMonitorAspect.class")
+  }
+}
+
 configurations {
   create("testArtifacts")
+  create("aspects")
 }
 
 artifacts {
   add("testArtifacts", testJar)
+  add("aspects", aspectJar)
 }
 
 // Core's tests run in four lanes: coreUnitTest, plus coreH2Test/coreMySQLTest/corePostgreSQLTest.

@@ -63,7 +63,10 @@ public class HiveCatalogCapability implements Capability {
     Preconditions.checkArgument(scope != null, "scope cannot be null");
     // Use if/else rather than a switch on the enum: javac compiles an enum switch into a
     // synthetic switch-map class that is loaded lazily by this class's ClassLoader.
-    if (scope == Scope.SCHEMA || scope == Scope.TABLE || scope == Scope.COLUMN) {
+    if (scope == Scope.SCHEMA
+        || scope == Scope.TABLE
+        || scope == Scope.VIEW
+        || scope == Scope.COLUMN) {
       // Hive is case insensitive, see
       // https://cwiki.apache.org/confluence/display/Hive/User+FAQ#UserFAQ-AreHiveSQLidentifiers(e.g.tablenames,columnnames,etc)casesensitive?
       return CapabilityResult.unsupported("Hive is case insensitive.");

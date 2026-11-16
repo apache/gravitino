@@ -32,10 +32,19 @@ import org.apache.hadoop.security.UserGroupInformation.AuthenticationMethod;
 import org.apache.hadoop.security.token.Token;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.hive.HiveClientPool;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergHiveCachedClientPool {
+
+  // The cache is static and shared by every pool, so keep the tests independent of each other.
+  @AfterEach
+  void clearSharedCache() {
+    if (IcebergHiveCachedClientPool.clientPoolCache() != null) {
+      IcebergHiveCachedClientPool.clientPoolCache().invalidateAll();
+    }
+  }
 
   @Test
   void test() throws IOException {
@@ -112,17 +121,16 @@ public class TestIcebergHiveCachedClientPool {
     configuration.set("hive.metastore.uris", "thrift://identity-test:9083");
     UserGroupInformation login = UserGroupInformation.createRemoteUser("catalog");
     UserGroupInformation proxy = UserGroupInformation.createProxyUser("catalog", login);
-    try (IcebergHiveCachedClientPool pool =
+    IcebergHiveCachedClientPool pool =
         new IcebergHiveCachedClientPool(
-            configuration, Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"))) {
-      HiveClientPool loginPool = login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-      HiveClientPool proxyPool = proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-      Assertions.assertNotSame(loginPool, proxyPool);
-      Assertions.assertSame(
-          loginPool, login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
-      Assertions.assertSame(
-          proxyPool, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
-    }
+            configuration, Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"));
+    HiveClientPool loginPool = login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+    HiveClientPool proxyPool = proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+    Assertions.assertNotSame(loginPool, proxyPool);
+    Assertions.assertSame(
+        loginPool, login.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
+    Assertions.assertSame(
+        proxyPool, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
   }
 
   @Test
@@ -134,17 +142,14 @@ public class TestIcebergHiveCachedClientPool {
     kerberos.set("hive.metastore.kerberos.principal", "hive/_HOST@EXAMPLE.COM");
     UserGroupInformation first = UserGroupInformation.createRemoteUser("first");
     UserGroupInformation second = UserGroupInformation.createRemoteUser("second");
-    try (IcebergHiveCachedClientPool simplePool =
-            new IcebergHiveCachedClientPool(simple, Map.of());
-        IcebergHiveCachedClientPool kerberosPool =
-            new IcebergHiveCachedClientPool(kerberos, Map.of())) {
-      HiveClientPool firstPool =
-          first.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool);
-      Assertions.assertNotSame(
-          firstPool, second.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool));
-      Assertions.assertNotSame(
-          firstPool, first.doAs((PrivilegedAction<HiveClientPool>) kerberosPool::clientPool));
-    }
+    IcebergHiveCachedClientPool simplePool = new IcebergHiveCachedClientPool(simple, Map.of());
+    IcebergHiveCachedClientPool kerberosPool = new IcebergHiveCachedClientPool(kerberos, Map.of());
+    HiveClientPool firstPool =
+        first.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool);
+    Assertions.assertNotSame(
+        firstPool, second.doAs((PrivilegedAction<HiveClientPool>) simplePool::clientPool));
+    Assertions.assertNotSame(
+        firstPool, first.doAs((PrivilegedAction<HiveClientPool>) kerberosPool::clientPool));
   }
 
   @Test
@@ -157,15 +162,13 @@ public class TestIcebergHiveCachedClientPool {
         List.of(
             Map.<String, String>of(),
             Map.of(CatalogProperties.CLIENT_POOL_CACHE_KEYS, "USER_NAME"))) {
-      try (IcebergHiveCachedClientPool pool =
-          new IcebergHiveCachedClientPool(configuration, properties)) {
-        HiveClientPool first =
-            proxyWithToken(login, 0).doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-        for (int request = 1; request <= 10; request++) {
-          UserGroupInformation proxy = proxyWithToken(login, request);
-          Assertions.assertSame(
-              first, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
-        }
+      IcebergHiveCachedClientPool pool = new IcebergHiveCachedClientPool(configuration, properties);
+      HiveClientPool first =
+          proxyWithToken(login, 0).doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+      for (int request = 1; request <= 10; request++) {
+        UserGroupInformation proxy = proxyWithToken(login, request);
+        Assertions.assertSame(
+            first, proxy.doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
       }
     }
   }
@@ -178,17 +181,15 @@ public class TestIcebergHiveCachedClientPool {
     UserGroupInformation second = UserGroupInformation.createRemoteUser("other");
     second.setAuthenticationMethod(AuthenticationMethod.KERBEROS);
     UserGroupInformation simple = UserGroupInformation.createRemoteUser("service");
-    try (IcebergHiveCachedClientPool pool =
-        new IcebergHiveCachedClientPool(configuration, Map.of())) {
-      HiveClientPool original =
-          UserGroupInformation.createProxyUser("alice", first)
-              .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
-      for (UserGroupInformation real : List.of(second, simple)) {
-        Assertions.assertNotSame(
-            original,
-            UserGroupInformation.createProxyUser("alice", real)
-                .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
-      }
+    IcebergHiveCachedClientPool pool = new IcebergHiveCachedClientPool(configuration, Map.of());
+    HiveClientPool original =
+        UserGroupInformation.createProxyUser("alice", first)
+            .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool);
+    for (UserGroupInformation real : List.of(second, simple)) {
+      Assertions.assertNotSame(
+          original,
+          UserGroupInformation.createProxyUser("alice", real)
+              .doAs((PrivilegedAction<HiveClientPool>) pool::clientPool));
     }
   }
 
@@ -198,25 +199,9 @@ public class TestIcebergHiveCachedClientPool {
     first.set("hive.metastore.token.signature", "first");
     Configuration second = new Configuration(first);
     second.set("hive.metastore.token.signature", "second");
-    try (IcebergHiveCachedClientPool firstPool = new IcebergHiveCachedClientPool(first, Map.of());
-        IcebergHiveCachedClientPool secondPool =
-            new IcebergHiveCachedClientPool(second, Map.of())) {
-      Assertions.assertNotSame(firstPool.clientPool(), secondPool.clientPool());
-    }
-  }
-
-  @Test
-  void testCloseMultipleInstances() throws IOException {
-    Configuration configuration = new Configuration();
-    Map<String, String> properties = Maps.newHashMap();
-    IcebergHiveCachedClientPool pool1 = new IcebergHiveCachedClientPool(configuration, properties);
-    IcebergHiveCachedClientPool pool2 = new IcebergHiveCachedClientPool(configuration, properties);
-
-    Assertions.assertDoesNotThrow(
-        () -> {
-          pool1.close();
-          pool2.close();
-        });
+    IcebergHiveCachedClientPool firstPool = new IcebergHiveCachedClientPool(first, Map.of());
+    IcebergHiveCachedClientPool secondPool = new IcebergHiveCachedClientPool(second, Map.of());
+    Assertions.assertNotSame(firstPool.clientPool(), secondPool.clientPool());
   }
 
   private static UserGroupInformation proxyWithToken(UserGroupInformation login, int sequence) {

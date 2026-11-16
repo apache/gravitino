@@ -35,7 +35,21 @@ import org.junit.jupiter.api.Test;
 public class TestHiveCatalogCapability {
 
   private static final Set<Capability.Scope> CASE_INSENSITIVE_SCOPES =
-      EnumSet.of(Capability.Scope.SCHEMA, Capability.Scope.TABLE, Capability.Scope.COLUMN);
+      EnumSet.of(
+          Capability.Scope.SCHEMA,
+          Capability.Scope.TABLE,
+          Capability.Scope.VIEW,
+          Capability.Scope.COLUMN);
+
+  @Test
+  public void testHiveEntityNamesAreCaseInsensitive() {
+    HiveCatalogCapability capability = new HiveCatalogCapability(() -> HiveVersion.HIVE2);
+
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.SCHEMA).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.TABLE).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.VIEW).supported());
+    assertFalse(capability.caseSensitiveOnName(Capability.Scope.COLUMN).supported());
+  }
 
   @Test
   public void testColumnConstraintsOnHive2() {

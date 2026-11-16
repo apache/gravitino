@@ -82,6 +82,7 @@ import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1012,6 +1013,38 @@ public class TestCatalogManager {
   }
 
   @Test
+  public void testCreateCatalogPropagatesBackendForbidden() throws Exception {
+    // The create-time probe reports that the backend refuses the configured credentials: the
+    // ForbiddenException must reach the caller unwrapped, and creation must roll back the cache and
+    // the store.
+    NameIdentifier forbidIdent = NameIdentifier.of("metalake", "verify-testconn-forbid");
+    Map<String, String> forbidProps =
+        Maps.newHashMap(
+            ImmutableMap.of(
+                PROPERTY_KEY1,
+                "value1",
+                PROPERTY_KEY2,
+                "value2",
+                PROPERTY_KEY5_PREFIX + "1",
+                "value3",
+                TestCatalogOperations.VALIDATE_ON_CREATE,
+                "true",
+                TestCatalogOperations.FORBID_TEST,
+                "true"));
+    ForbiddenException exception =
+        Assertions.assertThrows(
+            ForbiddenException.class,
+            () ->
+                catalogManager.createCatalog(
+                    forbidIdent, Catalog.Type.RELATIONAL, provider, "comment", forbidProps));
+    Assertions.assertEquals("Backend denied access", exception.getMessage());
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(forbidIdent));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> entityStore.get(forbidIdent, EntityType.CATALOG, CatalogEntity.class));
+  }
+
+  @Test
   public void testCreateCatalogVerifiesBackendViaTestConnection() throws Exception {
     // Opted in via validateOnCreate() force-probe, and the probe reports the backend unreachable:
     // creation must propagate ConnectionFailedException and roll back both the cache and the store.
@@ -1147,7 +1180,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testListCatalogsInfo() {
+  public void testListCatalogsInfo() throws IOException {
     NameIdentifier relIdent = NameIdentifier.of("metalake", "catalog_rel");
     NameIdentifier fileIdent = NameIdentifier.of("metalake", "catalog_file");
     Map<String, String> props =
@@ -1164,6 +1197,52 @@ public class TestCatalogManager {
     catalogManager.createCatalog(relIdent, Catalog.Type.RELATIONAL, provider, "comment", props);
     catalogManager.createCatalog(fileIdent, Catalog.Type.FILESET, provider, "comment", props);
     catalogManager.getCatalogCache().invalidateAll();
+
+    Catalog[] catalogDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+    Assertions.assertEquals(2, catalogDescriptors.length);
+    for (Catalog catalog : catalogDescriptors) {
+      Assertions.assertEquals(provider, catalog.provider());
+      Assertions.assertEquals("comment", catalog.comment());
+      Assertions.assertNotNull(catalog.auditInfo());
+      Assertions.assertEquals(
+          ImmutableMap.of(Catalog.PROPERTY_IN_USE, "true"), catalog.properties());
+    }
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+
+    catalogManager.disableCatalog(fileIdent);
+    CatalogEntity legacy = entityStore.get(relIdent, EntityType.CATALOG, CatalogEntity.class);
+    Map<String, String> legacyProperties = Maps.newHashMap(legacy.getProperties());
+    legacyProperties.remove(Catalog.PROPERTY_IN_USE);
+    for (Map<String, String> descriptorProperties : Arrays.asList(legacyProperties, null)) {
+      entityStore.update(
+          relIdent,
+          CatalogEntity.class,
+          EntityType.CATALOG,
+          old ->
+              CatalogEntity.builder()
+                  .withId(old.id())
+                  .withName(old.name())
+                  .withNamespace(old.namespace())
+                  .withType(old.getType())
+                  .withProvider(old.getProvider())
+                  .withComment(old.getComment())
+                  .withProperties(descriptorProperties)
+                  .withAuditInfo((AuditInfo) old.auditInfo())
+                  .build());
+      Catalog[] stateDescriptors = catalogManager.listCatalogsInfo(relIdent.namespace(), false);
+      for (Catalog catalog : stateDescriptors) {
+        Assertions.assertEquals(
+            ImmutableMap.of(
+                Catalog.PROPERTY_IN_USE,
+                catalog.name().equals(fileIdent.name()) ? "false" : "true"),
+            catalog.properties());
+      }
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(relIdent));
+      Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(fileIdent));
+    }
+    entityStore.update(relIdent, CatalogEntity.class, EntityType.CATALOG, old -> legacy);
+    catalogManager.enableCatalog(fileIdent);
 
     Catalog[] catalogs = catalogManager.listCatalogsInfo(relIdent.namespace());
     Assertions.assertEquals(2, catalogs.length);

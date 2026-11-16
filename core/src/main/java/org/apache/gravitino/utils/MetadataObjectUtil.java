@@ -38,6 +38,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -67,6 +68,7 @@ public class MetadataObjectUtil {
           .put(MetadataObject.Type.VIEW, Entity.EntityType.VIEW)
           .put(MetadataObject.Type.SEMANTIC_MODEL, Entity.EntityType.SEMANTIC_MODEL)
           .put(MetadataObject.Type.FUNCTION, Entity.EntityType.FUNCTION)
+          .put(MetadataObject.Type.DOMAIN, Entity.EntityType.DOMAIN)
           .build();
 
   private MetadataObjectUtil() {}
@@ -103,6 +105,16 @@ public class MetadataObjectUtil {
   }
 
   /**
+   * Returns the entity types that metadata object types are mapped to. A metadata object type that
+   * is not backed by an entity yet has no entry here.
+   *
+   * @return The entity types of the metadata objects.
+   */
+  public static Set<Entity.EntityType> metadataObjectEntityTypes() {
+    return TYPE_TO_TYPE_MAP.values();
+  }
+
+  /**
    * Convert the given {@link MetadataObject} full name to the corresponding {@link NameIdentifier}.
    *
    * @param metalakeName The metalake name
@@ -128,6 +140,10 @@ public class MetadataObjectUtil {
         return NameIdentifierUtil.ofJob(metalakeName, metadataObject.name());
       case JOB_TEMPLATE:
         return NameIdentifierUtil.ofJobTemplate(metalakeName, metadataObject.name());
+      case DOMAIN:
+        String domainName = metadataObject.fullName();
+        NameValidationUtils.validateName("domain", domainName);
+        return NameIdentifierUtil.ofDomain(metalakeName, domainName);
       case VIEW:
       case SEMANTIC_MODEL:
       case CATALOG:
@@ -334,6 +350,15 @@ public class MetadataObjectUtil {
         try {
           env.internalJobOperationDispatcher().getJobTemplate(metalake, object.fullName());
         } catch (NoSuchJobTemplateException e) {
+          throw exceptionToThrowSupplier.get();
+        }
+        break;
+
+      case DOMAIN:
+        NameIdentifierUtil.checkDomain(identifier);
+        try {
+          env.internalDomainDispatcher().getDomain(metalake, object.fullName());
+        } catch (NoSuchDomainException e) {
           throw exceptionToThrowSupplier.get();
         }
         break;
