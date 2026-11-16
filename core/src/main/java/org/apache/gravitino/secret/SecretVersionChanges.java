@@ -22,10 +22,12 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 /**
- * Write-through secret versions that an entity alter staged or stopped referencing.
+ * Write-through secret versions that an entity create or alter staged, or that an alter stopped
+ * referencing.
  *
- * <p>Created by the {@code SecretAlterChanges.prepare*Changes} methods. After the entity alter
- * commits, {@link SecretManager#commitSecrets} applies them; if the alter fails, {@link
+ * <p>Created by {@link SecretManager#stageSecrets}, which the {@code
+ * SecretAlterChanges.prepare*Changes} methods call. After the entity create or alter commits,
+ * {@link SecretManager#commitSecrets} applies them; if it fails, {@link
  * SecretManager#rollbackSecrets(SecretVersionChanges)} deletes the written versions.
  */
 public final class SecretVersionChanges {
@@ -53,7 +55,7 @@ public final class SecretVersionChanges {
     return new SecretVersionChanges(written, List.of());
   }
 
-  /** Versions written by the alter, to make current on commit and delete on rollback. */
+  /** Versions written by the create or alter, to make current on commit and delete on rollback. */
   List<WrittenVersion> written() {
     return written;
   }

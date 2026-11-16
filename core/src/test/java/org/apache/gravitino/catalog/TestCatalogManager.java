@@ -102,7 +102,6 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProvider;
 import org.apache.gravitino.secret.SecretProviderRegistry;
@@ -2643,7 +2642,7 @@ public class TestCatalogManager {
       NameIdentifier ident = NameIdentifier.of("metalake", "legacy_secret_providers");
       long id = new RandomIdGenerator().nextId();
       SecretUrn urn = writeThroughUrn("catalog", id, CredentialConstants.CREDENTIAL_PROVIDERS);
-      secrets.writeSecrets(List.of(new SecretMaterial(urn, "gcs-token")));
+      secrets.getRegistry().getProvider(urn.providerName()).writeSecretVersion(urn, "gcs-token");
       Map<String, String> props = new HashMap<>(catalogProps());
       props.put(CredentialConstants.CREDENTIAL_PROVIDERS, urn.toString());
       entityStore.put(

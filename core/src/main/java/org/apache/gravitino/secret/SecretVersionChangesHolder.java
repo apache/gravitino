@@ -26,7 +26,7 @@ import com.google.common.base.Preconditions;
  * <p>Used by catalog, schema, and fileset alter paths that stage secret versions inside {@code
  * store.update}, commit them after the update and roll them back on failure.
  */
-public final class SecretMaterialsHolder {
+public final class SecretVersionChangesHolder {
 
   private SecretVersionChanges changes = SecretVersionChanges.EMPTY;
 
