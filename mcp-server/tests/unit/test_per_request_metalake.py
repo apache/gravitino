@@ -179,7 +179,9 @@ class _EchoCatalogOperation:
 class _EchoMetalakeClient(MockOperation):
     """MockOperation that remembers the metalake it was constructed with."""
 
-    def __init__(self, metalake, uri, authorization="", *, auth=None):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         super().__init__(metalake, uri, authorization, auth=auth)
         self._metalake = metalake
 
@@ -270,7 +272,9 @@ class _RecordingClient(MockOperation):
     built = []
     auths = []
 
-    def __init__(self, metalake, uri, authorization="", *, auth=None):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         super().__init__(metalake, uri, authorization, auth=auth)
         _RecordingClient.built.append(metalake)
         _RecordingClient.auths.append(auth)
@@ -285,7 +289,9 @@ class _ClosableClient(MockOperation):
     parked = None
     released = None
 
-    def __init__(self, metalake, uri, authorization="", *, auth=None):
+    def __init__(
+        self, metalake, uri, authorization="", *, auth=None, read_timeout=60.0
+    ):
         super().__init__(metalake, uri, authorization, auth=auth)
         self._metalake = metalake
 

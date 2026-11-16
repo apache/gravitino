@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.utils.JdbcUrlUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,10 +75,19 @@ public final class HiddenPropertyMaskUtils {
 
   /**
    * Mapper for nest-JSON masking. Uses {@link JsonNode} with big-decimal floats so rewritten JSON
-   * keeps numeric fidelity better than {@code Map}/{@code List} round-trips.
+   * keeps numeric fidelity better than {@code Map}/{@code List} round-trips. {@link
+   * DeserializationFeature#FAIL_ON_TRAILING_TOKENS} rejects concatenated values (for example {@code
+   * {} {"password":"secret"}}), and {@link DeserializationFeature#FAIL_ON_READING_DUP_TREE_KEY}
+   * rejects duplicate object fields (for example {@code {"config":{"password":"x"},"config":{}}}),
+   * so a dropped earlier field cannot leave a secret in the original string when the walk sees only
+   * the last value.
    */
   private static final ObjectMapper NEST_JSON_MAPPER =
-      JsonUtils.anyFieldMapper().copy().enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+      JsonUtils.anyFieldMapper()
+          .copy()
+          .enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
+          .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY);
 
   private HiddenPropertyMaskUtils() {}
 
@@ -129,7 +139,8 @@ public final class HiddenPropertyMaskUtils {
       boolean reserved = metadata.isReservedProperty(key);
       if (hidden && reserved) {
         keysToOmit.add(key);
-      } else if (hidden
+      } else if (("jdbc-url".equalsIgnoreCase(key) && JdbcUrlUtils.containsCredentials(value))
+          || hidden
           || SecretPropertyUtils.isSecretProperty(key, value)
           || (!metadata.containsProperty(key) && SecretPropertyUtils.isSensitivePropertyKey(key))) {
         keysToMask.add(key);
@@ -198,17 +209,16 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Blank strings and non-JSON plain text (trimmed value does not start
-   * with '{' or '[') are returned unchanged. Values that look like a JSON object/array but fail to
-   * parse are replaced with {@link #MASKED_VALUE}. Scalar JSON roots are returned unchanged.
+   * Parses {@code value} as exactly one JSON object and masks sensitive-named keys. Used for
+   * credential JSON bags such as job {@code updater_options} / {@code spark_conf}.
    *
-   * <p>Useful when a caller already knows a string is a nested JSON map (for example a CLI argument
-   * following {@code --spark-conf}).
+   * <p>Useful when a caller already knows a string should be a nested JSON map (for example a CLI
+   * argument following {@code --spark-conf}).
    *
    * @param value JSON string to mask; may be null
-   * @return masked JSON, {@link #MASKED_VALUE} on object/array parse failure, or the original value
-   *     when blank, plain non-JSON, scalar JSON, or null
+   * @return masked JSON object, {@link #MASKED_VALUE} when the value is not exactly one JSON object
+   *     (parse failure, trailing tokens, duplicate fields, array, or scalar), the original value
+   *     when blank, or null when {@code value} is null
    */
   @Nullable
   public static String maskSensitiveJsonValue(@Nullable String value) {
@@ -219,34 +229,29 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Parses {@code value} as JSON and masks sensitive-named keys in objects (recursively through
-   * nested objects and arrays). Blank / plain non-JSON strings are returned unchanged. Malformed
-   * object/array-looking JSON is replaced with {@link #MASKED_VALUE}.
+   * Parses {@code value} as exactly one JSON object (no trailing tokens) and masks sensitive-named
+   * keys recursively through nested objects and arrays inside that object. Blank strings are
+   * returned unchanged. Anything else — malformed JSON, concatenated values such as {@code {}
+   * {"password":"secret"}}, duplicate object fields, {@code true {...}}, root arrays, or scalars —
+   * becomes {@link #MASKED_VALUE}.
    */
   private static String maskNestedJsonValue(String value) {
     // Empty / whitespace-only values carry no secret (common for unresolved {{spark_conf:-}}).
     if (StringUtils.isBlank(value)) {
       return value;
     }
-    // Bare words (e.g. --options=verbose) are not JSON maps; do not treat parse failure as secret.
-    String trimmed = value.trim();
-    if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
-      return value;
-    }
     try {
       JsonNode root = NEST_JSON_MAPPER.readTree(value);
-      if (!root.isObject() && !root.isArray()) {
-        // Scalar JSON (string/number/boolean/null) — nothing to walk by key name.
-        return value;
+      // Credential bags are JSON maps. Scalars/arrays/concatenated values are not mask-walked.
+      if (!root.isObject()) {
+        return MASKED_VALUE;
       }
       MaskedJson masked = maskJsonNode(root);
       return masked.changed ? NEST_JSON_MAPPER.writeValueAsString(masked.value) : value;
-    } catch (Exception e) {
-      // Malformed object/array JSON on a caller-declared nest key — do not leave a secret blob.
-      // Do not log the value; it may contain credentials.
-      LOG.warn(
-          "Replacing malformed nest JSON with masked placeholder after parse failure: {}",
-          e.toString());
+    } catch (Exception ignored) {
+      // Malformed / trailing-token / duplicate-key JSON — do not leave a secret blob.
+      // Fixed message only: Jackson exception text can embed the input (and credentials).
+      LOG.warn("Replacing malformed nest JSON with masked placeholder after parse failure");
       return MASKED_VALUE;
     }
   }

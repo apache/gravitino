@@ -19,6 +19,54 @@
 
 paths:
 
+  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/semantic-model-datasets:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - name: metadataObjectType
+        in: path
+        required: true
+        description: The source metadata object type
+        schema:
+          type: string
+          enum: [table, view]
+      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
+    get:
+      tags:
+        - semantic-model
+      summary: List Semantic Model datasets associated with a source
+      description: >-
+        Lists datasets directly associated with a registered table or View in the same metalake,
+        including models in other catalogs and schemas. Requires access to the source metadata
+        and returns datasets only from models the caller can load, including access to each model's
+        catalog and schema. Authorization evaluation failures exclude the affected models.
+        Returns one identifier per matching dataset, with namespace
+        [metalake, catalog, schema, semanticModel] and the exact, case-sensitive dataset name.
+        Results are sorted by those components in order using UTF-16 code units, independently of
+        database collation. Dataset names containing dots remain a single name component.
+        An existing source with no visible matches returns an empty identifiers array; missing
+        sources and storage failures fail the request. The response is unpaginated.
+        Associations refer to source IDs resolved at the latest definition write. Renaming a source
+        while preserving its ID keeps its associations; reusing its name for a new source does not.
+        This lookup neither rewrites nor revalidates model definitions and does not follow View
+        dependencies. The source full name uses catalog.schema.name; literal dots in source name
+        components cannot be represented reliably by this route.
+      operationId: listSemanticModelDatasets
+      responses:
+        "200":
+          $ref: "#/components/responses/SemanticModelDatasetListResponse"
+        "400":
+          $ref: "#/components/responses/SemanticModelBadRequestResponse"
+        "403":
+          $ref: "#/components/responses/SemanticModelForbiddenResponse"
+        "404":
+          description: The source or one of its parents does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5XX":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-model-metrics:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -463,16 +511,16 @@ components:
         primaryKey:
           type: array
           description: >-
-            Source columns that form the primary key. The property may be omitted; an explicitly
-            supplied empty array is retained as empty.
+            Names of fields declared in this dataset's fields that form the primary key. The
+            property may be omitted; an explicitly supplied empty array is retained as empty.
           items:
             type: string
             minLength: 1
         uniqueKeys:
           type: array
           description: >-
-            Source column sets that form unique keys. The property may be omitted; an explicitly
-            supplied empty array is retained as empty.
+            Sets of field names declared in this dataset's fields that form unique keys. The
+            property may be omitted; an explicitly supplied empty array is retained as empty.
           items:
             type: array
             minItems: 1
@@ -522,16 +570,16 @@ components:
         primary_key:
           type: array
           description: >-
-            Source columns that form the primary key. The property may be omitted; an explicitly
-            supplied empty array is retained as empty.
+            Names of fields declared in this dataset's fields that form the primary key. The
+            property may be omitted; an explicitly supplied empty array is retained as empty.
           items:
             type: string
             minLength: 1
         unique_keys:
           type: array
           description: >-
-            Source column sets that form unique keys. The property may be omitted; an explicitly
-            supplied empty array is retained as empty.
+            Sets of field names declared in this dataset's fields that form unique keys. The
+            property may be omitted; an explicitly supplied empty array is retained as empty.
           items:
             type: array
             minItems: 1
@@ -619,7 +667,8 @@ components:
           type: array
           minItems: 1
           description: >-
-            Non-empty source columns. The array must have the same number of entries as toColumns.
+            Non-empty field names declared by the from dataset. The array must have the same
+            number of entries as toColumns.
           items:
             type: string
             minLength: 1
@@ -627,8 +676,8 @@ components:
           type: array
           minItems: 1
           description: >-
-            Non-empty target columns. The array must have the same number of entries as
-            fromColumns.
+            Non-empty field names declared by the to dataset. The array must have the same number
+            of entries as fromColumns.
           items:
             type: string
             minLength: 1
@@ -793,7 +842,8 @@ components:
           type: array
           minItems: 1
           description: >-
-            Non-empty source columns. The array must have the same number of entries as to_columns.
+            Non-empty field names declared by the from dataset. The array must have the same
+            number of entries as to_columns.
           items:
             type: string
             minLength: 1
@@ -801,8 +851,8 @@ components:
           type: array
           minItems: 1
           description: >-
-            Non-empty target columns. The array must have the same number of entries as
-            from_columns.
+            Non-empty field names declared by the to dataset. The array must have the same number
+            of entries as from_columns.
           items:
             type: string
             minLength: 1
@@ -1190,6 +1240,54 @@ components:
       }
 
   responses:
+    SemanticModelDatasetListResponse:
+      description: Fully qualified identifiers of visible datasets directly associated with the source
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            required: [code, identifiers]
+            properties:
+              code:
+                type: integer
+                format: int32
+                enum: [0]
+              identifiers:
+                type: array
+                items:
+                  type: object
+                  required: [namespace, name]
+                  properties:
+                    namespace:
+                      type: array
+                      description: Full namespace [metalake, catalog, schema, semanticModel]
+                      minItems: 4
+                      maxItems: 4
+                      items:
+                        type: string
+                        minLength: 1
+                    name:
+                      type: string
+                      minLength: 1
+                      description: The exact, case-sensitive dataset name, which may contain dots
+                  additionalProperties: false
+            additionalProperties: false
+          examples:
+            SharedSource:
+              summary: Two datasets in one model referencing the same source
+              value:
+                code: 0
+                identifiers:
+                  - namespace: [example, analytics, semantic, employee_analysis]
+                    name: employee
+                  - namespace: [example, analytics, semantic, employee_analysis]
+                    name: manager
+            Empty:
+              summary: The source exists but no matching datasets are visible
+              value:
+                code: 0
+                identifiers: []
+
     SemanticModelMetricListResponse:
       description: Metric identifiers or complete metric definitions, according to details
       content:
@@ -1424,6 +1522,17 @@ components:
                   ]
                 },
                 "datatype": "Decimal"
+              },
+              {
+                "name": "order_id",
+                "expression": {
+                  "dialects": [
+                    {
+                      "dialect": "ANSI_SQL",
+                      "expression": "order_id"
+                    }
+                  ]
+                }
               }
             ]
           }
@@ -1518,6 +1627,28 @@ components:
                       "data": "{\"semantic_type\":\"money\"}"
                     }
                   ]
+                },
+                {
+                  "name": "order_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "order_id"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "customer_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "customer_id"
+                      }
+                    ]
+                  }
                 }
               ],
               "customExtensions": []
@@ -1528,7 +1659,19 @@ components:
                 "namespace": ["sales", "mart"],
                 "name": "customers"
               },
-              "fields": []
+              "fields": [
+                {
+                  "name": "customer_id",
+                  "expression": {
+                    "dialects": [
+                      {
+                        "dialect": "ANSI_SQL",
+                        "expression": "customer_id"
+                      }
+                    ]
+                  }
+                }
+              ]
             }
           ],
           "relationships": [

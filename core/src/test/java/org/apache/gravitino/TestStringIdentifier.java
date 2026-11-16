@@ -26,6 +26,15 @@ import org.junit.jupiter.api.Test;
 public class TestStringIdentifier {
 
   @Test
+  void testAppendedMarkerWinsOverMarkerLikeUserComment() {
+    String userComment = "x (From Gravitino, DO NOT EDIT: gravitino.v1.uid123)";
+    StringIdentifier ownId = StringIdentifier.fromId(456L);
+    String comment = StringIdentifier.addToComment(ownId, userComment);
+    Assertions.assertEquals(ownId.id(), StringIdentifier.fromComment(comment).id());
+    Assertions.assertEquals(userComment, StringIdentifier.removeIdFromComment(comment));
+  }
+
+  @Test
   public void testCreateStringIdentifierFromId() {
     long uid = 1L;
     StringIdentifier stringId = StringIdentifier.fromId(uid);

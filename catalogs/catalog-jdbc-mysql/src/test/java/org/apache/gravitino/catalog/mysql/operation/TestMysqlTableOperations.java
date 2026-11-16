@@ -21,9 +21,13 @@ package org.apache.gravitino.catalog.mysql.operation;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 
+import java.math.BigDecimal;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -32,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import javax.sql.DataSource;
+import org.apache.commons.dbcp2.BasicDataSource;
 import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
@@ -39,6 +44,7 @@ import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
 import org.apache.gravitino.catalog.mysql.converter.MysqlColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.mysql.converter.MysqlTypeConverter;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -54,12 +60,144 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 @Tag("gravitino-docker-test")
 public class TestMysqlTableOperations extends TestMysql {
   private static final Type VARCHAR = Types.VarCharType.of(255);
   private static final Type INT = Types.IntegerType.get();
+
+  @Test
+  void testNativeQuotedTableAndColumnLifecycle() {
+    String schema = TEST_DB_NAME.toString();
+    String tableName = "native`table ; --";
+    String columnName = "native`column\\name' ; --";
+    String renamed = "native_renamed_table";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName(columnName)
+            .withType(Types.IntegerType.get())
+            .withNullable(true)
+            .build();
+    try {
+      TABLE_OPERATIONS.create(
+          schema,
+          tableName,
+          new JdbcColumn[] {column},
+          null,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          Distributions.NONE,
+          Indexes.EMPTY_INDEXES);
+      Assertions.assertEquals(
+          columnName, TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.updateColumnComment(new String[] {columnName}, "changed"));
+      Assertions.assertEquals(
+          "changed", TABLE_OPERATIONS.load(schema, tableName).columns()[0].comment());
+      TABLE_OPERATIONS.alterTable(
+          schema, tableName, TableChange.renameColumn(new String[] {columnName}, "renamed_column"));
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, tableName).columns()[0].name());
+      TABLE_OPERATIONS.rename(schema, tableName, renamed);
+      Assertions.assertEquals(
+          "renamed_column", TABLE_OPERATIONS.load(schema, renamed).columns()[0].name());
+      Assertions.assertTrue(TABLE_OPERATIONS.drop(schema, renamed));
+    } finally {
+      TABLE_OPERATIONS.drop(schema, tableName);
+      TABLE_OPERATIONS.drop(schema, renamed);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "+00:00, 12:34:56.123456", "+08:00, 12:34:56.123456", "-07:00, 12:34:56.123456",
+    "+00:00, 12:34:00", "+08:00, 12:34:00", "-07:00, 12:34:00",
+    "+00:00, 00:00:00", "+08:00, 00:00:00", "-07:00, 00:00:00"
+  })
+  void testZonedTimestampDefaultsPreserveInstantOnCreateAndAlter(String timeZone, String time)
+      throws Exception {
+    for (boolean zoned : new boolean[] {true, false}) {
+      String table = RandomNameUtils.genRandomName("timestamp_defaults");
+      OffsetDateTime value = OffsetDateTime.parse("2026-11-04T" + time + "Z");
+      try (BasicDataSource dataSource =
+          (BasicDataSource) DataSourceUtils.createDataSource(getMySQLCatalogProperties())) {
+        dataSource.setConnectionInitSqls(List.of("SET time_zone = '" + timeZone + "'"));
+        MysqlTableOperations operations = new MysqlTableOperations();
+        operations.initialize(
+            dataSource,
+            JDBC_EXCEPTION_CONVERTER,
+            new MysqlTypeConverter(),
+            new MysqlColumnDefaultValueConverter(),
+            Collections.emptyMap());
+        operations.create(
+            TEST_DB_NAME.toString(),
+            table,
+            new JdbcColumn[] {
+              JdbcColumn.builder()
+                  .withName("ts")
+                  .withType(
+                      zoned
+                          ? Types.TimestampType.withTimeZone(6)
+                          : Types.TimestampType.withoutTimeZone(6))
+                  .withNullable(true)
+                  .withDefaultValue(
+                      zoned
+                          ? Literals.of(value, Types.TimestampType.withTimeZone())
+                          : Literals.timestampLiteral(value.toLocalDateTime()))
+                  .build()
+            },
+            null,
+            Collections.emptyMap(),
+            null,
+            Distributions.NONE,
+            Indexes.EMPTY_INDEXES);
+        try (Connection connection = dataSource.getConnection();
+            Statement statement = connection.createStatement()) {
+          String qualified = "`" + TEST_DB_NAME + "`.`" + table + "`";
+          for (int iteration = 0; iteration < 2; iteration++) {
+            if (iteration == 1) {
+              statement.executeUpdate("DELETE FROM " + qualified);
+              value = value.plusDays(1);
+              operations.alterTable(
+                  TEST_DB_NAME.toString(),
+                  table,
+                  TableChange.updateColumnDefaultValue(
+                      new String[] {"ts"},
+                      DTOConverters.toFunctionArg(
+                          zoned
+                              ? Literals.of(value, Types.TimestampType.withTimeZone())
+                              : Literals.timestampLiteral(value.toLocalDateTime()))));
+            }
+            statement.executeUpdate("INSERT INTO " + qualified + " () VALUES ()");
+            try (ResultSet result =
+                statement.executeQuery(
+                    "SELECT UNIX_TIMESTAMP(ts), @@session.time_zone, DATE_FORMAT(ts, '%Y-%m-%d %H:%i:%s.%f') FROM "
+                        + qualified)) {
+              Assertions.assertTrue(result.next());
+              if (zoned) {
+                Assertions.assertEquals(
+                    0,
+                    BigDecimal.valueOf(value.toEpochSecond())
+                        .add(BigDecimal.valueOf(value.getNano(), 9))
+                        .compareTo(result.getBigDecimal(1)));
+              } else {
+                Assertions.assertEquals(
+                    value
+                        .toLocalDateTime()
+                        .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS")),
+                    result.getString(3));
+              }
+              Assertions.assertEquals(timeZone, result.getString(2));
+            }
+          }
+        } finally {
+          operations.drop(TEST_DB_NAME.toString(), table);
+        }
+      }
+    }
+  }
 
   @Test
   public void testOperationTable() {
@@ -1244,11 +1382,22 @@ public class TestMysqlTableOperations extends TestMysql {
     // load table
     JdbcTable load = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
 
-    // If ifExists is set to true then the code should not throw an exception if the index doesn't
-    // exist.
+    // If ifExists is set to true and the index doesn't exist, no SQL should be generated.
     TableChange.DeleteIndex deleteIndex = new TableChange.DeleteIndex("uk_1", true);
     sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex);
-    Assertions.assertEquals("DROP INDEX `uk_1`", sql);
+    Assertions.assertEquals("", sql);
+    Assertions.assertDoesNotThrow(
+        () -> TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, deleteIndex));
+    Assertions.assertDoesNotThrow(
+        () ->
+            TABLE_OPERATIONS.alterTable(
+                TEST_DB_NAME.toString(),
+                tableName,
+                deleteIndex,
+                TableChange.updateComment("updated comment")));
+    JdbcTable altered = TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName);
+    Assertions.assertEquals("updated comment", altered.comment());
+    Assertions.assertEquals(1, altered.index().length);
 
     // The index existence check should only verify existence when ifExists is false, preventing
     // failures when dropping non-existent indexes.
@@ -1262,6 +1411,14 @@ public class TestMysqlTableOperations extends TestMysql {
     TableChange.DeleteIndex deleteIndex3 = new TableChange.DeleteIndex("uk_2", false);
     sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex3);
     Assertions.assertEquals("DROP INDEX `uk_2`", sql);
+
+    // Index names are matched case-insensitively.
+    TableChange.DeleteIndex deleteIndex4 = new TableChange.DeleteIndex("UK_2", true);
+    sql = MysqlTableOperations.deleteIndexDefinition(load, deleteIndex4);
+    Assertions.assertEquals("DROP INDEX `UK_2`", sql);
+    TABLE_OPERATIONS.alterTable(TEST_DB_NAME.toString(), tableName, deleteIndex4);
+    Assertions.assertEquals(
+        0, TABLE_OPERATIONS.load(TEST_DB_NAME.toString(), tableName).index().length);
   }
 
   @Test

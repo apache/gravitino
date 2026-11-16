@@ -29,6 +29,15 @@ dependencies {
   constraints {
     implementation(libs.thrift)
   }
+  // Raise the xnio-api pulled in by kerb-admin (3.8.8.Final) to the version in the catalog.
+  constraints {
+    implementation(libs.xnio.api)
+  }
+  // Raise the nimbus-jose-jwt pulled in by kerb-simplekdc (9.30.1) to the version in the catalog,
+  // which is the one already used by the server.
+  constraints {
+    implementation(libs.nimbus.jose.jwt)
+  }
 
   implementation(project(":api"))
   implementation(project(":catalogs:catalog-common"))
@@ -55,6 +64,8 @@ dependencies {
     exclude("org.ow2.asm")
   }
   implementation(libs.asm)
+  // Create cglib proxies without running the wrapped class constructors
+  implementation(libs.objenesis)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
   implementation(libs.iceberg.aliyun)

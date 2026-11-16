@@ -33,6 +33,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -183,8 +185,15 @@ public class AuthorizationExpressionEvaluator {
     metadataNames.forEach(
         (type, entityNameIdent) -> {
           if (isMetadataType(type)) {
-            MetadataObject metadataObject =
-                NameIdentifierUtil.toMetadataObject(entityNameIdent, type);
+            MetadataObject metadataObject;
+            try {
+              metadataObject = NameIdentifierUtil.toMetadataObjectForRead(entityNameIdent, type);
+            } catch (IllegalNameIdentifierException e) {
+              throw e;
+            } catch (IllegalArgumentException e) {
+              // Only metadata-name parsing failures are client errors, not authorizer failures.
+              throw new IllegalMetadataObjectException(e, "%s", e.getMessage());
+            }
             ognlContext.put(type.name(), metadataObject);
           }
           ognlContext.put(type.name() + "_NAME_IDENT", entityNameIdent);

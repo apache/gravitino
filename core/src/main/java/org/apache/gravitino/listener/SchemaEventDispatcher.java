@@ -47,6 +47,7 @@ import org.apache.gravitino.listener.api.event.LoadSchemaEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaPreEvent;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -71,6 +72,13 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   public SchemaEventDispatcher(EventBus eventBus, SchemaDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Schema importSchema(NameIdentifier ident, AuditInfo auditInfo)
+      throws NoSuchSchemaException {
+    return dispatcher.importSchema(ident, auditInfo);
   }
 
   @Override

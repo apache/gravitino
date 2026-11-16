@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -39,6 +40,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -50,6 +52,7 @@ import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretVersionChanges;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -67,6 +70,22 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       IdGenerator idGenerator,
       SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
+  }
+
+  /**
+   * Checks whether a fileset exists in a catalog that supports filesets.
+   *
+   * @param ident the fileset identifier
+   * @return whether the fileset exists
+   */
+  @Override
+  public boolean filesetExists(NameIdentifier ident) {
+    boolean supportsFilesets =
+        doWithCatalog(
+            getCatalogIdentifier(ident),
+            wrapper -> wrapper.doWithCatalog(catalog -> catalog.ops() instanceof FilesetCatalog),
+            RuntimeException.class);
+    return supportsFilesets && FilesetDispatcher.super.filesetExists(ident);
   }
 
   /**
@@ -264,7 +283,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
           NoSuchFilesetException.class,
           IllegalArgumentException.class);
     }
-    return alterFilesetWithPreparedSecrets(ident, catalogIdent, changes);
+    return alterFilesetWithSecretVersions(ident, catalogIdent, changes);
   }
 
   private boolean usesFilesetCatalogEntityStore(NameIdentifier catalogIdent) {
@@ -272,7 +291,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         catalogIdent, c -> "fileset".equals(c.catalog().provider()), NoSuchFilesetException.class);
   }
 
-  private Fileset alterFilesetWithPreparedSecrets(
+  private Fileset alterFilesetWithSecretVersions(
       NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
     Fileset currentFileset =
         doWithCatalog(
@@ -293,19 +312,21 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     }
 
     StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
-    long filesetId;
+    // Null for a fileset that was never imported: then the alter cannot touch write-through
+    // secrets.
+    Long filesetId;
     if (currentStringId != null) {
       filesetId = currentStringId.id();
     } else if (filesetEntity != null) {
       filesetId = filesetEntity.id();
     } else {
-      filesetId = 0L;
+      filesetId = null;
     }
 
     SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+      Pair<FilesetChange[], SecretVersionChanges> secretResult =
           SecretAlterChanges.prepareFilesetChanges(
               secretManager, currentProperties, filesetId, changes);
       writtenSecretMaterials.set(secretResult.getRight());
@@ -318,6 +339,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
               NoSuchFilesetException.class,
               IllegalArgumentException.class);
       alterCommitted = true;
+      secretManager.commitSecrets(writtenSecretMaterials.get());
       return altered;
     } finally {
       if (!alterCommitted) {
@@ -343,16 +365,31 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
           // Capture properties (including write-through secret URNs) before drop.
-          Map<String, String> filesetProperties;
+          Fileset fileset;
           try {
-            Fileset fileset =
+            fileset =
                 doWithCatalog(
                     catalogIdent,
                     c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
                     NoSuchFilesetException.class);
-            filesetProperties = fileset.properties();
           } catch (NoSuchFilesetException e) {
             return false;
+          }
+          // Delete the URNs on both sides: catalog loadFileset may omit them, and an alter that
+          // does not go through the entity store leaves the FilesetEntity behind the catalog.
+          Map<String, String> catalogProperties =
+              fileset.properties() == null ? Map.of() : fileset.properties();
+          Map<String, String> entityOnlyProperties = new HashMap<>();
+          FilesetEntity filesetEntity = getEntity(ident, FILESET, FilesetEntity.class);
+          if (filesetEntity != null && filesetEntity.properties() != null) {
+            filesetEntity
+                .properties()
+                .forEach(
+                    (key, value) -> {
+                      if (!Objects.equals(value, catalogProperties.get(key))) {
+                        entityOnlyProperties.put(key, value);
+                      }
+                    });
           }
 
           boolean dropped =
@@ -361,7 +398,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
                   NonEmptyEntityException.class);
           if (dropped) {
-            secretManager.deleteSecretsFromProperties(filesetProperties);
+            secretManager.deleteSecretsFromProperties(catalogProperties);
+            secretManager.deleteSecretsFromProperties(entityOnlyProperties);
           }
           return dropped;
         });

@@ -154,7 +154,9 @@ health check at `GET /health/ready` so a server that has lost its database stops
 Jobs run by the default `local` job executor keep their output in `gravitino.job.stagingDir`. Put
 that directory on storage shared by all servers, for example an NFS mount, so that a request for a
 job's output can be served by any server. Otherwise only the server that ran the job can return
-it, and the others return empty output. See [Manage Jobs](manage-jobs-in-gravitino.md).
+it, and the others return empty output. See [Local Job Executor](local-job-executor.md). The
+[Kubernetes job executor](k8s-job-executor.md) keeps no job state on the servers, so any server can
+return a job's output.
 
 ## Server Configuration
 
@@ -217,6 +219,24 @@ gravitino.server.webserver.trustedProxies = 10.0.0.10, 10.0.1.0/24, fd00:10::/64
 It adds the OAuth client settings when `oauth` is among the authenticators. Treat anything you add
 through `visibleConfigs` as public, and only add properties that a client needs before it can
 authenticate.
+
+Set `gravitino.server.visibleConfigs` when a Web UI or another client needs extra server
+configuration, for example to use the server's session timeout settings rather than local UI
+defaults. Set both the property values and the comma-separated list of keys in
+`conf/gravitino.conf`, then restart the server:
+
+```properties
+gravitino.ui.sessionIdleTimeoutMs = 1800000
+gravitino.ui.sessionMaxDurationMs = 28800000
+gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs
+```
+
+Clients can then read those values from `GET http://localhost:8090/configs`. A key with no
+explicitly configured value is omitted. Leave the list empty when clients do not need additional
+settings; the fixed configuration keys are still returned. This setting controls configuration
+visibility, not access to catalogs or other metadata. Never include passwords, tokens, client
+secrets, or administrator lists. See [Web UI session settings](webui-v2.md#session-timeout-configuration) for the
+UI's configuration lookup order.
 
 Two further groups of `gravitino.server.webserver.*` properties are documented elsewhere, because
 they belong to features rather than to the web server itself. TLS, key stores, trust stores, and
@@ -613,9 +633,11 @@ Each operation emits up to three events: a pre-event before it runs, a post-even
 succeeds, and a failure event after it throws. The names follow the operation, so `createTable`
 produces `CreateTablePreEvent`, `CreateTableEvent`, and `CreateTableFailureEvent`. Operations
 served by the Gravitino IRC endpoint carry an `Iceberg` prefix, as in `IcebergCreateTableEvent`.
-Not every operation defines all three. The full set of classes lives in the
+Not every operation defines all three. Core metadata events live in the
 [`org.apache.gravitino.listener.api.event`](https://github.com/apache/gravitino/tree/main/core/src/main/java/org/apache/gravitino/listener/api/event)
-package.
+package. Built-in IdP (`idp-basic`) user and group mutations additionally emit events from
+`org.apache.gravitino.idp.listener.event`, with object identifiers `basic.user.<name>` /
+`basic.group.<name>`; see [Local Users and Groups](./security/local-users-and-groups.md#audit-and-events).
 
 Throwing a `ForbiddenException` from a pre-event handler stops the operation before it runs, which
 makes pre-events a veto point rather than a notification.

@@ -92,7 +92,7 @@ CREATE TABLE IF NOT EXISTS schema_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (schema_id),
+    PRIMARY KEY (schema_id, deleted_at),
     UNIQUE (catalog_id, schema_name, deleted_at)
 );
 
@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS table_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (table_id),
+    PRIMARY KEY (table_id, deleted_at),
     UNIQUE (schema_id, table_name, deleted_at)
 );
 
@@ -147,7 +147,7 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     table_id BIGINT NOT NULL,
     table_version INT NOT NULL,
     column_id BIGINT NOT NULL,
-    column_name VARCHAR(128) NOT NULL,
+    column_name VARCHAR(300) NOT NULL,
     column_position INT NOT NULL,
     column_type TEXT NOT NULL,
     column_comment VARCHAR(4096) DEFAULT '',
@@ -263,7 +263,7 @@ CREATE TABLE IF NOT EXISTS topic_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (topic_id),
+    PRIMARY KEY (topic_id, deleted_at),
     UNIQUE (schema_id, topic_name, deleted_at)
 );
 
@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS user_role_rel (
 );
 
 CREATE INDEX IF NOT EXISTS user_role_rel_idx_user_id ON user_role_rel (user_id);
+CREATE INDEX IF NOT EXISTS user_role_rel_idx_role_id ON user_role_rel (role_id);
 COMMENT ON TABLE user_role_rel IS 'user role relation metadata';
 
 COMMENT ON COLUMN user_role_rel.id IS 'auto increment id';
@@ -422,6 +423,7 @@ CREATE TABLE IF NOT EXISTS group_role_rel (
 );
 
 CREATE INDEX IF NOT EXISTS group_role_rel_idx_group_id ON group_role_rel (group_id);
+CREATE INDEX IF NOT EXISTS group_role_rel_idx_role_id ON group_role_rel (role_id);
 COMMENT ON TABLE group_role_rel IS 'relation between group and role';
 COMMENT ON COLUMN group_role_rel.id IS 'auto increment id';
 COMMENT ON COLUMN group_role_rel.group_id IS 'group id';
@@ -942,7 +944,7 @@ CREATE TABLE IF NOT EXISTS view_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (view_id),
+    PRIMARY KEY (view_id, deleted_at),
     UNIQUE (schema_id, view_name, deleted_at)
 );
 
@@ -1295,45 +1297,121 @@ COMMENT ON COLUMN scheduled_commit_tasks.last_success IS 'last successful execut
 COMMENT ON COLUMN scheduled_commit_tasks.last_failure IS 'last failed execution time';
 
 CREATE TABLE IF NOT EXISTS table_maintenance_action (
-    id BIGSERIAL PRIMARY KEY,
+    action_id BIGSERIAL PRIMARY KEY,
     job_id BIGINT,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
-    before_snapshot_id BIGINT,
-    after_snapshot_id BIGINT,
-    finished_at BIGINT NOT NULL DEFAULT 0,
-    created_at BIGINT NOT NULL
+    before_metrics_id BIGINT,
+    after_metrics_id BIGINT,
+    created_at BIGINT NOT NULL,
+    finished_at BIGINT NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_tma_job_id ON table_maintenance_action (job_id);
 -- Soft slot: finished_at=0 is exclusive per table/policy (one in-flight finish).
 CREATE UNIQUE INDEX IF NOT EXISTS uk_tma_table_policy_finished ON table_maintenance_action (table_id, policy_id, finished_at);
-CREATE INDEX IF NOT EXISTS idx_tma_before_sid ON table_maintenance_action (table_id, before_snapshot_id);
-CREATE INDEX IF NOT EXISTS idx_tma_after_sid ON table_maintenance_action (table_id, after_snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tma_before_metrics ON table_maintenance_action (before_metrics_id);
+CREATE INDEX IF NOT EXISTS idx_tma_after_metrics ON table_maintenance_action (after_metrics_id);
 CREATE INDEX IF NOT EXISTS idx_tma_created_at ON table_maintenance_action (created_at);
 COMMENT ON TABLE table_maintenance_action IS 'table maintenance action metadata';
-COMMENT ON COLUMN table_maintenance_action.id IS 'auto increment id';
+COMMENT ON COLUMN table_maintenance_action.action_id IS 'maintenance action id';
 COMMENT ON COLUMN table_maintenance_action.job_id IS 'job run id, maps to job_run_meta.job_run_id';
 COMMENT ON COLUMN table_maintenance_action.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_maintenance_action.policy_id IS 'policy id from policy_meta';
-COMMENT ON COLUMN table_maintenance_action.before_snapshot_id IS 'Iceberg snapshot id before maintenance, null until sampled';
-COMMENT ON COLUMN table_maintenance_action.after_snapshot_id IS 'Iceberg snapshot id after maintenance, null while pending';
-COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
+COMMENT ON COLUMN table_maintenance_action.before_metrics_id IS 'table_snapshot_metrics.metrics_id for S0 sample';
+COMMENT ON COLUMN table_maintenance_action.after_metrics_id IS 'table_snapshot_metrics.metrics_id for S1 sample';
 COMMENT ON COLUMN table_maintenance_action.created_at IS 'creation timestamp in milliseconds';
+COMMENT ON COLUMN table_maintenance_action.finished_at IS 'finish millis, 0 = soft in-flight slot (one per table/policy)';
 
 CREATE TABLE IF NOT EXISTS table_snapshot_metrics (
-    id BIGSERIAL PRIMARY KEY,
+    metrics_id BIGSERIAL PRIMARY KEY,
     table_id BIGINT NOT NULL,
     policy_id BIGINT NOT NULL,
     snapshot_id BIGINT NOT NULL,
     metrics_value TEXT NOT NULL,
     created_at BIGINT NOT NULL
 );
-CREATE UNIQUE INDEX IF NOT EXISTS uk_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_tsm_tid_pid_sid ON table_snapshot_metrics (table_id, policy_id, snapshot_id);
 CREATE INDEX IF NOT EXISTS idx_tsm_created_at ON table_snapshot_metrics (created_at);
 COMMENT ON TABLE table_snapshot_metrics IS 'table snapshot metrics metadata';
-COMMENT ON COLUMN table_snapshot_metrics.id IS 'auto increment id';
+COMMENT ON COLUMN table_snapshot_metrics.metrics_id IS 'metrics row id';
 COMMENT ON COLUMN table_snapshot_metrics.table_id IS 'table id from table_meta';
 COMMENT ON COLUMN table_snapshot_metrics.policy_id IS 'policy id from policy_meta';
 COMMENT ON COLUMN table_snapshot_metrics.snapshot_id IS 'Iceberg snapshot id';
 COMMENT ON COLUMN table_snapshot_metrics.metrics_value IS 'metrics value as JSON';
 COMMENT ON COLUMN table_snapshot_metrics.created_at IS 'creation timestamp in milliseconds';
+
+CREATE TABLE IF NOT EXISTS semantic_model_source_rel (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    semantic_model_id BIGINT NOT NULL,
+    dataset_name TEXT NOT NULL,
+    source_type VARCHAR(64) NOT NULL,
+    source_id BIGINT NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_smsr_model ON semantic_model_source_rel (semantic_model_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_smsr_source ON semantic_model_source_rel (metalake_id, source_type, source_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_smsr_deleted_at ON semantic_model_source_rel (deleted_at);
+COMMENT ON TABLE semantic_model_source_rel IS 'current semantic model dataset source associations';
+COMMENT ON COLUMN semantic_model_source_rel.id IS 'auto increment id';
+COMMENT ON COLUMN semantic_model_source_rel.metalake_id IS 'containing metalake id';
+COMMENT ON COLUMN semantic_model_source_rel.semantic_model_id IS 'containing semantic model id';
+COMMENT ON COLUMN semantic_model_source_rel.dataset_name IS 'exact dataset name in the current definition';
+COMMENT ON COLUMN semantic_model_source_rel.source_type IS 'TABLE or VIEW';
+COMMENT ON COLUMN semantic_model_source_rel.source_id IS 'resolved source object id';
+COMMENT ON COLUMN semantic_model_source_rel.deleted_at IS 'association retired at';
+
+CREATE TABLE IF NOT EXISTS domain_meta (
+    domain_id BIGINT NOT NULL,
+    domain_name VARCHAR(128) NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    domain_comment VARCHAR(256) DEFAULT '',
+    domain_status VARCHAR(16) NOT NULL DEFAULT 'DRAFT',
+    backing_tag_id BIGINT DEFAULT NULL,
+    backing_tag_value VARCHAR(256) DEFAULT NULL,
+    properties TEXT DEFAULT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (domain_id),
+    UNIQUE (metalake_id, domain_name, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS domain_meta_idx_backing_tag ON domain_meta (metalake_id, backing_tag_id, backing_tag_value, deleted_at);
+COMMENT ON TABLE domain_meta IS 'domain metadata';
+COMMENT ON COLUMN domain_meta.domain_id IS 'domain id';
+COMMENT ON COLUMN domain_meta.domain_name IS 'domain name';
+COMMENT ON COLUMN domain_meta.metalake_id IS 'metalake id';
+COMMENT ON COLUMN domain_meta.domain_comment IS 'domain comment';
+COMMENT ON COLUMN domain_meta.domain_status IS 'domain status, DRAFT or PUBLISHED';
+COMMENT ON COLUMN domain_meta.backing_tag_id IS 'id of the backing tag, NULL if the domain has none';
+COMMENT ON COLUMN domain_meta.backing_tag_value IS 'value of the backing tag, NULL binds the tag without a value';
+COMMENT ON COLUMN domain_meta.properties IS 'domain properties';
+COMMENT ON COLUMN domain_meta.audit_info IS 'domain audit info';
+COMMENT ON COLUMN domain_meta.current_version IS 'domain current version';
+COMMENT ON COLUMN domain_meta.last_version IS 'domain last version';
+COMMENT ON COLUMN domain_meta.deleted_at IS 'domain deleted at';
+
+CREATE TABLE IF NOT EXISTS domain_rel (
+    id BIGINT GENERATED BY DEFAULT AS IDENTITY,
+    metalake_id BIGINT NOT NULL,
+    parent_id BIGINT NOT NULL,
+    child_id BIGINT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (id),
+    CONSTRAINT uk_dr_ci_del UNIQUE (child_id, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS domain_rel_idx_parent ON domain_rel (parent_id, deleted_at);
+CREATE INDEX IF NOT EXISTS domain_rel_idx_metalake ON domain_rel (metalake_id, deleted_at);
+COMMENT ON TABLE domain_rel IS 'domain parent relation';
+COMMENT ON COLUMN domain_rel.id IS 'auto increment id';
+COMMENT ON COLUMN domain_rel.metalake_id IS 'metalake id';
+COMMENT ON COLUMN domain_rel.parent_id IS 'parent domain id';
+COMMENT ON COLUMN domain_rel.child_id IS 'sub-domain id';
+COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
+COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
+COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
+COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';

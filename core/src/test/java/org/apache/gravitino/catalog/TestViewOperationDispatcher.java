@@ -28,10 +28,14 @@ import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -50,6 +54,7 @@ import java.util.function.Supplier;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -72,6 +77,8 @@ import org.apache.gravitino.rel.ViewChange;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestViewOperationDispatcher extends TestOperationDispatcher {
   static ViewOperationDispatcher viewOperationDispatcher;
@@ -147,6 +154,127 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         return auditInfo;
       }
     };
+  }
+
+  /**
+   * Imports write creation audit once and recover safely after competing imports or deletion.
+   *
+   * @param scenario the source audit and competing-import ordering to exercise
+   */
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "reported", "modified", "load", "raced", "deleted"})
+  public void testImportCreationAudit(String scenario) throws Exception {
+    Instant importTime = Instant.EPOCH.plusSeconds(60);
+    AuditInfo importAudit =
+        AuditInfo.builder().withCreator("alice").withCreateTime(importTime).build();
+    AuditInfo catalogAudit =
+        "reported".equals(scenario)
+            ? AuditInfo.builder().withCreator("catalog_user").withCreateTime(Instant.EPOCH).build()
+            : "modified".equals(scenario)
+                ? AuditInfo.builder()
+                    .withCreateTime(Instant.EPOCH)
+                    .withLastModifier("modifier")
+                    .withLastModifiedTime(Instant.EPOCH)
+                    .build()
+                : AuditInfo.EMPTY;
+    String expectedCreator =
+        "reported".equals(scenario) ? "catalog_user" : "load".equals(scenario) ? null : "alice";
+    Instant expectedTime =
+        "reported".equals(scenario) || "modified".equals(scenario)
+            ? Instant.EPOCH
+            : "load".equals(scenario) ? null : importTime;
+    NameIdentifier schemaIdent =
+        NameIdentifier.of(metalake, catalog, "schema_import_audit_view_" + scenario);
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", props);
+    TestCatalog testCatalog =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations operations = (TestCatalogOperations) testCatalog.ops();
+    NameIdentifier identifier =
+        NameIdentifier.of(metalake, catalog, schemaIdent.name(), "view_import_audit");
+    operations.views.put(identifier, createMockView(identifier.name(), props, catalogAudit));
+    entityStore.delete(identifier, VIEW);
+    clearInvocations(entityStore);
+
+    if ("raced".equals(scenario) || "deleted".equals(scenario)) {
+      viewOperationDispatcher.loadView(identifier);
+      clearInvocations(entityStore);
+    }
+    if ("deleted".equals(scenario)) {
+      doAnswer(
+              call -> {
+                entityStore.delete(identifier, VIEW);
+                throw new OptimisticLockException("Registration deleted during audit recovery");
+              })
+          .when(entityStore)
+          .update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    }
+    View loaded =
+        "load".equals(scenario)
+            ? viewOperationDispatcher.loadView(identifier)
+            : viewOperationDispatcher.importView(identifier, importAudit);
+
+    if ("deleted".equals(scenario)) {
+      EntityCombinedView combined = (EntityCombinedView) loaded;
+      Assertions.assertFalse(combined.imported());
+      Assertions.assertNull(combined.viewEntity());
+      Assertions.assertNull(loaded.auditInfo().creator());
+      Assertions.assertEquals(identifier.name(), loaded.name());
+      Assertions.assertEquals(props, loaded.properties());
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+      reset(entityStore);
+      viewOperationDispatcher.loadView(identifier);
+      Assertions.assertNull(
+          entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+      return;
+    }
+
+    ViewEntity imported = entityStore.get(identifier, VIEW, ViewEntity.class);
+    Assertions.assertEquals(expectedCreator, imported.auditInfo().creator());
+    Assertions.assertEquals(expectedCreator, loaded.auditInfo().creator());
+    Assertions.assertEquals(expectedTime, loaded.auditInfo().createTime());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? "modifier" : null, imported.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        "modified".equals(scenario) ? Instant.EPOCH : null,
+        imported.auditInfo().lastModifiedTime());
+    Assertions.assertEquals(expectedTime, imported.auditInfo().createTime());
+    if ("raced".equals(scenario)) {
+      verify(entityStore, never()).put(any(ViewEntity.class), anyBoolean());
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore).put(any(ViewEntity.class), eq(false));
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+
+    clearInvocations(entityStore);
+    viewOperationDispatcher.importView(
+        identifier,
+        AuditInfo.builder().withCreator("bob").withCreateTime(importTime.plusSeconds(60)).build());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? "bob" : expectedCreator,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().creator());
+    Assertions.assertEquals(
+        "load".equals(scenario) ? importTime.plusSeconds(60) : expectedTime,
+        entityStore.get(identifier, VIEW, ViewEntity.class).auditInfo().createTime());
+    verify(entityStore, never()).put(any(), anyBoolean());
+    if ("load".equals(scenario)) {
+      verify(entityStore).update(eq(identifier), eq(ViewEntity.class), eq(VIEW), any());
+    } else {
+      verify(entityStore, never()).update(any(), any(), any(), any());
+    }
+  }
+
+  /** Explicit imports require audit information. */
+  @Test
+  public void testImportRejectsNullAudit() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            viewOperationDispatcher.importView(
+                NameIdentifier.of(metalake, catalog, "schema", "missing"), null));
   }
 
   @Test
@@ -337,6 +465,111 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertNotNull(retrievedEntity);
     Assertions.assertEquals(initialId, retrievedEntity.id(), "Entity ID should not change");
     Assertions.assertEquals(1L, retrievedEntity.id(), "Entity ID should remain 1L (no new import)");
+  }
+
+  @Test
+  public void testConcurrentImportViewReusesExistingEntity() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_concurrent_import");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_concurrent_import");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity concurrentViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id())
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an HA race: the pre-import checks miss, the create-only write conflicts, and the
+    // reload observes the entity imported by the winning node.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(concurrentViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    View loadedView =
+        Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(viewIdent.name(), loadedView.name());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  public void testConcurrentImportViewFailsOnMismatchedIdentifier() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_view_import_conflict");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_import_conflict");
+    View createdView = createViewForLockTest(viewIdent);
+    ViewEntity importedViewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+
+    ViewEntity mismatchedViewEntity =
+        ViewEntity.builder()
+            .withId(importedViewEntity.id() + 1)
+            .withName(viewIdent.name())
+            .withNamespace(viewIdent.namespace())
+            .withComment(createdView.comment())
+            .withColumns(createdView.columns())
+            .withRepresentations(createdView.representations())
+            .withProperties(createdView.properties())
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+
+    // Simulate an external rename or multi-path conflict: the create-only write fails, and the
+    // entity found during reload has a different stable ID.
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock error"))
+        .doThrow(new NoSuchEntityException("mock error"))
+        .doReturn(mismatchedViewEntity)
+        .when(entityStore)
+        .get(any(), eq(Entity.EntityType.VIEW), any());
+    doThrow(new EntityAlreadyExistsException("mock conflict"))
+        .when(entityStore)
+        .put(any(), anyBoolean());
+
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external view registrations"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("metadata-only unregister of an individual external view"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
+  }
+
+  @Test
+  void testImportViewAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_soft_deleted_view_identifier");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_soft_deleted_identifier");
+    createViewForLockTest(viewIdent);
+    ViewEntity viewEntity = entityStore.get(viewIdent, VIEW, ViewEntity.class);
+    entityStore.delete(viewIdent, VIEW);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> viewOperationDispatcher.loadView(viewIdent));
+    Assertions.assertEquals(
+        viewEntity.id(), entityStore.get(viewIdent, VIEW, ViewEntity.class).id());
+    verify(entityStore).put(any(ViewEntity.class), eq(false));
   }
 
   @Test

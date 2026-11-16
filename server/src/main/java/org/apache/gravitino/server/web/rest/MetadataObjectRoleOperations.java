@@ -77,6 +77,7 @@ public class MetadataObjectRoleOperations {
           httpRequest,
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
+            TagOperations.checkVisibleTag(metalake, object);
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             String[] names = accessControlDispatcher.listRoleNamesByObject(metalake, object);
             names =

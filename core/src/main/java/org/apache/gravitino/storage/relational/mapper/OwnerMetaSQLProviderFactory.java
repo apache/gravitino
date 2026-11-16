@@ -117,6 +117,10 @@ public class OwnerMetaSQLProviderFactory {
         table = JobTemplateMetaMapper.TABLE_NAME;
         idColumn = "job_template_id";
         break;
+      case DOMAIN:
+        table = DomainMetaMapper.DOMAIN_TABLE_NAME;
+        idColumn = "domain_id";
+        break;
       case JOB:
         table = JobMetaMapper.TABLE_NAME;
         idColumn = "job_run_id";
@@ -187,6 +191,11 @@ public class OwnerMetaSQLProviderFactory {
 
   public static String softDeleteOwnerRelBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteOwnerRelBySchemaIds(schemaIds);
+  }
+
+  public static String softDeleteOwnerRelOfJobsByTemplateId(
+      @Param("jobTemplateId") Long jobTemplateId) {
+    return getProvider().softDeleteOwnerRelOfJobsByTemplateId(jobTemplateId);
   }
 
   public static String deleteOwnerMetasByLegacyTimeline(

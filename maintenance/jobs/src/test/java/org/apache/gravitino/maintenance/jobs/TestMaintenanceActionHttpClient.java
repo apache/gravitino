@@ -88,7 +88,7 @@ public class TestMaintenanceActionHttpClient {
       assertEquals("/api/metalakes/demo/maintenance/actions/7/metrics/before", path.get());
       assertTrue(body.get().contains("\"tableId\":1"));
       assertTrue(body.get().contains("\"policyId\":20"));
-      client.finish(7L, new MaintenanceActionFinishRequest(1L, 20L, 11L));
+      client.finish(7L, new MaintenanceActionFinishRequest(1L, 20L));
       assertEquals("/api/metalakes/demo/maintenance/actions/7/finish", path.get());
     }
     assertEquals(basic("alice", "dummy"), auth.get());

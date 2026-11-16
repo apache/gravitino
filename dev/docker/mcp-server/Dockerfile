@@ -16,7 +16,7 @@
 # specific language governing permissions and limitations
 # under the License.
 #
-FROM python:3.10
+FROM python:3.11
 
 LABEL maintainer="dev@gravitino.apache.org"
 

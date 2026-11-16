@@ -51,5 +51,9 @@ class ColumnDefaultValueSerdes(JsonSerializable[Expression]):
     @classmethod
     def is_empty(cls, value):
         if isinstance(value, (Expression, list)):
-            return value is None or value is Column.DEFAULT_VALUE_NOT_SET
+            return (
+                value is None
+                or value is Column.DEFAULT_VALUE_NOT_SET
+                or value is Column.INITIAL_DEFAULT_VALUE_NOT_SET
+            )
         return value is None

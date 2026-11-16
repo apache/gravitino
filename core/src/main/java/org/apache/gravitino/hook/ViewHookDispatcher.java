@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
@@ -56,6 +57,12 @@ public class ViewHookDispatcher implements ViewDispatcher {
   public ViewHookDispatcher(ViewDispatcher dispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.dispatcher = dispatcher;
     this.ownerDispatcher = ownerDispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public View importView(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchViewException {
+    return dispatcher.importView(ident, auditInfo);
   }
 
   @Override

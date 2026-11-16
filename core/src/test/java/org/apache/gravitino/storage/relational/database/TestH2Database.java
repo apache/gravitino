@@ -26,6 +26,21 @@ import org.junit.jupiter.api.Test;
 
 public class TestH2Database {
 
+  /** Resolves an existing file without creating or upgrading a database. */
+  @Test
+  public void testOfflineConnectionUrl() {
+    Config config = new Config(false) {};
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, "jdbc:h2");
+    config.set(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH, "/tmp/migration-db");
+    Assertions.assertEquals(
+        "jdbc:h2:file:/tmp/migration-db;DB_CLOSE_DELAY=-1;MODE=MYSQL;AUTO_SERVER=TRUE",
+        H2Database.getConnectionUrl(config));
+    config.set(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL, "jdbc:h2:file:/tmp/explicit-db;MODE=MYSQL");
+    Assertions.assertTrue(
+        H2Database.getConnectionUrl(config).startsWith("jdbc:h2:file:/tmp/explicit-db;"));
+  }
+
   @Test
   public void testGetStoragePathWithRelativePathWhenGravitinoHomeMissing() throws Exception {
     String javaBin = System.getProperty("java.home") + "/bin/java";
