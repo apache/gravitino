@@ -35,8 +35,10 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -216,14 +218,15 @@ public class EffectiveTagResolver {
       return new LinkedHashMap<>();
     }
     MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
-    return resolveValidated(metalake, metadataObjects);
+    return resolveValidated(metalake, metadataObjects, false);
   }
 
   /**
-   * Resolves assignments for display without reloading registered tables and schemas.
+   * Resolves assignments for display using only stored metadata.
    *
-   * <p>Results use the last registered identity. Unregistered objects and other object types still
-   * use live validation and import. This method must not be used for policy enforcement.
+   * <p>Unregistered objects have no direct assignments but can inherit from registered ancestors.
+   * External metadata is neither validated nor imported. This method must not be used for policy
+   * enforcement.
    *
    * @param metalake the metalake name
    * @param metadataObjects the objects to resolve
@@ -234,32 +237,20 @@ public class EffectiveTagResolver {
     if (metadataObjects.isEmpty()) {
       return new LinkedHashMap<>();
     }
-    List<MetadataObject> needsValidation = new ArrayList<>();
     for (MetadataObject object : metadataObjects) {
       Entity.EntityType type = MetadataObjectUtil.toEntityType(object);
       NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-      if (type == Entity.EntityType.TABLE) {
-        NameIdentifierUtil.checkTable(identifier);
-      } else if (type == Entity.EntityType.SCHEMA) {
-        NameIdentifierUtil.checkSchema(identifier);
-      } else {
-        needsValidation.add(object);
-        continue;
-      }
-      try {
-        if (!entityStore.exists(identifier, type)) {
-          needsValidation.add(object);
-        }
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to check registered metadata objects", e);
+      // Validate the identifier without loading the external object.
+      NameIdentifierUtil.toMetadataObject(identifier, type);
+      if (type == Entity.EntityType.METALAKE && !metalake.equals(object.name())) {
+        throw new IllegalMetadataObjectException("The metalake object name must be %s", metalake);
       }
     }
-    MetadataObjectUtil.checkMetadataObjects(metalake, needsValidation);
-    return resolveValidated(metalake, metadataObjects);
+    return resolveValidated(metalake, metadataObjects, true);
   }
 
   private Map<MetadataObject, ResolvedTag[]> resolveValidated(
-      String metalake, List<MetadataObject> metadataObjects) {
+      String metalake, List<MetadataObject> metadataObjects, boolean storedOnly) {
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
         new EnumMap<>(Entity.EntityType.class);
@@ -280,12 +271,18 @@ public class EffectiveTagResolver {
     for (Map.Entry<Entity.EntityType, Set<MetadataObject>> entry : objectsByType.entrySet()) {
       List<NameIdentifier> identifiers = new ArrayList<>();
       Map<NameIdentifier, MetadataObject> objectsByIdentifier = new LinkedHashMap<>();
-      for (MetadataObject object : entry.getValue()) {
-        NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
-        identifiers.add(identifier);
-        objectsByIdentifier.put(identifier, object);
-      }
       try {
+        for (MetadataObject object : entry.getValue()) {
+          NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+          if (storedOnly && !existsInStore(identifier, entry.getKey())) {
+            continue;
+          }
+          identifiers.add(identifier);
+          objectsByIdentifier.put(identifier, object);
+        }
+        if (identifiers.isEmpty()) {
+          continue;
+        }
         for (RelationalEntity<?> relation :
             entityStore
                 .relationOperations()
@@ -324,5 +321,23 @@ public class EffectiveTagResolver {
           result.put(requested, effectiveTags.values().toArray(new ResolvedTag[0]));
         });
     return result;
+  }
+
+  private boolean existsInStore(NameIdentifier identifier, Entity.EntityType type)
+      throws IOException {
+    if (type != Entity.EntityType.COLUMN) {
+      return entityStore.exists(identifier, type);
+    }
+    // Columns are stored with their table rather than as standalone entities.
+    try {
+      TableEntity table =
+          entityStore.get(
+              NameIdentifier.of(identifier.namespace().levels()),
+              Entity.EntityType.TABLE,
+              TableEntity.class);
+      return table.columns().stream().anyMatch(column -> column.name().equals(identifier.name()));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
   }
 }

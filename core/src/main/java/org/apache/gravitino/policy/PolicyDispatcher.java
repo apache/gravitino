@@ -183,11 +183,11 @@ public interface PolicyDispatcher {
   }
 
   /**
-   * Lists effective policies for display using registered table and schema identities when
-   * available.
+   * Lists effective policies for display using only stored metadata.
    *
-   * <p>Unregistered objects retain live validation and import. Results do not verify external
-   * changes to registered objects. This method must not be used for policy enforcement.
+   * <p>Unregistered objects have no direct assignments but can inherit from registered ancestors.
+   * External metadata is neither validated nor imported. This method must not be used for policy
+   * enforcement.
    *
    * @param metalake the metalake name
    * @param metadataObjects the objects to resolve

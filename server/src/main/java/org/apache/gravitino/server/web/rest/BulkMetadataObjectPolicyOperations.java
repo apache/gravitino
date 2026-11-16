@@ -23,12 +23,9 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -40,8 +37,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.dto.policy.PolicyDTO;
 import org.apache.gravitino.dto.requests.BulkMetadataObjectsRequest;
@@ -81,7 +77,7 @@ public class BulkMetadataObjectPolicyOperations {
    *
    * @param metalake the metalake name
    * @param request the metadata objects to load
-   * @return effective policies, or an error if any requested object cannot be loaded
+   * @return successful policies results and per-object errors
    */
   @POST
   @Consumes("application/json")
@@ -99,45 +95,40 @@ public class BulkMetadataObjectPolicyOperations {
           () -> {
             Preconditions.checkArgument(request != null, "Request body cannot be null");
             request.validate();
-            new BulkManager(GravitinoEnv.getInstance().config())
-                .checkBulkSize("metadataObjects", request.getMetadataObjects().length);
-            List<MetadataObject> objects =
-                Arrays.stream(request.getMetadataObjects())
-                    .map(object -> MetadataObjects.parse(object.fullName(), object.type()))
-                    .collect(Collectors.toList());
-            if (MetadataAuthzHelper.filterMetadataObject(metalake, request.getMetadataObjects())
-                    .length
-                != objects.size()) {
-              throw new ForbiddenException(
-                  "Not authorized to access one or more requested metadata objects");
-            }
-            Map<MetadataObject, PolicyEntity[]> policies =
-                policyDispatcher.listPolicyInfosForDisplay(metalake, objects);
-            List<Result> results = new ArrayList<>();
-            for (int i = 0; i < objects.size(); i++) {
-              PolicyEntity[] allPolicies = policies.get(objects.get(i));
-              PolicyEntity[] visiblePolicies =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_POLICY_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.POLICY,
-                      allPolicies,
-                      policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
-              PolicyDTO[] policyDTOs =
-                  Arrays.stream(visiblePolicies)
-                      .map(
-                          policy ->
-                              PolicyOperations.toDTO(
-                                  policy, Optional.of(policy.inherited().orElse(false))))
-                      .toArray(PolicyDTO[]::new);
-              results.add(
-                  new Result(
-                      request.getMetadataObjects()[i],
-                      new MetadataObjectPolicyListResponse(
-                          policyDTOs, visiblePolicies.length < allPolicies.length)));
-            }
+            BulkManager manager = new BulkManager(GravitinoEnv.getInstance().config());
+            manager.checkBulkSize("metadataObjects", request.getMetadataObjects().length);
+            List<BulkItemResult<Result>> results =
+                BulkMetadataObjectReader.read(
+                    metalake,
+                    request.getMetadataObjects(),
+                    objects -> policyDispatcher.listPolicyInfosForDisplay(metalake, objects),
+                    (i, allPolicies) -> {
+                      PolicyEntity[] visiblePolicies =
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_POLICY_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.POLICY,
+                              allPolicies,
+                              policy -> NameIdentifierUtil.ofPolicy(metalake, policy.name()));
+                      PolicyDTO[] policyDTOs =
+                          Arrays.stream(visiblePolicies)
+                              .map(
+                                  policy ->
+                                      PolicyOperations.toDTO(
+                                          policy, Optional.of(policy.inherited().orElse(false))))
+                              .toArray(PolicyDTO[]::new);
+                      return new Result(
+                          request.getMetadataObjects()[i],
+                          new MetadataObjectPolicyListResponse(
+                              policyDTOs, visiblePolicies.length < allPolicies.length));
+                    });
             return Utils.ok(
-                new BulkMetadataObjectPolicyListResponse(results.toArray(new Result[0])));
+                new BulkMetadataObjectPolicyListResponse(
+                    results.stream()
+                        .filter(BulkItemResult::succeeded)
+                        .map(result -> result.value().orElseThrow())
+                        .toArray(Result[]::new),
+                    BulkMetadataObjectReader.errors(results, manager)));
           });
     } catch (ForbiddenException e) {
       return Utils.forbidden(e.getMessage(), e);

@@ -55,6 +55,8 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.dto.requests.BulkMetadataObjectsRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
+import org.apache.gravitino.dto.responses.BulkMetadataObjectPolicyListResponse;
+import org.apache.gravitino.dto.responses.BulkMetadataObjectTagListResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -237,9 +239,23 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
               invocation ->
                   new MetadataObjectDTO[] {((MetadataObjectDTO[]) invocation.getArgument(1))[0]});
       try (Response response = directPost(kind)) {
-        Assertions.assertEquals(403, response.getStatus());
+        Assertions.assertEquals(200, response.getStatus());
+        BaseResponse result = (BaseResponse) response.getEntity();
+        result.validate();
+        JsonNode body = JsonUtils.objectMapper().valueToTree(result);
+        Assertions.assertEquals(1, body.path("results").size());
+        Assertions.assertEquals(1, body.path("errors").size());
+        Assertions.assertEquals(1, body.path("errors").get(0).path("index").asInt());
+        Assertions.assertEquals(1008, body.path("errors").get(0).path("code").asInt());
       }
-      verifyNoInteractions(TAGS, POLICIES);
+      if (kind.equals("tags")) {
+        verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+        verifyNoInteractions(POLICIES);
+      } else {
+        verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
+        verifyNoInteractions(TAGS);
+      }
+      verifyNoMoreInteractions(TAGS, POLICIES);
     }
   }
 
@@ -281,7 +297,7 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
 
   @ParameterizedTest
   @ValueSource(strings = {"tags", "policies"})
-  public void testFailureInOneKindDoesNotPreventOtherRead(String kind) {
+  public void testFailureInOneKindDoesNotPreventOtherRead(String kind) throws Exception {
     if (kind.equals("tags")) {
       when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
           .thenThrow(new NoSuchMetadataObjectException("Object was removed"));
@@ -290,10 +306,127 @@ public class TestBulkMetadataObjectOperations extends BaseOperationsTest {
           .thenThrow(new NoSuchMetadataObjectException("Object was removed"));
     }
     try (Response response = post(kind, REQUEST)) {
-      Assertions.assertEquals(404, response.getStatus());
+      Assertions.assertEquals(200, response.getStatus());
+      JsonNode body = JsonUtils.objectMapper().readTree(response.readEntity(String.class));
+      Assertions.assertEquals(0, body.path("results").size());
+      Assertions.assertEquals(2, body.path("errors").size());
+      Assertions.assertEquals(0, body.path("errors").get(0).path("index").asInt());
+      Assertions.assertEquals(1, body.path("errors").get(1).path("index").asInt());
     }
     try (Response response = post(kind.equals("tags") ? "policies" : "tags", REQUEST)) {
       Assertions.assertEquals(200, response.getStatus());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"tags", "policies"})
+  public void testOneObjectFailurePreservesSuccessfulResults(String kind) throws Exception {
+    if (kind.equals("tags")) {
+      Map<MetadataObject, Tag[]> data = TAGS.listEffectiveTagsForDisplay("demo", List.of(ONE));
+      reset(TAGS);
+      when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any()))
+          .thenAnswer(
+              invocation -> {
+                List<MetadataObject> objects = invocation.getArgument(1);
+                if (objects.contains(TWO)) {
+                  throw new RuntimeException("Missing external metadata file");
+                }
+                return data;
+              });
+    } else {
+      Map<MetadataObject, PolicyEntity[]> data =
+          POLICIES.listPolicyInfosForDisplay("demo", List.of(ONE));
+      reset(POLICIES);
+      when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any()))
+          .thenAnswer(
+              invocation -> {
+                List<MetadataObject> objects = invocation.getArgument(1);
+                if (objects.contains(TWO)) {
+                  throw new RuntimeException("Missing external metadata file");
+                }
+                return data;
+              });
+    }
+    try (Response response = directPost(kind)) {
+      Assertions.assertEquals(200, response.getStatus());
+      BaseResponse result = (BaseResponse) response.getEntity();
+      result.validate();
+      JsonNode body = JsonUtils.objectMapper().valueToTree(result);
+      Assertions.assertEquals(1, body.path("results").size());
+      Assertions.assertEquals(
+          "catalog.one",
+          body.path("results").get(0).path("metadataObject").path("fullName").asText());
+      Assertions.assertEquals(1, body.path("results").get(0).path(kind).path(kind).size());
+      Assertions.assertEquals(1, body.path("errors").size());
+      JsonNode error = body.path("errors").get(0);
+      Assertions.assertEquals(1, error.path("index").asInt());
+      Assertions.assertEquals("catalog.two", error.path("name").asText());
+      Assertions.assertEquals(1002, error.path("code").asInt());
+      Assertions.assertEquals("Missing external metadata file", error.path("message").asText());
+    }
+    if (kind.equals("tags")) {
+      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE, TWO));
+      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(TWO));
+    } else {
+      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE, TWO));
+      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
+      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(TWO));
+    }
+    verifyNoMoreInteractions(TAGS, POLICIES);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"tags", "policies"})
+  public void testSingleFailureReturnsValidErrorWithoutRetry(String kind) throws Exception {
+    if (kind.equals("tags")) {
+      when(TAGS.listEffectiveTagsForDisplay(eq("demo"), any())).thenThrow(new RuntimeException());
+    } else {
+      when(POLICIES.listPolicyInfosForDisplay(eq("demo"), any())).thenThrow(new RuntimeException());
+    }
+    String request = "{\"metadataObjects\":[{\"type\":\"SCHEMA\",\"fullName\":\"catalog.one\"}]}";
+    try (Response response = post(kind, request)) {
+      Assertions.assertEquals(200, response.getStatus());
+      String body = response.readEntity(String.class);
+      BaseResponse decoded =
+          kind.equals("tags")
+              ? JsonUtils.objectMapper().readValue(body, BulkMetadataObjectTagListResponse.class)
+              : JsonUtils.objectMapper()
+                  .readValue(body, BulkMetadataObjectPolicyListResponse.class);
+      decoded.validate();
+      JsonNode json = JsonUtils.objectMapper().readTree(body);
+      Assertions.assertEquals(0, json.path("results").size());
+      Assertions.assertEquals(1, json.path("errors").size());
+      Assertions.assertEquals(
+          "RuntimeException", json.path("errors").get(0).path("message").asText());
+    }
+    if (kind.equals("tags")) {
+      verify(TAGS).listEffectiveTagsForDisplay("demo", List.of(ONE));
+    } else {
+      verify(POLICIES).listPolicyInfosForDisplay("demo", List.of(ONE));
+    }
+    verifyNoMoreInteractions(TAGS, POLICIES);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"tags", "policies"})
+  public void testAllDeniedObjectsAreNotLoaded(String kind) throws Exception {
+    try (MockedStatic<MetadataAuthzHelper> auth =
+        mockStatic(MetadataAuthzHelper.class, CALLS_REAL_METHODS)) {
+      auth.when(
+              () ->
+                  MetadataAuthzHelper.filterMetadataObject(
+                      eq("demo"), any(MetadataObjectDTO[].class)))
+          .thenReturn(new MetadataObjectDTO[0]);
+      try (Response response = directPost(kind)) {
+        Assertions.assertEquals(200, response.getStatus());
+        BaseResponse result = (BaseResponse) response.getEntity();
+        result.validate();
+        JsonNode body = JsonUtils.objectMapper().valueToTree(result);
+        Assertions.assertEquals(0, body.path("results").size());
+        Assertions.assertEquals(2, body.path("errors").size());
+      }
+      verifyNoInteractions(TAGS, POLICIES);
     }
   }
 

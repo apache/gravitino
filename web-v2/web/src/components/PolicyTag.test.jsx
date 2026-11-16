@@ -52,7 +52,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-it.each([true, false])('respects readOnly=%s while retaining policy navigation', async readOnly => {
+it.each([true, false])('shows policies without direct mutation controls when readOnly=%s', async readOnly => {
   const directPolicy = { name: 'direct', enabled: true, inherited: false }
   const inheritedPolicy = { name: 'inherited', enabled: true, inherited: true }
   defHttp.get.mockResolvedValue({ policies: [directPolicy, inheritedPolicy] })
@@ -60,34 +60,17 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   await act(async () =>
     root.render(
       <Provider store={store}>
-        <PolicyTag readOnly={readOnly} metadataObjectType='table' metadataObjectFullName='sales.mart.orders' />
+        <PolicyTag readOnly={readOnly} metadataObjectType='column' metadataObjectFullName='sales.mart.orders.name' />
       </Provider>
     )
   )
   const [directTag, inheritedTag] = container.querySelectorAll('.ant-tag')
   expect(directTag.textContent).toBe('direct')
   expect(inheritedTag.textContent).toBe('inherited')
-  expect(inheritedTag.querySelector('.ant-tag-close-icon')).toBeNull()
-  expect(container.textContent.includes('Associate Policy')).toBe(!readOnly)
+  expect(container.querySelector('.ant-tag-close-icon')).toBeNull()
+  expect(container.textContent).not.toContain('Associate Policy')
 
-  const close = directTag.querySelector('.ant-tag-close-icon')
-  if (readOnly) {
-    expect(close).toBeNull()
-  } else {
-    expect(close).not.toBeNull()
-    defHttp.post.mockResolvedValue({ code: 0 })
-    defHttp.get.mockResolvedValue({ policies: [inheritedPolicy] })
-    await act(async () => close.click())
-    expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
-      url: '/api/metalakes/demo/objects/table/sales.mart.orders/policies',
-      data: { policiesToRemove: ['direct'] }
-    })
-    expect(container.textContent).not.toContain('direct')
-    expect(navigation.push).not.toHaveBeenCalled()
-  }
-
-  const policyLink = [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'inherited')
-  await act(async () => policyLink.click())
+  await act(async () => inheritedTag.click())
   expect(navigation.push).toHaveBeenCalledExactlyOnceWith('/metadataObjectsForPolicy?policy=inherited&metalake=demo')
-  if (readOnly) expect(defHttp.post).not.toHaveBeenCalled()
+  expect(defHttp.post).not.toHaveBeenCalled()
 })

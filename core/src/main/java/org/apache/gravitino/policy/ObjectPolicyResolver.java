@@ -124,10 +124,11 @@ public class ObjectPolicyResolver {
   }
 
   /**
-   * Resolves policies for display using the last registered table and schema identities.
+   * Resolves policies for display using only stored metadata.
    *
-   * <p>Unregistered objects retain live validation and import. Enforcement callers must use {@link
-   * #resolve(String, List)} instead.
+   * <p>Unregistered objects can inherit policies through registered ancestors. External metadata is
+   * neither validated nor imported. Enforcement callers must use {@link #resolve(String, List)}
+   * instead.
    *
    * @param metalake the metalake name
    * @param metadataObjects the objects to resolve

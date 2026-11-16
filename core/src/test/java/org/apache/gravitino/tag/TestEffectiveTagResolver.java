@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -39,6 +40,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -88,17 +90,56 @@ public class TestEffectiveTagResolver {
   }
 
   @Test
-  void testDisplayReadFallsBackToValidationForUnregisteredTable() {
-    NoSuchMetadataObjectException missing = new NoSuchMetadataObjectException("missing table");
+  void testDisplayReadInheritsFromRegisteredAncestorsWithoutLiveValidation() throws Exception {
+    TagEntity inherited = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    when(entityStore.exists(
+            MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA), Entity.EntityType.SCHEMA))
+        .thenReturn(true);
+    NameIdentifier schemaIdent = MetadataObjectUtil.toEntityIdent(METALAKE, SCHEMA);
+    RelationalEntity<?> relation =
+        new RelationalEntity<>(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            schemaIdent,
+            Entity.EntityType.SCHEMA,
+            inherited);
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            List.of(schemaIdent),
+            Entity.EntityType.SCHEMA))
+        .thenReturn(List.of(relation));
     metadataObjectUtil
-        .when(() -> MetadataObjectUtil.checkMetadataObjects(METALAKE, List.of(TABLE)))
-        .thenThrow(missing);
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(eq(METALAKE), anyList()))
+        .thenThrow(new NoSuchMetadataObjectException("external table is unavailable"));
 
-    Assertions.assertSame(
-        missing,
-        Assertions.assertThrows(
-            NoSuchMetadataObjectException.class,
-            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE))));
+    Map<MetadataObject, EffectiveTagResolver.ResolvedTag[]> result =
+        resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE, SCHEMA));
+
+    Assertions.assertEquals(2, result.size());
+    Assertions.assertEquals(1, result.get(TABLE).length);
+    Assertions.assertEquals(SCHEMA, result.get(TABLE)[0].source());
+    Assertions.assertArrayEquals(
+        new String[] {"finance"}, result.get(TABLE)[0].tag().assignment().orElseThrow().values());
+    Assertions.assertTrue(result.get(TABLE)[0].tag().inherited().orElseThrow());
+    Assertions.assertFalse(result.get(SCHEMA)[0].tag().inherited().orElseThrow());
+    metadataObjectUtil.verify(
+        () -> MetadataObjectUtil.checkMetadataObjects(any(), anyList()), never());
+    verify(relationOperations, times(1)).batchListEntitiesByRelation(any(), anyList(), any());
+  }
+
+  @Test
+  void testDisplayReadOfUnregisteredHierarchyReturnsEmptyWithoutLiveValidation() {
+    metadataObjectUtil
+        .when(() -> MetadataObjectUtil.checkMetadataObjects(eq(METALAKE), anyList()))
+        .thenThrow(new NoSuchMetadataObjectException("external table is unavailable"));
+
+    Map<MetadataObject, EffectiveTagResolver.ResolvedTag[]> result =
+        resolver.resolveWithSourcesForDisplay(METALAKE, List.of(TABLE));
+
+    Assertions.assertEquals(0, result.get(TABLE).length);
+    verifyNoInteractions(relationOperations);
+    Assertions.assertThrows(
+        NoSuchMetadataObjectException.class,
+        () -> resolver.resolveWithSources(METALAKE, List.of(TABLE)));
   }
 
   @Test
@@ -117,19 +158,23 @@ public class TestEffectiveTagResolver {
   }
 
   @Test
-  void testDisplayReadStillValidatesColumns() {
-    MetadataObject column =
-        MetadataObjects.parse("catalog.schema.table.column", MetadataObject.Type.COLUMN);
-    NoSuchMetadataObjectException missing = new NoSuchMetadataObjectException("missing table");
-    metadataObjectUtil
-        .when(() -> MetadataObjectUtil.checkMetadataObjects(METALAKE, List.of(column)))
-        .thenThrow(missing);
+  void testDisplayReadRejectsMalformedColumnIdentifier() {
+    MetadataObject malformed = mock(MetadataObject.class);
+    when(malformed.type()).thenReturn(MetadataObject.Type.COLUMN);
+    when(malformed.fullName()).thenReturn("catalog.schema.column");
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(malformed)));
+    verifyNoInteractions(entityStore);
+  }
 
-    Assertions.assertSame(
-        missing,
-        Assertions.assertThrows(
-            NoSuchMetadataObjectException.class,
-            () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(column))));
+  @Test
+  void testDisplayReadRejectsAnotherMetalake() {
+    MetadataObject other = MetadataObjects.parse("another_metalake", MetadataObject.Type.METALAKE);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> resolver.resolveWithSourcesForDisplay(METALAKE, List.of(other)));
+    verifyNoInteractions(entityStore);
   }
 
   @Test

@@ -48,31 +48,38 @@ export default function MetadataObjectListsProvider({ metalake, children }) {
           batches.push(pending.slice(i, i + MAX_BATCH_SIZE))
         }
 
-        const loaded = await Promise.all(
-          batches.map(async batch => {
-            try {
-              const response = await load(
-                metalake,
-                batch.map(([, entry]) => entry.object)
-              )
+        const loadBatch = async batch => {
+          try {
+            const response = await load(
+              metalake,
+              batch.map(([, entry]) => entry.object)
+            )
 
-              const values = new Map(
-                response.results.map(item => [
-                  `${kind}/${item.metadataObject.type.toUpperCase()}/${item.metadataObject.fullName}`,
-                  item[kind]
-                ])
-              )
-
-              return batch.map(([key, entry]) => [
-                key,
-                entry,
-                values.get(key) ? { data: values.get(key) } : { error: true }
+            const values = new Map(
+              response.results.map(item => [
+                `${kind}/${item.metadataObject.type.toUpperCase()}/${item.metadataObject.fullName}`,
+                item[kind]
               ])
-            } catch {
-              return batch.map(([key, entry]) => [key, entry, { error: true }])
+            )
+
+            return batch.map(([key, entry]) => [
+              key,
+              entry,
+              values.get(key) ? { data: values.get(key) } : { error: true }
+            ])
+          } catch (error) {
+            // Object failures are returned in the response; only adapt the request size here.
+            if (batch.length > 1 && error?.response?.status === 400) {
+              const middle = Math.ceil(batch.length / 2)
+              const results = await Promise.all([loadBatch(batch.slice(0, middle)), loadBatch(batch.slice(middle))])
+
+              return results.flat()
             }
-          })
-        )
+
+            return batch.map(([key, entry]) => [key, entry, { error: true }])
+          }
+        }
+        const loaded = await Promise.all(batches.map(loadBatch))
         if (!active.current) return
         setResults(current => {
           const next = { ...current }

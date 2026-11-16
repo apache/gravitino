@@ -39,7 +39,7 @@ import {
   getCurrentEntityTagsApi,
   getCurrentEntityPoliciesApi,
   getMetadataObjectsForTagApi,
-  getMetadataObjectsForPolicyApi
+  getTagsForPolicyApi
 } from '@/lib/api/metalakes'
 
 import {
@@ -573,18 +573,15 @@ export const getMetadataObjectsForTag = createAsyncThunk(
   }
 )
 
-export const getMetadataObjectsForPolicy = createAsyncThunk(
-  'appMetalakes/getMetadataObjectsForPolicy',
-  async ({ metalake, policy }) => {
-    const [err, res] = await to(getMetadataObjectsForPolicyApi(metalake, policy))
+export const getTagsForPolicy = createAsyncThunk('appMetalakes/getTagsForPolicy', async ({ metalake, policy }) => {
+  const [err, res] = await to(getTagsForPolicyApi(metalake, policy))
 
-    if (err || !res) {
-      throw new Error(err)
-    }
-
-    return res.metadataObjects
+  if (err || !res) {
+    throw new Error(err)
   }
-)
+
+  return res.associations
+})
 
 export const fetchCatalogs = createAsyncThunk(
   'appMetalakes/fetchCatalogs',
@@ -3105,7 +3102,7 @@ export const appMetalakesSlice = createSlice({
         toast.error(action.error.message)
       }
     })
-    builder.addCase(getMetadataObjectsForPolicy.rejected, (state, action) => {
+    builder.addCase(getTagsForPolicy.rejected, (state, action) => {
       if (!action.meta.aborted && !action.error.message.includes('CanceledError')) {
         toast.error(action.error.message)
       }

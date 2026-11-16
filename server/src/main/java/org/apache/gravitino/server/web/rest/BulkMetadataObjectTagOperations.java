@@ -23,12 +23,9 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.base.Preconditions;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -40,8 +37,7 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.dto.requests.BulkMetadataObjectsRequest;
 import org.apache.gravitino.dto.responses.BulkMetadataObjectTagListResponse;
@@ -49,13 +45,11 @@ import org.apache.gravitino.dto.responses.BulkMetadataObjectTagListResponse.Resu
 import org.apache.gravitino.dto.responses.MetadataObjectTagListResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
-import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
@@ -82,7 +76,7 @@ public class BulkMetadataObjectTagOperations {
    *
    * @param metalake the metalake name
    * @param request the metadata objects to load
-   * @return effective tags, or an error if any requested object cannot be loaded
+   * @return successful tags results and per-object errors
    */
   @POST
   @Consumes("application/json")
@@ -100,42 +94,40 @@ public class BulkMetadataObjectTagOperations {
           () -> {
             Preconditions.checkArgument(request != null, "Request body cannot be null");
             request.validate();
-            new BulkManager(GravitinoEnv.getInstance().config())
-                .checkBulkSize("metadataObjects", request.getMetadataObjects().length);
-            List<MetadataObject> objects =
-                Arrays.stream(request.getMetadataObjects())
-                    .map(object -> MetadataObjects.parse(object.fullName(), object.type()))
-                    .collect(Collectors.toList());
-            if (MetadataAuthzHelper.filterMetadataObject(metalake, request.getMetadataObjects())
-                    .length
-                != objects.size()) {
-              throw new ForbiddenException(
-                  "Not authorized to access one or more requested metadata objects");
-            }
-            Map<MetadataObject, Tag[]> tags =
-                tagDispatcher.listEffectiveTagsForDisplay(metalake, objects);
-            List<Result> results = new ArrayList<>();
-            for (int i = 0; i < objects.size(); i++) {
-              TagDTO[] allTags =
-                  Arrays.stream(tags.get(objects.get(i)))
-                      .map(
-                          tag ->
-                              DTOConverters.toDTO(tag, Optional.of(tag.inherited().orElse(false))))
-                      .toArray(TagDTO[]::new);
-              TagDTO[] visibleTags =
-                  MetadataAuthzHelper.filterByExpression(
-                      metalake,
-                      LOAD_TAG_AUTHORIZATION_EXPRESSION,
-                      Entity.EntityType.TAG,
-                      allTags,
-                      tag -> NameIdentifierUtil.ofTag(metalake, tag.name()));
-              results.add(
-                  new Result(
-                      request.getMetadataObjects()[i],
-                      new MetadataObjectTagListResponse(
-                          visibleTags, visibleTags.length < allTags.length)));
-            }
-            return Utils.ok(new BulkMetadataObjectTagListResponse(results.toArray(new Result[0])));
+            BulkManager manager = new BulkManager(GravitinoEnv.getInstance().config());
+            manager.checkBulkSize("metadataObjects", request.getMetadataObjects().length);
+            List<BulkItemResult<Result>> results =
+                BulkMetadataObjectReader.read(
+                    metalake,
+                    request.getMetadataObjects(),
+                    objects -> tagDispatcher.listEffectiveTagsForDisplay(metalake, objects),
+                    (i, tags) -> {
+                      TagDTO[] allTags =
+                          Arrays.stream(tags)
+                              .map(
+                                  tag ->
+                                      DTOConverters.toDTO(
+                                          tag, Optional.of(tag.inherited().orElse(false))))
+                              .toArray(TagDTO[]::new);
+                      TagDTO[] visibleTags =
+                          MetadataAuthzHelper.filterByExpression(
+                              metalake,
+                              LOAD_TAG_AUTHORIZATION_EXPRESSION,
+                              Entity.EntityType.TAG,
+                              allTags,
+                              tag -> NameIdentifierUtil.ofTag(metalake, tag.name()));
+                      return new Result(
+                          request.getMetadataObjects()[i],
+                          new MetadataObjectTagListResponse(
+                              visibleTags, visibleTags.length < allTags.length));
+                    });
+            return Utils.ok(
+                new BulkMetadataObjectTagListResponse(
+                    results.stream()
+                        .filter(BulkItemResult::succeeded)
+                        .map(result -> result.value().orElseThrow())
+                        .toArray(Result[]::new),
+                    BulkMetadataObjectReader.errors(results, manager)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.LIST, "", metalake, e);

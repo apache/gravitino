@@ -342,6 +342,41 @@ public class TestPolicyManager {
   }
 
   @Test
+  public void testDisplayReadInheritsPolicyForUnregisteredTable() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "unregistered_display_table");
+    MetadataObject table = NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+    MetadataObject schema =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), Entity.EntityType.SCHEMA);
+    PolicyEntity policy =
+        createCustomPolicy(
+            METALAKE,
+            "inherited_display_policy",
+            PolicyContents.custom(ImmutableMap.of(), SUPPORTS_OBJECT_TYPES, null));
+    associatePolicyThroughTag(policy, schema);
+    Assertions.assertFalse(entityStore.exists(tableIdent, Entity.EntityType.TABLE));
+    RuntimeException unavailable = new RuntimeException("Iceberg metadata file is unavailable");
+    Mockito.doThrow(unavailable).when(tableDispatcher).tableExists(tableIdent);
+    try {
+      Map<MetadataObject, PolicyEntity[]> result =
+          policyManager.listPolicyInfosForDisplay(METALAKE, List.of(table));
+      Assertions.assertEquals(1, result.get(table).length);
+      Assertions.assertEquals("inherited_display_policy", result.get(table)[0].name());
+      Assertions.assertTrue(result.get(table)[0].inherited().orElseThrow());
+      Assertions.assertFalse(entityStore.exists(tableIdent, Entity.EntityType.TABLE));
+      Mockito.verify(tableDispatcher, Mockito.never()).tableExists(tableIdent);
+      Assertions.assertSame(
+          unavailable,
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () -> policyManager.listPolicyInfosForMetadataObjects(METALAKE, List.of(table))));
+    } finally {
+      Mockito.doReturn(true).when(tableDispatcher).tableExists(tableIdent);
+    }
+  }
+
+  @Test
   public void testCreateAndGetPolicy() {
     String policyName = "policy_" + UUID.randomUUID().toString().replace("-", "");
     Map<String, Object> customRules = ImmutableMap.of("rule1", 1, "rule2", "value2");

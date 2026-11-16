@@ -30,11 +30,13 @@ paths:
       description: >-
         Returns effective tags for each requested object, including inherited
         tags. Results follow request order and omit tags the caller
-        cannot view. Each result indicates whether tags were omitted. Access to every
-        requested object is required. Registered tables and schemas use their last registered
-        identities without reloading external metadata; out-of-band changes are not checked.
-        Unregistered objects and other object types retain live validation and import.
-        The request fails as a whole if any object cannot be resolved.
+        cannot view. Each result indicates whether tags were omitted. Each requested
+        object is checked for access before loading. Results use only stored metadata without
+        validating or importing external objects; out-of-band changes are not checked.
+        Unregistered objects have no direct assignments but can inherit from registered ancestors.
+        Object-level failures, including denied access, are returned in errors with their
+        zero-based request index and full object name. Successful objects remain in results,
+        in request order. An accepted request returns HTTP 200 even if every object fails.
         The maximum request size is controlled by gravitino.server.bulk.maxItems,
         which defaults to 100. This operation does not modify tag or policy assignments.
       requestBody:
@@ -45,7 +47,7 @@ paths:
               $ref: "#/components/schemas/BulkMetadataObjectsRequest"
       responses:
         "200":
-          description: Effective tags for every requested object, including empty results
+          description: Successful tag results and per-object errors, including empty successful results
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -53,13 +55,13 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
-          description: The caller cannot access one or more requested metadata objects
+          description: The caller cannot access the metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or a requested object does not exist
+          description: A required request-level resource does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -78,11 +80,13 @@ paths:
       description: >-
         Returns effective policies for each requested object, including inherited
         policies. Results follow request order and omit policies the caller
-        cannot view. Each result indicates whether policies were omitted. Access to every
-        requested object is required. Registered tables and schemas use their last registered
-        identities without reloading external metadata; out-of-band changes are not checked.
-        Unregistered objects and other object types retain live validation and import.
-        The request fails as a whole if any object cannot be resolved.
+        cannot view. Each result indicates whether policies were omitted. Each requested
+        object is checked for access before loading. Results use only stored metadata without
+        validating or importing external objects; out-of-band changes are not checked.
+        Unregistered objects have no direct assignments but can inherit from registered ancestors.
+        Object-level failures, including denied access, are returned in errors with their
+        zero-based request index and full object name. Successful objects remain in results,
+        in request order. An accepted request returns HTTP 200 even if every object fails.
         The maximum request size is controlled by gravitino.server.bulk.maxItems,
         which defaults to 100. This operation does not modify tag or policy assignments.
       requestBody:
@@ -93,7 +97,7 @@ paths:
               $ref: "#/components/schemas/BulkMetadataObjectsRequest"
       responses:
         "200":
-          description: Effective policies for every requested object, including empty results
+          description: Successful policy results and per-object errors, including empty successful results
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -101,13 +105,13 @@ paths:
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "403":
-          description: The caller cannot access one or more requested metadata objects
+          description: The caller cannot access the metalake
           content:
             application/vnd.gravitino.v1+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
-          description: The metalake or a requested object does not exist
+          description: A required request-level resource does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -398,7 +402,7 @@ components:
 
     BulkMetadataObjectTagListResponse:
       type: object
-      required: [code, results]
+      required: [code, results, errors]
       properties:
         code:
           type: integer
@@ -414,10 +418,15 @@ components:
                 $ref: "./tags.yaml#/components/schemas/MetadataObject"
               tags:
                 $ref: "./tags.yaml#/components/responses/MetadataObjectTagListResponse"
+        errors:
+          type: array
+          description: Failures identified by their original request index and full object name
+          items:
+            $ref: "#/components/schemas/BulkError"
 
     BulkMetadataObjectPolicyListResponse:
       type: object
-      required: [code, results]
+      required: [code, results, errors]
       properties:
         code:
           type: integer
@@ -433,6 +442,11 @@ components:
                 $ref: "./tags.yaml#/components/schemas/MetadataObject"
               policies:
                 $ref: "./policies.yaml#/components/schemas/MetadataObjectPolicyListResponse"
+        errors:
+          type: array
+          description: Failures identified by their original request index and full object name
+          items:
+            $ref: "#/components/schemas/BulkError"
 
     BulkUserAddRequest:
       type: object

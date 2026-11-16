@@ -29,14 +29,28 @@ public class BulkMetadataObjectPolicyListResponse extends BaseResponse {
   @JsonProperty("results")
   private final Result[] results;
 
+  @JsonProperty("errors")
+  private final BulkError[] errors;
+
   /**
    * Creates a bulk policy response.
    *
-   * @param results the results in request order
+   * @param results the successful results in request order
    */
   public BulkMetadataObjectPolicyListResponse(Result[] results) {
+    this(results, new BulkError[0]);
+  }
+
+  /**
+   * Creates a bulk response with per-object failures.
+   *
+   * @param results the successful results in request order
+   * @param errors the failures identified by their request indices
+   */
+  public BulkMetadataObjectPolicyListResponse(Result[] results, BulkError[] errors) {
     super(0);
     this.results = results;
+    this.errors = errors;
   }
 
   /** Creates a response for Jackson deserialization. */
@@ -48,6 +62,11 @@ public class BulkMetadataObjectPolicyListResponse extends BaseResponse {
   public void validate() {
     super.validate();
     Preconditions.checkArgument(results != null, "results must not be null");
+    Preconditions.checkArgument(errors != null, "errors must not be null");
+    for (BulkError error : errors) {
+      Preconditions.checkArgument(error != null, "error must not be null");
+      error.validate();
+    }
     for (Result result : results) {
       Preconditions.checkArgument(
           result != null && result.metadataObject != null && result.policies != null,

@@ -256,6 +256,77 @@ it('bounds each kind to 100 objects and renders all its chunks together', async 
   expect(container.textContent).toContain('tag-schema100')
 })
 
+it.each([1008, 1003, 1002])('renders successful rows alongside item error %s without extra requests', async code => {
+  defHttp.post.mockImplementation(request => {
+    const names = namesFrom(request)
+
+    return Promise.resolve({
+      ...response(
+        kindFrom(request),
+        names.filter(name => name !== 's.denied'),
+        'table'
+      ),
+      errors: [
+        {
+          index: names.indexOf('s.denied'),
+          name: 'catalog.s.denied',
+          code,
+          type: 'RuntimeException',
+          message: 'Unavailable'
+        }
+      ]
+    })
+  })
+  await renderRows(['s.one', 's.denied', 's.two'], 'demo', 'table')
+
+  for (const name of ['s.one', 's.two']) {
+    const row = container.querySelector(`[data-row="${name}"]`)
+    expect(row.textContent).toContain(`tag-${name}`)
+    expect(row.textContent).toContain(`policy-${name}`)
+    expect(row.textContent).not.toContain('Unable to load')
+  }
+  expect(defHttp.post).toHaveBeenCalledTimes(2)
+  const deniedRow = container.querySelector('[data-row="s.denied"]')
+  expect(deniedRow.textContent).toContain('Unable to load tags')
+  expect(deniedRow.textContent).toContain('Unable to load policies')
+  expect(defHttp.get).not.toHaveBeenCalled()
+})
+
+it.each([1, 2])('loads all rows when the server bulk limit is %s', async limit => {
+  defHttp.post.mockImplementation(request =>
+    request.data.metadataObjects.length > limit
+      ? Promise.reject({ response: { status: 400 } })
+      : Promise.resolve(response(kindFrom(request), namesFrom(request)))
+  )
+  await renderRows(['one', 'two', 'three', 'four', 'five'])
+
+  for (const name of ['one', 'two', 'three', 'four', 'five']) {
+    const row = container.querySelector(`[data-row="${name}"]`)
+    expect(row.textContent).toContain(`tag-${name}`)
+    expect(row.textContent).toContain(`policy-${name}`)
+  }
+  expect(container.textContent).not.toContain('Unable to load')
+})
+
+it.each([
+  { label: 'authentication failure', error: { response: { status: 401 } } },
+  { label: 'authorization failure', error: { response: { status: 403 } } },
+  { label: 'missing endpoint', error: { response: { status: 404 } } },
+  { label: 'server error', error: { response: { status: 500 } } },
+  { label: 'service outage', error: { response: { status: 503 } } },
+  { label: 'network timeout', error: { code: 'ECONNABORTED' } }
+])('does not split requests on a $label', async ({ error }) => {
+  defHttp.post.mockRejectedValue(error)
+  await renderRows(['one', 'two'])
+
+  expect(defHttp.post).toHaveBeenCalledTimes(2)
+  for (const name of ['one', 'two']) {
+    const row = container.querySelector(`[data-row="${name}"]`)
+    expect(row.textContent).toContain('Unable to load tags')
+    expect(row.textContent).toContain('Unable to load policies')
+  }
+})
+
 it('only requests kinds with mounted consumers', async () => {
   resolveRequests()
   await renderRows(['one'], 'demo', 'schema', false)

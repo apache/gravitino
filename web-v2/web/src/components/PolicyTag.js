@@ -17,32 +17,19 @@
  * under the License.
  */
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { LockOutlined, PlusOutlined } from '@ant-design/icons'
-import { Button, Flex, Select, Space, Spin, Tag, Tooltip, theme } from 'antd'
-import { cn } from '@/lib/utils/tailwind'
-import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
-import { associatePolicy } from '@/lib/store/policies'
+import { LockOutlined } from '@ant-design/icons'
+import { Button, Flex, Spin, Tag, Tooltip, theme } from 'antd'
+import { useAppDispatch } from '@/lib/hooks/useStore'
 import { getCurrentEntityPolicies } from '@/lib/store/metalakes'
 import { useSearchParams } from 'next/navigation'
 import { useMetadataObjectList } from './MetadataObjectListsProvider'
 
-const tagInputStyle = {
-  width: 100,
-  height: 22,
-  marginInlineEnd: 8,
-  verticalAlign: 'top'
-}
-
 export default function PolicyTag({ ...props }) {
-  const { readOnly, metadataObjectType, metadataObjectFullName } = props
+  const { metadataObjectType, metadataObjectFullName } = props
   const { token } = theme.useToken()
-  const [inputVisible, setInputVisible] = useState(false)
-  const [optionList, setOptionList] = useState([])
-  const inputRef = useRef(null)
   const router = useRouter()
-  const store = useAppSelector(state => state.policies)
   const dispatch = useAppDispatch()
   const [loadedPolicies, setPoliciesForEntity] = useState([])
   const list = useMetadataObjectList('policies', metadataObjectType, metadataObjectFullName)
@@ -69,90 +56,10 @@ export default function PolicyTag({ ...props }) {
     }
   }, [bulk, currentMetalake, metadataObjectType, metadataObjectFullName])
 
-  useEffect(() => {
-    if (inputVisible) {
-      const options =
-        store.policiesData?.filter(
-          policyOption => !policiesForEntity?.map(policy => policy.name)?.includes(policyOption.name)
-        ) || []
-      setOptionList(options)
-      inputRef.current?.focus()
-    }
-  }, [inputVisible, policiesForEntity])
-
-  const showInput = () => {
-    setInputVisible(true)
-  }
-
-  const tagRender = props => {
-    const { value, closable, onClose } = props
-
-    const onPreventMouseDown = event => {
-      event.preventDefault()
-      event.stopPropagation()
-    }
-
-    return (
-      <Tag
-        className='text-defaultPrimary'
-        onMouseDown={onPreventMouseDown}
-        closable={closable}
-        onClose={onClose}
-        style={{ marginInlineEnd: 4 }}
-      >
-        {value}
-      </Tag>
-    )
-  }
-
-  const refreshPolicies = async () => {
-    if (bulk) {
-      list.refresh()
-    } else {
-      const policies = await getPoliciesForEntity()
-      setPoliciesForEntity(policies)
-    }
-  }
-
-  const handleChange = async value => {
-    if (value && !policiesForEntity?.map(policy => policy.name)?.includes(value)) {
-      await dispatch(
-        associatePolicy({
-          metalake: currentMetalake,
-          metadataObjectType,
-          metadataObjectFullName,
-          data: { policiesToAdd: [value] }
-        })
-      )
-      await refreshPolicies()
-    }
-    setInputVisible(false)
-  }
-
-  const handleClose = async removedPolicy => {
-    await dispatch(
-      associatePolicy({
-        metalake: currentMetalake,
-        metadataObjectType,
-        metadataObjectFullName,
-        data: { policiesToRemove: [removedPolicy] }
-      })
-    )
-    await refreshPolicies()
-  }
-
-  const handleBlur = () => {
-    setInputVisible(false)
-  }
-
   const handleClick = name => () => {
-    router.push(`/metadataObjectsForPolicy?policy=${name}&metalake=${currentMetalake}`)
-  }
-
-  const tagPlusStyle = {
-    height: 22,
-    background: token.colorBgContainer,
-    borderStyle: 'dashed'
+    router.push(
+      `/metadataObjectsForPolicy?policy=${encodeURIComponent(name)}&metalake=${encodeURIComponent(currentMetalake)}`
+    )
   }
 
   if (bulk && !list.data) {
@@ -178,12 +85,10 @@ export default function PolicyTag({ ...props }) {
           <Tag
             key={policy.name + index}
             color={color}
-            closable={!readOnly && !policy.inherited}
             icon={policy.inherited ? <LockOutlined /> : null}
             onClick={handleClick(policy.name)}
             className='cursor-pointer'
             style={{ userSelect: 'none' }}
-            onClose={() => handleClose(policy.name)}
           >
             <span>{isLongPolicy ? `${policy.name.slice(0, 20)}...` : policy.name}</span>
           </Tag>
@@ -197,33 +102,10 @@ export default function PolicyTag({ ...props }) {
           policyElem
         )
       })}
-      {policiesForEntity?.length === 0 && <span>No Policies</span>}
-      {inputVisible && !readOnly && (
-        <Select
-          size='small'
-          tagRender={tagRender}
-          ref={inputRef}
-          style={tagInputStyle}
-          onChange={handleChange}
-          onBlur={handleBlur}
-        >
-          {optionList.map(policy => (
-            <Select.Option value={policy.name} key={policy.name}>
-              <Space>
-                <span
-                  className='tag-swatch'
-                  style={{ backgroundColor: policy.enabled ? token.colorPrimary : token.colorTextDisabled }}
-                ></span>
-                <span>{policy.name}</span>
-              </Space>
-            </Select.Option>
-          ))}
-        </Select>
-      )}
-      {!inputVisible && !readOnly && (
-        <Tag style={tagPlusStyle} icon={<PlusOutlined />} onClick={showInput}>
-          Associate Policy
-        </Tag>
+      {policiesForEntity?.length === 0 && (
+        <Tooltip title='Policies are applied through tags.'>
+          <span>No Policies</span>
+        </Tooltip>
       )}
     </Flex>
   )

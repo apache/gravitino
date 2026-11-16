@@ -382,45 +382,40 @@ public class TestTagManager {
   }
 
   @Test
-  public void testDisplayReadImportsUnregisteredTable() throws Exception {
-    String name = "unregistered_display_table";
-    NameIdentifier tableIdent = NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, name);
+  public void testDisplayReadInheritsWithoutImportingUnregisteredObjects() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, "unregistered_display_table");
     MetadataObject table = NameIdentifierUtil.toMetadataObject(tableIdent, Entity.EntityType.TABLE);
+    MetadataObject column =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(
+                METALAKE, CATALOG, SCHEMA, tableIdent.name(), "missing_column"),
+            Entity.EntityType.COLUMN);
+    MetadataObject missingColumn =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofColumn(METALAKE, CATALOG, SCHEMA, TABLE, "missing_column"),
+            Entity.EntityType.COLUMN);
+    List<MetadataObject> requested = List.of(table, column, missingColumn);
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA);
     MetadataObject schema =
         NameIdentifierUtil.toMetadataObject(schemaIdent, Entity.EntityType.SCHEMA);
-    Tag tag = tagManager.createTag(METALAKE, "imported_display_tag", null, ImmutableMap.of());
+    Tag tag = tagManager.createTag(METALAKE, "inherited_display_tag", null, ImmutableMap.of());
     tagManager.associateTagsForMetadataObject(METALAKE, schema, new String[] {tag.name()}, null);
     Assertions.assertFalse(entityStore.exists(tableIdent, Entity.EntityType.TABLE));
-    Mockito.doAnswer(
-            invocation -> {
-              entityStore.put(
-                  TableEntity.builder()
-                      .withId(idGenerator.nextId())
-                      .withName(name)
-                      .withNamespace(Namespace.of(METALAKE, CATALOG, SCHEMA))
-                      .withColumns(Lists.newArrayList())
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator("test")
-                              .withCreateTime(Instant.now())
-                              .build())
-                      .build(),
-                  false);
-              return true;
-            })
-        .when(tableDispatcher)
-        .tableExists(tableIdent);
+    RuntimeException unavailable = new RuntimeException("Iceberg metadata file is unavailable");
+    Mockito.doThrow(unavailable).when(tableDispatcher).tableExists(tableIdent);
     try {
       Map<MetadataObject, Tag[]> result =
-          tagManager.listEffectiveTagsForDisplay(METALAKE, List.of(table));
-      Assertions.assertEquals(ImmutableSet.of("imported_display_tag"), tagNames(result.get(table)));
-      Assertions.assertTrue(result.get(table)[0].inherited().orElseThrow());
-      Assertions.assertTrue(entityStore.exists(tableIdent, Entity.EntityType.TABLE));
-      Mockito.verify(tableDispatcher).tableExists(tableIdent);
+          tagManager.listEffectiveTagsForDisplay(METALAKE, requested);
+      for (MetadataObject object : requested) {
+        Assertions.assertEquals(
+            ImmutableSet.of("inherited_display_tag"), tagNames(result.get(object)));
+        Assertions.assertTrue(result.get(object)[0].inherited().orElseThrow());
+      }
+      Assertions.assertFalse(entityStore.exists(tableIdent, Entity.EntityType.TABLE));
+      Mockito.verify(tableDispatcher, Mockito.never()).tableExists(tableIdent);
     } finally {
       Mockito.doReturn(true).when(tableDispatcher).tableExists(tableIdent);
-      entityStore.delete(tableIdent, Entity.EntityType.TABLE, true);
     }
   }
 
