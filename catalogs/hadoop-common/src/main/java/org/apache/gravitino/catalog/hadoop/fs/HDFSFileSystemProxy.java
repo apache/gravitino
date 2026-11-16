@@ -25,6 +25,7 @@ import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.IPC_
 import static org.apache.gravitino.catalog.hadoop.fs.HDFSFileSystemProvider.additionalHDFSConfig;
 import static org.apache.hadoop.fs.CommonConfigurationKeysPublic.HADOOP_SECURITY_AUTHENTICATION;
 
+import com.google.common.annotations.VisibleForTesting;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
@@ -34,7 +35,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nullable;
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;
@@ -60,6 +64,11 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   public static final String GRAVITINO_KEYTAB_FORMAT = "keytabs/gravitino-%s";
   private static final String GRAVITINO_ID_KEY = "gravitino.identifier";
 
+  // Keytab files of the proxies not closed yet, deleted when the JVM exits. File.deleteOnExit
+  // would keep the path of every proxy ever created.
+  private static final Set<File> LIVE_KEYTAB_FILES = ConcurrentHashMap.newKeySet();
+  private static final AtomicReference<Thread> KEYTAB_CLEANER = new AtomicReference<>();
+
   @Nullable private KerberosClient kerberosClient;
   @Nullable private File keytabFile;
   protected UserGroupInformation initUgi;
@@ -82,8 +91,21 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   }
 
   protected void initFileSystem(Path path, Map<String, String> config) {
+    initFileSystem(path, config, null);
+  }
+
+  /**
+   * Logs in and creates the file system with the given Hadoop configuration.
+   *
+   * @param path the HDFS path
+   * @param config the configuration map of Gravitino
+   * @param hadoopConf the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}, or null to build it here
+   */
+  protected void initFileSystem(
+      Path path, Map<String, String> config, @Nullable Configuration hadoopConf) {
     try {
-      Configuration conf = hadoopConfiguration(config);
+      Configuration conf = hadoopConf != null ? hadoopConf : hadoopConfiguration(config);
       this.configuration = conf;
 
       AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
@@ -117,14 +139,26 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
    * @throws IOException if an I/O error occurs
    */
   public FileSystem getProxy() throws IOException {
-    Enhancer e = new Enhancer();
-    ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
-    e.setClassLoader(enhancerClassLoader);
-    e.setSuperclass(fs.getClass());
-    e.setCallback(this);
-    FileSystem proxyFs = (FileSystem) e.create();
-    fs.setConf(configuration);
-    return proxyFs;
+    try {
+      Enhancer e = new Enhancer();
+      ClassLoader enhancerClassLoader = Enhancer.class.getClassLoader();
+      e.setClassLoader(enhancerClassLoader);
+      e.setSuperclass(fs.getClass());
+      e.setCallback(this);
+      FileSystem proxyFs = (FileSystem) e.create();
+      fs.setConf(configuration);
+      return proxyFs;
+    } catch (Throwable t) {
+      // The caller gets no proxy to close, for example when the file system class is final. CGLIB
+      // rethrows one cached exception for a class it failed to proxy, so t is left unchanged.
+      try {
+        fs.close();
+      } catch (IOException | RuntimeException e) {
+        LOG.warn("Failed to close the file system that could not be proxied", e);
+      }
+      close();
+      throw t;
+    }
   }
 
   @Override
@@ -152,17 +186,18 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   }
 
   /**
-   * Returns the settings that decide how a file system created from the given configuration logs
-   * in: the authentication type, whether impersonation is enabled, and with Kerberos authentication
-   * the principal, keytab URI and krb5.conf. They are resolved from the same Hadoop configuration
-   * the proxy logs in with, so values from {@code config.resources} files and variable expansion
-   * count.
+   * Returns the settings that decide how a proxy created with the given configurations logs in: the
+   * authentication type, whether impersonation is enabled, and with Kerberos authentication the
+   * principal, keytab URI and krb5.conf. Values from {@code config.resources} files and variable
+   * expansion count.
    *
    * @param config the configuration map of Gravitino
+   * @param configuration the configuration {@link #hadoopConfiguration(Map)} built from {@code
+   *     config}
    * @return the login settings, keyed by their configuration keys
    */
-  public static Map<String, String> loginSettings(Map<String, String> config) {
-    Configuration configuration = hadoopConfiguration(config);
+  public static Map<String, String> loginSettings(
+      Map<String, String> config, Configuration configuration) {
     AuthenticationConfig authenticationConfig = new AuthenticationConfig(config, configuration);
     Map<String, String> settings = new HashMap<>();
     settings.put(AuthenticationConfig.AUTH_TYPE_KEY, authenticationConfig.getAuthType());
@@ -213,14 +248,54 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     if (keytabFile != null) {
       try {
         Files.deleteIfExists(keytabFile.toPath());
-      } catch (IOException e) {
+      } catch (IOException | RuntimeException e) {
         LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
       }
+      LIVE_KEYTAB_FILES.remove(keytabFile);
       keytabFile = null;
     }
   }
 
-  private static Configuration hadoopConfiguration(Map<String, String> config) {
+  private synchronized void recordKeytabFile(File file) {
+    if (keytabFile != null) {
+      LIVE_KEYTAB_FILES.remove(keytabFile);
+    }
+    keytabFile = file;
+    if (KEYTAB_CLEANER.get() == null) {
+      Thread cleaner =
+          new Thread(HDFSFileSystemProxy::deleteLiveKeytabFiles, "gravitino-keytab-cleaner");
+      // A catalog class loader removes, when it is closed, the hooks whose context class loader is
+      // its own.
+      cleaner.setContextClassLoader(HDFSFileSystemProxy.class.getClassLoader());
+      if (KEYTAB_CLEANER.compareAndSet(null, cleaner)) {
+        try {
+          Runtime.getRuntime().addShutdownHook(cleaner);
+        } catch (IllegalStateException e) {
+          LOG.warn("The JVM is shutting down, {} is not deleted on exit", file);
+        }
+      }
+    }
+    LIVE_KEYTAB_FILES.add(file);
+  }
+
+  @VisibleForTesting
+  @Nullable
+  static Thread keytabCleaner() {
+    return KEYTAB_CLEANER.get();
+  }
+
+  private static void deleteLiveKeytabFiles() {
+    LIVE_KEYTAB_FILES.forEach(File::delete);
+  }
+
+  /**
+   * Builds the Hadoop configuration a proxy logs in and connects with. It reads the {@code
+   * config.resources} files.
+   *
+   * @param config the configuration map of Gravitino
+   * @return the Hadoop configuration
+   */
+  public static Configuration hadoopConfiguration(Map<String, String> config) {
     Configuration conf =
         FileSystemUtils.createCompatibleConfiguration(
             GRAVITINO_BYPASS, additionalHDFSConfig(config));
@@ -255,7 +330,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               properties.getOrDefault(GRAVITINO_ID_KEY, "") + "-" + UUID.randomUUID());
       File destination = new File(keytabPath);
       // Recorded before the fetch, so that close() also deletes what a failed fetch leaves behind.
-      this.keytabFile = destination;
+      recordKeytabFile(destination);
       File keytabFile =
           KerberosAuthUtils.fetchKeytabFromUri(
               kerberosConfig.getKeytab(),
@@ -263,7 +338,7 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
               kerberosConfig.getFetchTimeoutSec(),
               false,
               configuration);
-      this.keytabFile = keytabFile;
+      recordKeytabFile(keytabFile);
       UserGroupInformation ugi = client.login(keytabFile.getAbsolutePath());
       // login() starts the ticket refresh, so record the client before anything else can fail.
       this.kerberosClient = client;

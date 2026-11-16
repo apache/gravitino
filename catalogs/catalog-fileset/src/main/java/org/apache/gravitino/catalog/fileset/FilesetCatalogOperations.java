@@ -39,6 +39,8 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.google.common.util.concurrent.Uninterruptibles;
+import java.io.Closeable;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -62,6 +64,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -1486,39 +1489,78 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     FileSystemProvider provider = fileSystemProvidersMap.get(scheme);
     String authority =
         provider != null ? provider.getFullAuthority(path, conf) : path.toUri().getAuthority();
-    return fileSystemCache.get(
-        new FileSystemCacheKey(scheme, authority, loginSettings(path, conf)),
-        cacheKey -> {
-          try {
-            // Create the file system for the user it is cached under.
-            return getFileSystem(path, conf, cacheKey.currentUser);
-          } catch (IOException e) {
-            throw new GravitinoRuntimeException(
-                e, "Failed to get FileSystem for fileset: path: %s", path);
-          }
-        });
-  }
-
-  // Only an HDFS file system logs in with these settings, see createFileSystem.
-  private Map<String, String> loginSettings(Path path, Map<String, String> conf) {
-    String scheme =
-        path.toUri().getScheme() != null
-            ? path.toUri().getScheme()
-            : defaultFileSystemProvider.scheme();
-    if (!SCHEME_HDFS.equals(scheme)) {
-      return Collections.emptyMap();
+    // Only an HDFS file system logs in with the settings of the configuration, see
+    // createFileSystem.
+    String fsScheme = scheme != null ? scheme : defaultFileSystemProvider.scheme();
+    if (!SCHEME_HDFS.equals(fsScheme)) {
+      return fileSystemCache.get(
+          new FileSystemCacheKey(scheme, authority, Collections.emptyMap()),
+          cacheKey -> newFileSystem(path, conf, cacheKey, null));
     }
 
+    Map<String, String> hdfsConf = Collections.unmodifiableMap(new HashMap<>(conf));
+    FileSystem fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority);
+    if (fs == null) {
+      // The config.resources files changed after their login settings were cached.
+      hdfsLoginSettingsCache.invalidate(hdfsConf);
+      fs = getHdfsFileSystemWithCache(path, hdfsConf, scheme, authority);
+    }
+    if (fs == null) {
+      throw new GravitinoRuntimeException(
+          "The login settings in config.resources changed while getting FileSystem for fileset:"
+              + " path: %s",
+          path);
+    }
+    return fs;
+  }
+
+  // Returns null if the config.resources files no longer resolve to the cached login settings: a
+  // file system is cached only under the settings of the configuration it is created with.
+  @Nullable
+  private FileSystem getHdfsFileSystemWithCache(
+      Path path, Map<String, String> conf, @Nullable String scheme, @Nullable String authority) {
+    Map<String, String> settings =
+        hdfsLoginSettingsCache.get(conf, c -> loginSettings(path, c, hdfsConfiguration(path, c)));
+    // A null result caches nothing; the cache statistics count it as a failed load.
+    return fileSystemCache.get(
+        new FileSystemCacheKey(scheme, authority, settings),
+        cacheKey -> newFileSystem(path, conf, cacheKey, cacheKey.loginSettings));
+  }
+
+  @Nullable
+  private FileSystem newFileSystem(
+      Path path,
+      Map<String, String> conf,
+      FileSystemCacheKey cacheKey,
+      @Nullable Map<String, String> expectedLoginSettings) {
     try {
-      return hdfsLoginSettingsCache.get(
-          Collections.unmodifiableMap(new HashMap<>(conf)),
-          c -> {
-            Map<String, String> settings = new HashMap<>(HDFSFileSystemProxy.loginSettings(c));
-            // Other settings in these files, such as HA name services, decide which cluster is
-            // reached.
-            settings.put(CONFIG_RESOURCES, c.getOrDefault(CONFIG_RESOURCES, ""));
-            return Collections.unmodifiableMap(settings);
-          });
+      // Create the file system for the user it is cached under.
+      return getFileSystem(path, conf, cacheKey.currentUser, expectedLoginSettings);
+    } catch (IOException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to get FileSystem for fileset: path: %s", path);
+    }
+  }
+
+  // Building the Hadoop configuration reads the config.resources files.
+  private static Configuration hdfsConfiguration(Path path, Map<String, String> conf) {
+    try {
+      return HDFSFileSystemProxy.hadoopConfiguration(conf);
+    } catch (RuntimeException e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to get FileSystem for fileset: path: %s", path);
+    }
+  }
+
+  // Reading the Kerberos settings expands Hadoop variables, which can fail.
+  private static Map<String, String> loginSettings(
+      Path path, Map<String, String> conf, Configuration hadoopConf) {
+    try {
+      Map<String, String> settings =
+          new HashMap<>(HDFSFileSystemProxy.loginSettings(conf, hadoopConf));
+      // Other settings in these files, such as HA name services, decide which cluster is reached.
+      settings.put(CONFIG_RESOURCES, conf.getOrDefault(CONFIG_RESOURCES, ""));
+      return Collections.unmodifiableMap(settings);
     } catch (RuntimeException e) {
       throw new GravitinoRuntimeException(
           e, "Failed to get FileSystem for fileset: path: %s", path);
@@ -1535,10 +1577,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
     // Read the user here: a pool thread keeps the Subject of the request that started it.
-    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName());
+    return getFileSystem(path, config, PrincipalUtils.getCurrentUserName(), null);
   }
 
-  FileSystem getFileSystem(Path path, Map<String, String> config, String user) throws IOException {
+  // With expected login settings, returns null if the configuration no longer resolves to them.
+  @Nullable
+  FileSystem getFileSystem(
+      Path path,
+      Map<String, String> config,
+      String user,
+      @Nullable Map<String, String> expectedLoginSettings)
+      throws IOException {
     if (path == null) {
       throw new IllegalArgumentException("Path should not be null");
     }
@@ -1565,7 +1614,19 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     try {
       return executeFileSystemTask(
-          () -> createFileSystem(path, config, scheme, provider, user), timeoutSeconds);
+          () -> {
+            Configuration loginConf = null;
+            if (expectedLoginSettings != null) {
+              // Built here, so that reading the config.resources files is under the timeout too.
+              // The file system logs in with the configuration that was checked.
+              loginConf = hdfsConfiguration(path, config);
+              if (!loginSettings(path, config, loginConf).equals(expectedLoginSettings)) {
+                return null;
+              }
+            }
+            return createFileSystem(path, config, scheme, provider, user, loginConf);
+          },
+          timeoutSeconds);
     } catch (TimeoutException e) {
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
@@ -1603,15 +1664,45 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private <T> T executeFileSystemTask(Callable<T> task, int timeoutSeconds)
       throws InterruptedException, ExecutionException, TimeoutException {
-    Future<T> future = fileSystemExecutor.submit(task);
+    // The task and the caller race to set this, and the one that does not set it owns the result.
+    // A task that loses closes its result, as the caller stopped waiting; a caller that loses
+    // receives the result, or closes it if it has just stopped waiting. A login can ignore
+    // interrupts.
+    AtomicBoolean settled = new AtomicBoolean();
+    Future<T> future =
+        fileSystemExecutor.submit(
+            () -> {
+              T result = task.call();
+              if (!settled.compareAndSet(false, true)) {
+                // cancel(true) may have interrupted this thread.
+                Thread.interrupted();
+                closeQuietly(result);
+              }
+              return result;
+            });
     try {
       return future.get(timeoutSeconds, TimeUnit.SECONDS);
-    } catch (TimeoutException e) {
-      future.cancel(true);
+    } catch (TimeoutException | InterruptedException e) {
+      if (settled.compareAndSet(false, true)) {
+        future.cancel(true);
+      } else {
+        // The task has just handed its result over, so this does not wait.
+        closeQuietly(Uninterruptibles.getUninterruptibly(future));
+      }
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
       throw e;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw e;
+    }
+  }
+
+  private static void closeQuietly(@Nullable Object result) {
+    if (result instanceof Closeable) {
+      try {
+        ((Closeable) result).close();
+      } catch (IOException | RuntimeException e) {
+        LOG.warn("Failed to close a file system that its caller stopped waiting for", e);
+      }
     }
   }
 
@@ -1793,10 +1884,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, String> config,
       String scheme,
       FileSystemProvider provider,
-      String user)
+      String user,
+      @Nullable Configuration hadoopConf)
       throws IOException {
     if (scheme.equals(SCHEME_HDFS)) {
-      return new ImpersonationHDFSFileSystemProxy(path, config, () -> user).getProxy();
+      return new ImpersonationHDFSFileSystemProxy(path, config, hadoopConf, () -> user).getProxy();
     }
     return provider.getFileSystem(path, config);
   }
@@ -1809,7 +1901,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       String user)
       throws IOException {
     try {
-      return createFileSystem(path, config, scheme, provider, user);
+      return createFileSystem(path, config, scheme, provider, user, null);
     } catch (Exception e) {
       throw new ProbeInitializationException(e);
     }

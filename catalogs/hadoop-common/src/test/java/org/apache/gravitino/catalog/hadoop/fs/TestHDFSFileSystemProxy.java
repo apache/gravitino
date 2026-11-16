@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
@@ -52,6 +53,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -102,6 +104,109 @@ public class TestHDFSFileSystemProxy {
           () -> new HDFSFileSystemProxy(new Path("nosuchfs:///"), KERBEROS_CONFIG));
       verify(client, times(1)).close();
       assertFalse(keytabs.get(0).exists());
+    }
+  }
+
+  @Test
+  public void testFailedWrappingReleasesFileSystemAndLogin(@TempDir File keytabDir)
+      throws Exception {
+    // CGLIB cannot subclass a final class, so getProxy() fails after the login.
+    Map<String, String> config =
+        ImmutableMap.<String, String>builder()
+            .putAll(KERBEROS_CONFIG)
+            .put("fs.finalfs.impl", FinalFileSystem.class.getName())
+            .build();
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(new Path("finalfs:///"), config);
+      int closedBefore = FinalFileSystem.CLOSED.get();
+
+      assertThrows(IllegalArgumentException.class, proxy::getProxy);
+      assertEquals(closedBefore + 1, FinalFileSystem.CLOSED.get());
+      verify(client, times(1)).close();
+      assertFalse(keytabs.get(0).exists());
+    }
+  }
+
+  @Test
+  public void testProxyLogsInWithTheGivenConfiguration(@TempDir File keytabDir) throws Exception {
+    Configuration hadoopConf =
+        HDFSFileSystemProxy.hadoopConfiguration(
+            ImmutableMap.of(
+                AuthenticationConfig.AUTH_TYPE_KEY,
+                "kerberos",
+                Constants.HADOOP_SECURITY_PRINCIPAL,
+                "svc-a@EXAMPLE.COM"));
+    // Rebuilding the Hadoop configuration from this map would log in as svc-b.
+    Map<String, String> config =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
+            Constants.HADOOP_SECURITY_PRINCIPAL, "svc-b@EXAMPLE.COM",
+            KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      stubKeytabFetch(authUtils, keytabDir);
+      HDFSFileSystemProxy proxy = new HDFSFileSystemProxy();
+      proxy.initFileSystem(new Path("file:///"), config, hadoopConf);
+      proxy.getProxy().close();
+
+      clients.verify(() -> KerberosClient.builder(eq("svc-a@EXAMPLE.COM"), eq(hadoopConf)));
+    }
+  }
+
+  @Test
+  public void testFailedWrappingReleasesLoginWhenClosingFails(@TempDir File keytabDir)
+      throws Exception {
+    Map<String, String> config =
+        ImmutableMap.<String, String>builder()
+            .putAll(KERBEROS_CONFIG)
+            .put("fs.failclosefs.impl", FailingCloseFileSystem.class.getName())
+            .build();
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      HDFSFileSystemProxy proxy = new HDFSFileSystemProxy(new Path("failclosefs:///"), config);
+
+      // The wrapping failure stays the thrown exception, unchanged, and the login is released.
+      IllegalArgumentException e = assertThrows(IllegalArgumentException.class, proxy::getProxy);
+      assertEquals(0, e.getSuppressed().length);
+      verify(client, times(1)).close();
+      assertFalse(keytabs.get(0).exists());
+    }
+  }
+
+  @Test
+  public void testKeytabFilesOfOpenProxiesAreDeletedOnExit(@TempDir File keytabDir)
+      throws Exception {
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      FileSystem closed = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+      FileSystem open = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+      try {
+        closed.close();
+        // A closed proxy no longer owns its path, even if a file appears there again.
+        Files.write(keytabs.get(0).toPath(), new byte[0]);
+
+        // The registered shutdown hook deletes the files of the proxies not closed yet.
+        Thread cleaner = HDFSFileSystemProxy.keytabCleaner();
+        assertTrue(Runtime.getRuntime().removeShutdownHook(cleaner));
+        Runtime.getRuntime().addShutdownHook(cleaner);
+        cleaner.run();
+        assertTrue(keytabs.get(0).exists());
+        assertFalse(keytabs.get(1).exists());
+      } finally {
+        open.close();
+      }
     }
   }
 
@@ -170,7 +275,9 @@ public class TestHDFSFileSystemProxy {
       stubKeytabFetch(authUtils, keytabDir);
       new HDFSFileSystemProxy(new Path("file:///"), config).getProxy().close();
 
-      Map<String, String> settings = HDFSFileSystemProxy.loginSettings(config);
+      Map<String, String> settings =
+          HDFSFileSystemProxy.loginSettings(
+              config, HDFSFileSystemProxy.hadoopConfiguration(config));
       assertEquals("svc-kerberos@EXAMPLE.COM", settings.get(KerberosConfig.PRINCIPAL_KEY));
       assertEquals("/tmp/test-krb5.conf", settings.get(Constants.HADOOP_KRB5_CONF));
       ArgumentCaptor<Configuration> loginConf = ArgumentCaptor.forClass(Configuration.class);
@@ -226,5 +333,25 @@ public class TestHDFSFileSystemProxy {
               return keytab;
             });
     return keytabs;
+  }
+
+  /** A file system that CGLIB cannot subclass, and whose close fails. */
+  public static final class FailingCloseFileSystem extends RawLocalFileSystem {
+    @Override
+    public void close() throws IOException {
+      super.close();
+      throw new IllegalStateException("close failed");
+    }
+  }
+
+  /** A file system that CGLIB cannot subclass, and that counts how often it is closed. */
+  public static final class FinalFileSystem extends RawLocalFileSystem {
+    static final AtomicInteger CLOSED = new AtomicInteger();
+
+    @Override
+    public void close() throws IOException {
+      CLOSED.incrementAndGet();
+      super.close();
+    }
   }
 }
