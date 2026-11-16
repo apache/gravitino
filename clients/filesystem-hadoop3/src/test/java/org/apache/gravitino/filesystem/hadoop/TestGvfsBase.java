@@ -50,6 +50,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.google.common.collect.ImmutableMap;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.lang.reflect.Field;
 import java.net.SocketTimeoutException;
 import java.net.URISyntaxException;
@@ -57,6 +58,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +66,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.SchemaDTO;
@@ -81,8 +84,11 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
+import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -1811,6 +1817,8 @@ public class TestGvfsBase extends GravitinoMockServerBase {
       int catalogLoads = recordedGetRequests(catalogPath);
       int filesetLoads = recordedGetRequests(filesetPath);
       int locationLookups = recordedGetRequests(locationPath);
+      int srcLocationLookups = recordedGetRequests(locationPath, "/test.txt");
+      int dstLocationLookups = recordedGetRequests(locationPath, "/renamed.txt");
 
       switch (operation) {
         case "open":
@@ -1869,6 +1877,89 @@ public class TestGvfsBase extends GravitinoMockServerBase {
           "rename".equals(operation) ? 2 : 1,
           locationLookups,
           operation + " must look up each file location exactly once");
+      if ("rename".equals(operation)) {
+        // The local file system also renames a path to itself, so only the per-path counts catch a
+        // destination resolved from the source path.
+        assertEquals(
+            1,
+            recordedGetRequests(locationPath, "/test.txt") - srcLocationLookups,
+            "rename source location lookups");
+        assertEquals(
+            1,
+            recordedGetRequests(locationPath, "/renamed.txt") - dstLocationLookups,
+            "rename destination location lookups");
+      }
+      localFileSystem.delete(localPath, true);
+    }
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "LocationNameHookOperations, fsByName fsByName",
+    "PathHookOperations, fs fs",
+    "FilePathHookOperations, path:test.txt path:test.txt path:renamed.txt",
+    "AllHooksOperations, fs fsByName fileset catalog catalog path:test.txt catalog"
+        + " path:test.txt catalog path:renamed.txt catalog fs fsByName fileset catalog catalog"
+  })
+  public void testCustomOperationsResolutionHooks(String operationsClass, String expectedHookCalls)
+      throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    String filesetName = "testCustomOperationsResolutionHooks_" + operationsClass;
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String catalogPath = String.format("/api/metalakes/%s/catalogs/%s", metalakeName, catalogName);
+    String locationPath =
+        String.format(
+            "%s/schemas/%s/filesets/%s/location",
+            catalogPath, schemaName, RESTUtils.encodeString(filesetName));
+    Configuration opsConf = new Configuration(conf);
+    opsConf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_OPERATIONS_CLASS,
+        TestGvfsBase.class.getName() + "$" + operationsClass);
+    opsConf.set(LocalHooks.LOCAL_DIR_KEY, localPath.toString());
+    LocalHooks.CALLS.clear();
+
+    try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(opsConf);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+      try (FSDataOutputStream out =
+          localFileSystem.create(new Path(localPath + "/test.txt"), true)) {
+        out.writeUTF("hooked");
+      }
+      // The server resolves the same local paths as the hooks, for the hooks a class leaves as is.
+      mockFilesetDTO(
+          metalakeName,
+          catalogName,
+          schemaName,
+          filesetName,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("location1", localPath.toString()),
+          ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
+      for (String subPath : new String[] {"/test.txt", "/renamed.txt"}) {
+        buildMockResource(
+            Method.GET,
+            locationPath,
+            ImmutableMap.of("sub_path", subPath),
+            null,
+            new FileLocationResponse(localPath + subPath),
+            SC_OK);
+      }
+      buildMockResourceForCredential(filesetName, localPath.toString());
+      Path filePath = new Path(managedFilesetPath + "/test.txt");
+      Path renamedPath = new Path(managedFilesetPath + "/renamed.txt");
+      int catalogLoads = recordedGetRequests(catalogPath);
+
+      try (FSDataInputStream in = gravitinoFileSystem.open(filePath, 4096)) {
+        assertEquals("hooked", in.readUTF());
+      }
+      assertTrue(gravitinoFileSystem.rename(filePath, renamedPath));
+      assertTrue(localFileSystem.exists(new Path(localPath + "/renamed.txt")));
+
+      // Expected values come from the operations before issue #12856, which call the protected
+      // hooks in this order for an open followed by a rename. Each operation still loads the
+      // catalog from the server once, for the hooks a class does not override.
+      assertEquals(expectedHookCalls, String.join(" ", LocalHooks.CALLS), "hook calls");
+      assertEquals(2, recordedGetRequests(catalogPath) - catalogLoads, "catalog loads");
       localFileSystem.delete(localPath, true);
     }
   }
@@ -1920,5 +2011,123 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     return mockServer()
         .retrieveRecordedRequests(HttpRequest.request(path).withMethod(Method.GET.name()))
         .length;
+  }
+
+  private static int recordedGetRequests(String path, String subPath) {
+    return mockServer()
+        .retrieveRecordedRequests(
+            HttpRequest.request(path)
+                .withMethod(Method.GET.name())
+                .withQueryStringParameter("sub_path", subPath))
+        .length;
+  }
+
+  /** Records the protected hook calls and resolves paths to a local directory. */
+  private static final class LocalHooks {
+    static final String LOCAL_DIR_KEY = "test.gvfs.local-hooks.dir";
+    static final List<String> CALLS = Collections.synchronizedList(new ArrayList<>());
+
+    static FileSystem fileSystem(Configuration configuration) {
+      try {
+        return FileSystem.getLocal(configuration);
+      } catch (IOException e) {
+        throw new UncheckedIOException(e);
+      }
+    }
+
+    static Path filePath(Configuration configuration, Path gvfsPath) {
+      return new Path(configuration.get(LOCAL_DIR_KEY) + "/" + gvfsPath.getName());
+    }
+  }
+
+  /** Overrides the file system hook that takes a fileset identifier. */
+  public static class LocationNameHookOperations extends DefaultGVFSOperations {
+    private final Configuration configuration;
+
+    public LocationNameHookOperations(Configuration configuration) {
+      super(configuration);
+      this.configuration = configuration;
+    }
+
+    @Override
+    protected FileSystem getActualFileSystemByLocationName(
+        NameIdentifier filesetIdent, String locationName) {
+      LocalHooks.CALLS.add("fsByName");
+      return LocalHooks.fileSystem(configuration);
+    }
+  }
+
+  /** Overrides the file system hook that takes a virtual path. */
+  public static class PathHookOperations extends DefaultGVFSOperations {
+    private final Configuration configuration;
+
+    public PathHookOperations(Configuration configuration) {
+      super(configuration);
+      this.configuration = configuration;
+    }
+
+    @Override
+    protected FileSystem getActualFileSystem(Path filesetPath, String locationName) {
+      LocalHooks.CALLS.add("fs");
+      return LocalHooks.fileSystem(configuration);
+    }
+  }
+
+  /** Overrides the file path hook. */
+  public static class FilePathHookOperations extends DefaultGVFSOperations {
+    private final Configuration configuration;
+
+    public FilePathHookOperations(Configuration configuration) {
+      super(configuration);
+      this.configuration = configuration;
+    }
+
+    @Override
+    protected Path getActualFilePath(
+        Path gvfsPath, String locationName, FilesetDataOperation operation) {
+      LocalHooks.CALLS.add("path:" + gvfsPath.getName());
+      return LocalHooks.filePath(configuration, gvfsPath);
+    }
+  }
+
+  /** Overrides all five hooks, each delegating to the default implementation. */
+  public static class AllHooksOperations extends DefaultGVFSOperations {
+    public AllHooksOperations(Configuration configuration) {
+      super(configuration);
+    }
+
+    @Override
+    protected FileSystem getActualFileSystem(Path filesetPath, String locationName)
+        throws FileNotFoundException {
+      LocalHooks.CALLS.add("fs");
+      return super.getActualFileSystem(filesetPath, locationName);
+    }
+
+    @Override
+    protected FileSystem getActualFileSystemByLocationName(
+        NameIdentifier filesetIdent, String locationName) throws FileNotFoundException {
+      LocalHooks.CALLS.add("fsByName");
+      return super.getActualFileSystemByLocationName(filesetIdent, locationName);
+    }
+
+    @Override
+    protected Path getActualFilePath(
+        Path gvfsPath, String locationName, FilesetDataOperation operation)
+        throws FileNotFoundException {
+      LocalHooks.CALLS.add("path:" + gvfsPath.getName());
+      return super.getActualFilePath(gvfsPath, locationName, operation);
+    }
+
+    @Override
+    protected Fileset getFileset(NameIdentifier filesetIdent) {
+      LocalHooks.CALLS.add("fileset");
+      return super.getFileset(filesetIdent);
+    }
+
+    @Override
+    protected FilesetCatalog getFilesetCatalog(NameIdentifier catalogIdent) {
+      LocalHooks.CALLS.add("catalog");
+      return super.getFilesetCatalog(catalogIdent);
+    }
   }
 }
