@@ -431,6 +431,28 @@ public class TestDomainManager {
         Assertions.assertEquals(
             0,
             domainManager.listMembers(METALAKE, "HR", DomainMemberFilter.builder().build()).length);
+        // The direct query filters out the catalog, while expansion still needs it as a source.
+        DomainMemberFilter modelsOnly =
+            DomainMemberFilter.builder().withTypes(MetadataObject.Type.MODEL).build();
+        Assertions.assertEquals(
+            0, domainManager.listMembers(METALAKE, "Finance", modelsOnly).length);
+        DomainMemberFilter tablesOnly =
+            DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+        DomainMember[] tables = domainManager.listMembers(METALAKE, "Finance", tablesOnly);
+        Assertions.assertEquals(1, tables.length);
+        Assertions.assertEquals(leaf, tables[0].object());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, tables[0].relations());
+        DomainMember[] expandedTables =
+            domainManager.listMembers(
+                METALAKE,
+                "Finance",
+                DomainMemberFilter.builder()
+                    .withTypes(MetadataObject.Type.TABLE)
+                    .withExpand(true)
+                    .build());
+        Assertions.assertEquals(1, expandedTables.length);
+        Assertions.assertArrayEquals(members[0].relations(), expandedTables[0].relations());
         assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "dept", "hr");
         DomainMember[] tradingMembers =
             domainManager.listMembers(

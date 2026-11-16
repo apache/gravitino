@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.domain.Domain;
@@ -33,6 +34,7 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.TagValue;
 
@@ -240,6 +242,19 @@ public interface SupportsDomainOperations {
    * @throws IOException If the domains cannot be read.
    */
   List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
+      throws IOException;
+
+  /**
+   * Lists live directly assigned objects for the selected domain bindings and object types.
+   *
+   * @param metalake The metalake containing the domains.
+   * @param domains Selected domains with backing tags.
+   * @param types The candidate metadata object types.
+   * @return Assigned objects keyed by domain ID.
+   * @throws IOException If the assignments cannot be read.
+   */
+  Map<Long, List<GenericEntity>> listDomainAssignments(
+      String metalake, List<DomainEntity> domains, Set<MetadataObject.Type> types)
       throws IOException;
 
   /**

@@ -19,18 +19,51 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.storage.relational.po.DomainAssignmentPO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TagRelationTagPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
 public interface TagMetadataObjectRelMapper {
   String TAG_METADATA_OBJECT_RELATION_TABLE_NAME = "tag_relation_meta";
+
+  /**
+   * Reads selected domain assignments before resolving object names.
+   *
+   * @param metalake The containing metalake.
+   * @param domainIds Selected domain IDs.
+   * @param types Selected object types.
+   * @return Assignment rows with the matching domain ID.
+   */
+  @Select({
+    "<script>",
+    "SELECT d.domain_id AS domainId, r.tag_id AS tagId, r.tag_value AS tagValue,",
+    "r.metadata_object_id AS metadataObjectId, r.metadata_object_type AS metadataObjectType",
+    "FROM domain_meta d JOIN metalake_meta m ON m.metalake_id = d.metalake_id",
+    "JOIN tag_meta t ON t.tag_id = d.backing_tag_id AND t.metalake_id = m.metalake_id",
+    "JOIN tag_relation_meta r ON r.tag_id = t.tag_id",
+    "WHERE m.metalake_name = #{metalake} AND m.deleted_at = 0 AND d.deleted_at = 0",
+    "AND t.deleted_at = 0 AND r.deleted_at = 0",
+    "AND (d.backing_tag_value IS NULL OR d.backing_tag_value = r.tag_value)",
+    "AND d.domain_id IN",
+    "<foreach collection='domainIds' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "AND r.metadata_object_type IN",
+    "<foreach collection='types' item='type' open='(' separator=',' close=')'>#{type}</foreach>",
+    "</script>"
+  })
+  List<DomainAssignmentPO> listDomainAssignments(
+      @Param("metalake") String metalake,
+      @Param("domainIds") Set<Long> domainIds,
+      @Param("types") Set<MetadataObject.Type> types);
 
   @SelectProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,

@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -44,6 +43,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
@@ -53,7 +53,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsDomainOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -76,7 +76,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 
 class TestDomainMembershipResolver {
@@ -133,20 +132,43 @@ class TestDomainMembershipResolver {
     metadataObjects
         .when(() -> MetadataObjectUtil.checkMetadataObject(anyString(), any()))
         .thenAnswer(call -> null);
-    when(relations.listEntitiesByRelation(any(RelationQuery.class)))
+    when(domainOperations.listDomainAssignments(eq(METALAKE), anyList(), any()))
         .thenAnswer(
             call -> {
-              RelationQuery query = call.getArgument(0);
-              assertEquals(Entity.EntityType.TAG, query.anchorEntityType());
-              assertTrue(query.anchorId().isPresent());
-              // Like the store, a valued query returns only assignments of that exact value.
-              if (query.relationValue().isPresent()) {
-                String key = query.anchorId().get() + "=" + query.relationValue().get();
-                if (valuedCandidates.containsKey(key)) {
-                  return valuedCandidates.get(key);
+              Map<Long, List<GenericEntity>> result = new HashMap<>();
+              for (DomainEntity domain : call.<List<DomainEntity>>getArgument(1)) {
+                List<GenericEntity> rows =
+                    valuedCandidates.getOrDefault(
+                        domain.backingTagId() + "=" + domain.backingTagValue(),
+                        candidates.getOrDefault(domain.backingTagId(), Collections.emptyList()));
+                result.put(
+                    domain.id(),
+                    rows.stream()
+                        .filter(
+                            row ->
+                                call.<Set<MetadataObject.Type>>getArgument(2)
+                                    .contains(MetadataObject.Type.valueOf(row.type().name())))
+                        .collect(Collectors.toList()));
+              }
+              return result;
+            });
+    when(relations.batchListEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL), anyList(), any()))
+        .thenAnswer(
+            call -> {
+              List<RelationalEntity<?>> result = new ArrayList<>();
+              for (NameIdentifier ident : call.<List<NameIdentifier>>getArgument(1)) {
+                for (TagEntity tag :
+                    assignments.getOrDefault(ident.toString(), Collections.emptyList())) {
+                  result.add(
+                      new RelationalEntity<>(
+                          SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                          ident,
+                          call.getArgument(2),
+                          tag));
                 }
               }
-              return candidates.getOrDefault(query.anchorId().get(), Collections.emptyList());
+              return result;
             });
     when(relations.listEntitiesByRelation(
             eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
@@ -206,13 +228,8 @@ class TestDomainMembershipResolver {
             eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
             any(NameIdentifier.class),
             any(Entity.EntityType.class));
-    ArgumentCaptor<RelationQuery> queries = ArgumentCaptor.forClass(RelationQuery.class);
-    verify(relations, times(3)).listEntitiesByRelation(queries.capture());
-    assertEquals(
-        Arrays.asList(null, "tax", null),
-        queries.getAllValues().stream()
-            .map(query -> query.relationValue().orElse(null))
-            .collect(Collectors.toList()));
+    verify(domainOperations)
+        .listDomainAssignments(eq(METALAKE), eq(Arrays.asList(finance, tax, trading)), any());
 
     // A sub-domain lists its own assignments as direct.
     DomainMember[] tradingMembers =
@@ -290,7 +307,7 @@ class TestDomainMembershipResolver {
             any(NameIdentifier.class),
             any(Entity.EntityType.class));
 
-    verifyNoInteractions(domainOperations);
+    verify(domainOperations, never()).listDirectTagsByObjectIds(anyString(), any(), anyList());
     MetadataObject second = object("cat.db.volumes", MetadataObject.Type.TABLE);
     MetadataObject removed = object("cat.db.removed", MetadataObject.Type.TABLE);
     candidate(20, TABLE, second, removed);
@@ -311,15 +328,12 @@ class TestDomainMembershipResolver {
           DomainRelation.viaSubdomain("Tax"), DomainRelation.viaSubdomain("Trading")
         },
         members[0].relations());
-    ArgumentCaptor<RelationQuery> queries = ArgumentCaptor.forClass(RelationQuery.class);
-    verify(relations, times(2)).listEntitiesByRelation(queries.capture());
-    for (RelationQuery query : queries.getAllValues()) {
-      assertEquals(20L, query.anchorId().get().longValue());
-    }
+    verify(domainOperations, times(2))
+        .listDomainAssignments(eq(METALAKE), eq(List.of(trading)), any());
   }
 
   @Test
-  void testFilteredListingSkipsTagLookupWhenOtherDomainsAreUnbound() {
+  void testFilteredListingSkipsTagLookupWhenOtherDomainsAreUnbound() throws Exception {
     DomainEntity finance = domain(1, "Finance", null, null, null);
     DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
     DomainEntity tax = domain(3, "Tax", "Finance", null, null);
@@ -333,7 +347,7 @@ class TestDomainMembershipResolver {
     assertArrayEquals(new MetadataObject[] {TABLE}, objects(members));
     assertArrayEquals(
         new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, members[0].relations());
-    verifyNoInteractions(domainOperations);
+    verify(domainOperations, never()).listDirectTagsByObjectIds(anyString(), any(), anyList());
   }
 
   @Test
@@ -379,7 +393,7 @@ class TestDomainMembershipResolver {
                 METALAKE, finance, new DomainEntity[0], direct().withDomains("unknown").build())
             .length);
     verifyNoInteractions(relations);
-    when(relations.listEntitiesByRelation(any(RelationQuery.class)))
+    when(domainOperations.listDomainAssignments(anyString(), anyList(), any()))
         .thenThrow(new IOException("storage"));
     assertInstanceOf(
         IOException.class,
@@ -626,6 +640,29 @@ class TestDomainMembershipResolver {
   }
 
   @Test
+  void testExpandedMembersShareAncestorReadsAndSkipDroppedCandidates() throws Exception {
+    DomainEntity domain = domain(1, "Finance", null, 10L, null);
+    MetadataObject second = object("cat.db.volumes", MetadataObject.Type.TABLE);
+    candidate(10, TABLE, second);
+    assign(SCHEMA, tag(10, "finance"));
+    DomainEntity[] children = {};
+    assertArrayEquals(
+        new MetadataObject[] {TABLE, second},
+        objects(resolver.listMembers(METALAKE, domain, children, all())));
+    verify(relations)
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            List.of(NameIdentifier.of(METALAKE, "cat", "db")),
+            Entity.EntityType.SCHEMA);
+    metadataObjects
+        .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, second))
+        .thenThrow(new NoSuchMetadataObjectException("dropped"));
+    assertArrayEquals(
+        new MetadataObject[] {TABLE},
+        objects(resolver.listMembers(METALAKE, domain, children, all())));
+  }
+
+  @Test
   void testDroppedCandidateAndStorageFailure() throws Exception {
     DomainEntity domain = domain(1, "Finance", null, 10L, null);
     candidate(10, TABLE);
@@ -637,7 +674,7 @@ class TestDomainMembershipResolver {
     assertThrows(
         NoSuchMetadataObjectException.class,
         () -> listDomains(METALAKE, TABLE, new DomainEntity[] {domain}));
-    when(relations.listEntitiesByRelation(any(RelationQuery.class)))
+    when(domainOperations.listDomainAssignments(anyString(), anyList(), any()))
         .thenThrow(new IOException("storage"));
     assertInstanceOf(
         IOException.class,
