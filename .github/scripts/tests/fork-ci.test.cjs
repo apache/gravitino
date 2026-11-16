@@ -602,6 +602,28 @@ test('a recovered rerun ignores failed Required CI jobs for an obsolete base', a
   assert.equal(mirror.result.conclusion, 'success');
 });
 
+test('obsolete Required CI results cannot block recovered suites after the watcher also recovers', async () => {
+  for (const watcher of ['success', 'skipped', undefined]) {
+    for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
+      const p = pr();
+      const forkJobs = partialRerunJobs(p).filter(job => job.name !== FAIL_FAST);
+      if (watcher) forkJobs.push({ name: FAIL_FAST, id: 400, run_attempt: 3, conclusion: watcher });
+      // GitHub may retain the unexpanded job name from an early cancelled attempt.
+      forkJobs.push({ name: 'Required CI / ${{ needs.eligibility.outputs.base-ref }} / ${{ needs.eligibility.outputs.base-sha }} / ${{ needs.eligibility.outputs.head-sha }}',
+        id: 50, run_attempt: 1, conclusion });
+      const github = serviceMock({ forkJobs });
+      github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
+        event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion }] : [] } });
+      assert.equal((await createService(github).mirror(p)).result.conclusion, 'success');
+      // An obsolete failure must not disguise a real cancellation or failure.
+      for (const blocked of ['failure', 'timed_out', 'cancelled', null]) {
+        forkJobs.find(job => job.id === 300).conclusion = blocked;
+        assert.notEqual((await createService(github).mirror(p)).result.conclusion, 'success');
+      }
+    }
+  }
+});
+
 test('trusted partial reruns also recover with a cancelled watcher', async () => {
   const github = serviceMock({ trusted: true, trustedJobs: partialRerunJobs(pr()) });
   const list = github.rest.actions.listWorkflowRuns;

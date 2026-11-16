@@ -72,16 +72,19 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   }
   // Full reruns can resolve a newer base. Required CI jobs for older contexts must not
   // override the exact context selected above; its successful result is still mandatory.
-  const currentJobs = jobs.filter(job => !job.name.startsWith('Required CI / ') || job === required);
-  const failed = currentJobs.filter(job => job.name !== FAIL_FAST && ['failure', 'timed_out'].includes(job.conclusion))
+  const isAuxiliary = job => job.name === FAIL_FAST ||
+    (job.name.startsWith('Required CI / ') && job !== required);
+  const currentJobs = jobs.filter(job => !isAuxiliary(job));
+  const failed = currentJobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion))
     .map(job => job.name);
-  // Partial reruns can retain a cancelled watcher, keeping the whole run cancelled even
-  // after its suites recover. Ignore only that observer's result, then verify Required CI
-  // and all required suites below. Any other unfinished or unsuccessful job still blocks.
-  const watcherOnly = ['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
-    currentJobs.some(job => job.name === FAIL_FAST && ['failure', 'timed_out', 'cancelled'].includes(job.conclusion)) &&
-    currentJobs.every(job => job.name === FAIL_FAST || ['success', 'skipped'].includes(job.conclusion));
-  if (run.conclusion !== 'success' && !watcherOnly) {
+  // Partial reruns can retain a cancelled watcher or an obsolete Required CI job, keeping
+  // the whole run cancelled after its suites recover. Ignore only those auxiliary results,
+  // then verify the exact Required CI and all required suites below. Any other unfinished
+  // or unsuccessful job still blocks.
+  const auxiliaryOnly = ['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
+    jobs.some(job => isAuxiliary(job) && ['failure', 'timed_out', 'cancelled'].includes(job.conclusion)) &&
+    currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion));
+  if (run.conclusion !== 'success' && !auxiliaryOnly) {
     // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
     if (failed.length) return { status: 'completed', conclusion: 'failure',
       title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
