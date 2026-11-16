@@ -331,16 +331,20 @@ class TestDomainMembershipResolver {
     }
     DomainMemberFilter filter = direct().withDomains("Child0").build();
     assertEquals(0, resolver.listMembers(METALAKE, parent, children, filter).length);
-    candidate(2, TABLE);
-    assign(TABLE, tag(2, "selected"));
+    candidate(2, CATALOG, SCHEMA);
+    assign(CATALOG, tag(2, "selected"));
+    assign(SCHEMA, tag(2, "selected"));
     assertArrayEquals(
-        new MetadataObject[] {TABLE},
+        new MetadataObject[] {CATALOG, SCHEMA},
         objects(resolver.listMembers(METALAKE, parent, children, filter)));
     verify(domainOperations)
         .listDirectTagsByObjectIds(
-            METALAKE, MetadataObject.Type.TABLE, List.of(objectIds.get(TABLE)));
+            METALAKE, MetadataObject.Type.CATALOG, List.of(objectIds.get(CATALOG)));
+    verify(domainOperations)
+        .listDirectTagsByObjectIds(
+            METALAKE, MetadataObject.Type.SCHEMA, List.of(objectIds.get(SCHEMA)));
 
-    MetadataObject[] tables = new MetadataObject[501];
+    MetadataObject[] tables = new MetadataObject[1001];
     for (int i = 0; i < tables.length; i++) {
       tables[i] = object("cat.db.table" + i, MetadataObject.Type.TABLE);
     }
@@ -348,14 +352,24 @@ class TestDomainMembershipResolver {
     // The second query observes a rename of the same stable table ID.
     MetadataObject renamed = object("cat.db.renamed", MetadataObject.Type.TABLE);
     objectIds.put(renamed, objectIds.get(tables[0]));
-    candidate(3, renamed);
+    candidate(children[999].backingTagId(), renamed);
     DomainMember[] members = resolver.listMembers(METALAKE, parent, children, filter);
     assertEquals(tables.length, members.length);
     assertArrayEquals(
         new DomainRelation[] {
-          DomainRelation.viaSubdomain("Child0"), DomainRelation.viaSubdomain("Child1")
+          DomainRelation.viaSubdomain("Child0"), DomainRelation.viaSubdomain("Child999")
         },
         members[0].relations());
+    DomainMember[] filtered =
+        resolver.listMembers(
+            METALAKE, parent, children, direct().withNameContains("table0").build());
+    assertArrayEquals(new MetadataObject[] {tables[0]}, objects(filtered));
+    assertArrayEquals(members[0].relations(), filtered[0].relations());
+    assertEquals(
+        0,
+        resolver.listMembers(
+                METALAKE, parent, children, direct().withNameContains("renamed").build())
+            .length);
     verify(domainOperations, times(3))
         .listDomainAssignments(
             eq(METALAKE), eq(List.of(children[0])), any(), eq(Collections.emptySet()));

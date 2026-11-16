@@ -183,8 +183,11 @@ final class DomainMembershipResolver {
         for (GenericEntity assignment :
             assigned.getOrDefault(domain.id(), Collections.emptyList())) {
           MetadataObject object = assignedObject(assignment);
-          if (DIRECT_MEMBER_TYPES.contains(object.type()) && matchesFilter(object, filter)) {
+          if (DIRECT_MEMBER_TYPES.contains(object.type())) {
             if (needsOtherBindings && !joinPaths) {
+              if (!matchesFilter(object, filter)) {
+                continue;
+              }
               candidates
                   .computeIfAbsent(object.type(), t -> new LinkedHashMap<>())
                   .put(assignment.id(), object);
@@ -203,7 +206,7 @@ final class DomainMembershipResolver {
       }
 
       for (DirectMemberPaths paths : relations.values()) {
-        if (paths.selectedObject != null) {
+        if (paths.selectedObject != null && matchesFilter(paths.selectedObject, filter)) {
           members.add(
               new DomainMemberInfo(
                   paths.selectedObject, paths.relations.toArray(new DomainRelation[0])));
@@ -395,12 +398,16 @@ final class DomainMembershipResolver {
     long domainBatches =
         (remainingDomains + (long) JOINED_DOMAIN_BATCH_SIZE - 1) / JOINED_DOMAIN_BATCH_SIZE;
     Map<Entity.EntityType, Set<Long>> idsByType = new EnumMap<>(Entity.EntityType.class);
-    long objectBatches = 0;
+    // A join can require another name lookup for each matching type. Allow one object-ID
+    // batch per type before counting the extra batches a domain join could save.
+    long extraObjectBatches = 0;
     for (List<GenericEntity> assignments : selected.values()) {
       for (GenericEntity assignment : assignments) {
         Set<Long> ids = idsByType.computeIfAbsent(assignment.type(), ignored -> new HashSet<>());
-        if (ids.add(assignment.id()) && (ids.size() - 1) % MEMBERSHIP_LOOKUP_BATCH_SIZE == 0) {
-          if (++objectBatches > domainBatches) {
+        if (ids.add(assignment.id())
+            && ids.size() > 1
+            && (ids.size() - 1) % MEMBERSHIP_LOOKUP_BATCH_SIZE == 0) {
+          if (++extraObjectBatches > domainBatches) {
             return true;
           }
         }

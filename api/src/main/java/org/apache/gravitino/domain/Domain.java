@@ -34,10 +34,11 @@ import org.apache.gravitino.tag.TagValue;
 /**
  * A domain groups metadata objects from any catalog under a business name, such as "Finance". A
  * leaf metadata object, of a type in {@link DomainMember#SUPPORTED_TYPES}, is a member of a domain
- * when it carries the domain's backing tag, directly or inherited from its catalog or schema;
- * catalogs and schemas are never members themselves. For the same tag, the assignment nearest to
- * the object wins: a table that carries {@code dept=hr} under a schema that carries {@code
- * dept=finance} is a member of the domain backed by {@code dept=hr} only.
+ * when it carries the domain's backing tag, directly or inherited from its catalog or schema. The
+ * default member listing includes catalogs and schemas that directly carry a backing tag. For a
+ * leaf object, the nearest assignment of the same tag wins: a table that carries {@code dept=hr}
+ * under a schema that carries {@code dept=finance} is a member of the domain backed by {@code
+ * dept=hr} only.
  *
  * <p>Names have 1 to 64 ASCII letters, digits, underscores or hyphens and may not start with a
  * hyphen. The names {@code *} and {@code system} (in any letter case) are reserved.

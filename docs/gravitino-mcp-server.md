@@ -273,7 +273,8 @@ For example, call `list_domain_members` with:
 }
 ```
 
-`types` is a list of leaf object types; `domains` selects the union of named scopes using repeated query parameters.
+`types` accepts leaf object types and, in the default listing, `CATALOG` and `SCHEMA`. With `expand=true`, only leaf types are valid.
+`domains` selects the union of named scopes using repeated query parameters.
 Selecting the requested domain includes its visible children. Well-formed names outside that scope are ignored.
 `name_contains` matches a case-insensitive substring of the full metadata object name.
 If `name_contains` is omitted, empty, or contains only whitespace, MCP omits the
