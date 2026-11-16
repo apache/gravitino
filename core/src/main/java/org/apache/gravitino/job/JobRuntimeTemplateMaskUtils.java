@@ -226,13 +226,15 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks one JSON argument value. Never throws {@link RuntimeException}: unexpected failures
-   * become {@link HiddenPropertyMaskUtils#MASKED_VALUE} so the argument walk can continue.
+   * Masks one JSON argument value. Unexpected failures become {@link
+   * HiddenPropertyMaskUtils#MASKED_VALUE} so the argument walk can continue. Catches {@link
+   * Exception} (same scope as {@link HiddenPropertyMaskUtils#maskSensitiveJsonValue}) rather than
+   * only unchecked exceptions.
    */
   private static String safeMaskSensitiveJsonValue(String arg) {
     try {
       return HiddenPropertyMaskUtils.maskSensitiveJsonValue(arg);
-    } catch (RuntimeException e) {
+    } catch (Exception e) {
       // Do not log {@code arg}; it may contain credentials.
       LOG.warn(
           "Failed to mask a sensitive JSON argument; replacing with placeholder: {}", e.toString());
