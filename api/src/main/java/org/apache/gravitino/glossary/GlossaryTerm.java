@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchTermException;
+import org.apache.gravitino.exceptions.TermVersionConflictException;
 
 /**
  * A glossary term defines a business word, such as "Active Customer", in a metalake. A term has a
@@ -146,10 +147,14 @@ public interface GlossaryTerm extends Auditable {
   Map<String, String> properties();
 
   /**
-   * Returns the revision of the term. A new term has revision 1. Each successful alter call
-   * increases it by one, however many changes the call holds, and so does each bind or unbind call
-   * that changes the bindings of the term. Owner and tag changes do not increase it. A client can
-   * use it to see that a term changed after it read it. A revision is not an approved version.
+   * Returns the revision of the term. A new term has revision 1. Each alter whose final effective
+   * state changes increases it by one, however many changes the call holds, and so does each bind
+   * or unbind call that changes the bindings of the term. Owner and tag changes do not increase it.
+   * A client can use it to see that a term changed after it read it. A revision is not an approved
+   * version or a safe conditional-edit guard on its own: a same-name replacement starts again at
+   * revision 1. Use {@link #revisionToken()} for conditional editing. A no-op preserves both
+   * values, including repeated additions/removals and updates whose final effective state is
+   * unchanged.
    *
    * <p>Cleanup also increases the revision of each surviving term that loses a broader parent,
    * related relation or binding, exactly once per cleanup transaction regardless of the number of
@@ -162,8 +167,21 @@ public interface GlossaryTerm extends Auditable {
   long version();
 
   /**
-   * Returns the words that matched this term. It is set only on the terms returned by {@link
-   * GlossaryOperations#matchTerms(String[], String)}.
+   * Returns an opaque token identifying this snapshot's metalake, term identity and revision.
+   *
+   * <p>Copy the token unchanged into {@link GlossaryOperations#alterTerm(String, String,
+   * TermChange...)}. Do not parse it, construct it from the term's name or numeric revision, or use
+   * it as an authorization credential. A replacement term has a different token even when its name
+   * and numeric revision equal those of the old term. An effective change produces a new token; a
+   * no-op does not. Owner and tag changes alone do not change it.
+   *
+   * @return The nonblank opaque identity-and-revision token.
+   */
+  String revisionToken();
+
+  /**
+   * Returns the words that matched this term. It is set only on terms returned by the {@link
+   * GlossaryOperations#matchTerms(String[], String)} overloads, including definition-only lookup.
    *
    * @return The matches of this term, or an empty array if the term was not returned by a lookup.
    */
@@ -172,14 +190,28 @@ public interface GlossaryTerm extends Auditable {
   }
 
   /**
-   * Returns the bindings of the term. It is set only on the terms returned by {@link
-   * GlossaryOperations#matchTerms(String[], String)}.
+   * Returns whether a lookup requested the embedded binding preview.
+   *
+   * <p>This is true for {@link GlossaryOperations#matchTerms(String[], String)} and lookups with
+   * binding expansion enabled, even if no authorized binding exists. It is false on ordinary reads
+   * and definition-only lookups. When false, {@link #bindings()} and {@link #bindingsTruncated()}
+   * return empty/false placeholders that must not be interpreted as a complete binding result. REST
+   * projections omit both binding fields when they were not requested.
+   *
+   * @return Whether the embedded binding preview was requested.
+   */
+  boolean bindingsIncluded();
+
+  /**
+   * Returns the embedded bindings of the term, when {@link #bindingsIncluded()} is true.
    *
    * <p>The server first leaves out the objects and metrics that the caller cannot access, the same
    * as {@link #listBindings(TermBinding.Kind)}. Then it keeps at most 20 of the remaining bindings;
-   * see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} for all of them.
+   * see {@link #bindingsTruncated()}. Use {@link #listBindings(TermBinding.Kind)} to begin a paged
+   * read of all bindings, following each continuation until it is absent.
    *
-   * @return The bindings of the term, or an empty array if the term was not returned by a lookup.
+   * @return The authorized preview, or an empty array when none are visible or not requested; check
+   *     {@link #bindingsIncluded()} to distinguish those cases.
    */
   default TermBinding[] bindings() {
     return new TermBinding[0];
@@ -187,22 +219,56 @@ public interface GlossaryTerm extends Auditable {
 
   /**
    * Returns whether {@link #bindings()} was cut to the limit. Only the bindings that the caller can
-   * access count, so a binding to a hidden object never sets this flag.
+   * access count, so a binding to a hidden object never sets this flag. It is false when binding
+   * details were not requested; check {@link #bindingsIncluded()} first.
    *
-   * @return True if the caller can access more bindings of the term than {@link #bindings()}
-   *     returns.
+   * @return True if a requested preview omitted further authorized bindings; false when complete or
+   *     not requested.
    */
   default boolean bindingsTruncated() {
     return false;
   }
 
   /**
-   * Lists the bindings of the term. Only the objects and metrics the caller can access are
-   * returned.
+   * Returns the first page of bindings using {@link TermBindingPage#DEFAULT_PAGE_SIZE}.
+   *
+   * <p>The same page type is returned even for an empty first page, preserving any continuation.
+   * This method does not automatically read subsequent pages.
    *
    * @param kind The kind of bindings to list, or null to list both kinds.
-   * @return The bindings of the term.
+   * @return The first page of authorized bindings and its continuation, if any.
    * @throws NoSuchTermException If the term does not exist or is not visible to the caller.
    */
-  TermBinding[] listBindings(@Nullable TermBinding.Kind kind) throws NoSuchTermException;
+  default TermBindingPage listBindings(@Nullable TermBinding.Kind kind) throws NoSuchTermException {
+    return listBindings(kind, TermBindingPage.DEFAULT_PAGE_SIZE, null);
+  }
+
+  /**
+   * Returns one bounded page of authorized bindings of the current term.
+   *
+   * <p>Each call examines at most 1,000 candidates and returns at most {@code pageSize} visible
+   * bindings. Hidden candidates advance the cursor, so an empty page can still have a continuation.
+   * Only an absent continuation proves that scanning is complete. Do not silently drain all pages
+   * or discard the token. Every page rechecks term visibility and target access; paging does not
+   * freeze authorization.
+   *
+   * <p>The opaque, tamper-resistant cursor binds the metalake, term identity, revision, filters and
+   * scan position without revealing hidden target IDs/counts. A changed identity or revision throws
+   * {@link TermVersionConflictException}; restart explicitly from the first page without combining
+   * old and new pages. A malformed cursor or changed filters throws {@link
+   * IllegalArgumentException}. Missing/hidden roots throw {@link NoSuchTermException} before cursor
+   * comparison. An implementation must not silently ignore a cursor or page size.
+   *
+   * @param kind The binding kind, or null for both kinds; retain it on subsequent pages.
+   * @param pageSize The maximum visible results, from 1 to {@link TermBindingPage#MAX_PAGE_SIZE}.
+   * @param pageToken The previous page's continuation, or null to start a new scan.
+   * @return One page of visible bindings, possibly empty with a continuation.
+   * @throws NoSuchTermException If the term is missing or hidden.
+   * @throws IllegalArgumentException If the page size is invalid, the cursor is malformed or the
+   *     filters changed.
+   * @throws TermVersionConflictException If the cursor's term identity or revision changed.
+   */
+  TermBindingPage listBindings(
+      @Nullable TermBinding.Kind kind, int pageSize, @Nullable String pageToken)
+      throws NoSuchTermException, IllegalArgumentException, TermVersionConflictException;
 }

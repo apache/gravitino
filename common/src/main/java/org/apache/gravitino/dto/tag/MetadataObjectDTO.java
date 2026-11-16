@@ -80,7 +80,7 @@ public class MetadataObjectDTO implements MetadataObject {
       name = null;
       return;
     }
-    int index = type == Type.DOMAIN ? -1 : fullName.lastIndexOf(".");
+    int index = type == Type.DOMAIN || type == Type.GLOSSARY_TERM ? -1 : fullName.lastIndexOf(".");
     if (index == -1) {
       parent = null;
       name = fullName;

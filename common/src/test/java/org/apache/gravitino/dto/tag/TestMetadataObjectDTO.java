@@ -169,6 +169,28 @@ public class TestMetadataObjectDTO {
   }
 
   @Test
+  void testGlossaryTermNameRoundTrip() throws JsonProcessingException {
+    MetadataObjectDTO original =
+        MetadataObjectDTO.builder()
+            .withName("v1.2/Churn")
+            .withType(MetadataObject.Type.GLOSSARY_TERM)
+            .build();
+    for (String json :
+        new String[] {
+          JsonUtils.objectMapper().writeValueAsString(original),
+          "{\"fullName\":\"v1.2/Churn\",\"type\":\"glossary_term\"}",
+          "{\"type\":\"glossary_term\",\"fullName\":\"v1.2/Churn\"}"
+        }) {
+      MetadataObjectDTO decoded = JsonUtils.objectMapper().readValue(json, MetadataObjectDTO.class);
+      Assertions.assertEquals(original, decoded);
+      Assertions.assertEquals(MetadataObject.Type.GLOSSARY_TERM, decoded.type());
+      Assertions.assertEquals("v1.2/Churn", decoded.fullName());
+      Assertions.assertEquals("v1.2/Churn", decoded.name());
+      Assertions.assertNull(decoded.parent());
+    }
+  }
+
+  @Test
   void testMissingOrNullFullName() throws JsonProcessingException {
     for (MetadataObject.Type type : MetadataObject.Type.values()) {
       for (String fields : new String[] {"", ",\"fullName\":null"}) {
