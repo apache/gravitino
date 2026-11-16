@@ -322,8 +322,8 @@ public class Configs {
               ConfigConstants.NOT_BLANK_ERROR_MSG)
           .createWithDefault(Lists.newArrayList("simple"));
 
-  public static final ConfigEntry<String> AUTHENTICATOR_TOKEN_HEADER =
-      new ConfigBuilder("gravitino.authenticator.tokenHeader")
+  public static final ConfigEntry<String> AUTHENTICATOR_AUTH_HEADER =
+      new ConfigBuilder("gravitino.authenticator.authHeader")
           .doc(
               "The HTTP request header from which the authenticators read the credential. "
                   + "Defaults to the standard Authorization header")

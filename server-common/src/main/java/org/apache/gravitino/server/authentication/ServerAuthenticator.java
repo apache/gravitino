@@ -28,7 +28,7 @@ public class ServerAuthenticator {
 
   private List<Authenticator> authenticators;
 
-  private volatile String tokenHeader = AuthConstants.HTTP_HEADER_AUTHORIZATION;
+  private volatile String authHeader = AuthConstants.HTTP_HEADER_AUTHORIZATION;
 
   private ServerAuthenticator() {}
 
@@ -52,7 +52,7 @@ public class ServerAuthenticator {
    */
   public void initialize(Config config) {
     // Create and initialize Authenticator related modules
-    this.tokenHeader = config.get(Configs.AUTHENTICATOR_TOKEN_HEADER);
+    this.authHeader = config.get(Configs.AUTHENTICATOR_AUTH_HEADER);
     this.authenticators = AuthenticatorFactory.createAuthenticators(config);
     for (Authenticator authenticator : authenticators) {
       authenticator.initialize(config);
@@ -65,11 +65,11 @@ public class ServerAuthenticator {
 
   /**
    * The request header the credential is read from, {@code Authorization} unless overridden by
-   * {@code gravitino.authenticator.tokenHeader}.
+   * {@code gravitino.authenticator.authHeader}.
    *
-   * @return The token header name.
+   * @return The auth header name.
    */
-  public String tokenHeader() {
-    return tokenHeader;
+  public String authHeader() {
+    return authHeader;
   }
 }

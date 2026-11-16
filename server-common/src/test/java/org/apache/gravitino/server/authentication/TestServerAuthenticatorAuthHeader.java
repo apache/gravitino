@@ -41,34 +41,34 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestServerAuthenticatorTokenHeader {
+public class TestServerAuthenticatorAuthHeader {
 
   private static final String CUSTOM_HEADER = "X-Custom-Token";
 
   @AfterEach
-  public void resetTokenHeader() {
+  public void resetAuthHeader() {
     // ServerAuthenticator is a singleton, restore the default for other tests.
     ServerAuthenticator.getInstance().initialize(new Config(false) {});
   }
 
   @Test
-  public void testTokenHeaderDefaultsToAuthorization() {
+  public void testAuthHeaderDefaultsToAuthorization() {
     ServerAuthenticator.getInstance().initialize(new Config(false) {});
     Assertions.assertEquals(
-        AuthConstants.HTTP_HEADER_AUTHORIZATION, ServerAuthenticator.getInstance().tokenHeader());
+        AuthConstants.HTTP_HEADER_AUTHORIZATION, ServerAuthenticator.getInstance().authHeader());
   }
 
   @Test
-  public void testTokenHeaderIsConfigurable() {
+  public void testAuthHeaderIsConfigurable() {
     ServerAuthenticator.getInstance().initialize(configWithHeader(CUSTOM_HEADER));
-    Assertions.assertEquals(CUSTOM_HEADER, ServerAuthenticator.getInstance().tokenHeader());
+    Assertions.assertEquals(CUSTOM_HEADER, ServerAuthenticator.getInstance().authHeader());
   }
 
   @Test
-  public void testBlankTokenHeaderIsRejected() {
+  public void testBlankAuthHeaderIsRejected() {
     Config config = configWithHeader(" ");
     Assertions.assertThrows(
-        IllegalArgumentException.class, () -> config.get(Configs.AUTHENTICATOR_TOKEN_HEADER));
+        IllegalArgumentException.class, () -> config.get(Configs.AUTHENTICATOR_AUTH_HEADER));
   }
 
   @Test
@@ -96,7 +96,7 @@ public class TestServerAuthenticatorTokenHeader {
 
   private static Config configWithHeader(String header) {
     Config config = new Config(false) {};
-    config.set(Configs.AUTHENTICATOR_TOKEN_HEADER, header);
+    config.set(Configs.AUTHENTICATOR_AUTH_HEADER, header);
     return config;
   }
 }
