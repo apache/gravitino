@@ -240,7 +240,10 @@ public class TestDomainManager {
             .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, leaf))
             .thenAnswer(call -> null);
         DomainMemberFilter filter =
-            DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+            DomainMemberFilter.builder()
+                .withExpand(true)
+                .withTypes(MetadataObject.Type.TABLE)
+                .build();
         DomainMember[] members = domainManager.listMembers(METALAKE, "Finance", filter);
         Assertions.assertEquals(1, members.length);
         Assertions.assertEquals(leaf, members[0].object());
@@ -399,7 +402,8 @@ public class TestDomainManager {
             .when(() -> MetadataObjectUtil.checkMetadataObject(METALAKE, leaf))
             .thenAnswer(call -> null);
         DomainMember[] members =
-            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build());
+            domainManager.listMembers(
+                METALAKE, "Finance", DomainMemberFilter.builder().withExpand(true).build());
         Assertions.assertEquals(1, members.length);
         Assertions.assertArrayEquals(
             new DomainRelation[] {
@@ -410,17 +414,73 @@ public class TestDomainManager {
             members[0].relations());
         Assertions.assertEquals(
             2, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
+
+        // Without expansion the tagged catalog is listed once, and the valued HR binding does
+        // not match the catalog's finance assignment.
+        MetadataObject catalogObject =
+            MetadataObjects.parse(catalogName, MetadataObject.Type.CATALOG);
+        DomainMember[] direct =
+            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build());
+        Assertions.assertArrayEquals(
+            new MetadataObject[] {catalogObject, leaf},
+            Arrays.stream(direct).map(DomainMember::object).toArray(MetadataObject[]::new));
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.direct()}, direct[0].relations());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, direct[1].relations());
+        Assertions.assertEquals(
+            0,
+            domainManager.listMembers(METALAKE, "HR", DomainMemberFilter.builder().build()).length);
+        // The direct query filters out the catalog, while expansion still needs it as a source.
+        DomainMemberFilter modelsOnly =
+            DomainMemberFilter.builder().withTypes(MetadataObject.Type.MODEL).build();
+        Assertions.assertEquals(
+            0, domainManager.listMembers(METALAKE, "Finance", modelsOnly).length);
+        DomainMemberFilter tablesOnly =
+            DomainMemberFilter.builder().withTypes(MetadataObject.Type.TABLE).build();
+        DomainMember[] tables = domainManager.listMembers(METALAKE, "Finance", tablesOnly);
+        Assertions.assertEquals(1, tables.length);
+        Assertions.assertEquals(leaf, tables[0].object());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")}, tables[0].relations());
+        DomainMember[] expandedTables =
+            domainManager.listMembers(
+                METALAKE,
+                "Finance",
+                DomainMemberFilter.builder()
+                    .withTypes(MetadataObject.Type.TABLE)
+                    .withExpand(true)
+                    .build());
+        Assertions.assertEquals(1, expandedTables.length);
+        Assertions.assertArrayEquals(members[0].relations(), expandedTables[0].relations());
         assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "dept", "hr");
+        DomainMember[] tradingMembers =
+            domainManager.listMembers(
+                METALAKE, "Finance", DomainMemberFilter.builder().withDomains("Trading").build());
+        Assertions.assertEquals(1, tradingMembers.length);
+        Assertions.assertEquals(leaf, tradingMembers[0].object());
         Assertions.assertArrayEquals(
             new DomainRelation[] {DomainRelation.viaSubdomain("Trading")},
-            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())[0]
+            tradingMembers[0].relations());
+        DomainMember[] hrMembers =
+            domainManager.listMembers(METALAKE, "HR", DomainMemberFilter.builder().build());
+        Assertions.assertEquals(1, hrMembers.length);
+        Assertions.assertEquals(leaf, hrMembers[0].object());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.direct()}, hrMembers[0].relations());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")},
+            domainManager
+                .listMembers(
+                    METALAKE, "Finance", DomainMemberFilter.builder().withExpand(true).build())[0]
                 .relations());
         Assertions.assertEquals(
             3, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
         domainManager.detachDomain(METALAKE, "Trading");
         Assertions.assertEquals(
             0,
-            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())
+            domainManager.listMembers(
+                    METALAKE, "Finance", DomainMemberFilter.builder().withExpand(true).build())
                 .length);
         Assertions.assertEquals(
             2, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
@@ -435,7 +495,8 @@ public class TestDomainManager {
             0, domainManager.listDomainsForMetadataObject(METALAKE, leaf).length);
         Assertions.assertEquals(
             0,
-            domainManager.listMembers(METALAKE, "Finance", DomainMemberFilter.builder().build())
+            domainManager.listMembers(
+                    METALAKE, "Finance", DomainMemberFilter.builder().withExpand(true).build())
                 .length);
         // The original binding survives a tag deletion but never follows a recreated name.
         Assertions.assertEquals(

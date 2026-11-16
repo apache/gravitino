@@ -33,6 +33,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
@@ -198,10 +199,17 @@ class TestUpdateTableAuthzHandler {
   private MethodInvocation updateInvocation(UpdateTableRequest request) throws Throwable {
     Method method =
         IcebergTableOperations.class.getMethod(
-            "updateTable", String.class, String.class, String.class, UpdateTableRequest.class);
+            "updateTable",
+            String.class,
+            String.class,
+            String.class,
+            UpdateTableRequest.class,
+            String.class,
+            UriInfo.class);
     MethodInvocation invocation = mock(MethodInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
-    when(invocation.getArguments()).thenReturn(new Object[] {CATALOG + "/", "s1", TABLE, request});
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {CATALOG + "/", "s1", TABLE, request, null, null});
     when(invocation.proceed()).thenReturn(PROCEEDED);
     return invocation;
   }

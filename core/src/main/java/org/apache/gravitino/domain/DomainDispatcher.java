@@ -276,13 +276,12 @@ public interface DomainDispatcher {
   DomainEntity[] listSubdomainInfos(String metalake, String name) throws NoSuchDomainException;
 
   /**
-   * Lists recorded leaf objects in a domain's scope, with every applicable relation. Results are
-   * unfiltered; server callers apply domain visibility and metadata access checks.
+   * Lists members in a domain's scope, with every applicable relation. Server callers apply domain
+   * visibility and metadata access checks.
    *
-   * <p>This operation is unpaginated. Catalog and schema assignments enumerate recorded leaf
-   * objects, and each candidate requires effective-tag resolution, including ancestor lookups and
-   * object existence checks. Query work grows with the candidate count and schema depth; type and
-   * name filters do not impose a bound on the number of objects enumerated.
+   * <p>The default listing returns directly tagged objects, including catalogs and schemas. With
+   * expansion enabled, catalog and schema assignments enumerate recorded leaves and resolve their
+   * effective tags. Both modes return an unpaginated result.
    *
    * @param metalake The metalake name.
    * @param name The listed domain.
