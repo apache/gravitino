@@ -325,7 +325,7 @@ class TestDomainMembershipResolver {
   @Test
   void testWideScopeUsesCandidateCountToChooseLookup() throws Exception {
     DomainEntity parent = domain(1, "Finance", null, 1L, null);
-    DomainEntity[] children = new DomainEntity[500];
+    DomainEntity[] children = new DomainEntity[1000];
     for (int i = 0; i < children.length; i++) {
       children[i] = domain(i + 2, "Child" + i, "Finance", (long) i + 2, null);
     }
@@ -345,7 +345,10 @@ class TestDomainMembershipResolver {
       tables[i] = object("cat.db.table" + i, MetadataObject.Type.TABLE);
     }
     candidate(2, tables);
-    candidate(3, tables[0]);
+    // The second query observes a rename of the same stable table ID.
+    MetadataObject renamed = object("cat.db.renamed", MetadataObject.Type.TABLE);
+    objectIds.put(renamed, objectIds.get(tables[0]));
+    candidate(3, renamed);
     DomainMember[] members = resolver.listMembers(METALAKE, parent, children, filter);
     assertEquals(tables.length, members.length);
     assertArrayEquals(

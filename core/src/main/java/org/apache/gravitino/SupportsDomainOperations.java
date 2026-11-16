@@ -62,6 +62,9 @@ public interface SupportsDomainOperations {
   /** Number of domain or object IDs per direct membership lookup batch. */
   int MEMBERSHIP_LOOKUP_BATCH_SIZE = 500;
 
+  /** Maximum visible domain IDs per candidate-restricted membership join. */
+  int JOINED_DOMAIN_BATCH_SIZE = 5_000;
+
   /**
    * Deletes a domain after checking its current state under the domain row lock.
    *

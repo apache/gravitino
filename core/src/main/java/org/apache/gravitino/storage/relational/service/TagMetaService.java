@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.SupportsDomainOperations.JOINED_DOMAIN_BATCH_SIZE;
 import static org.apache.gravitino.SupportsDomainOperations.MEMBERSHIP_LOOKUP_BATCH_SIZE;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
@@ -83,7 +84,6 @@ import org.apache.gravitino.utils.NamespaceUtil;
 public class TagMetaService {
 
   // One domain batch can contribute many more object IDs than domains.
-  private static final int JOINED_DOMAIN_BATCH_SIZE = 5_000;
   private static final int NAME_LOOKUP_BATCH_SIZE = 10_000;
   private static final TagMetaService INSTANCE = new TagMetaService();
 

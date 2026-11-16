@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.domain;
 
+import static org.apache.gravitino.SupportsDomainOperations.JOINED_DOMAIN_BATCH_SIZE;
 import static org.apache.gravitino.SupportsDomainOperations.MEMBERSHIP_LOOKUP_BATCH_SIZE;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
+import com.google.common.collect.Table;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -132,10 +135,9 @@ final class DomainMembershipResolver {
             && !selectedIds.isEmpty()
             && selectedIds.size() <= MEMBERSHIP_LOOKUP_BATCH_SIZE
             && !filter.nameContains().isPresent();
-    Set<MetadataObject> selectedObjects = new HashSet<>();
     Map<MetadataObject.Type, Map<Long, MetadataObject>> candidates =
         new EnumMap<>(MetadataObject.Type.class);
-    Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
+    Table<MetadataObject.Type, Long, DirectMemberPaths> relations = HashBasedTable.create();
     List<DomainMember> members = new ArrayList<>();
     try {
       Set<MetadataObject.Type> types =
@@ -158,15 +160,7 @@ final class DomainMembershipResolver {
             scopeDomains.stream()
                 .filter(d -> d.backingTagId() != null && !selectedIds.contains(d.id()))
                 .collect(Collectors.toList());
-        // Use the smaller set of lookup keys: object IDs for sparse selections, remaining
-        // domain IDs for dense selections. The first lookup is reused in both cases.
-        joinPaths =
-            assigned.values().stream()
-                    .flatMap(List::stream)
-                    .distinct()
-                    .limit(remaining.size() + 1L)
-                    .count()
-                > remaining.size();
+        joinPaths = fewerDomainBatches(assigned, remaining.size());
         if (joinPaths) {
           assigned.putAll(listAssignments(metalake, remaining, types, selectedIds));
         } else {
@@ -195,22 +189,26 @@ final class DomainMembershipResolver {
                   .computeIfAbsent(object.type(), t -> new LinkedHashMap<>())
                   .put(assignment.id(), object);
             } else {
-              relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
-              if (joinPaths && selectedIds.contains(domain.id())) {
-                selectedObjects.add(object);
+              DirectMemberPaths paths =
+                  relations
+                      .row(object.type())
+                      .computeIfAbsent(assignment.id(), ignored -> new DirectMemberPaths());
+              paths.relations.add(relation);
+              if (paths.selectedObject == null && selectedIds.contains(domain.id())) {
+                paths.selectedObject = object;
               }
             }
           }
         }
       }
 
-      // SQL comparison can be broader than exact Java binding-value equality on some collations.
-      if (joinPaths) {
-        relations.keySet().retainAll(selectedObjects);
+      for (DirectMemberPaths paths : relations.values()) {
+        if (paths.selectedObject != null) {
+          members.add(
+              new DomainMemberInfo(
+                  paths.selectedObject, paths.relations.toArray(new DomainRelation[0])));
+        }
       }
-      relations.forEach(
-          (object, paths) ->
-              members.add(new DomainMemberInfo(object, paths.toArray(new DomainRelation[0]))));
       if (candidates.isEmpty()) {
         return members;
       }
@@ -383,6 +381,32 @@ final class DomainMembershipResolver {
     }
 
     return scopeDomains;
+  }
+
+  // A name can change between domain batches. Group paths by (type, ID) and use the
+  // first name observed in a selected domain for display.
+  private static final class DirectMemberPaths {
+    private final Set<DomainRelation> relations = new LinkedHashSet<>();
+    @Nullable private MetadataObject selectedObject;
+  }
+
+  private static boolean fewerDomainBatches(
+      Map<Long, List<GenericEntity>> selected, int remainingDomains) {
+    long domainBatches =
+        (remainingDomains + (long) JOINED_DOMAIN_BATCH_SIZE - 1) / JOINED_DOMAIN_BATCH_SIZE;
+    Map<Entity.EntityType, Set<Long>> idsByType = new EnumMap<>(Entity.EntityType.class);
+    long objectBatches = 0;
+    for (List<GenericEntity> assignments : selected.values()) {
+      for (GenericEntity assignment : assignments) {
+        Set<Long> ids = idsByType.computeIfAbsent(assignment.type(), ignored -> new HashSet<>());
+        if (ids.add(assignment.id()) && (ids.size() - 1) % MEMBERSHIP_LOOKUP_BATCH_SIZE == 0) {
+          if (++objectBatches > domainBatches) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 
   /** Matches tag IDs and exact assignment values, preserving the visible scope's relation order. */
