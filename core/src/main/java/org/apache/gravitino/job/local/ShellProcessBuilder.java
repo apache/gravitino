@@ -24,6 +24,11 @@ import com.google.common.collect.Lists;
 import java.io.File;
 import java.util.List;
 import java.util.Map;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.connector.job.JobResourceUtils;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
+>>>>>>> e20a6b055 ([#14978] fix(core): Mask sensitive local job command logs including --conf (#14979))
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -56,7 +61,10 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    LOG.info("Starting local shell job with command: {}", Joiner.on(" ").join(commandList));
+    // Mask JSON bags and sensitive --conf for the log only; ProcessBuilder keeps plaintext.
+    LOG.info(
+        "Starting local shell job with command: {}",
+        Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)));
 
     try {
       return builder.start();
