@@ -262,6 +262,27 @@ public class TestJobRuntimeTemplateMaskUtils {
   }
 
   @Test
+  void testMaskSensitiveArgumentsMasksNonSingleJsonObjectBags() {
+    String concatenated = "{} {\"password\":\"concat-secret\"}";
+    String scalarThenObject = "true {\"password\":\"scalar-secret\"}";
+    List<String> masked =
+        JobRuntimeTemplateMaskUtils.maskSensitiveArguments(
+            ImmutableList.of(
+                "--updater-options",
+                concatenated,
+                "--spark-conf",
+                scalarThenObject,
+                "--table",
+                "db.t"));
+
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(1));
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(3));
+    Assertions.assertFalse(masked.get(1).contains("concat-secret"));
+    Assertions.assertFalse(masked.get(3).contains("scalar-secret"));
+    Assertions.assertEquals("db.t", masked.get(5));
+  }
+
+  @Test
   void testMalformedCredentialJsonDoesNotLeakInMaskingLogs() {
     // Regression for review on #14979: Jackson exception text must not reach WARN logs.
     String malformed = "{\"password\":\"malformed-credential-secret\",";

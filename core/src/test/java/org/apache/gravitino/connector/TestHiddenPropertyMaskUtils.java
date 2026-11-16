@@ -237,12 +237,28 @@ public class TestHiddenPropertyMaskUtils {
   }
 
   @Test
-  void testMaskSensitiveJsonValueLeavesPlainNonJsonUnchanged() {
-    Assertions.assertEquals("verbose", HiddenPropertyMaskUtils.maskSensitiveJsonValue("verbose"));
-    Assertions.assertEquals("5", HiddenPropertyMaskUtils.maskSensitiveJsonValue("5"));
+  void testMaskSensitiveJsonValueRequiresSingleJsonObject() {
+    // Non-objects / invalid bags become ****** (credential JSON must be one map).
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("verbose"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, HiddenPropertyMaskUtils.maskSensitiveJsonValue("5"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("true"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("[{\"password\":\"x\"}]"));
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE,
         HiddenPropertyMaskUtils.maskSensitiveJsonValue("{not-json,\"password\":\"x\"}"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("{} {\"password\":\"secret\"}"));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        HiddenPropertyMaskUtils.maskSensitiveJsonValue("true {\"password\":\"secret\"}"));
   }
 
   @Test
