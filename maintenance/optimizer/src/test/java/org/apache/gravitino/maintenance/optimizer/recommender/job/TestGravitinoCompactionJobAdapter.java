@@ -88,7 +88,8 @@ public class TestGravitinoCompactionJobAdapter {
                     partitioning,
                     partitions));
 
-    Assertions.assertEquals("(days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
+    Assertions.assertEquals(
+        "(`catalog`.system.days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {

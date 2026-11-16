@@ -282,7 +282,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", "usa")))),
             new Column[] {column("region", Types.StringType.get())},
-            new Transform[] {Transforms.identity("region")});
+            new Transform[] {Transforms.identity("region")},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(region = 'usa')", where);
     callRewrite(spark, table, where);
   }
@@ -313,7 +314,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", "O'Brien")))),
             new Column[] {column("region", Types.StringType.get())},
-            new Transform[] {Transforms.identity("region")});
+            new Transform[] {Transforms.identity("region")},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(region = 'O\\'Brien')", where);
     callRewrite(spark, table, where);
   }
@@ -336,7 +338,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
             new Column[] {column("region", Types.StringType.get())},
-            new Transform[] {Transforms.identity("region")});
+            new Transform[] {Transforms.identity("region")},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(region = 'a\"b\\\\c')", where);
     callRewrite(spark, table, where);
   }
@@ -353,7 +356,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2024-01-01")))),
             new Column[] {column("dt", Types.DateType.get())},
-            new Transform[] {Transforms.identity("dt")});
+            new Transform[] {Transforms.identity("dt")},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
     callRewrite(spark, table, where);
   }
@@ -370,7 +374,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts", "2024-01-01 00:00:00")))),
             new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
-            new Transform[] {Transforms.identity("ts")});
+            new Transform[] {Transforms.identity("ts")},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(ts = TIMESTAMP '2024-01-01 00:00:00')", where);
     callRewrite(spark, table, where);
   }
@@ -390,8 +395,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-03-18")))),
             columns,
-            partitioning);
-    Assertions.assertEquals("(days(ts) = DATE '2026-03-18')", where);
+            partitioning,
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(ts) = DATE \'2026-03-18\')", where);
     callRewrite(spark, table, where);
   }
 
@@ -425,8 +432,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl(fieldName, value)))),
             new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
-            new Transform[] {transform});
-    Assertions.assertEquals("(" + functionName + "(ts) = " + value + ")", where);
+            new Transform[] {transform},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(ts) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -449,8 +458,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
                         new PartitionEntryImpl(
                             partitionStruct.schema().fields()[0].name(), value)))),
             new Column[] {column("user_id", Types.LongType.get())},
-            new Transform[] {Transforms.bucket(16, new String[] {"user_id"})});
-    Assertions.assertEquals("(bucket(16, user_id) = " + value + ")", where);
+            new Transform[] {Transforms.bucket(16, new String[] {"user_id"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(16, user_id) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -466,8 +477,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("country_trunc", "usa")))),
             new Column[] {column("country", Types.StringType.get())},
-            new Transform[] {Transforms.truncate(3, "country")});
-    Assertions.assertEquals("(truncate(3, country) = 'usa')", where);
+            new Transform[] {Transforms.truncate(3, "country")},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(3, country) = 'usa')", where);
     callRewrite(spark, table, where);
   }
 
@@ -477,7 +490,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
         "struct_day_" + ansi,
         "days(event.ts)",
         Transforms.day(new String[] {"event", "ts"}),
-        "(days(event.ts) = DATE '2026-03-18')",
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(event.ts) = DATE '2026-03-18')",
         "2026-03-18");
   }
 
@@ -518,7 +531,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.ts", partitionValue)))),
             new Column[] {eventStructColumn()},
-            new Transform[] {transform});
+            new Transform[] {transform},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals(expectedWhere, where);
     callRewrite(spark, table, where);
   }
@@ -535,8 +549,11 @@ public class TestBuiltinIcebergRewriteDataFiles {
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.ts", value)))),
             new Column[] {eventStructColumn()},
-            new Transform[] {transform});
-    Assertions.assertEquals("(" + functionName + "(event.ts) = " + value + ")", where);
+            new Transform[] {transform},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(event.ts) = " + value + ")",
+        where);
     callRewrite(spark, table, where);
   }
 
@@ -562,8 +579,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
                   Types.StructType.of(
                       Types.StructType.Field.notNullField("uid", Types.LongType.get())))
             },
-            new Transform[] {Transforms.bucket(8, new String[][] {new String[] {"event", "uid"}})});
-    Assertions.assertEquals("(bucket(8, event.uid) = " + value + ")", where);
+            new Transform[] {Transforms.bucket(8, new String[][] {new String[] {"event", "uid"}})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(8, event.uid) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -586,8 +605,10 @@ public class TestBuiltinIcebergRewriteDataFiles {
                   Types.StructType.of(
                       Types.StructType.Field.notNullField("loc", Types.StringType.get())))
             },
-            new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})});
-    Assertions.assertEquals("(truncate(2, event.loc) = 'ab')", where);
+            new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(2, event.loc) = 'ab')", where);
     callRewrite(spark, table, where);
   }
 
@@ -600,7 +621,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
                 PartitionPath.of(
                     List.of(new PartitionEntryImpl("event.ts", "2026-03-18 12:00:00")))),
             new Column[] {eventStructColumn()},
-            new Transform[] {Transforms.identity(new String[] {"event", "ts"})});
+            new Transform[] {Transforms.identity(new String[] {"event", "ts"})},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(event.ts = TIMESTAMP '2026-03-18 12:00:00')", where);
     callRewrite(spark, table, where);
   }
@@ -624,7 +646,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
                   Types.StructType.of(
                       Types.StructType.Field.notNullField("code", Types.IntegerType.get())))
             },
-            new Transform[] {Transforms.identity(new String[] {"event", "code"})});
+            new Transform[] {Transforms.identity(new String[] {"event", "code"})},
+            SPARK_CATALOG_NAME);
     Assertions.assertEquals("(event.code = 7)", where);
     callRewrite(spark, table, where);
   }
@@ -878,27 +901,21 @@ public class TestBuiltinIcebergRewriteDataFiles {
   }
 
   private static SparkSession createSparkSession() {
-    // Resolve the stock rewrite template configs so years()/months() use the same defaultCatalog
-    // path as production (do not hand-set defaultCatalog independently of the template).
+    // Resolve template keys and values the same way JobTemplateResolver does; keys also carry
+    // {{catalog_name}} (e.g. spark.sql.catalog.{{catalog_name}}).
     Map<String, String> sparkConfigs = new HashMap<>();
     for (Map.Entry<String, String> entry :
         IcebergSparkConfigUtils.buildTemplateSparkConfigs().entrySet()) {
-      String value =
-          entry
-              .getValue()
-              .replace("{{catalog_name}}", SPARK_CATALOG_NAME)
-              .replace("{{catalog_type}}", "rest")
-              .replace("{{catalog_uri}}", ICEBERG_REST_URI)
-              .replace("{{warehouse_location}}", WAREHOUSE_LOCATION)
-              .replace("{{spark_master:-}}", "local[2]")
-              .replace("{{spark_executor_instances:-1}}", "1")
-              .replace("{{spark_executor_cores:-1}}", "1")
-              .replace("{{spark_executor_memory:-1g}}", "1g")
-              .replace("{{spark_driver_memory:-1g}}", "1g");
+      String key = resolveTemplatePlaceholders(entry.getKey());
+      String value = resolveTemplatePlaceholders(entry.getValue());
       if (StringUtils.isNotBlank(value)) {
-        sparkConfigs.put(entry.getKey(), value);
+        sparkConfigs.put(key, value);
       }
     }
+    Assertions.assertEquals(
+        "org.apache.iceberg.spark.SparkCatalog",
+        sparkConfigs.get("spark.sql.catalog." + SPARK_CATALOG_NAME),
+        "resolved template must register " + SPARK_CATALOG_NAME + " before starting Spark");
     // Template configs may already carry defaultCatalog; spark_conf overlay must not. ensure owns
     // the key from catalog_name (same as IcebergRewriteDataFilesJob / IcebergMaintenanceJob).
     sparkConfigs.remove("spark.sql.defaultCatalog");
@@ -918,6 +935,20 @@ public class TestBuiltinIcebergRewriteDataFiles {
         SparkSession.builder().appName("builtin-iceberg-rewrite-data-files-it");
     sparkConfigs.forEach(builder::config);
     return builder.getOrCreate();
+  }
+
+  /** Mirrors production template substitution for both config keys and values. */
+  private static String resolveTemplatePlaceholders(String template) {
+    return template
+        .replace("{{catalog_name}}", SPARK_CATALOG_NAME)
+        .replace("{{catalog_type}}", "rest")
+        .replace("{{catalog_uri}}", ICEBERG_REST_URI)
+        .replace("{{warehouse_location}}", WAREHOUSE_LOCATION)
+        .replace("{{spark_master:-}}", "local[2]")
+        .replace("{{spark_executor_instances:-1}}", "1")
+        .replace("{{spark_executor_cores:-1}}", "1")
+        .replace("{{spark_executor_memory:-1g}}", "1g")
+        .replace("{{spark_driver_memory:-1g}}", "1g");
   }
 
   private static void createPartitionTableAndInsertData(SparkSession spark, String fullTableName) {

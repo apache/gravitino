@@ -21,6 +21,7 @@ package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -51,6 +52,11 @@ import org.apache.gravitino.rel.types.Types;
  * quotes are identifiers there). The job embeds the clause in {@code CALL ... where => '...'} via
  * {@code IcebergJobUtils.escapeSparkCallStringArg} ({@code '} → {@code \'}), which preserves these
  * inner literals through the outer Spark parse.
+ *
+ * <p>Non-identity transforms are qualified as {@code catalog.system.years|months|days|hours|...} so
+ * resolution does not depend on {@code spark.sql.defaultCatalog} or a catalog {@code
+ * default-namespace} (which would otherwise turn bare {@code years(ts)} into {@code
+ * catalog.db.years}).
  */
 public class PartitionUtils {
 
@@ -58,9 +64,14 @@ public class PartitionUtils {
    * Builds an OR of per-partition predicates, each wrapped in parentheses.
    *
    * <p>Example: {@code (a = 'x' AND b = 1) OR (a = 'y' AND b = 2)}.
+   *
+   * @param catalogName Iceberg Spark catalog used to qualify system functions
    */
   public static String getWhereClauseForPartitions(
-      List<PartitionPath> partitions, Column[] columns, Transform[] partitioning) {
+      List<PartitionPath> partitions,
+      Column[] columns,
+      Transform[] partitioning,
+      String catalogName) {
     Preconditions.checkArgument(
         partitions != null && !partitions.isEmpty(), "partitions cannot be null or empty");
     Preconditions.checkArgument(ArrayUtils.isNotEmpty(columns), "columns cannot be null or empty");
@@ -69,7 +80,8 @@ public class PartitionUtils {
 
     List<String> predicates = Lists.newArrayListWithExpectedSize(partitions.size());
     for (PartitionPath partition : partitions) {
-      predicates.add(getWhereClauseForPartition(partition.entries(), columns, partitioning));
+      predicates.add(
+          getWhereClauseForPartition(partition.entries(), columns, partitioning, catalogName));
     }
     return predicates.stream().map(p -> "(" + p + ")").collect(Collectors.joining(" OR "));
   }
@@ -79,23 +91,31 @@ public class PartitionUtils {
    *
    * <ul>
    *   <li>Identity: {@code column = literal}
-   *   <li>Bucket / truncate: Iceberg argument order ({@code bucket(N, col)}, {@code truncate(W,
-   *       col)})
+   *   <li>Bucket / truncate: Iceberg argument order ({@code catalog.system.bucket(N, col)}, {@code
+   *       catalog.system.truncate(W, col)})
    *   <li>{@code years}/{@code months}/{@code hours}: compare to the stored Iceberg int (years
    *       since 1970, etc.)—not a calendar year/month
    *   <li>{@code days}: Iceberg Spark {@code days()} returns {@code DateType}, so the RHS is {@code
    *       DATE 'yyyy-MM-dd'}. Stored partition strings must be ISO {@code yyyy-MM-dd} (same as
    *       Iceberg {@code DateTimeUtil.isoDateToDays})
    * </ul>
+   *
+   * @param catalogName Iceberg Spark catalog used to qualify system functions
    */
   public static String getWhereClauseForPartition(
-      List<PartitionEntry> partition, Column[] columns, Transform[] partitioning) {
+      List<PartitionEntry> partition,
+      Column[] columns,
+      Transform[] partitioning,
+      String catalogName) {
     Preconditions.checkArgument(
         partition != null && !partition.isEmpty(), "partition cannot be null or empty");
     Preconditions.checkArgument(ArrayUtils.isNotEmpty(columns), "columns cannot be null or empty");
     Preconditions.checkArgument(
         partitioning != null && partitioning.length == partition.size(),
         "partitioning must match the size of partition entries");
+    Preconditions.checkArgument(
+        catalogName != null && !catalogName.trim().isEmpty(),
+        "catalogName cannot be null or empty");
 
     Map<String, Column> columnMap =
         Arrays.stream(columns)
@@ -118,7 +138,7 @@ public class PartitionUtils {
       }
       Preconditions.checkNotNull(column, "Column '%s' not found in table schema", columnName);
 
-      String expression = buildExpression(transform, columnName);
+      String expression = buildExpression(transform, columnName, catalogName.trim());
       // Walk into struct fields so nested identity uses TIMESTAMP/INT/... not STRUCT→string.
       String literal =
           formatLiteral(transform, resolveLeafDataType(column, columnName), entry.partitionValue());
@@ -177,32 +197,44 @@ public class PartitionUtils {
    * <p>Temporal transforms use plural names ({@code years}/{@code months}/{@code days}/{@code
    * hours}) matching {@code org.apache.iceberg.spark.functions.SparkFunctions}. {@code bucket} and
    * {@code truncate} put the width argument first, matching Iceberg's Spark UDF signatures.
+   * Non-identity functions are qualified as {@code catalog.system.<fn>} so a catalog {@code
+   * default-namespace} cannot rewrite them to {@code catalog.<ns>.<fn>}.
    */
-  private static String buildExpression(Transform transform, String columnName) {
+  private static String buildExpression(
+      Transform transform, String columnName, String catalogName) {
     if (transform instanceof Transforms.IdentityTransform) {
       return columnName;
-    } else if (transform instanceof Transforms.YearTransform) {
-      return "years(" + columnName + ")";
+    }
+    String systemFn = quoteCatalogIdentifier(catalogName) + ".system.";
+    if (transform instanceof Transforms.YearTransform) {
+      return systemFn + "years(" + columnName + ")";
     } else if (transform instanceof Transforms.MonthTransform) {
-      return "months(" + columnName + ")";
+      return systemFn + "months(" + columnName + ")";
     } else if (transform instanceof Transforms.DayTransform) {
-      return "days(" + columnName + ")";
+      return systemFn + "days(" + columnName + ")";
     } else if (transform instanceof Transforms.HourTransform) {
-      return "hours(" + columnName + ")";
+      return systemFn + "hours(" + columnName + ")";
     } else if (transform instanceof Transforms.BucketTransform) {
-      return "bucket("
+      return systemFn
+          + "bucket("
           + ((Transforms.BucketTransform) transform).numBuckets()
           + ", "
           + columnName
           + ")";
     } else if (transform instanceof Transforms.TruncateTransform) {
-      return "truncate("
+      return systemFn
+          + "truncate("
           + ((Transforms.TruncateTransform) transform).width()
           + ", "
           + columnName
           + ")";
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
+  }
+
+  /** Backtick-quotes a Spark catalog identifier (internal backticks are doubled). */
+  private static String quoteCatalogIdentifier(String catalogName) {
+    return "`" + catalogName.replace("`", "``") + "`";
   }
 
   private static String formatLiteral(Transform transform, Type type, String rawValue) {
@@ -215,14 +247,9 @@ public class PartitionUtils {
         || transform instanceof Transforms.MonthTransform
         || transform instanceof Transforms.HourTransform
         || transform instanceof Transforms.BucketTransform) {
-      try {
-        return Long.toString(Long.parseLong(rawValue));
-      } catch (NumberFormatException e) {
-        throw new IllegalArgumentException(
-            "Partition value for years/months/hours/bucket must be an integer, but got: "
-                + rawValue,
-            e);
-      }
+      // Same trim + parse as identity integrals so " 54 " does not fail only on one path.
+      return formatIntegralLiteral(
+          rawValue, "Partition value for years/months/hours/bucket must be an integer");
     }
 
     // days() → DateType; single-quoted DATE survives ANSI doubleQuotedIdentifiers.
@@ -232,21 +259,77 @@ public class PartitionUtils {
 
     switch (type.name()) {
       case BOOLEAN:
-        return rawValue.toLowerCase(Locale.ROOT);
+        return formatBooleanLiteral(rawValue);
       case BYTE:
       case SHORT:
       case INTEGER:
       case LONG:
+        return formatIntegralLiteral(
+            rawValue, "Partition value for identity integral column must be an integer");
       case FLOAT:
       case DOUBLE:
+        return formatFloatingLiteral(rawValue);
       case DECIMAL:
-        return rawValue;
+        return formatDecimalLiteral(rawValue);
       case DATE:
       case TIMESTAMP:
       case TIME:
         return type.name() + " '" + escapeStringLiteral(rawValue) + "'";
       default:
         return "'" + escapeStringLiteral(rawValue) + "'";
+    }
+  }
+
+  /**
+   * Parses identity boolean partition values. Only {@code true}/{@code false} (any case) are
+   * accepted so malformed imports cannot inject SQL.
+   */
+  private static String formatBooleanLiteral(String rawValue) {
+    String normalized = rawValue.trim().toLowerCase(Locale.ROOT);
+    if (!"true".equals(normalized) && !"false".equals(normalized)) {
+      throw new IllegalArgumentException(
+          "Partition value for boolean must be true or false, but got: " + rawValue);
+    }
+    return normalized;
+  }
+
+  /**
+   * Parses integral partition values so inputs like {@code 7 OR 1 = 1} fail instead of broadening
+   * the predicate.
+   *
+   * @param messagePrefix context-specific prefix before {@code , but got: ...}
+   */
+  private static String formatIntegralLiteral(String rawValue, String messagePrefix) {
+    try {
+      return Long.toString(Long.parseLong(rawValue.trim()));
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(messagePrefix + ", but got: " + rawValue, e);
+    }
+  }
+
+  private static String formatFloatingLiteral(String rawValue) {
+    String trimmed = rawValue.trim();
+    try {
+      double parsed = Double.parseDouble(trimmed);
+      if (Double.isInfinite(parsed) || Double.isNaN(parsed)) {
+        throw new NumberFormatException("non-finite");
+      }
+      // Keep the producer spelling after validation (avoid Double.toString reformatting).
+      return trimmed;
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Partition value for floating type must be a finite number, but got: " + rawValue, e);
+    }
+  }
+
+  private static String formatDecimalLiteral(String rawValue) {
+    String trimmed = rawValue.trim();
+    try {
+      new BigDecimal(trimmed);
+      return trimmed;
+    } catch (NumberFormatException | ArithmeticException e) {
+      throw new IllegalArgumentException(
+          "Partition value for decimal must be a number, but got: " + rawValue, e);
     }
   }
 

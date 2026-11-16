@@ -526,7 +526,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
               Collections.singletonList(
                   PartitionPath.of(List.of(new PartitionEntryImpl("region", apostrophe)))),
               new Column[] {column("region", Types.StringType.get())},
-              new Transform[] {Transforms.identity("region")});
+              new Transform[] {Transforms.identity("region")},
+              catalogName);
       assertEquals("(region = 'O\\'Brien')", where);
 
       String sql =
@@ -624,7 +625,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
                         PartitionPath.of(
                             List.of(new PartitionEntryImpl("region", partitionValue)))),
                     new Column[] {column("region", Types.StringType.get())},
-                    new Transform[] {Transforms.identity("region")});
+                    new Transform[] {Transforms.identity("region")},
+                    catalogName);
             assertEquals(expectedWhere, stringWhere, ansiModeLabel(ansiEnabled, doubleQuotedIds));
             String stringSql =
                 IcebergRewriteDataFilesJob.buildProcedureCall(
@@ -641,16 +643,18 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
                     Collections.singletonList(
                         PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2024-01-01")))),
                     new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
-                    new Transform[] {Transforms.day("ts")});
+                    new Transform[] {Transforms.day("ts")},
+                    catalogName);
             assertEquals(
-                "(days(ts) = DATE '2024-01-01')",
+                "(`" + catalogName + "`.system.days(ts) = DATE '2024-01-01')",
                 dateWhere,
                 ansiModeLabel(ansiEnabled, doubleQuotedIds));
             String dateSql =
                 IcebergRewriteDataFilesJob.buildProcedureCall(
                     catalogName, "db." + tableSuffix, "binpack", null, dateWhere, null);
             assertTrue(
-                dateSql.contains("where => '(days(ts) = DATE \\'2024-01-01\\')'"),
+                dateSql.contains(
+                    "where => '(`" + catalogName + "`.system.days(ts) = DATE \\'2024-01-01\\')'"),
                 ansiModeLabel(ansiEnabled, doubleQuotedIds) + ": " + dateSql);
             assertDoesNotThrow(
                 () -> spark.sql(dateSql).collect(),
@@ -659,6 +663,55 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
             spark.sql("DROP TABLE IF EXISTS " + table);
           });
     }
+  }
+
+  /**
+   * With catalog {@code default-namespace}, unqualified {@code years(ts)} is rewritten to {@code
+   * catalog.<ns>.years}; {@code catalog.system.years} stays a system function.
+   */
+  @Test
+  public void testCatalogSystemYearsWithDefaultNamespace() {
+    String table = catalogName + ".db.pu_years_dns";
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, ts TIMESTAMP) USING iceberg PARTITIONED BY (years(ts))");
+    List<Row> rows = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      rows.add(RowFactory.create(i, java.sql.Timestamp.valueOf("2024-06-15 12:00:00")));
+    }
+    StructType schema =
+        new StructType()
+            .add("id", DataTypes.IntegerType, false)
+            .add("ts", DataTypes.TimestampType, false);
+    spark
+        .createDataFrame(rows, schema)
+        .write()
+        .format("iceberg")
+        .mode(SaveMode.Append)
+        .saveAsTable(table);
+
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            Collections.singletonList(
+                PartitionPath.of(List.of(new PartitionEntryImpl("ts_year", "54")))),
+            new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
+            new Transform[] {Transforms.year("ts")},
+            catalogName);
+    assertEquals("(`" + catalogName + "`.system.years(ts) = 54)", where);
+
+    spark.conf().set("spark.sql.defaultCatalog", catalogName);
+    spark.conf().set("spark.sql.catalog." + catalogName + ".default-namespace", "db");
+    try {
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_years_dns", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.conf().unset("spark.sql.catalog." + catalogName + ".default-namespace");
+    }
+    spark.sql("DROP TABLE IF EXISTS " + table);
   }
 
   private static void withAnsiModes(

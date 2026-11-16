@@ -66,9 +66,12 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
     if (jobContext.getPartitions().isEmpty()) {
       return "";
     }
-    // See PartitionUtils: Iceberg Spark system-function forms + CALL-safe literals.
+    // See PartitionUtils: catalog.system.* functions + CALL-safe literals.
     return PartitionUtils.getWhereClauseForPartitions(
-        jobContext.getPartitions(), jobContext.getColumns(), jobContext.getPartitioning());
+        jobContext.getPartitions(),
+        jobContext.getColumns(),
+        jobContext.getPartitioning(),
+        IdentifierUtils.getCatalogNameFromTableIdentifier(jobContext.nameIdentifier()));
   }
 
   private String getOptions(JobExecutionContext jobExecutionContext) {

@@ -121,7 +121,8 @@ rewrites the whole table and succeeds on `PARTITIONED BY (p, days(ts))` (and sim
 still see `Rewritten data files: 0` when files are not rewrite-eligible (`min-input-files`).
 
 Strategy-generated partition filters use Iceberg Spark system functions (for example
-`days(ts) = DATE '2024-01-01'`, `years(ts) = 54`, `bucket(16, id) = 3`), not Spark builtins such
+`catalog.system.days(ts) = DATE '2024-01-01'`, `catalog.system.years(ts) = 54`,
+`catalog.system.bucket(16, id) = 3`), not Spark builtins such
 as `day()`. The `days()` UDF returns `DATE`, so the strategy emits a date literal (not the raw
 epoch-day int). Identity `DATE`/`TIMESTAMP`/`TIME` partitions use the same single-quoted typed
 literals (`dt = DATE '2024-01-01'`): the job embeds them in `CALL ... where => '...'` via Spark
@@ -132,8 +133,12 @@ matching Iceberg Spark runtime and that the predicate resolved as an Iceberg fun
 in job run status and `error.log` under `builtin-iceberg-rewrite-data-files`.
 
 **`Day partition value must be an ISO date`** — day-transform stats must be ISO `yyyy-MM-dd`.
-Epoch-day (`19723`) or compact (`20260101`) values fail while building `where_clause` (before
-submit). Refresh with `update-stats`; there is no epoch-day migration.
+Epoch-day (`19723`) and compact (`20260101`) fail while building `where_clause` (no migration or
+guessing). `update-stats` alone is not enough if an imported non-ISO row remains: it adds an
+ISO-keyed row but leaves the old one selectable, so the next recommendation can still abort. List
+partition statistics, drop the non-ISO partition's statistic names
+([Drop partition statistics](../manage-statistics-in-gravitino.md#drop-partition-statistics)),
+re-run `update-stats`, then resubmit.
 
 **`spark.sql.parser.escapedStringLiterals must be false`** — built-in Iceberg jobs require
 Spark's default. Remove the key from `spark_conf` or set it to `false`.
