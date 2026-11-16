@@ -32,9 +32,9 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 
 /**
  * Display-masks credentials in a Spark job's {@code updater_options} and {@code spark_conf} JSON
- * before that JSON is returned by an API or placed on an event. Sensitive-named keys inside the
- * JSON are replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}. This is not encryption: the
- * stored runtime template and the map passed to job execution stay plaintext.
+ * before that JSON is returned by an API, placed on an event or written to a log. Sensitive-named
+ * keys inside the JSON are replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}. This is not
+ * encryption: the stored runtime template and the map passed to job execution stay plaintext.
  *
  * <p>Only those two JSON bags are masked.
  *
@@ -158,11 +158,16 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks the JSON value of {@link #JSON_ARGUMENT_FLAGS}. The value is one list element, including
-   * any spaces inside the JSON. Other arguments are copied unchanged.
+   * Returns a copy of {@code arguments} with the JSON value of {@link #JSON_ARGUMENT_FLAGS} masked.
+   * The value is one list element, including any spaces inside the JSON, or the text after {@code
+   * =} in {@code --flag=json}. Other arguments are copied unchanged. Does not mutate the input; use
+   * the result only for display, such as API responses, events and log messages.
+   *
+   * @param arguments job arguments or a full process command line; may be null
+   * @return a masked copy, or null when {@code arguments} is null
    */
   @Nullable
-  private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
+  public static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
     if (arguments == null) {
       return null;
     }

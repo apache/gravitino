@@ -25,6 +25,7 @@ import java.io.File;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.connector.job.JobResourceUtils;
+import org.apache.gravitino.job.JobRuntimeTemplateMaskUtils;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,7 +63,9 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    LOG.info("Starting local shell job with command: {}", Joiner.on(" ").join(commandList));
+    LOG.info(
+        "Starting local shell job with command: {}",
+        Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)));
 
     try {
       return builder.start();
