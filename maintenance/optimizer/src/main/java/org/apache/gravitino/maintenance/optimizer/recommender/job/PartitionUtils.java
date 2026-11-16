@@ -46,16 +46,18 @@ import org.apache.gravitino.rel.types.Types;
  * days}/{@code hours}/{@code bucket}/{@code truncate}) so {@code SparkV2Filters} can push them
  * down. Spark builtins such as {@code day()} / {@code year()} are intentionally not used.
  *
- * <p>String and typed literals ({@code DATE}/{@code TIMESTAMP}/{@code TIME}) use double quotes
- * because the job embeds the clause in {@code CALL ... where => '...'}—single-quoted typed literals
- * are eaten by that outer string even when SQL-escaped.
+ * <p>String and typed literals ({@code DATE}/{@code TIMESTAMP}/{@code TIME}) use single quotes so
+ * predicates stay valid when {@code spark.sql.ansi.doubleQuotedIdentifiers} is enabled (double
+ * quotes are identifiers there). The job embeds the clause in {@code CALL ... where => '...'} via
+ * {@code IcebergJobUtils.escapeSparkCallStringArg} ({@code '} → {@code \'}), which preserves these
+ * inner literals through the outer Spark parse.
  */
 public class PartitionUtils {
 
   /**
    * Builds an OR of per-partition predicates, each wrapped in parentheses.
    *
-   * <p>Example: {@code (a = "x" AND b = 1) OR (a = "y" AND b = 2)}.
+   * <p>Example: {@code (a = 'x' AND b = 1) OR (a = 'y' AND b = 2)}.
    */
   public static String getWhereClauseForPartitions(
       List<PartitionPath> partitions, Column[] columns, Transform[] partitioning) {
@@ -82,7 +84,7 @@ public class PartitionUtils {
    *   <li>{@code years}/{@code months}/{@code hours}: compare to the stored Iceberg int (years
    *       since 1970, etc.)—not a calendar year/month
    *   <li>{@code days}: Iceberg Spark {@code days()} returns {@code DateType}, so the RHS is {@code
-   *       DATE "yyyy-MM-dd"}. Stored partition strings must be ISO {@code yyyy-MM-dd} (same as
+   *       DATE 'yyyy-MM-dd'}. Stored partition strings must be ISO {@code yyyy-MM-dd} (same as
    *       Iceberg {@code DateTimeUtil.isoDateToDays})
    * </ul>
    */
@@ -204,6 +206,8 @@ public class PartitionUtils {
   }
 
   private static String formatLiteral(Transform transform, Type type, String rawValue) {
+    Preconditions.checkArgument(rawValue != null, "Partition value cannot be null");
+
     // years/months/hours/bucket: raw Iceberg ints from producers (e.g. update-stats
     // String.valueOf(Spark partition field)). years = years since 1970 (calendar 2024 → 54),
     // not a calendar year/month; months/hours likewise. Validate before emitting.
@@ -221,9 +225,9 @@ public class PartitionUtils {
       }
     }
 
-    // days() → DateType; double-quoted DATE survives CALL where => '...' embedding.
+    // days() → DateType; single-quoted DATE survives ANSI doubleQuotedIdentifiers.
     if (transform instanceof Transforms.DayTransform) {
-      return "DATE \"" + escapeStringLiteral(toIsoDateFromDayPartitionValue(rawValue)) + "\"";
+      return "DATE '" + escapeStringLiteral(toIsoDateFromDayPartitionValue(rawValue)) + "'";
     }
 
     switch (type.name()) {
@@ -240,10 +244,9 @@ public class PartitionUtils {
       case DATE:
       case TIMESTAMP:
       case TIME:
-        // Same CALL embedding constraint as days(); escape " / \ like string literals.
-        return type.name() + " \"" + escapeStringLiteral(rawValue) + "\"";
+        return type.name() + " '" + escapeStringLiteral(rawValue) + "'";
       default:
-        return "\"" + escapeStringLiteral(rawValue) + "\"";
+        return "'" + escapeStringLiteral(rawValue) + "'";
     }
   }
 
@@ -266,14 +269,14 @@ public class PartitionUtils {
   }
 
   /**
-   * Escapes a value for a double-quoted Iceberg Spark literal ({@code \} → {@code \\}, {@code "} →
-   * {@code \"}).
+   * Escapes a value for a single-quoted Iceberg Spark literal ({@code \} → {@code \\}, {@code '} →
+   * {@code \'}).
    *
    * <p>Does not apply CALL {@code where => '...'} outer escaping; the job builder doubles
-   * backslashes when embedding this clause.
+   * backslashes (and re-encodes {@code '}) when embedding this clause.
    */
   private static String escapeStringLiteral(String value) {
-    return value.replace("\\", "\\\\").replace("\"", "\\\"");
+    return value.replace("\\", "\\\\").replace("'", "\\'");
   }
 
   private static String joinFieldName(String[] fieldNameParts) {

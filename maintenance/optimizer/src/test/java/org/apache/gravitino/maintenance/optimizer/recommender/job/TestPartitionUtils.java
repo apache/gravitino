@@ -52,7 +52,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("colA = \"O'Hara\"", where);
+    Assertions.assertEquals("colA = 'O\\'Hara'", where);
   }
 
   @Test
@@ -85,8 +85,8 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    // One-level double-quoted literal escapes; CALL outer doubling is done by the job builder.
-    Assertions.assertEquals("colA = \"a\\\"b\\\\c\"", where);
+    // One-level single-quoted literal escapes; CALL outer escaping is done by the job builder.
+    Assertions.assertEquals("colA = 'a\"b\\\\c'", where);
   }
 
   @Test
@@ -99,18 +99,18 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     // Double-quoted typed literal survives CALL where => '...' embedding.
-    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\"", where);
+    Assertions.assertEquals("ts = TIMESTAMP '2024-01-01 00:00:00'", where);
   }
 
   @Test
-  void testIdentityTimePartitionUsesDoubleQuotedLiteral() {
+  void testIdentityTimePartitionUsesSingleQuotedLiteral() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("t", "12:34:56"));
     Column[] columns = new Column[] {column("t", Types.TimeType.get())};
     Transform[] transforms = new Transform[] {Transforms.identity("t")};
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("t = TIME \"12:34:56\"", where);
+    Assertions.assertEquals("t = TIME '12:34:56'", where);
   }
 
   @Test
@@ -122,7 +122,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("ts = TIMESTAMP \"2024-01-01 00:00:00\\\"x\\\\y\"", where);
+    Assertions.assertEquals("ts = TIMESTAMP '2024-01-01 00:00:00\"x\\\\y'", where);
   }
 
   @Test
@@ -144,7 +144,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("truncate(3, country) = \"usa\"", where);
+    Assertions.assertEquals("truncate(3, country) = 'usa'", where);
   }
 
   @Test
@@ -160,7 +160,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("colA = \"abc\" AND bucket(2, colB) = 1", where);
+    Assertions.assertEquals("colA = 'abc' AND bucket(2, colB) = 1", where);
   }
 
   @Test
@@ -179,7 +179,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("truncate(5, colC) = \"prefix\" AND years(colD) = 54", where);
+    Assertions.assertEquals("truncate(5, colC) = 'prefix' AND years(colD) = 54", where);
   }
 
   @Test
@@ -191,7 +191,7 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
     // ISO only (DateTimeUtil.isoDateToDays); Iceberg Spark days() returns DateType
-    Assertions.assertEquals("days(event_time) = DATE \"2024-01-01\"", where);
+    Assertions.assertEquals("days(event_time) = DATE '2024-01-01'", where);
   }
 
   @Test
@@ -204,7 +204,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("days(event.ts) = DATE \"2026-03-18\"", where);
+    Assertions.assertEquals("days(event.ts) = DATE '2026-03-18'", where);
   }
 
   @Test
@@ -217,7 +217,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("event.ts = TIMESTAMP \"2026-03-18 12:00:00\"", where);
+    Assertions.assertEquals("event.ts = TIMESTAMP '2026-03-18 12:00:00'", where);
   }
 
   @Test
@@ -319,7 +319,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("truncate(2, event.loc) = \"ab\"", where);
+    Assertions.assertEquals("truncate(2, event.loc) = 'ab'", where);
   }
 
   @Test
@@ -331,7 +331,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms);
 
-    Assertions.assertEquals("days(event_time) = DATE \"2026-01-01\"", where);
+    Assertions.assertEquals("days(event_time) = DATE '2026-01-01'", where);
   }
 
   @Test
@@ -413,6 +413,19 @@ public class TestPartitionUtils {
   }
 
   @Test
+  void testPartitionValueRejectsNull() {
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("region", null));
+    Column[] columns = new Column[] {column("region", Types.StringType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("region")};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms));
+    Assertions.assertTrue(ex.getMessage().contains("cannot be null"));
+  }
+
+  @Test
   void testBucketPartitionRejectsNonIntegerValue() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("bucket", "14.5"));
     Column[] columns = new Column[] {column("user_id", Types.LongType.get())};
@@ -452,7 +465,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning);
 
-    Assertions.assertEquals("(a = \"x1\" AND b = \"y1\") OR (a = \"x2\" AND b = \"y2\")", where);
+    Assertions.assertEquals("(a = 'x1' AND b = 'y1') OR (a = 'x2' AND b = 'y2')", where);
   }
 
   @Test
@@ -485,7 +498,7 @@ public class TestPartitionUtils {
 
     String where = PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning);
 
-    Assertions.assertEquals("(dt = DATE \"2024-01-01\")", where);
+    Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
   }
 
   @Test
@@ -523,8 +536,8 @@ public class TestPartitionUtils {
     String where = PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning);
 
     Assertions.assertEquals(
-        "(hours(event.ts) = 8 AND truncate(3, country) = \"usa\" AND bucket(16, user_id) = 5 AND flag = false) "
-            + "OR (hours(event.ts) = 12 AND truncate(3, country) = \"can\" AND bucket(16, user_id) = 9 AND flag = true)",
+        "(hours(event.ts) = 8 AND truncate(3, country) = 'usa' AND bucket(16, user_id) = 5 AND flag = false) "
+            + "OR (hours(event.ts) = 12 AND truncate(3, country) = 'can' AND bucket(16, user_id) = 9 AND flag = true)",
         where);
   }
 

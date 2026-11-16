@@ -20,6 +20,7 @@
 package org.apache.gravitino.maintenance.optimizer.recommender.job;
 
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,13 +36,18 @@ import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.maintenance.optimizer.api.common.PartitionPath;
 import org.apache.gravitino.maintenance.optimizer.common.PartitionEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
+import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.spark.sql.Row;
+import org.apache.spark.sql.RowFactory;
+import org.apache.spark.sql.SaveMode;
 import org.apache.spark.sql.SparkSession;
+import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructType;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -222,8 +228,21 @@ public class TestBuiltinIcebergRewriteDataFiles {
       // Iceberg Spark system functions are resolved inside rewrite_data_files where parsing
       // (SparkV2Filters), not always as free-standing Spark SQL routines in this classpath.
 
-      for (boolean ansi : new boolean[] {false, true}) {
-        spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(ansi));
+      boolean[][] ansiModes =
+          new boolean[][] {
+            {false, false},
+            {true, false},
+            {false, true},
+            {true, true},
+          };
+      for (boolean[] mode : ansiModes) {
+        boolean ansiEnabled = mode[0];
+        boolean doubleQuotedIds = mode[1];
+        spark.conf().set("spark.sql.ansi.enabled", Boolean.toString(ansiEnabled));
+        spark
+            .conf()
+            .set("spark.sql.ansi.doubleQuotedIdentifiers", Boolean.toString(doubleQuotedIds));
+        String ansi = ansiFlag(ansiEnabled, doubleQuotedIds);
         assertRewriteCallForIdentityString(spark, ansi);
         assertRewriteCallForIdentityStringWithSingleQuote(spark, ansi);
         assertRewriteCallForIdentityStringWithQuoteAndBackslash(spark, ansi);
@@ -244,13 +263,15 @@ public class TestBuiltinIcebergRewriteDataFiles {
         assertRewriteCallForStructIdentityTimestamp(spark, ansi);
         assertRewriteCallForStructIdentityInt(spark, ansi);
       }
+      spark.conf().set("spark.sql.ansi.enabled", "false");
+      spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", "false");
     } finally {
       spark.stop();
     }
   }
 
-  private static void assertRewriteCallForIdentityString(SparkSession spark, boolean ansi) {
-    String table = fullTable("id_str_" + ansiFlag(ansi));
+  private static void assertRewriteCallForIdentityString(SparkSession spark, String ansi) {
+    String table = fullTable("id_str_" + ansi);
     recreateTable(
         spark,
         table,
@@ -262,31 +283,44 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", "usa")))),
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
-    Assertions.assertEquals("(region = \"usa\")", where);
+    Assertions.assertEquals("(region = 'usa')", where);
     callRewrite(spark, table, where);
   }
 
   private static void assertRewriteCallForIdentityStringWithSingleQuote(
-      SparkSession spark, boolean ansi) {
-    String table = fullTable("id_str_sq_" + ansiFlag(ansi));
-    recreateTable(
-        spark,
-        table,
-        "(id INT, region STRING)",
-        "region",
-        "INSERT INTO " + table + " SELECT id, 'O''Brien' FROM range(0, 20)");
+      SparkSession spark, String ansi) {
+    String table = fullTable("id_str_sq_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE " + table + " (id INT, region STRING) USING iceberg PARTITIONED BY (region)");
+    // SQL '' drops the apostrophe under Spark's default parser; insert via DataFrame.
+    StructType schema =
+        new StructType()
+            .add("id", DataTypes.IntegerType, false)
+            .add("region", DataTypes.StringType, false);
+    List<Row> rows = new ArrayList<>();
+    for (int i = 0; i < 20; i++) {
+      rows.add(RowFactory.create(i, "O'Brien"));
+    }
+    spark
+        .createDataFrame(rows, schema)
+        .write()
+        .format("iceberg")
+        .mode(SaveMode.Append)
+        .saveAsTable(table);
     String where =
         PartitionUtils.getWhereClauseForPartitions(
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", "O'Brien")))),
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
-    Assertions.assertEquals("(region = \"O'Brien\")", where);
+    Assertions.assertEquals("(region = 'O\\'Brien')", where);
     callRewrite(spark, table, where);
   }
 
   private static void assertRewriteCallForIdentityStringWithQuoteAndBackslash(
-      SparkSession spark, boolean ansi) {
-    String table = fullTable("id_str_qb_" + ansiFlag(ansi));
+      SparkSession spark, String ansi) {
+    String table = fullTable("id_str_qb_" + ansi);
     String partitionValue = "a\"b\\c";
     recreateTable(
         spark,
@@ -303,12 +337,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("region", partitionValue)))),
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")});
-    Assertions.assertEquals("(region = \"a\\\"b\\\\c\")", where);
+    Assertions.assertEquals("(region = 'a\"b\\\\c')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForIdentityDate(SparkSession spark, boolean ansi) {
-    String table = fullTable("id_date_" + ansiFlag(ansi));
+  private static void assertRewriteCallForIdentityDate(SparkSession spark, String ansi) {
+    String table = fullTable("id_date_" + ansi);
     recreateTable(
         spark,
         table,
@@ -320,12 +354,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("dt", "2024-01-01")))),
             new Column[] {column("dt", Types.DateType.get())},
             new Transform[] {Transforms.identity("dt")});
-    Assertions.assertEquals("(dt = DATE \"2024-01-01\")", where);
+    Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForIdentityTimestamp(SparkSession spark, boolean ansi) {
-    String table = fullTable("id_ts_" + ansiFlag(ansi));
+  private static void assertRewriteCallForIdentityTimestamp(SparkSession spark, String ansi) {
+    String table = fullTable("id_ts_" + ansi);
     recreateTable(
         spark,
         table,
@@ -337,12 +371,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts", "2024-01-01 00:00:00")))),
             new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
             new Transform[] {Transforms.identity("ts")});
-    Assertions.assertEquals("(ts = TIMESTAMP \"2024-01-01 00:00:00\")", where);
+    Assertions.assertEquals("(ts = TIMESTAMP '2024-01-01 00:00:00')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForDays(SparkSession spark, boolean ansi) {
-    String table = fullTable("days_" + ansiFlag(ansi));
+  private static void assertRewriteCallForDays(SparkSession spark, String ansi) {
+    String table = fullTable("days_" + ansi);
     recreateTable(
         spark,
         table,
@@ -357,21 +391,20 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("ts_day", "2026-03-18")))),
             columns,
             partitioning);
-    Assertions.assertEquals("(days(ts) = DATE \"2026-03-18\")", where);
+    Assertions.assertEquals("(days(ts) = DATE '2026-03-18')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForYears(SparkSession spark, boolean ansi) {
-    assertTemporalIntRewrite(spark, "years_" + ansiFlag(ansi), "years(ts)", Transforms.year("ts"));
+  private static void assertRewriteCallForYears(SparkSession spark, String ansi) {
+    assertTemporalIntRewrite(spark, "years_" + ansi, "years(ts)", Transforms.year("ts"));
   }
 
-  private static void assertRewriteCallForMonths(SparkSession spark, boolean ansi) {
-    assertTemporalIntRewrite(
-        spark, "months_" + ansiFlag(ansi), "months(ts)", Transforms.month("ts"));
+  private static void assertRewriteCallForMonths(SparkSession spark, String ansi) {
+    assertTemporalIntRewrite(spark, "months_" + ansi, "months(ts)", Transforms.month("ts"));
   }
 
-  private static void assertRewriteCallForHours(SparkSession spark, boolean ansi) {
-    assertTemporalIntRewrite(spark, "hours_" + ansiFlag(ansi), "hours(ts)", Transforms.hour("ts"));
+  private static void assertRewriteCallForHours(SparkSession spark, String ansi) {
+    assertTemporalIntRewrite(spark, "hours_" + ansi, "hours(ts)", Transforms.hour("ts"));
   }
 
   private static void assertTemporalIntRewrite(
@@ -397,8 +430,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForBucket(SparkSession spark, boolean ansi) {
-    String table = fullTable("bucket_" + ansiFlag(ansi));
+  private static void assertRewriteCallForBucket(SparkSession spark, String ansi) {
+    String table = fullTable("bucket_" + ansi);
     recreateTable(
         spark,
         table,
@@ -421,8 +454,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForTruncate(SparkSession spark, boolean ansi) {
-    String table = fullTable("trunc_" + ansiFlag(ansi));
+  private static void assertRewriteCallForTruncate(SparkSession spark, String ansi) {
+    String table = fullTable("trunc_" + ansi);
     recreateTable(
         spark,
         table,
@@ -434,40 +467,40 @@ public class TestBuiltinIcebergRewriteDataFiles {
             List.of(PartitionPath.of(List.of(new PartitionEntryImpl("country_trunc", "usa")))),
             new Column[] {column("country", Types.StringType.get())},
             new Transform[] {Transforms.truncate(3, "country")});
-    Assertions.assertEquals("(truncate(3, country) = \"usa\")", where);
+    Assertions.assertEquals("(truncate(3, country) = 'usa')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForStructDay(SparkSession spark, boolean ansi) {
+  private static void assertRewriteCallForStructDay(SparkSession spark, String ansi) {
     assertStructTemporalRewrite(
         spark,
-        "struct_day_" + ansiFlag(ansi),
+        "struct_day_" + ansi,
         "days(event.ts)",
         Transforms.day(new String[] {"event", "ts"}),
-        "(days(event.ts) = DATE \"2026-03-18\")",
+        "(days(event.ts) = DATE '2026-03-18')",
         "2026-03-18");
   }
 
-  private static void assertRewriteCallForStructYear(SparkSession spark, boolean ansi) {
+  private static void assertRewriteCallForStructYear(SparkSession spark, String ansi) {
     assertStructTemporalIntRewrite(
         spark,
-        "struct_year_" + ansiFlag(ansi),
+        "struct_year_" + ansi,
         "years(event.ts)",
         Transforms.year(new String[] {"event", "ts"}));
   }
 
-  private static void assertRewriteCallForStructMonth(SparkSession spark, boolean ansi) {
+  private static void assertRewriteCallForStructMonth(SparkSession spark, String ansi) {
     assertStructTemporalIntRewrite(
         spark,
-        "struct_month_" + ansiFlag(ansi),
+        "struct_month_" + ansi,
         "months(event.ts)",
         Transforms.month(new String[] {"event", "ts"}));
   }
 
-  private static void assertRewriteCallForStructHour(SparkSession spark, boolean ansi) {
+  private static void assertRewriteCallForStructHour(SparkSession spark, String ansi) {
     assertStructTemporalIntRewrite(
         spark,
-        "struct_hour_" + ansiFlag(ansi),
+        "struct_hour_" + ansi,
         "hours(event.ts)",
         Transforms.hour(new String[] {"event", "ts"}));
   }
@@ -507,8 +540,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForStructBucket(SparkSession spark, boolean ansi) {
-    String table = fullTable("struct_bucket_" + ansiFlag(ansi));
+  private static void assertRewriteCallForStructBucket(SparkSession spark, String ansi) {
+    String table = fullTable("struct_bucket_" + ansi);
     spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
     spark.sql("DROP TABLE IF EXISTS " + table);
     spark.sql(
@@ -534,8 +567,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForStructTruncate(SparkSession spark, boolean ansi) {
-    String table = fullTable("struct_trunc_" + ansiFlag(ansi));
+  private static void assertRewriteCallForStructTruncate(SparkSession spark, String ansi) {
+    String table = fullTable("struct_trunc_" + ansi);
     spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
     spark.sql("DROP TABLE IF EXISTS " + table);
     spark.sql(
@@ -554,13 +587,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
                       Types.StructType.Field.notNullField("loc", Types.StringType.get())))
             },
             new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})});
-    Assertions.assertEquals("(truncate(2, event.loc) = \"ab\")", where);
+    Assertions.assertEquals("(truncate(2, event.loc) = 'ab')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForStructIdentityTimestamp(
-      SparkSession spark, boolean ansi) {
-    String table = fullTable("struct_id_ts_" + ansiFlag(ansi));
+  private static void assertRewriteCallForStructIdentityTimestamp(SparkSession spark, String ansi) {
+    String table = fullTable("struct_id_ts_" + ansi);
     recreateStructTsTable(spark, table, "event.ts");
     String where =
         PartitionUtils.getWhereClauseForPartitions(
@@ -569,12 +601,12 @@ public class TestBuiltinIcebergRewriteDataFiles {
                     List.of(new PartitionEntryImpl("event.ts", "2026-03-18 12:00:00")))),
             new Column[] {eventStructColumn()},
             new Transform[] {Transforms.identity(new String[] {"event", "ts"})});
-    Assertions.assertEquals("(event.ts = TIMESTAMP \"2026-03-18 12:00:00\")", where);
+    Assertions.assertEquals("(event.ts = TIMESTAMP '2026-03-18 12:00:00')", where);
     callRewrite(spark, table, where);
   }
 
-  private static void assertRewriteCallForStructIdentityInt(SparkSession spark, boolean ansi) {
-    String table = fullTable("struct_id_int_" + ansiFlag(ansi));
+  private static void assertRewriteCallForStructIdentityInt(SparkSession spark, String ansi) {
+    String table = fullTable("struct_id_int_" + ansi);
     spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
     spark.sql("DROP TABLE IF EXISTS " + table);
     spark.sql(
@@ -624,8 +656,8 @@ public class TestBuiltinIcebergRewriteDataFiles {
     return SPARK_CATALOG_NAME + ".db.pu_" + suffix;
   }
 
-  private static String ansiFlag(boolean ansi) {
-    return ansi ? "ansi" : "plain";
+  private static String ansiFlag(boolean ansiEnabled, boolean doubleQuotedIds) {
+    return (ansiEnabled ? "e1" : "e0") + "_" + (doubleQuotedIds ? "d1" : "d0");
   }
 
   private static void recreateTable(
@@ -650,21 +682,16 @@ public class TestBuiltinIcebergRewriteDataFiles {
         "CALL "
             + SPARK_CATALOG_NAME
             + ".system.rewrite_data_files(table => '"
-            + escapeSqlString(tableArg)
+            + escapeSparkCallStringArg(tableArg)
             + "', strategy => 'binpack', where => '"
             + escapeSparkCallStringArg(whereClause)
             + "')";
     Assertions.assertDoesNotThrow(() -> spark.sql(sql).collect());
   }
 
-  /** Same as {@code IcebergJobUtils.escapeSqlString}: double single quotes only. */
-  private static String escapeSqlString(String value) {
-    return value == null ? null : value.replace("'", "''");
-  }
-
   /** Same as {@code IcebergJobUtils.escapeSparkCallStringArg}. */
   private static String escapeSparkCallStringArg(String value) {
-    return value == null ? null : escapeSqlString(value.replace("\\", "\\\\"));
+    return value == null ? null : value.replace("\\", "\\\\").replace("'", "\\'");
   }
 
   private static GravitinoMetalake loadOrCreateMetalake(
@@ -851,31 +878,45 @@ public class TestBuiltinIcebergRewriteDataFiles {
   }
 
   private static SparkSession createSparkSession() {
-    SparkSession.Builder builder =
-        SparkSession.builder()
-            .master("local[2]")
-            .appName("builtin-iceberg-rewrite-data-files-it")
-            .config(
-                "spark.sql.extensions",
-                "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions")
-            .config(
-                "spark.sql.catalog." + SPARK_CATALOG_NAME, "org.apache.iceberg.spark.SparkCatalog")
-            .config("spark.sql.catalog." + SPARK_CATALOG_NAME + ".type", "rest")
-            .config("spark.sql.catalog." + SPARK_CATALOG_NAME + ".cache-enabled", "false")
-            .config("spark.sql.catalog." + SPARK_CATALOG_NAME + ".uri", ICEBERG_REST_URI)
-            .config("spark.sql.catalog." + SPARK_CATALOG_NAME + ".warehouse", WAREHOUSE_LOCATION)
-            // Iceberg years/months/days/hours resolve via the Iceberg FunctionCatalog.
-            .config("spark.sql.defaultCatalog", SPARK_CATALOG_NAME);
-    if (StringUtils.isNotBlank(BASIC_AUTH_USER) && StringUtils.isNotBlank(BASIC_AUTH_PASSWORD)) {
-      builder
-          .config("spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.type", "basic")
-          .config(
-              "spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.basic.username",
-              BASIC_AUTH_USER)
-          .config(
-              "spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.basic.password",
-              BASIC_AUTH_PASSWORD);
+    // Resolve the stock rewrite template configs so years()/months() use the same defaultCatalog
+    // path as production (do not hand-set defaultCatalog independently of the template).
+    Map<String, String> sparkConfigs = new HashMap<>();
+    for (Map.Entry<String, String> entry :
+        IcebergSparkConfigUtils.buildTemplateSparkConfigs().entrySet()) {
+      String value =
+          entry
+              .getValue()
+              .replace("{{catalog_name}}", SPARK_CATALOG_NAME)
+              .replace("{{catalog_type}}", "rest")
+              .replace("{{catalog_uri}}", ICEBERG_REST_URI)
+              .replace("{{warehouse_location}}", WAREHOUSE_LOCATION)
+              .replace("{{spark_master:-}}", "local[2]")
+              .replace("{{spark_executor_instances:-1}}", "1")
+              .replace("{{spark_executor_cores:-1}}", "1")
+              .replace("{{spark_executor_memory:-1g}}", "1g")
+              .replace("{{spark_driver_memory:-1g}}", "1g");
+      if (StringUtils.isNotBlank(value)) {
+        sparkConfigs.put(entry.getKey(), value);
+      }
     }
+    // Template configs may already carry defaultCatalog; spark_conf overlay must not. ensure owns
+    // the key from catalog_name (same as IcebergRewriteDataFilesJob / IcebergMaintenanceJob).
+    sparkConfigs.remove("spark.sql.defaultCatalog");
+    IcebergSparkConfigUtils.ensureIcebergCatalogConfigs(sparkConfigs, SPARK_CATALOG_NAME);
+    // IT-only extras (not part of the stock template).
+    sparkConfigs.put("spark.sql.catalog." + SPARK_CATALOG_NAME + ".cache-enabled", "false");
+    if (StringUtils.isNotBlank(BASIC_AUTH_USER) && StringUtils.isNotBlank(BASIC_AUTH_PASSWORD)) {
+      sparkConfigs.put("spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.type", "basic");
+      sparkConfigs.put(
+          "spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.basic.username", BASIC_AUTH_USER);
+      sparkConfigs.put(
+          "spark.sql.catalog." + SPARK_CATALOG_NAME + ".rest.auth.basic.password",
+          BASIC_AUTH_PASSWORD);
+    }
+
+    SparkSession.Builder builder =
+        SparkSession.builder().appName("builtin-iceberg-rewrite-data-files-it");
+    sparkConfigs.forEach(builder::config);
     return builder.getOrCreate();
   }
 
