@@ -76,6 +76,7 @@ import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
 import org.apache.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.dto.requests.TopicCreateRequest;
@@ -94,6 +95,7 @@ import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.server.web.rest.TopicOperations;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.kafka.clients.admin.AdminClient;
 import org.apache.kafka.clients.admin.ListTopicsResult;
 import org.apache.kafka.common.KafkaFuture;
@@ -465,8 +467,15 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
     kafkaCatalogOperations.createTopic(existingTopic, null, null, properties);
     try {
       CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-      when(catalogManager.doWithCatalog(Mockito.any(), Mockito.any()))
-          .thenReturn(new KafkaCatalogCapability());
+      BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+      when(catalog.capability()).thenReturn(new KafkaCatalogCapability());
+      Mockito.doAnswer(
+              invocation -> {
+                ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+                return operation.apply(catalog);
+              })
+          .when(catalogManager)
+          .doWithCatalog(Mockito.any(), Mockito.any());
       TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
       when(dispatcher.createTopic(Mockito.any(), Mockito.any(), Mockito.any(), Mockito.any()))
           .thenAnswer(
