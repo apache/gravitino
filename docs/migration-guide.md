@@ -72,26 +72,37 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
 ### Kafka catalog client upgrade
 - The Kafka catalog now ships the Kafka client 3.9.2 instead of 3.4.0. The `gravitino.bypass.`
   properties are passed to this client, so check them against the
-  [Kafka Admin Configs](https://kafka.apache.org/39/documentation.html#adminclientconfigs).
-- The Kafka catalog rejects `gravitino.bypass.config.providers` and `gravitino.bypass.config.providers.*`
-  (for example `.class` and `.param.*`), including when they come from
-  `catalogs/kafka/conf/kafka.conf`. Kafka 3.5 added an environment variable config provider, and
-  any provider can read the Gravitino server's own environment or files. In 1.3, the file and
-  directory providers could be used through these properties. After the upgrade, creating or
-  altering a catalog with them is rejected, and an existing catalog that still has them fails on
-  schema and topic operations and on `testConnection`, with an error that names the rejected
-  properties, until it is updated.
+  [Kafka Admin Configs](https://kafka.apache.org/39/configuration/admin-configs/).
+- The Kafka catalog rejects `gravitino.bypass.config.providers` and every
+  `gravitino.bypass.config.providers.*` property (for example `.class` and `.param.*`), each on its
+  own. Kafka 3.5 added an environment variable config provider, and any provider can read the
+  Gravitino server's own environment or files. In 1.3, the file and directory providers could be
+  used through these properties. After the upgrade:
+  - Creating, testing, or altering a catalog with any of them is rejected with an error that names
+    them. This includes values from `catalogs/kafka/conf/kafka.conf`, so one provider property in
+    that file blocks the creation of every Kafka catalog.
+  - An existing catalog that still has any of them fails on schema and topic operations and on
+    `testConnection` until they are removed.
+- `kafka.conf` values are copied into the properties of each catalog when it is created. Editing
+  or removing the file later does not change existing catalogs, which must be updated with
+  `alterCatalog`.
 - Before upgrading, while still on 1.3, take an inventory:
-  1. List the Kafka catalogs and the `kafka.conf` entries that set `gravitino.bypass.config.providers`.
-     Its value is a comma-separated list of provider aliases chosen by the operator, for example
-     `file`, `env`, or `fileProvider`.
-  2. For each alias, search the property values of that catalog for `${<alias>:...}` references.
+  1. List every Kafka catalog and `kafka.conf` that has `gravitino.bypass.config.providers` or any
+     `gravitino.bypass.config.providers.*` property. Include catalogs that have only
+     `gravitino.bypass.config.providers.*` keys: they must be removed even when nothing refers to
+     them.
+  2. Read the provider aliases from `gravitino.bypass.config.providers`. Its value is a
+     comma-separated list of aliases chosen by the operator, for example `file`, `env`, or
+     `fileProvider`. For each alias, search the property values for `${<alias>:...}` references.
      Searching only for `${file:`, `${directory:`, or `${env:` misses custom aliases. See
      [Kafka configuration providers](https://kafka.apache.org/39/configuration/configuration-providers/).
   3. Record the value each reference resolves to, and whether it is a credential.
+- Before starting the 2.0 server, remove all provider properties from `kafka.conf`. Keep only
+  non-sensitive defaults in this file, because its values become catalog properties that can be
+  returned by the REST API.
 - After upgrading to 2.0, update each affected catalog with one `alterCatalog` call that removes
-  the provider properties and replaces every reference. An `alterCatalog` call that leaves any
-  provider property in place is rejected, including a comment-only change. Until this update,
+  all of its provider properties and replaces every reference. An `alterCatalog` call that leaves
+  any provider property in place is rejected, including a comment-only change. Until this update,
   the catalog cannot run Kafka operations, so apply it right after the upgrade.
   - Set a non-sensitive value, such as a timeout, as a literal value.
   - Do not set a credential as a literal value. Bypass properties can be returned in plaintext by
@@ -101,9 +112,6 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
     secret provider configured, bind the whole property with `CatalogChange.setSecretBinding`
     (REST update type `setSecretBinding`) in the same call. `setSecretBinding` is not available in
     the 1.3 client or REST API.
-  - In `kafka.conf`, remove the provider properties and write the resolved values before starting
-    the 2.0 server. Values from this file are not stored as catalog properties, so restrict access
-    to the file if it holds credentials.
 - The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
   configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
   the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the
