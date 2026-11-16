@@ -355,7 +355,11 @@ public class TopicMetaService {
                         TopicMetaMapper.class,
                         mapper ->
                             mapper.softDeleteTopicMetasByTopicId(
-                                observedTopicPO.getTopicId(), observedTopicPO.getCurrentVersion())),
+                                observedTopicPO.getTopicId(),
+                                observedTopicPO.getCurrentVersion(),
+                                observedTopicPO.getCatalogId(),
+                                observedTopicPO.getSchemaId(),
+                                observedTopicPO.getTopicName())),
                 () -> topicWriteFailure(identifier, observedTopicPO)),
         () -> deleteTopicDependents(observedTopicPO.getTopicId()));
   }

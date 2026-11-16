@@ -50,40 +50,39 @@ public class StarRocksExceptionConverter extends JdbcExceptionConverter {
   static final int CODE_PARTITION_ALREADY_EXISTS = 1517;
   static final int CODE_GENERIC_ERROR = 5064;
 
-  @SuppressWarnings("FormatStringAnnotation")
   @Override
   public GravitinoRuntimeException toGravitinoException(SQLException se) {
     int errorCode = se.getErrorCode();
     switch (errorCode) {
       case CODE_DATABASE_EXISTS:
-        return new SchemaAlreadyExistsException(se, se.getMessage());
+        return new SchemaAlreadyExistsException(se, "%s", se.getMessage());
       case CODE_TABLE_EXISTS:
-        return new TableAlreadyExistsException(se, se.getMessage());
+        return new TableAlreadyExistsException(se, "%s", se.getMessage());
       case CODE_DATABASE_NOT_EXISTS:
       case CODE_UNKNOWN_DATABASE:
       case CODE_UNKNOWN_DATABASE_2:
-        return new NoSuchSchemaException(se, se.getMessage());
+        return new NoSuchSchemaException(se, "%s", se.getMessage());
       case CODE_NO_SUCH_TABLE:
       case CODE_NO_SUCH_TABLE_2:
-        return new NoSuchTableException(se, se.getMessage());
+        return new NoSuchTableException(se, "%s", se.getMessage());
       case CODE_UNAUTHORIZED:
-        return new UnauthorizedException(se, se.getMessage());
+        return new UnauthorizedException(se, "%s", se.getMessage());
       case CODE_NO_SUCH_COLUMN:
-        return new NoSuchColumnException(se, se.getMessage());
+        return new NoSuchColumnException(se, "%s", se.getMessage());
       case CODE_DELETE_NON_EXISTING_PARTITION:
-        return new NoSuchPartitionException(se, se.getMessage());
+        return new NoSuchPartitionException(se, "%s", se.getMessage());
       case CODE_PARTITION_ALREADY_EXISTS:
-        return new PartitionAlreadyExistsException(se, se.getMessage());
+        return new PartitionAlreadyExistsException(se, "%s", se.getMessage());
       case CODE_GENERIC_ERROR:
         if (se.getMessage() != null && se.getMessage().contains("Unknown properties")) {
-          return new IllegalPropertyException(se, se.getMessage());
+          return new IllegalPropertyException(se, "%s", se.getMessage());
         }
-        return new GravitinoRuntimeException(se, se.getMessage());
+        return new GravitinoRuntimeException(se, "%s", se.getMessage());
       default:
         if (se.getMessage() != null && se.getMessage().contains("Access denied")) {
-          return new ConnectionFailedException(se, se.getMessage());
+          return new ConnectionFailedException(se, "%s", se.getMessage());
         }
-        return new GravitinoRuntimeException(se, se.getMessage());
+        return new GravitinoRuntimeException(se, "%s", se.getMessage());
     }
   }
 }

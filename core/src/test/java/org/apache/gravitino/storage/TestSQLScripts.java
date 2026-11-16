@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -32,6 +33,7 @@ import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -49,6 +51,126 @@ import org.opentest4j.AssertionFailedError;
 
 @DatabaseFixture(resetStrategy = ResetStrategy.FRESH_DATABASE)
 public class TestSQLScripts extends TestJDBCBackend {
+
+  @TestTemplate
+  void testReimportedIdentifiersWithFreshAndUpgradedSchemas() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    List<String> inserts = externalEntityInsertStatements();
+    for (String initialVersion : List.of("1.3.0", "2.0.0")) {
+      dropAllTables();
+      executeScript(scripts.resolve("schema-" + initialVersion + suffix).toFile());
+      executeStatements(inserts, "initial registrations");
+      if (initialVersion.equals("1.3.0")) {
+        executeScript(upgrade);
+      }
+      for (int generation = 1; generation <= 2; generation++) {
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          executeStatements(
+              List.of(
+                  "UPDATE "
+                      + entity
+                      + "_meta SET deleted_at = "
+                      + generation
+                      + " WHERE deleted_at = 0"),
+              "retire registration");
+        }
+        executeStatements(inserts, "reimport the same external IDs");
+        try (SqlSession session =
+                SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+            Connection connection = session.getConnection();
+            Statement statement = connection.createStatement()) {
+          for (String insert : inserts) {
+            String conflictingPath =
+                insert
+                    .replace("'schema'", "'other_schema'")
+                    .replace("'table'", "'other_table'")
+                    .replace("'topic'", "'other_topic'")
+                    .replace("'view'", "'other_view'")
+                    .replace(", 2,", ", 3,");
+            Assertions.assertThrows(
+                SQLException.class,
+                () -> statement.executeUpdate(conflictingPath),
+                "A duplicate active identity must still fail");
+          }
+        }
+        if (initialVersion.equals("1.3.0")) {
+          executeScript(upgrade);
+        }
+        for (String entity : List.of("schema", "table", "topic", "view")) {
+          String table = entity + "_meta";
+          assertExternalIdentityPrimaryKey(table, entity + "_id");
+          try (SqlSession session =
+                  SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+              Connection connection = session.getConnection();
+              Statement statement = connection.createStatement();
+              ResultSet result =
+                  statement.executeQuery(
+                      "SELECT COUNT(*), SUM(CASE WHEN deleted_at = 0 THEN 1 ELSE 0 END) FROM "
+                          + table)) {
+            Assertions.assertTrue(result.next());
+            Assertions.assertEquals(
+                generation + 1, result.getInt(1), "History must remain after a migration retry");
+            Assertions.assertEquals(1, result.getInt(2), "Only one registration can be active");
+          }
+        }
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeEarlierTwoZeroIdentifierKeys() throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-2.0.0" + suffix).toFile());
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      String table = entity + "_meta";
+      String dropPrimaryKey =
+          backendType.equalsIgnoreCase("postgresql")
+              ? " DROP CONSTRAINT " + table + "_pkey"
+              : " DROP PRIMARY KEY";
+      executeStatements(
+          List.of(
+              "ALTER TABLE " + table + dropPrimaryKey,
+              "ALTER TABLE " + table + " ADD PRIMARY KEY (" + entity + "_id)"),
+          "simulate the earlier 2.0 identifier-only primary keys");
+    }
+    executeStatements(externalEntityInsertStatements(), "live 2.0 registrations");
+    seedExternalGovernance(1);
+    for (int attempt = 0; attempt < 2; attempt++) {
+      executeScript(upgrade);
+      assertExternalGovernanceCount(4);
+      for (String entity : List.of("schema", "table", "topic", "view")) {
+        assertExternalIdentityPrimaryKey(entity + "_meta", entity + "_id");
+      }
+    }
+  }
+
+  @TestTemplate
+  void testUpgradeClearsRetiredGovernanceAndPreservesReimportedGovernance()
+      throws SQLException, IOException {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scripts.resolve("schema-1.3.0" + suffix).toFile());
+    executeStatements(externalEntityInsertStatements(), "legacy registrations");
+    seedExternalGovernance(1);
+    for (String entity : List.of("schema", "table", "topic", "view")) {
+      executeStatements(
+          List.of("UPDATE " + entity + "_meta SET deleted_at = 42"), "retire legacy registrations");
+    }
+    executeScript(upgrade);
+    assertExternalGovernanceCount(0);
+
+    executeStatements(externalEntityInsertStatements(), "reimport external IDs");
+    seedExternalGovernance(2);
+    executeScript(upgrade);
+    assertExternalGovernanceCount(4);
+  }
 
   @TestTemplate
   public void testSQLScripts() throws SQLException, IOException {
@@ -96,10 +218,14 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
     }
 
-    for (List<File> scripts : versionScrips.values()) {
+    for (Map.Entry<String, List<File>> versionScripts : versionScrips.entrySet()) {
       dropAllTables();
-      for (File scriptFile : scripts) {
+      for (File scriptFile : versionScripts.getValue()) {
         executeScript(scriptFile);
+      }
+      if ("2.0.0".equals(versionScripts.getKey())) {
+        assertCleanupIndexes("schema " + versionScripts.getKey());
+        assertNameColumnWidths("schema " + versionScripts.getKey());
       }
     }
   }
@@ -131,6 +257,45 @@ public class TestSQLScripts extends TestJDBCBackend {
       dropAllTables();
       executeScript(sourceSchema);
       executeScript(upgradeScript);
+      if ("2.0.0".equals(upgradeMatcher.group(2))) {
+        assertCleanupIndexes(upgradeScript.getName());
+        assertNameColumnWidths(upgradeScript.getName());
+      }
+    }
+  }
+
+  /**
+   * Verifies the PostgreSQL 1.1.0-to-1.2.0 upgrade script can be re-run as a whole after a
+   * completed upgrade: every statement is guarded by IF NOT EXISTS or is naturally idempotent
+   * (COMMENT ON). The scope is limited to this script; other upgrade scripts are not claimed to be
+   * retryable. The created indexes must exist with the expected columns and uniqueness.
+   */
+  @TestTemplate
+  public void testUpgradeToOneTwoIsIdempotent() throws SQLException, IOException {
+    if (!"postgresql".equals(backendType)) {
+      return;
+    }
+    Path scriptDir = upgradeScriptDirectory();
+    File upgrade = scriptDir.resolve("upgrade-1.1.0-to-1.2.0-postgresql.sql").toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.1.0-postgresql.sql").toFile());
+    executeScript(upgrade);
+    // A retry after a completed upgrade must succeed; no statement may fail again.
+    executeScript(upgrade);
+
+    // Index entries are formatted as "table:index name:ordinal position:column:non-unique".
+    List<String> indexes = readSchemaIndexes(Set.of("function_meta", "function_version_info"));
+    List<String> expectedIndexes =
+        List.of(
+            "function_meta:idx_function_meta_catalog_id:1:catalog_id:true",
+            "function_meta:idx_function_meta_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_catalog_id:1:catalog_id:true",
+            "function_version_info:idx_function_version_metalake_id:1:metalake_id:true",
+            "function_version_info:idx_function_version_schema_id:1:schema_id:true");
+    for (String expectedIndex : expectedIndexes) {
+      Assertions.assertTrue(
+          indexes.contains(expectedIndex),
+          "Expected index entry missing after the re-run: " + expectedIndex);
     }
   }
 
@@ -357,6 +522,45 @@ public class TestSQLScripts extends TestJDBCBackend {
     }
   }
 
+  /**
+   * Verifies the 2.0 migration expands column names and preserves data on retry.
+   *
+   * @throws SQLException if the migrated database cannot be queried
+   * @throws IOException if the scripts cannot be read
+   */
+  @TestTemplate
+  public void testUpgradeToTwoZeroSupportsLongColumnNames() throws SQLException, IOException {
+    Path scriptDir = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase() + ".sql";
+    File upgrade = scriptDir.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    dropAllTables();
+    executeScript(scriptDir.resolve("schema-1.3.0" + suffix).toFile());
+    String insert =
+        "INSERT INTO table_column_version_info "
+            + "(metalake_id, catalog_id, schema_id, table_id, table_version, column_id, column_name, "
+            + "column_position, column_type, column_op_type, audit_info) "
+            + "VALUES (1, 2, 3, 4, 1, %d, '%s', 0, 'string', 0, '{}')";
+    String oldName = "c".repeat(128);
+    executeStatements(List.of(String.format(insert, 1, oldName)), "existing 1.3 column");
+    executeScript(upgrade);
+    String longName = "c".repeat(300);
+    executeStatements(List.of(String.format(insert, 2, longName)), "new long column");
+    executeScript(upgrade);
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rows =
+            statement.executeQuery(
+                "SELECT column_name FROM table_column_version_info ORDER BY column_id")) {
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(oldName, rows.getString(1));
+      Assertions.assertTrue(rows.next());
+      Assertions.assertEquals(longName, rows.getString(1));
+      Assertions.assertFalse(rows.next());
+    }
+  }
+
   /** Verifies a completed upgrade can be repeated without resetting migrated data. */
   @TestTemplate
   public void testUpgradeToTwoZeroIsIdempotent() throws SQLException, IOException {
@@ -520,6 +724,151 @@ public class TestSQLScripts extends TestJDBCBackend {
           readSchemaIndexes(Set.of("table_version_info")).stream()
               .anyMatch(index -> index.contains("uk_table_id_version_deleted_at")),
           "Failed conversion must preserve the existing indexes");
+    }
+  }
+
+  private void seedExternalGovernance(int generation) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      Map<Long, String> objects = Map.of(11L, "SCHEMA", 12L, "TABLE", 13L, "TOPIC", 14L, "VIEW");
+      for (Map.Entry<Long, String> object : objects.entrySet()) {
+        long id = object.getKey();
+        String type = object.getValue();
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO owner_meta (metalake_id, owner_id, owner_type, metadata_object_id, metadata_object_type, audit_info) VALUES (1, 101, 'USER', %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO role_meta_securable_object (role_id, metadata_object_id, type, privilege_names, privilege_conditions) VALUES (101, %d, '%s', '[]', '[]')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, audit_info) VALUES (102, %d, '%s', '{}')",
+                id, type));
+        statement.executeUpdate(
+            String.format(
+                "INSERT INTO statistic_meta (statistic_id, statistic_name, metalake_id, statistic_value, metadata_object_id, metadata_object_type, audit_info) VALUES (%d, 'row_count', 1, '{}', %d, '%s', '{}')",
+                id + generation * 1000L, id, type));
+      }
+    }
+  }
+
+  private void assertExternalGovernanceCount(int expected) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      for (String table :
+          List.of(
+              "owner_meta", "role_meta_securable_object", "tag_relation_meta", "statistic_meta")) {
+        try (ResultSet result =
+            statement.executeQuery(
+                "SELECT COUNT(*) FROM "
+                    + table
+                    + " WHERE deleted_at = 0 AND metadata_object_id IN (11, 12, 13, 14)")) {
+          Assertions.assertTrue(result.next());
+          Assertions.assertEquals(expected, result.getInt(1), table);
+        }
+      }
+    }
+  }
+
+  private List<String> externalEntityInsertStatements() {
+    return List.of(
+        "INSERT INTO schema_meta (schema_id, schema_name, metalake_id, catalog_id, audit_info) VALUES (11, 'schema', 1, 2, '{}')",
+        "INSERT INTO table_meta (table_id, table_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (12, 'table', 1, 2, 11, '{}')",
+        "INSERT INTO topic_meta (topic_id, topic_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (13, 'topic', 1, 2, 11, '{}')",
+        "INSERT INTO view_meta (view_id, view_name, metalake_id, catalog_id, schema_id, audit_info) VALUES (14, 'view', 1, 2, 11, '{}')");
+  }
+
+  private void assertExternalIdentityPrimaryKey(String table, String idColumn) throws SQLException {
+    String actualTable =
+        readSchemaColumns().keySet().stream()
+            .filter(name -> name.equalsIgnoreCase(table))
+            .findFirst()
+            .orElseThrow();
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        ResultSet keys =
+            connection
+                .getMetaData()
+                .getPrimaryKeys(connection.getCatalog(), connection.getSchema(), actualTable)) {
+      Map<Short, String> columns = new TreeMap<>();
+      while (keys.next()) {
+        columns.put(
+            keys.getShort("KEY_SEQ"), keys.getString("COLUMN_NAME").toLowerCase(Locale.ROOT));
+      }
+      Assertions.assertEquals(
+          List.of(idColumn, "deleted_at"), new ArrayList<>(columns.values()), table);
+    }
+  }
+
+  /**
+   * Verifies the fileset storage location name and model version URI name columns are 256
+   * characters wide on every backend, both on a fresh install and after the 2.0.0 upgrade.
+   */
+  private void assertNameColumnWidths(String source) throws SQLException {
+    Map<String, String> columns =
+        Map.of(
+            "fileset_version_info", "storage_location_name",
+            "model_version_info", "model_version_uri_name");
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, String> entry : columns.entrySet()) {
+        String table = entry.getKey();
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        String columnName =
+            metaData.storesUpperCaseIdentifiers()
+                ? entry.getValue().toUpperCase(Locale.ROOT)
+                : entry.getValue();
+        try (ResultSet result =
+            metaData.getColumns(connection.getCatalog(), null, tableName, columnName)) {
+          Assertions.assertTrue(result.next(), "Column not found: " + table);
+          Assertions.assertEquals(
+              256,
+              result.getInt("COLUMN_SIZE"),
+              entry.getValue() + " of " + table + " must be 256 wide after " + source);
+        }
+      }
+    }
+  }
+
+  private void assertCleanupIndexes(String source) throws SQLException {
+    Map<String, String> leadingColumns =
+        Map.of(
+            "user_role_rel", "role_id",
+            "group_role_rel", "role_id",
+            "semantic_model_source_rel", "deleted_at");
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection()) {
+      DatabaseMetaData metaData = connection.getMetaData();
+      for (Map.Entry<String, String> entry : leadingColumns.entrySet()) {
+        String table = entry.getKey();
+        String column = entry.getValue();
+        String tableName =
+            metaData.storesUpperCaseIdentifiers() ? table.toUpperCase(Locale.ROOT) : table;
+        boolean indexed = false;
+        try (ResultSet indexes =
+            metaData.getIndexInfo(connection.getCatalog(), null, tableName, false, false)) {
+          while (indexes.next()) {
+            if (indexes.getShort("ORDINAL_POSITION") == 1
+                && column.equalsIgnoreCase(indexes.getString("COLUMN_NAME"))) {
+              indexed = true;
+              break;
+            }
+          }
+        }
+        Assertions.assertTrue(
+            indexed, "No index leading with " + column + " on " + table + " after " + source);
+      }
     }
   }
 

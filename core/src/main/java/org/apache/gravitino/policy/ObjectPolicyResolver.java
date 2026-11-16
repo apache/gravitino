@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.policy;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -35,12 +37,16 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.ResolvedTagPolicy;
+import org.apache.gravitino.authorization.TagPolicyReader;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.EffectiveTagResolver;
 import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -50,8 +56,11 @@ import org.slf4j.LoggerFactory;
  *
  * <p>The resolver evaluates relation selectors, filters disabled policies, and deduplicates
  * repeated matches by policy entity ID while preserving contributing metadata-object sources.
+ *
+ * <p>The reader methods expose direct tag assignments and unfiltered policy bindings for
+ * authorization, which evaluates selectors after checking privileges and active roles.
  */
-public class ObjectPolicyResolver {
+public class ObjectPolicyResolver implements TagPolicyReader {
 
   private static final Logger LOG = LoggerFactory.getLogger(ObjectPolicyResolver.class);
 
@@ -68,7 +77,7 @@ public class ObjectPolicyResolver {
   }
 
   ObjectPolicyResolver(EntityStore entityStore, EffectiveTagResolver effectiveTagResolver) {
-    this.entityStore = entityStore;
+    this.entityStore = Objects.requireNonNull(entityStore, "entityStore must not be null");
     this.effectiveTagResolver = effectiveTagResolver;
   }
 
@@ -164,23 +173,86 @@ public class ObjectPolicyResolver {
     return result;
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public List<TagEntity> loadTags(String metalake, MetadataObject object) {
+    try {
+      return entityStore
+          .relationOperations()
+          .listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(metalake, object),
+              MetadataObjectUtil.toEntityType(object));
+    } catch (NoSuchEntityException e) {
+      return Collections.emptyList();
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read tag assignments for " + object, e);
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<ResolvedTagPolicy> loadPolicyBindings(
+      String metalake, List<TagEntity> effectiveTags) {
+    if (effectiveTags.isEmpty()) {
+      return Collections.emptyList();
+    }
+    Map<NameIdentifier, TagEntity> tagsByIdentifier = new LinkedHashMap<>();
+    for (TagEntity tag : effectiveTags) {
+      Preconditions.checkArgument(
+          tagsByIdentifier.putIfAbsent(NameIdentifierUtil.ofTag(metalake, tag.name()), tag) == null,
+          "Duplicate effective tag name: %s",
+          tag.name());
+    }
+    try {
+      List<RelationalEntity<?>> relations =
+          loadRelations(new ArrayList<>(tagsByIdentifier.keySet()));
+      List<ResolvedTagPolicy> bindings = new ArrayList<>();
+      for (RelationalEntity<?> relation : relations) {
+        TagEntity tag =
+            Objects.requireNonNull(
+                tagsByIdentifier.get(relation.source()),
+                "Policy binding has an unexpected source tag");
+        PolicyEntity policy = (PolicyEntity) relation.targetEntity();
+        PolicyAssociationSelector selector;
+        try {
+          // SQL NULL matches this tag with any assigned value or no value.
+          selector =
+              relation
+                  .relationValue()
+                  .map(PolicyAssociationSelectorSerde::deserialize)
+                  .orElseGet(AllValuesSelector::get);
+        } catch (IllegalArgumentException e) {
+          throw new IllegalStateException(
+              String.format(
+                  "Invalid stored selector in metalake %s for tag ID %s and policy ID %s",
+                  metalake, tag.id(), policy.id()),
+              e);
+        }
+        bindings.add(new ResolvedTagPolicy(tag, policy, selector));
+      }
+      return List.copyOf(bindings);
+    } catch (IOException e) {
+      throw new UncheckedIOException("Failed to read policy bindings in " + metalake, e);
+    }
+  }
+
   private List<RelationalEntity<?>> loadRelations(
       List<NameIdentifier> tagIdentifiers, Object request) {
-
-    List<RelationalEntity<?>> relations;
     try {
-      relations =
-          entityStore
-              .relationOperations()
-              .batchListEntitiesByRelation(
-                  SupportsRelationOperations.Type.POLICY_TAG_REL,
-                  tagIdentifiers,
-                  Entity.EntityType.TAG);
+      return loadRelations(tagIdentifiers);
     } catch (IOException e) {
       LOG.error("Failed to resolve policies for metadata objects {}", request, e);
       throw new RuntimeException(e);
     }
-    return relations;
+  }
+
+  private List<RelationalEntity<?>> loadRelations(List<NameIdentifier> tagIdentifiers)
+      throws IOException {
+    return entityStore
+        .relationOperations()
+        .batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL, tagIdentifiers, Entity.EntityType.TAG);
   }
 
   private static PolicyEntity[] policies(Match[] matches) {
@@ -212,7 +284,7 @@ public class ObjectPolicyResolver {
               .map(PolicyAssociationSelectorSerde::deserialize)
               .orElseGet(AllValuesSelector::get);
       TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
-      boolean matches = matches(selector, assignment);
+      boolean matches = PolicySelectorMatcher.matches(selector, assignment);
       MatchState state =
           matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
       state.record(matches, tag.inherited().orElse(false), resolvedTag.source());
@@ -223,18 +295,6 @@ public class ObjectPolicyResolver {
         .map(MatchState::toMatch)
         .filter(match -> match.policy().enabled())
         .toArray(Match[]::new);
-  }
-
-  private static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
-    if (selector instanceof AllValuesSelector) {
-      return true;
-    }
-    if (selector instanceof TagValueSelector) {
-      String expectedValue = ((TagValueSelector) selector).value();
-      return Arrays.asList(assignment.values()).contains(expectedValue);
-    }
-    throw new IllegalArgumentException(
-        "Unsupported policy association selector type: " + selector.type());
   }
 
   /**

@@ -24,12 +24,14 @@ import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.ViewCatalog;
@@ -59,6 +61,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.testcontainers.containers.Container;
 import scala.collection.JavaConverters;
 
 @Tag("gravitino-docker-test")
@@ -188,6 +191,11 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p1=2)");
     Assertions.assertEquals(0, partitionInfo.size());
 
+    // A partial spec on the second partition column.
+    partitionInfo = sql("SHOW PARTITIONS " + tableName + " PARTITION (age_p2='twenty two')");
+    Assertions.assertEquals(1, partitionInfo.size());
+    Assertions.assertEquals("age_p1=22/age_p2=twenty two", partitionInfo.get(0)[0]);
+
     String nullPartitionTableName = "hive_null_partition_ops_table";
     dropTableIfExists(nullPartitionTableName);
     sql(
@@ -198,6 +206,14 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
     List<Object[]> nullPartitionInfo = getTablePartitions(nullPartitionTableName);
     Assertions.assertEquals(1, nullPartitionInfo.size());
     Assertions.assertTrue(String.valueOf(nullPartitionInfo.get(0)[0]).startsWith("dt="));
+
+    // The null partition written by the INSERT can be dropped, and re-added through the connector.
+    sql("ALTER TABLE " + nullPartitionTableName + " DROP PARTITION (dt = null)");
+    Assertions.assertEquals(0, getTablePartitions(nullPartitionTableName).size());
+    sql("ALTER TABLE " + nullPartitionTableName + " ADD PARTITION (dt = null)");
+    Assertions.assertEquals(1, getTablePartitions(nullPartitionTableName).size());
+    sql("ALTER TABLE " + nullPartitionTableName + " DROP PARTITION (dt = null)");
+    Assertions.assertEquals(0, getTablePartitions(nullPartitionTableName).size());
 
     // Adding a partition that already exists must surface Spark's PARTITIONS_ALREADY_EXIST. Assert
     // the type rather than the message: the connector builds the exception from (table, ident,
@@ -615,8 +631,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
           Column.of("age", Types.IntegerType.get(), null)
         },
         new SQLRepresentation[] {sparkRep},
-        getCatalogName(),
-        schemaName,
+        null,
+        null,
         ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {
@@ -632,6 +648,108 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
       viewCatalog.dropView(viewIdent);
       dropTableIfExists(tableName);
     }
+  }
+
+  @Test
+  void testSelectViewWithUnqualifiedSqlResolvesInViewNamespace() {
+    String tableName = "view_base_table_unq";
+    String schemaName = getDefaultDatabase();
+    String otherDb = "db_view_unq_other";
+    String ownView = "test_hive_view_unq_own";
+    String recordedView = "test_hive_view_unq_recorded";
+
+    // The real table is in the default database; a same-named table in otherDb holds other rows.
+    dropTableIfExists(tableName);
+    createSimpleTable(tableName);
+    sql(String.format("INSERT INTO %s VALUES (1, '1', 1)", tableName));
+    createDatabaseIfNotExists(otherDb, getProvider());
+    String shadowTable = String.join(".", otherDb, tableName);
+    dropTableIfExists(shadowTable);
+    createSimpleTable(shadowTable);
+    sql(String.format("INSERT INTO %s VALUES (9, 'shadow', 9)", shadowTable));
+
+    ViewCatalog viewCatalog = getGravitinoCatalog().asViewCatalog();
+    NameIdentifier ownIdent = NameIdentifier.of(schemaName, ownView);
+    NameIdentifier recordedIdent = NameIdentifier.of(otherDb, recordedView);
+    // No recorded namespace: the SQL resolves in the view's own database. The CTE and the
+    // subquery check that their table names are qualified too.
+    createUnqualifiedView(
+        viewCatalog,
+        ownIdent,
+        String.format(
+            "WITH x AS (SELECT * FROM %1$s) SELECT * FROM x WHERE id IN (SELECT id FROM %1$s)",
+            tableName),
+        ImmutableMap.of());
+    // Like a Spark view created by "USE default_db; CREATE VIEW otherDb.v AS SELECT * FROM t".
+    createUnqualifiedView(
+        viewCatalog,
+        recordedIdent,
+        String.format("SELECT * FROM %s", tableName),
+        ImmutableMap.of(
+            "view.catalogAndNamespace.numParts", "2",
+            "view.catalogAndNamespace.part.0", "spark_catalog",
+            "view.catalogAndNamespace.part.1", schemaName));
+    // A view created by Hive itself, whose expanded text qualifies the table with default_db.
+    String hiveView = "test_hive_view_unq_hive";
+    NameIdentifier hiveIdent = NameIdentifier.of(otherDb, hiveView);
+    Container.ExecResult created =
+        ContainerSuite.getInstance()
+            .getHiveContainer()
+            .executeInContainer(
+                "hive",
+                "-e",
+                String.format(
+                    "USE %s; CREATE VIEW %s.%s AS SELECT * FROM %s",
+                    schemaName, otherDb, hiveView, tableName));
+    Assertions.assertEquals(0, created.getExitCode(), created.getStderr());
+
+    try {
+      // The session is in another catalog, so unqualified names in the session resolve elsewhere.
+      sql("USE spark_catalog.default");
+      for (NameIdentifier view : new NameIdentifier[] {ownIdent, recordedIdent, hiveIdent}) {
+        List<String> data =
+            getQueryData(
+                String.format(
+                    "SELECT * FROM %s.%s.%s",
+                    getCatalogName(), view.namespace().level(0), view.name()));
+        Assertions.assertEquals(Arrays.asList("1,1,1"), data, view.toString());
+      }
+      Assertions.assertEquals("spark_catalog", getSparkSession().catalog().currentCatalog());
+    } finally {
+      sql("USE " + String.join(".", getCatalogName(), getDefaultDatabase()));
+      viewCatalog.dropView(ownIdent);
+      viewCatalog.dropView(recordedIdent);
+      viewCatalog.dropView(hiveIdent);
+      dropTableIfExists(shadowTable);
+      dropDatabaseIfExists(otherDb);
+      dropTableIfExists(tableName);
+    }
+  }
+
+  private void createUnqualifiedView(
+      ViewCatalog viewCatalog,
+      NameIdentifier viewIdent,
+      String viewSql,
+      Map<String, String> extraProperties) {
+    if (viewCatalog.viewExists(viewIdent)) {
+      viewCatalog.dropView(viewIdent);
+    }
+    SQLRepresentation sparkRep =
+        SQLRepresentation.builder().withDialect("spark").withSql(viewSql).build();
+    Map<String, String> properties = new HashMap<>(extraProperties);
+    properties.put("spark.sql.create.version", getSparkSession().version());
+    viewCatalog.createView(
+        viewIdent,
+        "unqualified view",
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), null),
+          Column.of("name", Types.StringType.get(), null),
+          Column.of("age", Types.IntegerType.get(), null)
+        },
+        new SQLRepresentation[] {sparkRep},
+        null,
+        null,
+        properties);
   }
 
   @Test
@@ -693,8 +811,8 @@ public abstract class SparkHiveCatalogIT extends SparkCommonIT {
         null,
         new Column[0],
         new SQLRepresentation[] {sparkRep},
-        getCatalogName(),
-        schemaName,
+        null,
+        null,
         ImmutableMap.of("spark.sql.create.version", getSparkSession().version()));
 
     try {

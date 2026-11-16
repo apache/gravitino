@@ -23,13 +23,16 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 import static org.apache.gravitino.catalog.CapabilityHelpers.resolvePhysicalTableName;
 
+import com.google.common.base.Preconditions;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -49,6 +52,13 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   public TableNormalizeDispatcher(TableDispatcher dispatcher, CatalogManager catalogManager) {
     this.catalogManager = catalogManager;
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    return dispatcher.importTable(
+        resolvePhysicalTableName(normalizeCaseSensitive(ident), catalogManager), auditInfo);
   }
 
   @Override
@@ -133,6 +143,17 @@ public class TableNormalizeDispatcher implements TableDispatcher {
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {
     Capability capability = getCapability(tableIdent, catalogManager);
-    return applyCapabilities(tableIdent, Capability.Scope.TABLE, capability);
+    Namespace namespace = tableIdent.namespace();
+    validateExistingName(
+        Capability.Scope.SCHEMA, namespace.level(namespace.length() - 1), capability);
+    validateExistingName(Capability.Scope.TABLE, tableIdent.name(), capability);
+    return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
+  }
+
+  private static void validateExistingName(
+      Capability.Scope scope, String name, Capability capability) {
+    CapabilityResult result = capability.specificationOnExistingName(scope, name);
+    Preconditions.checkArgument(
+        result.supported(), result.unsupportedMessage() + " Illegal name: " + name);
   }
 }

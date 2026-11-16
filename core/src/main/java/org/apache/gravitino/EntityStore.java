@@ -75,6 +75,19 @@ public interface EntityStore extends Closeable {
   void initialize(Config config) throws RuntimeException;
 
   /**
+   * Lists all recorded descendant schemas of a schema, excluding the schema itself.
+   *
+   * @param identifier The schema identifier using the configured logical separator.
+   * @return The descendant schemas in logical form.
+   * @throws IOException If the schemas cannot be read.
+   * @throws NoSuchEntityException If the schema does not exist.
+   * @throws UnsupportedOperationException If descendant schema listing is not supported.
+   */
+  default List<SchemaEntity> listDescendantSchemas(NameIdentifier identifier) throws IOException {
+    throw new UnsupportedOperationException("This store cannot list descendant schemas");
+  }
+
+  /**
    * List all the entities with the specified {@link org.apache.gravitino.Namespace}, and
    * deserialize them into the specified {@link Entity} object.
    *
@@ -143,6 +156,10 @@ public interface EntityStore extends Closeable {
    * Store the entity into the underlying storage. According to the {@code overwritten} flag, it
    * will overwrite the existing entity or throw an {@link EntityAlreadyExistsException}.
    *
+   * <p>Relational schema storage also rejects conflicting active identities when overwriting: a
+   * different ID at the same name, or an active ID owned by another catalog, requires explicit
+   * reconciliation. Overwrite does not authorize cascading deletion of the previous schema.
+   *
    * <p>Note. The implementation should be transactional, and should be able to handle concurrent
    * store of entities.
    *
@@ -151,7 +168,7 @@ public interface EntityStore extends Closeable {
    * @param <E> the type of the entity
    * @throws IOException if the store operation fails
    * @throws EntityAlreadyExistsException if the entity already exists and the overwritten flag is
-   *     set to false
+   *     set to false, or relational schema storage detects conflicting active identities
    */
   <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException;
@@ -396,5 +413,15 @@ public interface EntityStore extends Closeable {
    */
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
+  }
+
+  /**
+   * Get the domain operations that are supported by the entity store.
+   *
+   * @return the domain operations that are supported by the entity store
+   * @throws UnsupportedOperationException if the domain operations are not supported
+   */
+  default SupportsDomainOperations domainOperations() {
+    throw new UnsupportedOperationException("domain operations are not supported");
   }
 }

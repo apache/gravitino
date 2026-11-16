@@ -21,6 +21,7 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
@@ -240,6 +241,20 @@ class Catalog(Auditable):
             SupportsTags: the {@link SupportsTags} instance
         """
         raise UnsupportedOperationException("Catalog does not support tag operations")
+
+    def supports_policies(self) -> SupportsPolicies:
+        """
+        Return the {@link SupportsPolicies} if the catalog supports policy operations.
+
+        Raises:
+            UnsupportedOperationException: if the catalog does not support policy operations.
+
+        Returns:
+            SupportsPolicies: the {@link SupportsPolicies} instance
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support policy operations"
+        )
 
     def supports_roles(self) -> SupportsRoles:
         """Return role operations supported by this catalog.

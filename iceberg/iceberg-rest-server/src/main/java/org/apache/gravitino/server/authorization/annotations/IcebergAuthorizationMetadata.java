@@ -34,6 +34,9 @@ public @interface IcebergAuthorizationMetadata {
     RENAME_TABLE,
     RENAME_VIEW,
     CREATE_NAMESPACE,
+    REGISTER_TABLE,
+    /** A table commit that may complete staged creation. */
+    UPDATE_TABLE,
   }
   /**
    * The type of the parameter to be used for authorization.

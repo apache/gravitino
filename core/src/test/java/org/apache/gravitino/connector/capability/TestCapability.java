@@ -25,6 +25,18 @@ import org.junit.jupiter.api.Test;
 public class TestCapability {
 
   @Test
+  void testExistingColumnReferencesPreserveDefaultRestrictions() {
+    Assertions.assertTrue(
+        Capability.DEFAULT
+            .specificationOnExistingName(Capability.Scope.COLUMN, "valid")
+            .supported());
+    Assertions.assertFalse(
+        Capability.DEFAULT
+            .specificationOnExistingName(Capability.Scope.COLUMN, "c`, DROP COLUMN victim -- ")
+            .supported());
+  }
+
+  @Test
   void testDefaultNameSpecification() {
     for (Capability.Scope scope : Capability.Scope.values()) {
       // test for normal name

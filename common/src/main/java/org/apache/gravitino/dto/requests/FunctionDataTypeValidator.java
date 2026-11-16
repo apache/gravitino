@@ -19,12 +19,10 @@
 package org.apache.gravitino.dto.requests;
 
 import com.google.common.base.Preconditions;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.function.FunctionColumnDTO;
 import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.function.FunctionParamDTO;
-import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 final class FunctionDataTypeValidator {
 
@@ -40,12 +38,15 @@ final class FunctionDataTypeValidator {
         String parameterPath = fieldPath + ".parameters[" + i + "]";
         Preconditions.checkArgument(
             parameters[i] != null, "\"%s\" field is required and cannot be null", parameterPath);
-        validateDataType(parameters[i].getDataType(), parameterPath + ".dataType");
+        WritableDataTypeValidator.validate(
+            parameters[i].getDataType(), parameterPath + ".dataType");
+        WritableDataTypeValidator.validateExpression(
+            parameters[i].defaultValue(), parameterPath + ".defaultValue");
       }
     }
 
     if (definition.getReturnType() != null) {
-      validateDataType(definition.getReturnType(), fieldPath + ".returnType");
+      WritableDataTypeValidator.validate(definition.getReturnType(), fieldPath + ".returnType");
     }
 
     FunctionColumnDTO[] returnColumns = definition.getReturnColumns();
@@ -56,69 +57,9 @@ final class FunctionDataTypeValidator {
             returnColumns[i] != null,
             "\"%s\" field is required and cannot be null",
             returnColumnPath);
-        validateDataType(returnColumns[i].getDataType(), returnColumnPath + ".dataType");
+        WritableDataTypeValidator.validate(
+            returnColumns[i].getDataType(), returnColumnPath + ".dataType");
       }
     }
-  }
-
-  private static void validateDataType(Type dataType, String fieldPath) {
-    Preconditions.checkArgument(
-        dataType != null, "\"%s\" field is required and cannot be null", fieldPath);
-    Preconditions.checkArgument(
-        !(dataType instanceof Types.UnparsedType),
-        "\"%s\" must be a Gravitino-recognized data type or an explicit ExternalType; "
-            + "UnparsedType is not allowed for new function definitions",
-        fieldPath);
-
-    if (dataType instanceof Types.ExternalType) {
-      Types.ExternalType externalType = (Types.ExternalType) dataType;
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(externalType.catalogString()),
-          "\"%s.catalogString\" field is required and cannot be blank",
-          fieldPath);
-      return;
-    }
-
-    if (dataType instanceof Types.StructType) {
-      Types.StructType.Field[] fields = ((Types.StructType) dataType).fields();
-      Preconditions.checkArgument(
-          fields != null, "\"%s.fields\" field is required and cannot be null", fieldPath);
-      for (int i = 0; i < fields.length; i++) {
-        Preconditions.checkArgument(
-            fields[i] != null,
-            "\"%s.fields[%s]\" field is required and cannot be null",
-            fieldPath,
-            i);
-        validateDataType(fields[i].type(), fieldPath + ".fields[" + i + "].type");
-      }
-      return;
-    }
-
-    if (dataType instanceof Types.ListType) {
-      validateDataType(((Types.ListType) dataType).elementType(), fieldPath + ".elementType");
-      return;
-    }
-
-    if (dataType instanceof Types.MapType) {
-      Types.MapType mapType = (Types.MapType) dataType;
-      validateDataType(mapType.keyType(), fieldPath + ".keyType");
-      validateDataType(mapType.valueType(), fieldPath + ".valueType");
-      return;
-    }
-
-    if (dataType instanceof Types.UnionType) {
-      Type[] types = ((Types.UnionType) dataType).types();
-      Preconditions.checkArgument(
-          types != null, "\"%s.types\" field is required and cannot be null", fieldPath);
-      for (int i = 0; i < types.length; i++) {
-        validateDataType(types[i], fieldPath + ".types[" + i + "]");
-      }
-      return;
-    }
-
-    Preconditions.checkArgument(
-        dataType instanceof Type.PrimitiveType || dataType instanceof Types.NullType,
-        "\"%s\" must be a Gravitino-recognized data type or an explicit ExternalType",
-        fieldPath);
   }
 }

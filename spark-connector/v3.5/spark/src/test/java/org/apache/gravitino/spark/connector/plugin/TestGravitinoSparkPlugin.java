@@ -19,6 +19,9 @@
 
 package org.apache.gravitino.spark.connector.plugin;
 
+import java.io.IOException;
+import java.io.InputStream;
+import org.apache.spark.api.plugin.SparkPlugin;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -32,5 +35,57 @@ public class TestGravitinoSparkPlugin {
   @Test
   void testTheBindingsThisModuleDeclaresAreComplete() {
     Assertions.assertNotNull(new GravitinoSparkPlugin().driverPlugin());
+  }
+
+  @Test
+  void testDriverPluginDoesNotRequireOptionalIcebergRuntime() throws Exception {
+    ClassLoader loader = new WithoutIcebergClassLoader(GravitinoSparkPlugin.class.getClassLoader());
+    ClassLoader previous = Thread.currentThread().getContextClassLoader();
+    try {
+      Thread.currentThread().setContextClassLoader(loader);
+      Class<?> pluginClass = Class.forName(GravitinoSparkPlugin.class.getName(), true, loader);
+      SparkPlugin plugin = (SparkPlugin) pluginClass.getConstructor().newInstance();
+
+      Assertions.assertNotNull(plugin.driverPlugin());
+    } finally {
+      Thread.currentThread().setContextClassLoader(previous);
+    }
+  }
+
+  private static class WithoutIcebergClassLoader extends ClassLoader {
+
+    private WithoutIcebergClassLoader(ClassLoader parent) {
+      super(parent);
+    }
+
+    @Override
+    protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+      if (name.startsWith("org.apache.iceberg.")
+          || name.startsWith("org.apache.spark.sql.connector.iceberg.")) {
+        throw new ClassNotFoundException(name);
+      }
+      if (!name.startsWith("org.apache.gravitino.spark.connector.")) {
+        return super.loadClass(name, resolve);
+      }
+      synchronized (getClassLoadingLock(name)) {
+        Class<?> loaded = findLoadedClass(name);
+        if (loaded == null) {
+          try (InputStream input =
+              getParent().getResourceAsStream(name.replace('.', '/') + ".class")) {
+            if (input == null) {
+              throw new ClassNotFoundException(name);
+            }
+            byte[] bytes = input.readAllBytes();
+            loaded = defineClass(name, bytes, 0, bytes.length);
+          } catch (IOException e) {
+            throw new ClassNotFoundException(name, e);
+          }
+        }
+        if (resolve) {
+          resolveClass(loaded);
+        }
+        return loaded;
+      }
+    }
   }
 }

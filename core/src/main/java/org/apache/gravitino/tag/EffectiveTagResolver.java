@@ -32,14 +32,18 @@ import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -201,6 +205,7 @@ public class EffectiveTagResolver {
     }
     MetadataObjectUtil.checkMetadataObjects(metalake, metadataObjects);
     Map<MetadataObject, List<MetadataObject>> resolutionOrders = new LinkedHashMap<>();
+    Map<MetadataObject, MetadataObject> normalizedObjects = new LinkedHashMap<>();
     Map<Entity.EntityType, Set<MetadataObject>> objectsByType =
         new EnumMap<>(Entity.EntityType.class);
     for (MetadataObject requested : metadataObjects) {
@@ -209,10 +214,12 @@ public class EffectiveTagResolver {
       order.addAll(MetadataObjectUtil.getParentMetadataObjects(requested));
       resolutionOrders.put(requested, order);
       for (MetadataObject object : order) {
+        MetadataObject normalized =
+            normalizedObjects.computeIfAbsent(object, key -> normalizeForLookup(metalake, key));
         objectsByType
             .computeIfAbsent(
                 MetadataObjectUtil.toEntityType(object), ignored -> new LinkedHashSet<>())
-            .add(object);
+            .add(normalized);
       }
     }
 
@@ -255,7 +262,7 @@ public class EffectiveTagResolver {
             boolean inherited = index > 0;
             MetadataObject source = order.get(index);
             directTags
-                .getOrDefault(source, Collections.emptyList())
+                .getOrDefault(normalizedObjects.get(source), Collections.emptyList())
                 .forEach(
                     tag ->
                         effectiveTags.putIfAbsent(
@@ -287,7 +294,8 @@ public class EffectiveTagResolver {
   }
 
   private List<TagEntity> loadTags(String metalake, MetadataObject object) {
-    NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
+    NameIdentifier identifier =
+        MetadataObjectUtil.toEntityIdent(metalake, normalizeForLookup(metalake, object));
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
     try {
       return entityStore
@@ -300,6 +308,33 @@ public class EffectiveTagResolver {
     } catch (IOException e) {
       LOG.error("Failed to resolve effective tags for metadata object {}", object, e);
       throw new RuntimeException(e);
+    }
+  }
+
+  private MetadataObject normalizeForLookup(String metalake, MetadataObject object) {
+    switch (object.type()) {
+      case SCHEMA:
+      case TABLE:
+      case COLUMN:
+      case VIEW:
+      case FUNCTION:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case SEMANTIC_MODEL:
+        // resolveWithSources checks the original requested objects before building the chain.
+        // Normalize each original chain node: normalizing an already unquoted name again can
+        // change its meaning.
+        NameIdentifier identifier =
+            CapabilityHelpers.normalizeMetadataIdentifier(
+                MetadataObjectUtil.toEntityIdent(metalake, object),
+                Capability.Scope.valueOf(object.type().name()),
+                GravitinoEnv.getInstance().catalogManager(),
+                () -> entityStore);
+        return NameIdentifierUtil.toMetadataObject(
+            identifier, MetadataObjectUtil.toEntityType(object));
+      default:
+        return object;
     }
   }
 }

@@ -18,14 +18,15 @@
  */
 package org.apache.gravitino.server.web.rest;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -33,15 +34,19 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.EntityCombinedTable;
+import org.apache.gravitino.catalog.EntityCombinedView;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -51,7 +56,8 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
-import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.View;
@@ -59,6 +65,7 @@ import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.semantic.Dataset;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
+import org.apache.gravitino.semantic.SemanticModelSourceUpdate;
 import org.apache.gravitino.server.authorization.PassThroughAuthorizer;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Test;
@@ -82,7 +89,7 @@ public class TestSemanticModelSourceValidator {
 
   @Test
   void testCrossCatalogSourceAndKeysWithDisabledAuthorization() {
-    table("id", "unique_id");
+    table();
     validator.validate(
         "metalake",
         definition(dataset("orders", new String[] {"id"}, new String[][] {{"id", "unique_id"}})));
@@ -91,54 +98,146 @@ public class TestSemanticModelSourceValidator {
   }
 
   @Test
-  void testViewFallbackAndColumns() {
-    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
-    View view = mock(View.class);
-    doReturn(columns("id")).when(view).columns();
-    when(views.loadView(FULL_SOURCE)).thenReturn(view);
-    validator.validate("metalake", definition(dataset("orders", new String[] {"id"}, null)));
-    assertThrows(
-        IllegalSemanticModelException.class,
-        () ->
-            validator.validate(
-                "metalake", definition(dataset("orders", new String[] {"missing"}, null))));
-  }
+  void testManagedTableUsesIdentityFromLoadedProperties() {
+    Table managed = mock(Table.class);
+    when(managed.properties())
+        .thenReturn(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(303L), Map.of()));
+    EntityCombinedTable combined = EntityCombinedTable.of(managed).withImported(true);
+    when(tables.loadTable(FULL_SOURCE)).thenReturn(combined);
+    SemanticModelSourceUpdate update =
+        validator.validate("metalake", definition(dataset("orders", null, null)));
+    assertEquals(303L, update.sources().get(0).getSourceId());
+    assertEquals(EntityType.TABLE, update.sources().get(0).getSourceType());
+    verify(tables).loadTable(FULL_SOURCE);
+    verifyNoInteractions(views);
 
-  @Test
-  void testMissingUniqueKeyAndUnavailableColumns() {
-    Table table = table("id");
+    // An unregistered external table's connector property is not a registered identity.
+    combined.withImported(false);
     assertThrows(
-        IllegalSemanticModelException.class,
-        () ->
-            validator.validate(
-                "metalake", definition(dataset("orders", null, new String[][] {{"missing"}}))));
-    when(table.columns()).thenReturn(null);
-    assertThrows(
-        IllegalSemanticModelException.class,
+        IllegalStateException.class,
         () -> validator.validate("metalake", definition(dataset("orders", null, null))));
   }
 
   @Test
-  void testRelationshipColumnsAndRepeatedSource() {
-    table("id");
+  void testTableWithoutRegisteredIdentityIsRejected() {
+    Table table = mock(Table.class);
+    when(tables.loadTable(FULL_SOURCE)).thenReturn(table);
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+
+    when(tables.loadTable(FULL_SOURCE))
+        .thenReturn(EntityCombinedTable.of(table).withImported(true));
+    when(table.properties()).thenReturn(Map.of());
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+    verifyNoInteractions(views);
+  }
+
+  @Test
+  void testViewWithoutRegisteredIdentityIsRejected() {
+    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
+    View view = mock(View.class);
+    when(views.loadView(FULL_SOURCE)).thenReturn(view);
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+
+    EntityCombinedView combined = mock(EntityCombinedView.class);
+    when(views.loadView(FULL_SOURCE)).thenReturn(combined);
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+  }
+
+  @Test
+  void testManagedViewUsesIdentityFromLoadedProperties() {
+    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
+    View managed = mock(View.class);
+    when(managed.properties())
+        .thenReturn(StringIdentifier.newPropertiesWithId(StringIdentifier.fromId(404L), Map.of()));
+    EntityCombinedView combined = EntityCombinedView.of(managed).withImported(true);
+    when(views.loadView(FULL_SOURCE)).thenReturn(combined);
+
+    SemanticModelSourceUpdate update =
+        validator.validate("metalake", definition(dataset("orders", null, null)));
+    assertEquals(404L, update.sources().get(0).getSourceId());
+    assertEquals(EntityType.VIEW, update.sources().get(0).getSourceType());
+
+    combined.withImported(false);
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+
+    combined.withImported(true);
+    when(managed.properties()).thenReturn(Map.of());
+    assertThrows(
+        IllegalStateException.class,
+        () -> validator.validate("metalake", definition(dataset("orders", null, null))));
+  }
+
+  @Test
+  void testViewFallback() {
+    when(tables.loadTable(FULL_SOURCE)).thenThrow(new NoSuchTableException("missing"));
+    View view = registeredView();
+    when(views.loadView(FULL_SOURCE)).thenReturn(view);
+    SemanticModelSourceUpdate update =
+        validator.validate("metalake", definition(dataset("orders", null, null)));
+    assertEquals(1, update.sources().size());
+    assertEquals(202L, update.sources().get(0).getSourceId());
+    assertEquals(EntityType.VIEW, update.sources().get(0).getSourceType());
+  }
+
+  @Test
+  void testKeyAndJoinReferencesAreNotResolvedAgainstSource() {
+    // Keys and relationship columns name fields declared inside the model; this validator never
+    // reads source column metadata, so undeclared names still pass here.
+    Table table = table();
+    Dataset orders =
+        dataset("orders", new String[] {"undeclared_key"}, new String[][] {{"undeclared_unique"}});
+    Dataset customers = dataset("customers", null, null);
+    SemanticModelDefinition definition =
+        SemanticModelDefinition.builder()
+            .withDatasets(new Dataset[] {orders, customers})
+            .withRelationships(
+                new Relationship[] {
+                  Relationship.builder()
+                      .withName("orders_customers")
+                      .withFrom("orders")
+                      .withTo("customers")
+                      .withFromColumns(new String[] {"undeclared_join"})
+                      .withToColumns(new String[] {"undeclared_join"})
+                      .build()
+                })
+            .build();
+
+    SemanticModelSourceUpdate update = validator.validate("metalake", definition);
+
+    assertEquals(2, update.sources().size());
+    verify(table, never()).columns();
+  }
+
+  @Test
+  void testRelationshipAndRepeatedSource() {
+    table();
     Dataset first = dataset("orders", null, null);
     Dataset second = dataset("customers", null, null);
     SemanticModelDefinition valid = related(first, second, "id", "id");
-    validator.validate("metalake", valid);
+    SemanticModelSourceUpdate update = validator.validate("metalake", valid);
+    assertEquals(2, update.sources().size());
+    assertEquals(101L, update.sources().get(0).getSourceId());
+    assertEquals(101L, update.sources().get(1).getSourceId());
+    assertEquals(EntityType.TABLE, update.sources().get(0).getSourceType());
+    assertEquals("orders", update.sources().get(0).getDatasetName());
+    assertEquals("customers", update.sources().get(1).getDatasetName());
     verify(tables, times(1)).loadTable(FULL_SOURCE);
-    assertThrows(
-        IllegalSemanticModelException.class,
-        () -> validator.validate("metalake", related(first, second, "missing", "id")));
-    assertThrows(
-        IllegalSemanticModelException.class,
-        () -> validator.validate("metalake", related(first, second, "id", "missing")));
   }
 
   @Test
   void testDeniedTableCanResolveAuthorizedViewWithoutTableLookup() {
     authorizeOnly(MetadataObject.Type.VIEW, Privilege.Name.SELECT_VIEW);
-    View view = mock(View.class);
-    doReturn(columns("id")).when(view).columns();
+    View view = registeredView();
     when(views.loadView(FULL_SOURCE)).thenReturn(view);
     validator.validate("metalake", definition(dataset("orders", null, null)));
     verifyNoInteractions(tables);
@@ -148,13 +247,8 @@ public class TestSemanticModelSourceValidator {
   @Test
   void testAuthorizedTableDoesNotRequireViewAccess() {
     authorizeOnly(MetadataObject.Type.TABLE, Privilege.Name.SELECT_TABLE);
-    table("id");
-    validator.validate("metalake", definition(dataset("orders", new String[] {"id"}, null)));
-    assertThrows(
-        IllegalSemanticModelException.class,
-        () ->
-            validator.validate(
-                "metalake", definition(dataset("orders", new String[] {"missing"}, null))));
+    table();
+    validator.validate("metalake", definition(dataset("orders", null, null)));
     verifyNoInteractions(views);
   }
 
@@ -255,13 +349,12 @@ public class TestSemanticModelSourceValidator {
   @Test
   void testViewOnlyCatalogCanResolveSourceWithoutTableLookup() {
     authorizeOnly(MetadataObject.Type.VIEW, Privilege.Name.SELECT_VIEW);
-    View view = mock(View.class);
-    doReturn(columns("id")).when(view).columns();
+    View view = registeredView();
     when(views.loadView(FULL_SOURCE)).thenReturn(view);
     SemanticModelSourceValidator checking =
         new SemanticModelSourceValidator(
             tables, views, () -> authorizer, ident -> EnumSet.of(EntityType.VIEW));
-    checking.validate("metalake", definition(dataset("orders", new String[] {"id"}, null)));
+    checking.validate("metalake", definition(dataset("orders", null, null)));
     verifyNoInteractions(tables);
     verify(views).loadView(FULL_SOURCE);
     when(views.loadView(FULL_SOURCE)).thenThrow(new NoSuchViewException("missing"));
@@ -315,20 +408,10 @@ public class TestSemanticModelSourceValidator {
             });
   }
 
-  private Table table(String... names) {
-    Table table = mock(Table.class);
-    doReturn(columns(names)).when(table).columns();
+  private Table table() {
+    Table table = registeredTable();
     when(tables.loadTable(FULL_SOURCE)).thenReturn(table);
     return table;
-  }
-
-  private Column[] columns(String... names) {
-    Column[] columns = new Column[names.length];
-    for (int i = 0; i < names.length; i++) {
-      columns[i] = mock(Column.class);
-      when(columns[i].name()).thenReturn(names[i]);
-    }
-    return columns;
   }
 
   private Dataset dataset(String name, String[] primaryKey, String[][] uniqueKeys) {
@@ -358,5 +441,21 @@ public class TestSemanticModelSourceValidator {
                   .build()
             })
         .build();
+  }
+
+  private static Table registeredTable() {
+    EntityCombinedTable table = mock(EntityCombinedTable.class);
+    TableEntity entity = mock(TableEntity.class);
+    when(entity.id()).thenReturn(101L);
+    when(table.tableFromGravitino()).thenReturn(entity);
+    return table;
+  }
+
+  private static View registeredView() {
+    EntityCombinedView view = mock(EntityCombinedView.class);
+    ViewEntity entity = mock(ViewEntity.class);
+    when(entity.id()).thenReturn(202L);
+    when(view.viewEntity()).thenReturn(entity);
+    return view;
   }
 }

@@ -62,8 +62,9 @@ arrives, which Iceberg calls hidden partitioning. There is no partition object t
 which is why Iceberg is not in the list above.
 
 Gravitino sets the spec when it creates the table. Identity, bucket, truncate, year, month, day, and
-hour transforms all convert to an Iceberg spec, with bucket limited to one field. List and range
-partitioning have no Iceberg equivalent and are rejected.
+hour transforms all convert to an Iceberg spec. Each bucket transform takes one field; a spec may
+contain multiple bucket transforms on different fields. List and range partitioning have no Iceberg
+equivalent and are rejected.
 
 After creation, partitioning is changed through the engine rather than through the Gravitino API.
 Point Spark, Trino, or another Iceberg client at the Iceberg REST catalog service, which listens on

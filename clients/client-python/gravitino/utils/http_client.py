@@ -23,8 +23,9 @@ SOFTWARE.
 """
 
 from typing import Tuple
+from http.client import IncompleteRead
 from urllib.request import Request, build_opener
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlsplit
 
 from urllib.error import HTTPError
 import json as _json
@@ -36,7 +37,11 @@ from gravitino.typing import JSONType
 
 from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.oauth2_error_response import OAuth2ErrorResponse
-from gravitino.exceptions.base import RESTException, UnknownError
+from gravitino.exceptions.base import (
+    BadRequestException,
+    HTTPResponseException,
+    UnknownError,
+)
 from gravitino.exceptions.handlers.error_handler import ErrorHandler
 
 
@@ -134,26 +139,88 @@ class HTTPClient:
         try:
             return (True, Response(opener.open(request, timeout=timeout)))
         except HTTPError as err:
+            try:
+                return (False, self._read_error_response(err, request))
+            finally:
+                try:
+                    err.close()
+                except OSError:
+                    # Closing a failed response must not replace its HTTP failure.
+                    pass
+
+    def _read_error_response(self, err, request) -> ErrorResponse:
+        try:
             err_body = err.read()
+        except (IncompleteRead, OSError):
+            raise self._http_response_exception(
+                err, request, "Unable to read error response"
+            ) from None
 
-            if err_body is None or len(err_body) == 0:
-                return (
-                    False,
-                    ErrorResponse.generate_error_response(RESTException, err.reason),
-                )
+        if not err_body:
+            raise self._http_response_exception(
+                err, request, "Empty error response"
+            ) from None
 
-            err_resp = self._parse_error_response(err_body)
-            err_resp.validate()
+        try:
+            response = self._parse_error_response(err_body)
+            response.validate()
+        except (ValueError, TypeError, KeyError, BadRequestException, RecursionError):
+            raise self._http_response_exception(
+                err, request, "Invalid error response"
+            ) from None
+        return response
 
-            return (False, err_resp)
+    @staticmethod
+    def _http_response_exception(err, request, reason) -> HTTPResponseException:
+        endpoint = "<unknown endpoint>"
+        try:
+            address = urlsplit(request.full_url)
+            hostname = address.hostname
+            if address.scheme in ("http", "https") and hostname:
+                host = f"[{hostname}]" if ":" in hostname else hostname
+                port = address.port
+                endpoint = f"{address.scheme}://{host}"
+                if port is not None:
+                    endpoint = f"{endpoint}:{port}"
+        except ValueError:
+            pass
+        return HTTPResponseException(err.code, request.get_method(), endpoint, reason)
 
     def _parse_error_response(self, err_body: bytes) -> ErrorResponse:
         json_err_body = _json.loads(err_body)
-
+        if not isinstance(json_err_body, dict):
+            raise ValueError("Error response must be an object")
         if "code" in json_err_body:
-            return ErrorResponse.from_json(err_body, infer_missing=True)
-
-        return OAuth2ErrorResponse.from_json(err_body, infer_missing=True)
+            code = json_err_body["code"]
+            if not isinstance(code, int) or isinstance(code, bool) or code < 0:
+                raise ValueError("Invalid error code")
+            for name in ("type", "message"):
+                value = json_err_body.get(name)
+                if not isinstance(value, str) or not value.strip():
+                    raise ValueError("Invalid error field")
+            stack = json_err_body.get("stack")
+            if stack is not None and (
+                not isinstance(stack, list)
+                or any(not isinstance(item, str) for item in stack)
+            ):
+                raise ValueError("Invalid error stack")
+            # Construct from validated fields so internal aliases cannot override them.
+            return ErrorResponse(
+                code, json_err_body["type"], json_err_body["message"], stack
+            )
+        error = json_err_body.get("error")
+        description = json_err_body.get("error_description")
+        if not isinstance(error, str) or not error:
+            raise ValueError("Invalid OAuth2 error")
+        if description is not None and not isinstance(description, str):
+            raise ValueError("Invalid OAuth2 error description")
+        stack = json_err_body.get("stack")
+        if stack is not None and (
+            not isinstance(stack, list)
+            or any(not isinstance(item, str) for item in stack)
+        ):
+            raise ValueError("Invalid OAuth2 error stack")
+        return OAuth2ErrorResponse(None, error, description, stack)
 
     # pylint: disable=too-many-locals
     def _request(

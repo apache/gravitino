@@ -57,12 +57,18 @@ public final class TagPolicyResolver {
     Objects.requireNonNull(metalake, "metalake must not be null");
     Objects.requireNonNull(target, "target must not be null");
     Objects.requireNonNull(context, "context must not be null");
-    return context.computeTagPoliciesIfAbsent(metalake, target, () -> resolve(metalake, target));
+    return context.computeTagPoliciesIfAbsent(
+        metalake, target, () -> resolveUncached(metalake, target, context));
   }
 
-  private List<ResolvedTagPolicy> resolve(String metalake, MetadataObject target) {
+  private List<ResolvedTagPolicy> resolveUncached(
+      String metalake, MetadataObject target, AuthorizationRequestContext context) {
     TagEntity[] tags =
-        EffectiveTagResolver.resolve(target, object -> reader.loadTags(metalake, object));
+        EffectiveTagResolver.resolve(
+            target,
+            object ->
+                context.computeDirectTagsIfAbsent(
+                    metalake, object, () -> reader.loadTags(metalake, object)));
     if (tags.length == 0) {
       return Collections.emptyList();
     }

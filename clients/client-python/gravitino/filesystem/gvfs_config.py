@@ -34,6 +34,7 @@ class GVFSConfig:
     OAUTH2_CREDENTIAL = "oauth2_credential"
     OAUTH2_PATH = "oauth2_path"
     OAUTH2_SCOPE = "oauth2_scope"
+    OAUTH2_CLIENT_AUTHENTICATION_METHOD = "oauth2_client_authentication_method"
 
     GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE = "gcs_service_account_file"
 

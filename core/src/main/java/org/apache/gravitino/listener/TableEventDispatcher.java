@@ -46,6 +46,7 @@ import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTablePreEvent;
 import org.apache.gravitino.listener.api.info.TableInfo;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
@@ -81,6 +82,12 @@ public class TableEventDispatcher implements TableDispatcher {
   public TableEventDispatcher(EventBus eventBus, TableDispatcher dispatcher) {
     this.eventBus = eventBus;
     this.dispatcher = dispatcher;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Table importTable(NameIdentifier ident, AuditInfo auditInfo) throws NoSuchTableException {
+    return dispatcher.importTable(ident, auditInfo);
   }
 
   @Override

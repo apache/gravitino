@@ -72,12 +72,12 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
   }
 
   @Test
-  public void testToFlinkTablePropertiesPrefersExplicitDefaultDatabase() {
-    // When 'flink.bypass.default-database' is explicitly set, it takes precedence over
-    // jdbc-database.
-    String explicitDefaultDatabase = "explicit_db";
+  public void testToFlinkTablePropertiesWithExplicitDefaultDatabase() {
+    // 'flink.bypass.default-database' names the Flink current database (a PostgreSQL schema), so
+    // the connection must still target jdbc-database.
+    String schema = "public";
     Map<String, String> catalogPropertiesWithBoth = new HashMap<>(catalogProperties);
-    catalogPropertiesWithBoth.put(FLINK_BYPASS_DEFAULT_DATABASE, explicitDefaultDatabase);
+    catalogPropertiesWithBoth.put(FLINK_BYPASS_DEFAULT_DATABASE, schema);
     catalogPropertiesWithBoth.put(
         JdbcPropertiesConstants.GRAVITINO_JDBC_URL, gravitinoUrlWithDomain);
     catalogPropertiesWithBoth.put(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "gravitino");
@@ -87,11 +87,114 @@ public class TestPostgresqlPropertiesConverter extends AbstractJdbcPropertiesCon
     Map<String, String> tableProperties =
         getConverter(catalogPropertiesWithBoth)
             .toFlinkTableProperties(
+                flinkCatalogProperties, ImmutableMap.of(), new ObjectPath(schema, "t"));
+
+    Assertions.assertEquals(
+        schema, flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+    Assertions.assertEquals(
+        flinkUrlWithDomain + "gravitino",
+        tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+    Assertions.assertEquals(
+        schema + ".t", tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_NAME));
+  }
+
+  @Test
+  public void testToFlinkTablePropertiesWithDatabaseFromJdbcUrl() {
+    // Without jdbc-database, the connection database comes from jdbc-url.
+    Map<String, String> catalogPropertiesWithUrlDatabase = new HashMap<>(catalogProperties);
+    catalogPropertiesWithUrlDatabase.put(FLINK_BYPASS_DEFAULT_DATABASE, "public");
+    catalogPropertiesWithUrlDatabase.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
+        "jdbc:postgresql://db.example.com:5432/myDatabase?sslmode=require");
+
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogPropertiesWithUrlDatabase)
+            .toFlinkCatalogProperties(catalogPropertiesWithUrlDatabase);
+    Map<String, String> tableProperties =
+        getConverter(catalogPropertiesWithUrlDatabase)
+            .toFlinkTableProperties(
                 flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t"));
 
     Assertions.assertEquals(
-        flinkUrlWithDomain + explicitDefaultDatabase,
+        "jdbc:postgresql://db.example.com:5432/myDatabase",
         tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL));
+  }
+
+  @Test
+  public void testConnectionDatabaseFromJdbcUrl() {
+    // Without jdbc-database, the database in jdbc-url is the connection database, but not the
+    // Flink default database, which names a schema.
+    Map<String, String> catalogPropertiesWithUrlDatabase = new HashMap<>(catalogProperties);
+    catalogPropertiesWithUrlDatabase.remove(FLINK_BYPASS_DEFAULT_DATABASE);
+    catalogPropertiesWithUrlDatabase.put(
+        JdbcPropertiesConstants.GRAVITINO_JDBC_URL,
+        "jdbc:postgresql://db.example.com:5432/myDatabase?sslmode=require");
+
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogPropertiesWithUrlDatabase)
+            .toFlinkCatalogProperties(catalogPropertiesWithUrlDatabase);
+
+    Assertions.assertNull(
+        flinkCatalogProperties.get(JdbcPropertiesConstants.FLINK_JDBC_DEFAULT_DATABASE));
+    Assertions.assertEquals(
+        "myDatabase",
+        flinkCatalogProperties.get(JdbcPropertiesConstants.GRAVITINO_CONNECTION_DATABASE));
+  }
+
+  @Test
+  public void testToFlinkTablePropertiesWithBypassBaseUrl() {
+    // Flink JDBC accepts a base-url with or without the trailing slash, and 4.x also one with the
+    // database and query parameters.
+    Map<String, String> expectedTableUrls =
+        ImmutableMap.of(
+            "jdbc:postgresql://127.0.0.1:15432/", "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432", "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432/gravitino",
+                "jdbc:postgresql://127.0.0.1:15432/gravitino",
+            "jdbc:postgresql://127.0.0.1:15432/gravitino?sslmode=require",
+                "jdbc:postgresql://127.0.0.1:15432/gravitino?sslmode=require");
+    for (Map.Entry<String, String> entry : expectedTableUrls.entrySet()) {
+      String bypassBaseUrl = entry.getKey();
+      Map<String, String> catalogPropertiesWithBypassUrl = new HashMap<>(catalogProperties);
+      catalogPropertiesWithBypassUrl.put(FLINK_BYPASS_DEFAULT_DATABASE, "public");
+      catalogPropertiesWithBypassUrl.put(
+          JdbcPropertiesConstants.GRAVITINO_JDBC_URL, gravitinoUrlWithDomain);
+      catalogPropertiesWithBypassUrl.put(
+          JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE, "gravitino");
+      catalogPropertiesWithBypassUrl.put("flink.bypass.base-url", bypassBaseUrl);
+
+      Map<String, String> flinkCatalogProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkCatalogProperties(catalogPropertiesWithBypassUrl);
+      Map<String, String> tableProperties =
+          getConverter(catalogPropertiesWithBypassUrl)
+              .toFlinkTableProperties(
+                  flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t"));
+
+      Assertions.assertEquals(
+          entry.getValue(),
+          tableProperties.get(JdbcPropertiesConstants.FLINK_JDBC_TABLE_DATABASE_URL),
+          bypassBaseUrl);
+    }
+  }
+
+  @Test
+  public void testDefaultDatabaseIsNotConnectionDatabase() {
+    // Only flink.bypass.default-database is set, and jdbc-url has no database. The default
+    // database names a schema, so it must not be used as the connection database.
+    Map<String, String> flinkCatalogProperties =
+        getConverter(catalogProperties).toFlinkCatalogProperties(catalogProperties);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                getConverter(catalogProperties)
+                    .toFlinkTableProperties(
+                        flinkCatalogProperties, ImmutableMap.of(), new ObjectPath("public", "t")));
+    Assertions.assertTrue(
+        exception.getMessage().contains(JdbcPropertiesConstants.GRAVITINO_JDBC_DATABASE),
+        exception.getMessage());
   }
 
   @Test

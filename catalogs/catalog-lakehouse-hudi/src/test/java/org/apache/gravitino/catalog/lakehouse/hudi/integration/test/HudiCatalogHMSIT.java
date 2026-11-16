@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
@@ -209,7 +210,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertTrue(Arrays.asList(schemas).contains(DB_NAME));
 
     // test load
-    Schema schema = schemaOps.loadSchema(DB_NAME);
+    Schema schema = schemaOps.loadSchema(DB_NAME.toUpperCase(Locale.ROOT));
     Assertions.assertEquals(DB_NAME, schema.name());
     Assertions.assertEquals("", schema.comment());
     Assertions.assertTrue(schema.properties().get(LOCATION).endsWith(DB_NAME));
@@ -260,7 +261,10 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertTrue(tableNames.contains(MOR_TABLE + "_ro"));
 
     // test load
-    Table table = tableOps.loadTable(NameIdentifier.of(DB_NAME, COW_TABLE));
+    Table table =
+        tableOps.loadTable(
+            NameIdentifier.of(
+                DB_NAME.toUpperCase(Locale.ROOT), COW_TABLE.toUpperCase(Locale.ROOT)));
     Assertions.assertEquals(COW_TABLE, table.name());
     assertTable(table);
 

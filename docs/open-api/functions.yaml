@@ -187,11 +187,11 @@ components:
           description: The name of the function
         functionType:
           type: string
-          description: The type of the function
+          description: The type of the function. Responses always use lowercase values.
           enum:
-            - SCALAR
-            - AGGREGATE
-            - TABLE
+            - scalar
+            - aggregate
+            - table
         deterministic:
           type: boolean
           description: Whether the function is deterministic
@@ -314,7 +314,7 @@ components:
           description: The comment of the parameter
           nullable: true
         defaultValue:
-          $ref: "./expression.yaml#/components/schemas/FunctionArg"
+          $ref: "./expression.yaml#/components/schemas/WritableFunctionArg"
           description: The default value expression of the parameter
 
     WritableFunctionColumn:
@@ -414,6 +414,7 @@ components:
       required:
         - language
         - runtime
+        - handler
       properties:
         language:
           type: string
@@ -427,11 +428,11 @@ components:
             - TRINO
         handler:
           type: string
-          description: The Python handler function
-          nullable: true
+          description: The Python handler entrypoint. Cannot be null or blank.
+          pattern: '\S'
         codeBlock:
           type: string
-          description: The Python code block
+          description: The inline Python code block. Optional; it does not replace the handler.
           nullable: true
         resources:
           $ref: "#/components/schemas/FunctionResources"
@@ -530,6 +531,7 @@ components:
       type: object
       required:
         - "@type"
+        - newComment
       properties:
         "@type":
           type: string
@@ -537,8 +539,8 @@ components:
             - "updateComment"
         newComment:
           type: string
-          description: The new comment of the function. Can be null to clear the comment.
-          nullable: true
+          description: The new comment of the function. Cannot be null or blank.
+          pattern: '\S'
       example: {
         "@type": "updateComment",
         "newComment": "This is a new comment"
@@ -800,7 +802,7 @@ components:
         "code": 0,
         "function": {
           "name": "add_one",
-          "functionType": "SCALAR",
+          "functionType": "scalar",
           "deterministic": true,
           "comment": "A simple scalar function that adds one",
           "definitions": [
@@ -832,7 +834,7 @@ components:
         "code": 0,
         "function": {
           "name": "generate_series",
-          "functionType": "TABLE",
+          "functionType": "table",
           "deterministic": true,
           "comment": "A table function that generates a series of integers",
           "definitions": [
@@ -871,7 +873,7 @@ components:
         "functions": [
           {
             "name": "add_one",
-            "functionType": "SCALAR",
+            "functionType": "scalar",
             "deterministic": true,
             "comment": "A simple scalar function",
             "definitions": [

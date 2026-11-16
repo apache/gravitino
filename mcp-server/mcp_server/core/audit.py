@@ -17,6 +17,7 @@
 
 import base64
 import binascii
+import hashlib
 import json
 import logging
 from datetime import datetime, timezone
@@ -28,8 +29,8 @@ def _extract_principal(authorization: str) -> str:
     """Derive a display principal from a raw Authorization header value.
 
     - "Basic <base64(user:secret)>" → "<user>"  (Gravitino simple auth)
-    - "Bearer <token>"              → "bearer:<first-8-chars-of-token>"
-    - "<scheme> <credential>"       → "<scheme>:<first-8-chars-of-credential>"
+    - "Bearer <token>"              → "bearer:<sha256(token)[:16]>"
+    - "<scheme> <credential>"       → "<scheme>:<sha256(credential)[:16]>"
     - empty / missing / unparsable  → "anonymous"
 
     The credential may itself contain spaces (a custom scheme is free to use a
@@ -54,7 +55,8 @@ def _extract_principal(authorization: str) -> str:
             return "anonymous"
         user = decoded.split(":", 1)[0]
         return user if user else "anonymous"
-    return f"{scheme}:{credential[:8]}"
+    digest = hashlib.sha256(credential.encode("utf-8", "surrogatepass"))
+    return f"{scheme}:{digest.hexdigest()[:16]}"
 
 
 def emit(
@@ -68,7 +70,7 @@ def emit(
     """Write one structured JSON audit record to the audit logger.
 
     Args:
-        principal: Identity derived from the request (e.g. "bearer:abc12345" or "anonymous").
+        principal: Identity derived from the request (e.g. "bearer:f39dac6cbaba535e" or "anonymous").
         tool:      MCP tool name that was invoked.
         outcome:   "allow" for successful calls, "deny" for failed calls. Note the
                    AuditMiddleware emits "deny" for any tool-call exception (an

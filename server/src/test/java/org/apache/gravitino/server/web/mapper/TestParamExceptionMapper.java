@@ -43,17 +43,34 @@ public class TestParamExceptionMapper {
     Assertions.assertTrue(entity.getMessage().contains("For input string"));
   }
 
+  /** Verifies query conversion failures use the API's bad-request error response. */
   @Test
-  public void testQueryParamExceptionReturnsNotFound() {
+  public void testQueryParamExceptionReturnsIllegalArguments() {
     NumberFormatException cause = new NumberFormatException("For input string: \"xyz\"");
     ParamException exception = new ParamException.QueryParamException(cause, "limit", null);
 
     Response response = mapper.toResponse(exception);
     ErrorResponse entity = (ErrorResponse) response.getEntity();
 
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, entity.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), entity.getType());
+    Assertions.assertTrue(entity.getMessage().contains("limit"));
+    Assertions.assertTrue(entity.getMessage().contains("For input string"));
+  }
+
+  /** Verifies the query-parameter override does not change other URI parameter errors. */
+  @Test
+  public void testMatrixParamExceptionReturnsNotFound() {
+    ParamException exception =
+        new ParamException.MatrixParamException(new NumberFormatException("abc"), "version", null);
+
+    Response response = mapper.toResponse(exception);
+    ErrorResponse entity = (ErrorResponse) response.getEntity();
+
     Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, entity.getCode());
-    Assertions.assertTrue(entity.getMessage().contains("limit"));
+    Assertions.assertTrue(entity.getMessage().contains("version"));
   }
 
   @Test
