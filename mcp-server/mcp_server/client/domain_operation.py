@@ -46,12 +46,11 @@ class DomainOperation(ABC):
     ) -> str:
         """List domain members and all applicable relations.
 
-        By default, lists objects that carry the domain's backing tag themselves,
-        including catalogs and schemas; a CATALOG or SCHEMA member includes all
-        objects under it and is listed once. expand=true instead expands catalogs
-        and schemas into the recorded leaf objects under them, with INHERITED
-        relations; use it to enumerate every table, view, fileset, topic, model or
-        semantic model in a domain.
+        By default, lists objects directly assigned the backing tag of the domain
+        or a visible subdomain. A tagged catalog or schema appears once. A nearer
+        assignment of the same tag can override the inherited value and exclude a
+        descendant. Set expand=true to list accessible recorded leaves whose
+        effective tags match, with INHERITED relations where applicable.
         types filters object types (for example TABLE, TOPIC, CATALOG or SCHEMA;
         CATALOG and SCHEMA are not allowed with expand=true).
         domains filters source domain names. name_contains matches a case-insensitive

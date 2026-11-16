@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +41,7 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.DomainEntity;
@@ -114,47 +114,60 @@ final class DomainMembershipResolver {
       List<DomainEntity> scopeDomains,
       List<DomainEntity> selectedDomains,
       DomainMemberFilter filter) {
-    if (selectedDomains.isEmpty()) {
-      return new ArrayList<>();
-    }
-
-    Set<Long> selectedIds =
-        selectedDomains.stream().map(DomainEntity::id).collect(Collectors.toSet());
     Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
-    Set<MetadataObject> selected = new HashSet<>();
+    List<DomainMember> members = new ArrayList<>();
     try {
-      // Read every scope domain so a selected member still reports all its relations.
-      for (DomainEntity scopeDomain : scopeDomains) {
-        if (scopeDomain.backingTagId() == null) {
+      for (DomainEntity domain : selectedDomains) {
+        if (domain.backingTagId() == null) {
           continue;
         }
 
         DomainRelation relation =
-            Objects.equals(queriedDomain.id(), scopeDomain.id())
+            Objects.equals(queriedDomain.id(), domain.id())
                 ? DomainRelation.direct()
-                : DomainRelation.viaSubdomain(scopeDomain.name());
-        for (MetadataObject object : listAssignedObjects(metalake, scopeDomain)) {
-          if (!DIRECT_MEMBER_TYPES.contains(object.type()) || !matchesFilter(object, filter)) {
-            continue;
+                : DomainRelation.viaSubdomain(domain.name());
+        for (MetadataObject object : listAssignedObjects(metalake, domain)) {
+          if (DIRECT_MEMBER_TYPES.contains(object.type()) && matchesFilter(object, filter)) {
+            relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
           }
+        }
+      }
 
-          relations.computeIfAbsent(object, o -> new LinkedHashSet<>()).add(relation);
-          if (selectedIds.contains(scopeDomain.id())) {
-            selected.add(object);
+      for (Map.Entry<MetadataObject, Set<DomainRelation>> entry : relations.entrySet()) {
+        MetadataObject object = entry.getKey();
+        if (selectedDomains.size() == scopeDomains.size()) {
+          members.add(
+              new DomainMemberInfo(object, entry.getValue().toArray(new DomainRelation[0])));
+          continue;
+        }
+
+        // Read only this candidate's direct tags to recover all visible membership paths.
+        // The assignment may have been removed since candidate enumeration.
+        try {
+          List<TagEntity> directTags =
+              store
+                  .relationOperations()
+                  .listEntitiesByRelation(
+                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                      MetadataObjectUtil.toEntityIdent(metalake, object),
+                      MetadataObjectUtil.toEntityType(object));
+          ResolvedTag[] assignments =
+              directTags.stream()
+                  .map(tag -> new ResolvedTag(tag, object))
+                  .toArray(ResolvedTag[]::new);
+          DomainRelation[] current =
+              resolveRelations(queriedDomain, scopeDomains, object, assignments);
+          if (Arrays.stream(current).anyMatch(entry.getValue()::contains)) {
+            members.add(new DomainMemberInfo(object, current));
           }
+        } catch (NoSuchEntityException e) {
+          LOG.debug("Skipping missing member candidate {} in metalake {}", object, metalake, e);
         }
       }
     } catch (IOException e) {
       throw new RuntimeException("Failed to list members of domain " + queriedDomain.name(), e);
     }
 
-    List<DomainMember> members = new ArrayList<>();
-    for (Map.Entry<MetadataObject, Set<DomainRelation>> entry : relations.entrySet()) {
-      if (selected.contains(entry.getKey())) {
-        members.add(
-            new DomainMemberInfo(entry.getKey(), entry.getValue().toArray(new DomainRelation[0])));
-      }
-    }
     return members;
   }
 

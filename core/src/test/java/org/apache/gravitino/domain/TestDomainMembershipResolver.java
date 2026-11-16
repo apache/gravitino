@@ -240,6 +240,8 @@ class TestDomainMembershipResolver {
             resolver.listMembers(
                 METALAKE, finance, domains, direct().withNameContains("CAT.DB").build())));
 
+    assign(SCHEMA, tag(20, "trading"));
+    assign(TABLE, tag(10, "finance"), tag(20, "trading"));
     // Selecting a sub-domain selects its members but keeps all their relations.
     DomainMember[] selected =
         resolver.listMembers(METALAKE, finance, domains, direct().withDomains("Trading").build());
@@ -255,6 +257,36 @@ class TestDomainMembershipResolver {
         0,
         resolver.listMembers(METALAKE, finance, domains, direct().withDomains("missing").build())
             .length);
+  }
+
+  @Test
+  void testFilteredListingOnlyEnumeratesSelectedDomain() throws Exception {
+    DomainEntity finance = domain(1, "Finance", null, 10L, null);
+    DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
+    DomainEntity tax = domain(3, "Tax", "Finance", 30L, "tax");
+    DomainEntity[] children = {trading, tax};
+    DomainMemberFilter filter = direct().withDomains("Trading").build();
+    assertEquals(0, resolver.listMembers(METALAKE, finance, children, filter).length);
+    verify(relations, never())
+        .listEntitiesByRelation(
+            eq(SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL),
+            any(NameIdentifier.class),
+            any(Entity.EntityType.class));
+
+    candidate(20, TABLE);
+    assign(TABLE, tag(20, "trading"), tag(30, "dept", "tax"));
+    DomainMember[] members = resolver.listMembers(METALAKE, finance, children, filter);
+    assertArrayEquals(new MetadataObject[] {TABLE}, objects(members));
+    assertArrayEquals(
+        new DomainRelation[] {
+          DomainRelation.viaSubdomain("Tax"), DomainRelation.viaSubdomain("Trading")
+        },
+        members[0].relations());
+    ArgumentCaptor<RelationQuery> queries = ArgumentCaptor.forClass(RelationQuery.class);
+    verify(relations, times(2)).listEntitiesByRelation(queries.capture());
+    for (RelationQuery query : queries.getAllValues()) {
+      assertEquals(20L, query.anchorId().get().longValue());
+    }
   }
 
   @Test

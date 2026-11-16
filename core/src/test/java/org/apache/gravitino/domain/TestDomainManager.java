@@ -432,6 +432,14 @@ public class TestDomainManager {
             0,
             domainManager.listMembers(METALAKE, "HR", DomainMemberFilter.builder().build()).length);
         assignMembershipTag(table.nameIdentifier(), Entity.EntityType.TABLE, "dept", "hr");
+        DomainMember[] tradingMembers =
+            domainManager.listMembers(
+                METALAKE, "Finance", DomainMemberFilter.builder().withDomains("Trading").build());
+        Assertions.assertEquals(1, tradingMembers.length);
+        Assertions.assertEquals(leaf, tradingMembers[0].object());
+        Assertions.assertArrayEquals(
+            new DomainRelation[] {DomainRelation.viaSubdomain("Trading")},
+            tradingMembers[0].relations());
         DomainMember[] hrMembers =
             domainManager.listMembers(METALAKE, "HR", DomainMemberFilter.builder().build());
         Assertions.assertEquals(1, hrMembers.length);

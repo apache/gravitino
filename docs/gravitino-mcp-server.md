@@ -253,7 +253,7 @@ All are annotated as read-only and idempotent and issue only GET requests.
 | `list_of_domains` | `details=true` | Domain snapshots, or names when false |
 | `get_domain_by_name` | `domain_name` | A complete domain snapshot |
 | `list_subdomains` | `domain_name`, `details=true` | Immediate subdomain snapshots or names |
-| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains` | Recorded leaf members with all applicable relations |
+| `list_domain_members` | `domain_name`, optional `types`, `domains`, `name_contains`, `expand` | Directly tagged objects, including catalogs and schemas. Use `expand=true` for accessible recorded leaves whose effective tags match |
 | `list_domains_for_metadata` | `metadata_type`, `metadata_full_name`, `details=true` | Domains of a leaf object, including all relations when details is true |
 
 Results follow the existing MCP JSON-string convention; empty lists return `[]`.
