@@ -26,6 +26,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects.MetadataObjectImpl;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
@@ -36,6 +37,9 @@ import org.apache.gravitino.annotation.Evolving;
  * own stable ID for persistence, including a metric ID rather than its containing model's ID. The
  * storage key does not include the metric name. A binding grants no access to its target, and a
  * {@link Kind#USED_BY} binding does not by itself establish that the metric computes the term.
+ *
+ * <p>The target's parent, name and type are captured in an immutable snapshot. Later changes to a
+ * caller-supplied metadata object do not change the binding or its hash code.
  */
 @Evolving
 public final class TermBinding {
@@ -66,7 +70,7 @@ public final class TermBinding {
 
   private TermBinding(Kind kind, MetadataObject object, @Nullable String metric) {
     this.kind = kind;
-    this.object = object;
+    this.object = new MetadataObjectImpl(object.parent(), object.name(), object.type());
     this.metric = metric;
   }
 
@@ -119,7 +123,7 @@ public final class TermBinding {
    * Returns the bound object. For a {@link Kind#USED_BY} binding, it is the semantic model that
    * defines the metric.
    *
-   * @return The bound object.
+   * @return The immutable snapshot of the bound object's identity.
    */
   public MetadataObject object() {
     return object;
