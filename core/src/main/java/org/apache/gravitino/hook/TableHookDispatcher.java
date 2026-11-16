@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.hook;
 
+import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
+import java.util.OptionalLong;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -27,6 +29,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -96,14 +99,24 @@ public class TableHookDispatcher implements TableDispatcher {
       SortOrder[] sortOrders,
       Index[] indexes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
     Table table =
         dispatcher.createTable(
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
-    // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
+      Preconditions.checkState(
+          table instanceof EntityCombinedTable,
+          "Table %s was created, but the table dispatcher did not report whether this request "
+              + "created it, so no owner was set. Set the owner explicitly.",
+          ident);
+      OptionalLong createdId = ((EntityCombinedTable) table).createdTableId();
+      if (createdId.isEmpty()) {
+        return table;
+      }
       try {
+        // Preserve the existing owner hook for actual creations. Identity-bound initialization
+        // and its transfer/drop-recreate races are outside this EXIST_OK fix.
         ownerManager.setOwner(
             ident.namespace().level(0),
             NameIdentifierUtil.toMetadataObject(ident, Entity.EntityType.TABLE),

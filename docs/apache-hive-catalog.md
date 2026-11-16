@@ -78,6 +78,27 @@ When using Gravitino with Spark, pass the Spark Hive connector configuration usi
 
 When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin)
 
+### Identifier Case Behavior
+
+Schema, table, and view identifiers are case-insensitive; you can use any casing. Column identifiers
+remain case-sensitive.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Hive Metastore databases, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
+
 ### Catalog Operations
 
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.

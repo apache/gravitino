@@ -69,10 +69,13 @@ import org.apache.gravitino.EntityFieldLimits;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.TestTable;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.connector.GenericTable;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
@@ -84,6 +87,7 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
+import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.meta.AuditInfo;
@@ -524,6 +528,183 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
+  void testManagedCreateOutcomeSkipsConcurrentExistOkOwnerInitialization() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "managed_create_outcome");
+    Map<String, String> props = Map.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(ns.levels()), "", props);
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = (TestCatalogOperations) source.ops();
+    TestCatalogOperations operations = spy(originalOps);
+    Capability originalCapability = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : originalCapability.managedStorage(scope);
+          }
+        };
+    doAnswer(
+            invocation -> {
+              try {
+                return originalOps.loadTable(ident);
+              } catch (NoSuchTableException e) {
+                return invocation.callRealMethod();
+              }
+            })
+        .when(operations)
+        .createTable(eq(ident), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(source, "capability", managed, true);
+    FieldUtils.writeField(source, "ops", operations, true);
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    CountDownLatch initializing = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    doAnswer(
+            invocation -> {
+              initializing.countDown();
+              Assertions.assertTrue(release.await(30, TimeUnit.SECONDS));
+              return null;
+            })
+        .when(owners)
+        .setOwner(any(), any(), any(), any());
+    TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<Table> first =
+          executor.submit(() -> hook.createTable(ident, new Column[0], "", props));
+      Assertions.assertTrue(initializing.await(30, TimeUnit.SECONDS));
+      // The table exists, but its creator has not initialized ownership. A second create returning
+      // it must not try to claim it, even though an owner lookup would still return empty.
+      EntityCombinedTable existing =
+          (EntityCombinedTable) hook.createTable(ident, new Column[0], "", props);
+      Assertions.assertTrue(existing.createdTableId().isEmpty());
+      Assertions.assertFalse(existing.properties().containsKey(ID_KEY));
+      release.countDown();
+      EntityCombinedTable created = (EntityCombinedTable) first.get(30, TimeUnit.SECONDS);
+      long id = StringIdentifier.fromProperties(originalOps.loadTable(ident).properties()).id();
+      Assertions.assertEquals(id, created.createdTableId().orElseThrow());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
+      verify(owners, never()).getOwner(any(), any());
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+      Assertions.assertTrue(executor.awaitTermination(30, TimeUnit.SECONDS));
+      FieldUtils.writeField(source, "capability", originalCapability, true);
+      FieldUtils.writeField(source, "ops", originalOps, true);
+    }
+  }
+
+  @Test
+  void testManagedCreateWithoutReturnedIdentifierUsesStoredIdentity() throws Exception {
+    Namespace ns = Namespace.of(metalake, catalog, "managed_sanitized_create");
+    Map<String, String> props = Map.of("k1", "v1", "k2", "v2");
+    schemaOperationDispatcher.createSchema(NameIdentifier.of(ns.levels()), "", props);
+    NameIdentifier ident = NameIdentifier.of(ns, "t");
+    TestCatalog source =
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
+    TestCatalogOperations originalOps = (TestCatalogOperations) source.ops();
+    TestCatalogOperations operations = spy(originalOps);
+    Capability originalCapability = source.capability();
+    Capability managed =
+        new Capability() {
+          @Override
+          public CapabilityResult managedStorage(Scope scope) {
+            return scope == Scope.TABLE
+                ? CapabilityResult.SUPPORTED
+                : originalCapability.managedStorage(scope);
+          }
+        };
+    doAnswer(
+            invocation -> {
+              Table table;
+              try {
+                table = originalOps.loadTable(ident);
+              } catch (NoSuchTableException e) {
+                table = (Table) invocation.callRealMethod();
+                TableEntity entity =
+                    TableEntity.builder()
+                        .withId(StringIdentifier.fromProperties(table.properties()).id())
+                        .withName(ident.name())
+                        .withNamespace(ns)
+                        .withProperties(table.properties())
+                        .withColumns(List.of())
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build();
+                entityStore.put(entity, false);
+              }
+              // A valid managed connector can drop the identifier from its returned table and keep
+              // it in storage. The same result is used for a new table and for EXIST_OK.
+              return GenericTable.builder()
+                  .withName(table.name())
+                  .withColumns(new Column[0])
+                  .withPartitioning(new Transform[0])
+                  .withDistribution(Distributions.NONE)
+                  .withSortOrders(new SortOrder[0])
+                  .withIndexes(Indexes.EMPTY_INDEXES)
+                  .withProperties(StringIdentifier.newPropertiesWithoutId(table.properties()))
+                  .withAuditInfo(AuditInfo.EMPTY)
+                  .build();
+            })
+        .when(operations)
+        .createTable(eq(ident), any(), any(), any(), any(), any(), any(), any());
+    FieldUtils.writeField(source, "capability", managed, true);
+    FieldUtils.writeField(source, "ops", operations, true);
+    OwnerDispatcher owners = mock(OwnerDispatcher.class);
+    TableHookDispatcher hook = new TableHookDispatcher(tableOperationDispatcher, () -> owners);
+    try {
+      EntityCombinedTable created =
+          (EntityCombinedTable) hook.createTable(ident, new Column[0], "", props);
+      long createdId = entityStore.get(ident, TABLE, TableEntity.class).id();
+      Assertions.assertEquals(createdId, created.createdTableId().orElseThrow());
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).setOwner(eq(metalake), any(), any(), any());
+
+      // A replacement observed by the fallback belongs to another request.
+      TableEntity replacement =
+          TableEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(ident.name())
+              .withNamespace(ns)
+              .withColumns(List.of())
+              .withAuditInfo(AuditInfo.EMPTY)
+              .build();
+      entityStore.delete(ident, TABLE);
+      entityStore.put(replacement, false);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      entityStore.delete(ident, TABLE);
+      Assertions.assertTrue(
+          ((EntityCombinedTable) hook.createTable(ident, new Column[0], "", props))
+              .createdTableId()
+              .isEmpty());
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
+
+      IOException failure = new IOException("entity store unavailable");
+      doThrow(failure).when(entityStore).get(ident, TABLE, TableEntity.class);
+      GravitinoRuntimeException error =
+          Assertions.assertThrows(
+              GravitinoRuntimeException.class,
+              () -> hook.createTable(ident, new Column[0], "", props));
+      Assertions.assertSame(failure, error.getCause());
+      Assertions.assertTrue(error.getMessage().contains(ident.toString()));
+      verify(owners, times(1)).setOwner(any(), any(), any(), any());
+    } finally {
+      FieldUtils.writeField(source, "capability", originalCapability, true);
+      FieldUtils.writeField(source, "ops", originalOps, true);
+    }
+  }
+
+  @Test
   public void testCreateAndListTables() throws IOException {
     Namespace tableNs = Namespace.of(metalake, catalog, "schema41");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
@@ -547,6 +728,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Table table1 =
         tableOperationDispatcher.createTable(
             tableIdent1, columns, "comment", props, new Transform[0]);
+    Assertions.assertEquals(
+        entityStore.get(tableIdent1, TABLE, TableEntity.class).id(),
+        ((EntityCombinedTable) table1).createdTableId().orElseThrow());
     Assertions.assertEquals("table1", table1.name());
     Assertions.assertEquals("comment", table1.comment());
     testProperties(props, table1.properties());
@@ -716,9 +900,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // Audit info is gotten from the catalog, not from the entity store
     Assertions.assertEquals("test", loadedTable3.auditInfo().creator());
 
-    // Case 4: Test if the table entity is not matched
+    // Case 4: An external rename or conflicting path must not overwrite the stored identity.
     reset(entityStore);
-    TableEntity tableEntity =
+    TableEntity storedBeforeConflict = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    TableEntity mismatchedEntity =
         TableEntity.builder()
             .withId(1L)
             .withName("table11")
@@ -726,14 +911,30 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
             .withAuditInfo(
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
-    doReturn(tableEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
-    Table loadedTable4 = tableOperationDispatcher.loadTable(tableIdent1);
-    // Succeed to import the topic entity
+    doReturn(mismatchedEntity).when(entityStore).get(any(), eq(Entity.EntityType.TABLE), any());
+    UnsupportedOperationException exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class,
+            () -> tableOperationDispatcher.loadTable(tableIdent1));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external table registrations"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("metadata-only unregister of an individual external table"));
+    Assertions.assertTrue(exception.getMessage().contains("force-drop and recreate"));
+    Assertions.assertTrue(
+        exception.getMessage().contains("privileges, tags, and other relationships"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(TableEntity.class), eq(false));
+
+    // The rejected import leaves the existing entity and its identity unchanged.
     reset(entityStore);
-    TableEntity tableImportedEntity = entityStore.get(tableIdent1, TABLE, TableEntity.class);
-    Assertions.assertEquals("test", tableImportedEntity.auditInfo().creator());
-    // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", loadedTable4.auditInfo().creator());
+    TableEntity storedAfterConflict = entityStore.get(tableIdent1, TABLE, TableEntity.class);
+    Assertions.assertEquals(storedBeforeConflict.id(), storedAfterConflict.id());
+    Assertions.assertEquals(storedBeforeConflict.name(), storedAfterConflict.name());
   }
 
   @Test
@@ -743,6 +944,34 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         () ->
             new TableOperationDispatcher(
                 catalogManager, entityStore, idGenerator, null, secretManager));
+  }
+
+  @Test
+  void testImportTableAfterRegistrationDeletionReusesIdentifier() throws IOException {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_soft_deleted_table_identifier");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_soft_deleted_identifier");
+    tableOperationDispatcher.createTable(
+        tableIdent,
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        },
+        "comment",
+        ImmutableMap.of("k1", "v1"),
+        new Transform[0]);
+    TableEntity tableEntity = entityStore.get(tableIdent, TABLE, TableEntity.class);
+    entityStore.delete(tableIdent, TABLE);
+
+    reset(entityStore);
+    Assertions.assertDoesNotThrow(() -> tableOperationDispatcher.loadTable(tableIdent));
+    Assertions.assertEquals(
+        tableEntity.id(), entityStore.get(tableIdent, TABLE, TableEntity.class).id());
+    verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 
   @Test
@@ -1087,6 +1316,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertDoesNotThrow(() -> tableOperationDispatcher.loadTable(tableIdent));
     Assertions.assertEquals(tableIdent.name(), loadedTable.name());
     Assertions.assertEquals("comment", loadedTable.comment());
+    verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 
   @Test
@@ -1192,7 +1422,12 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         Assertions.assertThrows(
             UnsupportedOperationException.class,
             () -> tableOperationDispatcher.loadTable(tableIdent));
-    Assertions.assertTrue(exception.getMessage().contains("Table managed by multiple catalogs"));
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains("does not automatically reconcile conflicting external table registrations"));
+    Assertions.assertTrue(exception.getMessage().contains("catalog-specific recovery guidance"));
+    verify(entityStore).put(any(TableEntity.class), eq(false));
   }
 
   @Test

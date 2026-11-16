@@ -87,10 +87,13 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
   private static final String HADOOP_S3_ENDPOINT = "fs.s3a.endpoint";
   private static final String HADOOP_S3_ACCESS_KEY = "fs.s3a.access.key";
   private static final String HADOOP_S3_SECRET_KEY = "fs.s3a.secret.key";
+  private static final String OSS_OPTION_PREFIX = "fs.oss.";
+  private static final String OSS_WAREHOUSE_SCHEME = "oss://";
 
   private final CatalogFactory.Context context;
   // Mutable copy shared with BaseCatalog.catalogOptions. The inner Paimon catalog is created from a
-  // sanitized copy so Hadoop-prefixed options can be moved to Hadoop configuration before logging.
+  // copy so Hadoop-prefixed options can be moved to Hadoop configuration before logging. For OSS
+  // warehouses that copy keeps the fs.oss.* entries, because Paimon's OSSFileIO only reads options.
   private final Map<String, String> mutableOptions;
   private AbstractCatalog paimonCatalog;
 
@@ -155,14 +158,17 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
           e);
     }
     movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
+    copyOssOptionsBackToPaimonOptions(hadoopConf, paimonOptions);
     this.paimonCatalog = createInnerCatalog(paimonOptions, hadoopConf);
     super.open();
   }
 
   /**
-   * Creates the inner Paimon Flink catalog from sanitized Paimon options and Hadoop configuration.
+   * Creates the inner Paimon Flink catalog from Paimon options and Hadoop configuration.
    *
-   * @param paimonOptions Paimon catalog options without Hadoop-prefixed sensitive properties.
+   * @param paimonOptions Paimon catalog options without Hadoop-prefixed properties, except for OSS
+   *     warehouses where {@code fs.oss.*} is kept because Paimon's OSSFileIO does not read the
+   *     Hadoop configuration.
    * @param hadoopConf Hadoop configuration carrying filesystem credentials and Hadoop options.
    * @return the created inner Paimon catalog.
    */
@@ -195,6 +201,34 @@ public abstract class GravitinoPaimonCatalog extends BaseCatalog {
         paimonOptions, hadoopConf, PaimonConstants.OSS_ACCESS_KEY, PaimonConstants.OSS_ACCESS_KEY);
     moveOptionToHadoopConf(
         paimonOptions, hadoopConf, PaimonConstants.OSS_SECRET_KEY, PaimonConstants.OSS_SECRET_KEY);
+  }
+
+  /**
+   * Paimon's OSSFileIO (paimon-oss 1.x) builds its Hadoop configuration only from the catalog
+   * options and never reads the Hadoop configuration, so after the move above the OSS endpoint and
+   * keys would be invisible to it ("Aliyun OSS endpoint should not be null or empty"). Hand those
+   * entries back to the inner catalog's options; they stay out of this connector's own option map.
+   *
+   * <p>Only OSS warehouses get the entries back. For HDFS, S3 and local warehouses the entries live
+   * in the Hadoop configuration alone, so OSS settings that come from {@code core-site.xml} under
+   * {@code HADOOP_CONF_DIR} are not copied into Paimon options that Paimon may log.
+   */
+  @VisibleForTesting
+  static void copyOssOptionsBackToPaimonOptions(
+      Configuration hadoopConf, Map<String, String> paimonOptions) {
+    String warehouse = paimonOptions.get(PaimonConstants.WAREHOUSE);
+    if (warehouse == null
+        || !warehouse.regionMatches(
+            true, 0, OSS_WAREHOUSE_SCHEME, 0, OSS_WAREHOUSE_SCHEME.length())) {
+      return;
+    }
+    // extractHadoopConfiguration and the move above already removed every fs.* key, so no
+    // catalog-level value can be overwritten here.
+    for (Map.Entry<String, String> entry : hadoopConf) {
+      if (entry.getKey().startsWith(OSS_OPTION_PREFIX)) {
+        paimonOptions.put(entry.getKey(), entry.getValue());
+      }
+    }
   }
 
   private static void moveOptionToHadoopConf(

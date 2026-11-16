@@ -22,11 +22,15 @@ import static io.trino.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -39,7 +43,10 @@ import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.security.ConnectorIdentity;
+import io.trino.spi.transaction.IsolationLevel;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.gravitino.Catalog;
@@ -346,6 +353,135 @@ class TestGravitinoConnectorForwardUser {
     assertEquals(message, ex.getMessage());
   }
 
+  @Test
+  void testEvictedClientStaysOpenUntilTransactionCommits() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    ConnectorTransactionHandle aliceTransaction = begin(connector);
+    connector.getMetadata(mockSession("alice", null), aliceTransaction);
+
+    // Bob's transaction evicts alice's client while alice's transaction is still open.
+    connector.getMetadata(mockSession("bob", null), begin(connector));
+    verify(clients.get("alice"), never()).close();
+
+    connector.commit(aliceTransaction);
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testEvictedClientStaysOpenUntilTransactionRollsBack() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    ConnectorTransactionHandle aliceTransaction = begin(connector);
+    connector.getMetadata(mockSession("alice", null), aliceTransaction);
+
+    connector.getMetadata(mockSession("bob", null), begin(connector));
+    verify(clients.get("alice"), never()).close();
+
+    connector.rollback(aliceTransaction);
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testEvictedClientWithoutTransactionIsClosedAtOnce() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    connector.resolveSessionMetadata(mockSession("alice", null));
+
+    connector.resolveSessionMetadata(mockSession("bob", null));
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testShutdownClosesClientsOfOpenTransactions() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    connector.getMetadata(mockSession("alice", null), begin(connector));
+
+    connector.shutdown();
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testCommittedTransactionLeavesCachedClientOpen() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    ConnectorTransactionHandle first = begin(connector);
+    connector.getMetadata(mockSession("alice", null), first);
+    GravitinoAdminClient client = clients.get("alice");
+
+    connector.commit(first);
+    connector.getMetadata(mockSession("alice", null), begin(connector));
+    assertSame(client, clients.get("alice"));
+    verify(client, never()).close();
+  }
+
+  @Test
+  void testLeaseTakenAfterRollbackIsReleased() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    ConnectorTransactionHandle aliceTransaction = begin(connector);
+    // Trino may roll back a transaction while its getMetadata is still running.
+    connector.rollback(aliceTransaction);
+    connector.getMetadata(mockSession("alice", null), aliceTransaction);
+
+    connector.resolveSessionMetadata(mockSession("bob", null));
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testNonPositiveSessionCacheSettingsThrowAtConstruction() {
+    for (String key :
+        List.of(
+            GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY,
+            GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY)) {
+      CatalogConnectorContext ctx =
+          mockContextWithConfig(
+              ImmutableMap.of(
+                  GravitinoAuthProvider.FORWARD_SESSION_USER_KEY,
+                  "true",
+                  GravitinoAuthProvider.AUTH_TYPE_KEY,
+                  "simple",
+                  key,
+                  "0"));
+
+      TrinoException ex = assertThrows(TrinoException.class, () -> new GravitinoConnector(ctx));
+      assertEquals(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), ex.getErrorCode(), key);
+    }
+  }
+
+  @Test
+  void testLeasesAreReleasedWhenInternalRollbackFails() {
+    Map<String, GravitinoAdminClient> clients = new ConcurrentHashMap<>();
+    GravitinoConnector connector = newConnectorWithCacheSizeOne(clients);
+    Connector internal = connector.catalogConnectorContext.getInternalConnector();
+    doThrow(new IllegalStateException("rollback failed")).when(internal).rollback(any());
+    ConnectorTransactionHandle aliceTransaction = begin(connector);
+    connector.getMetadata(mockSession("alice", null), aliceTransaction);
+    connector.getMetadata(mockSession("bob", null), begin(connector));
+
+    assertThrows(IllegalStateException.class, () -> connector.rollback(aliceTransaction));
+    verify(clients.get("alice")).close();
+  }
+
+  @Test
+  void testUserSessionClosesAfterLastLeaseOfRetiredSession() {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    GravitinoConnector.UserSession session =
+        new GravitinoConnector.UserSession(client, mock(CatalogConnectorMetadata.class));
+    assertTrue(session.tryLease());
+    assertTrue(session.tryLease());
+
+    session.retire();
+    assertFalse(session.tryLease());
+    session.release();
+    verify(client, never()).close();
+
+    session.release();
+    verify(client).close();
+  }
+
   /**
    * Creates a {@link GravitinoConnector} whose {@code buildAuthClient} is overridden with the given
    * function, so tests can control what building the per-user client does without mocking the
@@ -360,6 +496,43 @@ class TestGravitinoConnectorForwardUser {
         return authClientBuilder.apply(session);
       }
     };
+  }
+
+  private static GravitinoConnector newConnectorWithCacheSizeOne(
+      Map<String, GravitinoAdminClient> clients) {
+    CatalogConnectorContext ctx =
+        mockContextWithConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "simple",
+                GravitinoAuthProvider.SESSION_CACHE_MAX_SIZE_KEY, "1"));
+    Connector internal = mock(Connector.class);
+    when(ctx.getInternalConnector()).thenReturn(internal);
+    when(internal.getMetadata(any(), any())).thenReturn(mock(ConnectorMetadata.class));
+    when(internal.beginTransaction(any(), anyBoolean(), anyBoolean()))
+        .thenAnswer(invocation -> mock(ConnectorTransactionHandle.class));
+    GravitinoMetalake metalake = ctx.getMetalake();
+    return new GravitinoConnector(ctx) {
+      @Override
+      GravitinoAdminClient buildAuthClient(ConnectorSession session) {
+        GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+        when(client.loadMetalake(any())).thenReturn(metalake);
+        clients.put(session.getUser(), client);
+        return client;
+      }
+
+      @Override
+      protected GravitinoMetadata createGravitinoMetadata(
+          CatalogConnectorMetadata metadata,
+          CatalogConnectorMetadataAdapter adapter,
+          ConnectorMetadata delegate) {
+        return new GravitinoMetadata(metadata, adapter, delegate) {};
+      }
+    };
+  }
+
+  private static ConnectorTransactionHandle begin(GravitinoConnector connector) {
+    return connector.beginTransaction(IsolationLevel.READ_COMMITTED, false, true);
   }
 
   private static GravitinoAdminClient mockAdminClient(

@@ -724,12 +724,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         sparkTypeConverter);
   }
 
-  private void validateNamespace(String[] namespace) {
-    Preconditions.checkArgument(
-        namespace.length == 1,
-        "Doesn't support multi level namespaces: " + String.join(".", namespace));
-  }
-
   protected String getCatalogDefaultNamespace() {
     String[] catalogDefaultNamespace = sparkCatalog.defaultNamespace();
     Preconditions.checkArgument(
@@ -738,7 +732,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return catalogDefaultNamespace[0];
   }
 
-  private static org.apache.gravitino.rel.Column createGravitinoColumn(
+  /**
+   * Converts a Spark field to a Gravitino column for catalog-specific table creation.
+   *
+   * @param structField the Spark field
+   * @param typeConverter the converter for the table's format
+   * @return the converted column, including its comment and nullability
+   */
+  protected static org.apache.gravitino.rel.Column createGravitinoColumn(
       StructField structField, SparkTypeConverter typeConverter) {
     return org.apache.gravitino.rel.Column.of(
         structField.name(),
@@ -749,6 +750,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         false,
         // todo: support default value
         org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET);
+  }
+
+  private void validateNamespace(String[] namespace) {
+    Preconditions.checkArgument(
+        namespace.length == 1,
+        "Doesn't support multi level namespaces: " + String.join(".", namespace));
   }
 
   private String getDatabase(NameIdentifier gravitinoIdentifier) {

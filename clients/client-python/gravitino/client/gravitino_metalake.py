@@ -26,6 +26,22 @@ from gravitino.api.authorization.role import Role
 from gravitino.api.authorization.securable_objects import SecurableObject
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.authorization.user import User
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.domain_change import DomainChangeVariant
+from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.tag.tag_value import TagValue
+from gravitino.client.generic_domain import GenericDomain
+from gravitino.dto.requests.domain_create_request import (
+    BackingTagCreate,
+    DomainCreateRequest,
+)
+from gravitino.dto.requests.domain_updates_request import DomainUpdatesRequest
+from gravitino.dto.responses.domain_response import (
+    DomainListResponse,
+    DomainNamesListResponse,
+    DomainResponse,
+)
+from gravitino.exceptions.handlers.domain_error_handler import DOMAIN_ERROR_HANDLER
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
 from gravitino.api.job.job_handle import JobHandle
@@ -137,7 +153,11 @@ from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLE
 from gravitino.exceptions.handlers.policy_error_handler import POLICY_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
-from gravitino.rest.rest_utils import encode_string
+from gravitino.rest.rest_utils import (
+    domain_path,
+    encode_metadata_object_name,
+    encode_string,
+)
 from gravitino.utils.http_client import HTTPClient
 from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
@@ -153,6 +173,7 @@ class GravitinoMetalake(
     SupportsJobs,
     SupportsRoles,
     TagOperations,
+    DomainOperations,
     PolicyOperations,
     SupportsSecrets,
 ):  # pylint: disable=too-many-ancestors
@@ -227,8 +248,16 @@ class GravitinoMetalake(
         entity_list.validate()
         return [identifier.name() for identifier in entity_list.identifiers()]
 
-    def list_catalogs_info(self) -> List[Catalog]:
+    def list_catalogs_info(self, include_properties: bool = True) -> List[Catalog]:
         """List all the catalogs with their information under this metalake.
+
+        Args:
+            include_properties: Whether to resolve catalog properties. Defaults to True.
+                False returns lightweight descriptors without initializing server-side
+                catalog wrappers. Their properties retain only in-use, read from stored
+                metadata and defaulting to "true" when absent; name, type, provider,
+                comment, and audit information remain populated. Use descriptors for discovery
+                only. Call load_catalog before reading, comparing, or altering properties.
 
         Raises:
             NoSuchMetalakeException if the metalake with specified namespace does not exist.
@@ -236,7 +265,10 @@ class GravitinoMetalake(
         Returns:
             A list of Catalog under the specified namespace.
         """
-        params = {"details": "true"}
+        params = {
+            "details": "true",
+            "includeProperties": str(include_properties).lower(),
+        }
         url = f"api/metalakes/{encode_string(self.name())}/catalogs"
         response = self.rest_client.get(
             url, params=params, error_handler=CATALOG_ERROR_HANDLER
@@ -689,6 +721,94 @@ class GravitinoMetalake(
         resp.validate()
 
         return GenericJobHandle(resp.job())
+
+    def list_domains(self) -> list[str]:
+        """List visible domain names, including subdomains."""
+        response = self.rest_client.get(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainNamesListResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return result.names()
+
+    def list_domains_info(self) -> list[Domain]:
+        """List visible domain snapshots, including subdomains."""
+        response = self.rest_client.get(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            params={"details": "true"},
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainListResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return [
+            GenericDomain(self.name(), dto, self.rest_client)
+            for dto in result.domains()
+        ]
+
+    def get_domain(self, name: str) -> Domain:
+        """Load a domain by name; hidden drafts raise NoSuchDomainException."""
+        response = self.rest_client.get(
+            domain_path(self.name(), name),
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def create_domain(
+        self,
+        name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        backing_tag: TagValue,
+        create_backing_tag: bool,
+    ) -> Domain:
+        """Create a draft top-level domain with an explicit new or existing tag."""
+        Precondition.check_argument(
+            backing_tag is not None, "backing_tag must not be None"
+        )
+        request = DomainCreateRequest(
+            name,
+            comment,
+            properties,
+            None,
+            BackingTagCreate(
+                backing_tag.name(), backing_tag.value(), create_backing_tag
+            ),
+        )
+        request.validate()
+        response = self.rest_client.post(
+            f"api/metalakes/{encode_string(self.name())}/domains",
+            json=request,
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
+        """Alter name, comment or properties; the backing tag is unchanged."""
+        request = DomainUpdatesRequest.from_changes(changes)
+        request.validate()
+        response = self.rest_client.put(
+            domain_path(self.name(), name),
+            json=request,
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DomainResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return GenericDomain(self.name(), result.domain(), self.rest_client)
+
+    def delete_domain(self, name: str) -> bool:
+        """Delete a domain, preserving tags; parents with children are rejected."""
+        response = self.rest_client.delete(
+            domain_path(self.name(), name),
+            error_handler=DOMAIN_ERROR_HANDLER,
+        )
+        result = DropResponse.from_json(response.body, infer_missing=True)
+        result.validate()
+        return result.dropped()
 
     #########
     # Tag operations
@@ -1269,7 +1389,7 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_OWNERS_PATH.format(
             encode_string(self.name()),
-            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+            f"{metadata_object.type().value}/{encode_metadata_object_name(metadata_object)}",
         )
         response = self.rest_client.get(url, error_handler=OWNER_ERROR_HANDLER)
         resp = OwnerResponse.from_json(response.body, infer_missing=True)
@@ -1294,7 +1414,7 @@ class GravitinoMetalake(
         """
         url = self.API_METALAKES_OWNERS_PATH.format(
             encode_string(self.name()),
-            f"{metadata_object.type().value}/{encode_string(metadata_object.full_name())}",
+            f"{metadata_object.type().value}/{encode_metadata_object_name(metadata_object)}",
         )
         req = OwnerSetRequest(owner_name, owner_type)
         req.validate()
@@ -1783,7 +1903,7 @@ class GravitinoMetalake(
             encode_string(self.name()),
             encode_string(role_name),
             encode_string(securable_object.type().name.lower()),
-            encode_string(securable_object.full_name()),
+            encode_metadata_object_name(securable_object),
         )
         response = self.rest_client.put(
             url, json=req, error_handler=PERMISSION_ERROR_HANDLER
@@ -1824,7 +1944,7 @@ class GravitinoMetalake(
             encode_string(self.name()),
             encode_string(role_name),
             encode_string(securable_object.type().name.lower()),
-            encode_string(securable_object.full_name()),
+            encode_metadata_object_name(securable_object),
         )
         response = self.rest_client.put(
             url, json=req, error_handler=PERMISSION_ERROR_HANDLER
