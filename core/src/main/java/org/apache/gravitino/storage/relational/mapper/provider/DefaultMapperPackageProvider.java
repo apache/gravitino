@@ -28,6 +28,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
@@ -101,6 +102,7 @@ public class DefaultMapperPackageProvider implements MapperPackageProvider {
         TableMetaMapper.class,
         TagMetadataObjectRelMapper.class,
         TagMetaMapper.class,
+        GlossaryTermMetaMapper.class,
         TopicMetaMapper.class,
         UserMetaMapper.class,
         UserRoleRelMapper.class,

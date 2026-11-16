@@ -224,6 +224,7 @@ public class TestSQLScripts extends TestJDBCBackend {
         executeScript(scriptFile);
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
+        assertGlossarySchema();
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
       }
@@ -258,6 +259,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(sourceSchema);
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
+        assertGlossarySchema();
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
       }
@@ -1113,6 +1115,31 @@ public class TestSQLScripts extends TestJDBCBackend {
 
     for (String table : tableList) {
       connection.createStatement().execute("DROP TABLE " + table);
+    }
+  }
+
+  private void assertGlossarySchema() throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession();
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, metalake_id, name, name_key, definition, status, links, source_ref, properties, audit_info, current_version, deleted_at FROM glossary_term_meta WHERE 1=0")) {
+        Assertions.assertEquals(12, rows.getMetaData().getColumnCount());
+      }
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT term_id, metalake_id, synonym, synonym_key, deleted_at FROM glossary_term_synonym WHERE 1=0")) {
+        Assertions.assertEquals(5, rows.getMetaData().getColumnCount());
+      }
+      try (ResultSet tables =
+          connection.getMetaData().getTables(null, null, "%", new String[] {"TABLE"})) {
+        while (tables.next())
+          Assertions.assertNotEquals(
+              "glossary_term_version_info",
+              tables.getString("TABLE_NAME").toLowerCase(Locale.ROOT));
+      }
     }
   }
 }

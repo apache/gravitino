@@ -923,3 +923,30 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
     KEY `domain_rel_idx_parent` (`parent_id`, `deleted_at`),
     KEY `domain_rel_idx_metalake` (`metalake_id`, `deleted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
+
+CREATE TABLE IF NOT EXISTS glossary_term_meta (
+    term_id BIGINT NOT NULL PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    name VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+    name_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL,
+    definition MEDIUMTEXT,
+    status VARCHAR(16) NOT NULL,
+    links MEDIUMTEXT NOT NULL,
+    source_ref VARCHAR(128) COLLATE utf8mb4_0900_bin,
+    properties MEDIUMTEXT NOT NULL,
+    audit_info MEDIUMTEXT NOT NULL,
+    current_version BIGINT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, deleted_at),
+    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+
+CREATE TABLE IF NOT EXISTS glossary_term_synonym (
+    term_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    synonym VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
+    synonym_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (term_id, synonym_key, deleted_at),
+    KEY idx_glossary_synonym (metalake_id, synonym_key, deleted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;

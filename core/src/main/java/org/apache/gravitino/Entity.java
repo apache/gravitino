@@ -88,7 +88,8 @@ public interface Entity extends Serializable {
     JOB,
     AUDIT,
     FUNCTION,
-    DOMAIN;
+    DOMAIN,
+    GLOSSARY_TERM;
   }
 
   /**

@@ -1415,3 +1415,30 @@ COMMENT ON COLUMN domain_rel.audit_info IS 'domain relation audit info';
 COMMENT ON COLUMN domain_rel.current_version IS 'domain relation current version';
 COMMENT ON COLUMN domain_rel.last_version IS 'domain relation last version';
 COMMENT ON COLUMN domain_rel.deleted_at IS 'domain relation deleted at';
+
+CREATE TABLE IF NOT EXISTS glossary_term_meta (
+    term_id BIGINT NOT NULL PRIMARY KEY,
+    metalake_id BIGINT NOT NULL,
+    name VARCHAR(128) COLLATE "C" NOT NULL,
+    name_key VARCHAR(384) COLLATE "C" NOT NULL,
+    definition TEXT,
+    status VARCHAR(16) NOT NULL,
+    links TEXT NOT NULL,
+    source_ref VARCHAR(128) COLLATE "C",
+    properties TEXT NOT NULL,
+    audit_info TEXT NOT NULL,
+    current_version BIGINT NOT NULL DEFAULT 1,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, deleted_at),
+    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, deleted_at)
+);
+
+CREATE TABLE IF NOT EXISTS glossary_term_synonym (
+    term_id BIGINT NOT NULL,
+    metalake_id BIGINT NOT NULL,
+    synonym VARCHAR(128) COLLATE "C" NOT NULL,
+    synonym_key VARCHAR(384) COLLATE "C" NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (term_id, synonym_key, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_synonym ON glossary_term_synonym (metalake_id, synonym_key, deleted_at);
