@@ -275,6 +275,32 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
         with self.assertRaises(DomainAlreadyExistsException):
             self.lake.create_domain(parent.name(), None, {}, TagValue("unused"), True)
 
+    def _assert_direct_members(self, finance):
+        direct = {
+            m.object().full_name(): m
+            for m in finance.list_members(DomainMemberFilter())
+        }
+        self.assertEqual(
+            {
+                "ice.schema",
+                "ice.schema.orders",
+                "files.schema.data",
+                "models.schema.model",
+            },
+            set(direct),
+        )
+        self.assertEqual(
+            MetadataObject.Type.SCHEMA, direct["ice.schema"].object().type()
+        )
+        self.assertEqual(
+            [DomainRelation.Type.DIRECT],
+            [r.type() for r in direct["ice.schema"].relations()],
+        )
+        self.assertEqual(
+            [DomainRelation.Type.VIA_SUBDOMAIN],
+            [r.type() for r in direct["ice.schema.orders"].relations()],
+        )
+
     def test_members_relations_filters_and_nearest_assignment(self):
         catalog, table, hidden, view, semantic, fileset, model = self._catalogs()
         self.lake.create_tag("department", None, {}, ["finance", "risk"])
@@ -336,31 +362,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             ],
         )
 
-        # By default the tagged objects are listed, and the schema is listed once.
-        direct = {
-            m.object().full_name(): m
-            for m in finance.list_members(DomainMemberFilter())
-        }
-        self.assertEqual(
-            {
-                "ice.schema",
-                "ice.schema.orders",
-                "files.schema.data",
-                "models.schema.model",
-            },
-            set(direct),
-        )
-        self.assertEqual(
-            MetadataObject.Type.SCHEMA, direct["ice.schema"].object().type()
-        )
-        self.assertEqual(
-            [DomainRelation.Type.DIRECT],
-            [r.type() for r in direct["ice.schema"].relations()],
-        )
-        self.assertEqual(
-            [DomainRelation.Type.VIA_SUBDOMAIN],
-            [r.type() for r in direct["ice.schema.orders"].relations()],
-        )
+        self._assert_direct_members(finance)
 
         # Reverse lookup must expose the same domain on every supported leaf resource.
         for resource in (table, view, semantic, fileset, model):
