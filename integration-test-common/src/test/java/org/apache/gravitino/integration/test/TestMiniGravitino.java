@@ -47,6 +47,7 @@ import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.RESTClient;
+import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.junit.jupiter.api.Test;
@@ -129,19 +130,28 @@ class TestMiniGravitino {
         });
   }
 
-  @Test
-  void testUsesStoragePathFromJvm() throws Throwable {
-    String storagePath = mockConfDir.resolve("jvm-metadata").toString();
+  @ParameterizedTest
+  @ValueSource(strings = {"jvm-metadata", "caf\u00e9", "\u5143\u6570\u636e"})
+  void testUsesStoragePathFromJvm(String directory) throws Throwable {
+    String storagePath = mockConfDir.resolve(directory).toString();
     withSystemProperty(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
         storagePath,
         () -> {
           Properties properties = rewriteConfig("jdbc:h2", null, Collections.emptyMap());
-          ServerConfig config = new ServerConfig();
-          config.loadFromProperties(properties);
-          String jdbcUrl = H2Database.getConnectionUrl(config);
-          assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + storagePath + ";"), jdbcUrl);
-          assertTrue(jdbcUrl.contains(";WRITE_DELAY=0"));
+          // Startup may write the configuration twice more when disabling auxiliary services.
+          for (int rewrite = 0; rewrite < 3; rewrite++) {
+            ServerConfig config = new ServerConfig();
+            config.loadFromProperties(properties);
+            String jdbcUrl = H2Database.getConnectionUrl(config);
+            assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + storagePath + ";"), jdbcUrl);
+            assertTrue(jdbcUrl.contains(";WRITE_DELAY=0"));
+            if (rewrite < 2) {
+              Path configFile = mockConfDir.resolve("gravitino.conf");
+              ITUtils.overwriteConfigFile(configFile.toString(), properties);
+              properties = config.loadPropertiesFromFile(configFile.toFile());
+            }
+          }
         });
   }
 
@@ -163,7 +173,9 @@ class TestMiniGravitino {
   @ParameterizedTest
   @ValueSource(booleans = {false, true})
   void testFileStoragePathOverridesJvm(boolean useOverride) throws Throwable {
-    String storagePath = mockConfDir.resolve(useOverride ? "override" : "metadata").toString();
+    String templatePath = mockConfDir.resolve("caf\u00e9").toString();
+    String storagePath =
+        useOverride ? mockConfDir.resolve("\u5143\u6570\u636e").toString() : templatePath;
     withSystemProperty(
         Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
         mockConfDir.resolve("jvm-metadata").toString(),
@@ -172,7 +184,7 @@ class TestMiniGravitino {
               useOverride
                   ? Map.of(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), storagePath)
                   : Collections.emptyMap();
-          Properties properties = rewriteConfig("jdbc:h2", overrides);
+          Properties properties = rewriteConfig("jdbc:h2", templatePath, overrides);
           ServerConfig config = new ServerConfig();
           config.loadFromProperties(properties);
           String jdbcUrl = H2Database.getConnectionUrl(config);
