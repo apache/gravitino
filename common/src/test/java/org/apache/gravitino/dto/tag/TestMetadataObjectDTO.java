@@ -19,7 +19,12 @@
 package org.apache.gravitino.dto.tag;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import java.util.HashSet;
+import java.util.Set;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.glossary.TermBinding;
+import org.apache.gravitino.glossary.TermBindingPage;
 import org.apache.gravitino.json.JsonUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -165,6 +170,65 @@ public class TestMetadataObjectDTO {
       Assertions.assertEquals("Finance.US", decoded.name());
       Assertions.assertEquals("Finance.US", decoded.fullName());
       Assertions.assertNull(decoded.parent());
+    }
+  }
+
+  @Test
+  void testGlossaryTermNameRoundTrip() throws JsonProcessingException {
+    MetadataObjectDTO original =
+        MetadataObjectDTO.builder()
+            .withName("v1.2/Churn")
+            .withType(MetadataObject.Type.GLOSSARY_TERM)
+            .build();
+    for (String json :
+        new String[] {
+          JsonUtils.objectMapper().writeValueAsString(original),
+          "{\"fullName\":\"v1.2/Churn\",\"type\":\"glossary_term\"}",
+          "{\"type\":\"glossary_term\",\"fullName\":\"v1.2/Churn\"}"
+        }) {
+      MetadataObjectDTO decoded = JsonUtils.objectMapper().readValue(json, MetadataObjectDTO.class);
+      Assertions.assertEquals(original, decoded);
+      Assertions.assertEquals(MetadataObject.Type.GLOSSARY_TERM, decoded.type());
+      Assertions.assertEquals("v1.2/Churn", decoded.fullName());
+      Assertions.assertEquals("v1.2/Churn", decoded.name());
+      Assertions.assertNull(decoded.parent());
+    }
+  }
+
+  @Test
+  void testTermBindingsSnapshotMutableDtoTargets() {
+    for (MetadataObject.Type type :
+        new MetadataObject.Type[] {MetadataObject.Type.TABLE, MetadataObject.Type.SEMANTIC_MODEL}) {
+      MetadataObjectDTO.Builder builder =
+          MetadataObjectDTO.builder().withParent("dw.sales").withName("orders").withType(type);
+      MetadataObjectDTO target = builder.build();
+      MetadataObject expectedTarget = MetadataObjects.parse("dw.sales.orders", type);
+      TermBinding binding =
+          type == MetadataObject.Type.TABLE
+              ? TermBinding.implementedBy(target)
+              : TermBinding.usedBy(target, "net_revenue");
+      TermBinding expected =
+          type == MetadataObject.Type.TABLE
+              ? TermBinding.implementedBy(expectedTarget)
+              : TermBinding.usedBy(expectedTarget, "net_revenue");
+      Set<TermBinding> hashed = new HashSet<>();
+      hashed.add(binding);
+      int originalHash = binding.hashCode();
+      TermBindingPage page = TermBindingPage.of(new TermBinding[] {binding}, null);
+
+      target.setFullName("dw.finance.returns");
+      builder.withType(MetadataObject.Type.VIEW);
+
+      Assertions.assertEquals("dw.finance.returns", target.fullName());
+      Assertions.assertEquals(MetadataObject.Type.VIEW, target.type());
+      Assertions.assertEquals(originalHash, binding.hashCode());
+      Assertions.assertEquals("dw.sales", binding.object().parent());
+      Assertions.assertEquals("orders", binding.object().name());
+      Assertions.assertEquals(type, binding.object().type());
+      Assertions.assertEquals(expected, binding);
+      Assertions.assertTrue(hashed.contains(expected));
+      Assertions.assertEquals(expected, page.bindings()[0]);
+      Assertions.assertEquals(originalHash, page.bindings()[0].hashCode());
     }
   }
 

@@ -83,7 +83,12 @@ public interface MetadataObject {
      * as a table, belongs to a domain when its effective tags, its own or those inherited from its
      * schema and catalog, match the domain's backing tag. A domain cannot be tagged itself.
      */
-    DOMAIN;
+    DOMAIN,
+    /**
+     * A glossary term defines a business word in a metalake, and can be bound to the metadata
+     * objects and metrics behind it.
+     */
+    GLOSSARY_TERM;
   }
 
   /**

@@ -26,6 +26,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.domain.SupportsDomains;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -170,6 +171,16 @@ public interface Table extends Auditable {
    */
   default SupportsDomains supportsDomains() {
     throw new UnsupportedOperationException("Table does not support domain operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this table.
+   *
+   * @return The {@link SupportsTerms} if the table supports glossary term operations.
+   * @throws UnsupportedOperationException If the table does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("Table does not support glossary term operations.");
   }
 
   /**

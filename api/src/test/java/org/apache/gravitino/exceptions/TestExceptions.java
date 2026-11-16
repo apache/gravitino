@@ -56,4 +56,41 @@ public class TestExceptions {
     Assertions.assertEquals(
         "Tag t already backs d", ((BackingTagAlreadyBoundException) alreadyBound).getMessage());
   }
+
+  @Test
+  public void testGlossaryExceptionsHierarchy() {
+    // The parents drive the HTTP mapping: AlreadyExistsException to 409, NotFoundException to 404.
+    Object alreadyExists = new TermAlreadyExistsException("Term %s already exists", "Churn");
+    Object noSuchTerm = new NoSuchTermException("Term %s does not exist", "Churn");
+    Assertions.assertTrue(alreadyExists instanceof AlreadyExistsException);
+    Assertions.assertTrue(noSuchTerm instanceof NotFoundException);
+    Assertions.assertEquals(
+        "Term Churn does not exist", ((NoSuchTermException) noSuchTerm).getMessage());
+  }
+
+  /** The exception parents preserve conflict/invalid-query categories and diagnostic causes. */
+  @Test
+  public void testGlossaryConflictAndLookupExceptions() {
+    Throwable cause = new IllegalStateException("store failure");
+    TermVersionConflictException conflict =
+        new TermVersionConflictException("Term %s changed; reload before editing", "Churn");
+    Object conflictCategory = conflict;
+    Assertions.assertTrue(conflictCategory instanceof OptimisticLockException);
+    Assertions.assertEquals("Term Churn changed; reload before editing", conflict.getMessage());
+    TermVersionConflictException conflictWithCause =
+        new TermVersionConflictException(cause, "Term %s changed", "Churn");
+    Assertions.assertSame(cause, conflictWithCause.getCause());
+    Assertions.assertEquals("Term Churn changed", conflictWithCause.getMessage());
+
+    LookupTooBroadException lookup =
+        new LookupTooBroadException("Lookup is too broad; %s", "omit bindings or narrow the query");
+    Object lookupCategory = lookup;
+    Assertions.assertTrue(lookupCategory instanceof IllegalArgumentException);
+    Assertions.assertEquals(
+        "Lookup is too broad; omit bindings or narrow the query", lookup.getMessage());
+    LookupTooBroadException lookupWithCause =
+        new LookupTooBroadException(cause, "Lookup is too broad; %s", "narrow the query");
+    Assertions.assertSame(cause, lookupWithCause.getCause());
+    Assertions.assertEquals("Lookup is too broad; narrow the query", lookupWithCause.getMessage());
+  }
 }

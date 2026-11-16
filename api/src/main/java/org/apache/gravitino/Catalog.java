@@ -25,6 +25,7 @@ import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.function.FunctionCatalog;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
@@ -272,6 +273,16 @@ public interface Catalog extends Auditable {
    */
   default SupportsTags supportsTags() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support tag operations");
+  }
+
+  /**
+   * Returns the glossary term operations for this catalog.
+   *
+   * @return The {@link SupportsTerms} if the catalog supports glossary term operations.
+   * @throws UnsupportedOperationException If the catalog does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support glossary term operations.");
   }
 
   /**

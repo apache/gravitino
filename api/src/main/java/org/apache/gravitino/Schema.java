@@ -23,6 +23,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
@@ -77,6 +78,16 @@ public interface Schema extends Auditable {
    */
   default SupportsTags supportsTags() {
     throw new UnsupportedOperationException("Schema does not support tag operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this schema.
+   *
+   * @return The {@link SupportsTerms} if the schema supports glossary term operations.
+   * @throws UnsupportedOperationException If the schema does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("Schema does not support glossary term operations.");
   }
 
   /**

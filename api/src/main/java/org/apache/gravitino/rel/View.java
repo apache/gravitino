@@ -26,6 +26,7 @@ import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.domain.SupportsDomains;
+import org.apache.gravitino.glossary.SupportsTerms;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.tag.SupportsTags;
@@ -144,6 +145,17 @@ public interface View extends Auditable {
    */
   default SupportsDomains supportsDomains() {
     throw new UnsupportedOperationException("View does not support domain operations.");
+  }
+
+  /**
+   * Returns the glossary term operations for this view itself. This does not support bindings on
+   * view output columns or {@link SupportsTerms#listColumnTerms()}.
+   *
+   * @return The {@link SupportsTerms} if the view supports glossary term operations.
+   * @throws UnsupportedOperationException If the view does not support glossary term operations.
+   */
+  default SupportsTerms supportsTerms() {
+    throw new UnsupportedOperationException("View does not support glossary term operations.");
   }
 
   /**
