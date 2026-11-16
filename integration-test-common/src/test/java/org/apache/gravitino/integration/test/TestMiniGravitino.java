@@ -45,16 +45,20 @@ import java.util.Properties;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.client.RESTClient;
+import org.apache.gravitino.server.ServerConfig;
 import org.apache.gravitino.storage.relational.database.H2Database;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.api.parallel.ResourceLock;
+import org.junit.jupiter.api.parallel.Resources;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
+@ResourceLock(Resources.SYSTEM_PROPERTIES)
 class TestMiniGravitino {
 
   @TempDir private Path mockConfDir;
@@ -64,7 +68,7 @@ class TestMiniGravitino {
   @ValueSource(strings = "jdbc:h2")
   void testDefaultH2UsesSynchronousWrites(@Nullable String templateUrl) throws Exception {
     Properties properties = rewriteConfig(templateUrl, Collections.emptyMap());
-    Config config = new Config(false) {};
+    ServerConfig config = new ServerConfig();
     config.loadFromProperties(properties);
     String jdbcUrl = H2Database.getConnectionUrl(config);
     assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + mockConfDir.resolve("metadata") + ";"));
@@ -104,6 +108,77 @@ class TestMiniGravitino {
     String jdbcUrl = "jdbc:h2:file:/tmp/template-metadata;WRITE_DELAY=100";
     Properties properties = rewriteConfig(jdbcUrl, Collections.emptyMap());
     assertEquals(jdbcUrl, properties.getProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY));
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "jdbc:h2:file:/tmp/jvm-metadata;WRITE_DELAY=100",
+        "jdbc:mysql://localhost/gravitino",
+        "jdbc:postgresql://localhost/gravitino"
+      })
+  void testPreservesJdbcUrlFromJvm(String jdbcUrl) throws Throwable {
+    withSystemProperty(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
+        jdbcUrl,
+        () -> {
+          Properties properties = rewriteConfig(null, Collections.emptyMap());
+          ServerConfig config = new ServerConfig();
+          config.loadFromProperties(properties);
+          assertEquals(jdbcUrl, config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL));
+        });
+  }
+
+  @Test
+  void testUsesStoragePathFromJvm() throws Throwable {
+    String storagePath = mockConfDir.resolve("jvm-metadata").toString();
+    withSystemProperty(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
+        storagePath,
+        () -> {
+          Properties properties = rewriteConfig("jdbc:h2", null, Collections.emptyMap());
+          ServerConfig config = new ServerConfig();
+          config.loadFromProperties(properties);
+          String jdbcUrl = H2Database.getConnectionUrl(config);
+          assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + storagePath + ";"), jdbcUrl);
+          assertTrue(jdbcUrl.contains(";WRITE_DELAY=0"));
+        });
+  }
+
+  @Test
+  void testTemplateOverridesJvmJdbcUrl() throws Throwable {
+    withSystemProperty(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
+        "jdbc:postgresql://localhost/gravitino",
+        () -> {
+          Properties properties = rewriteConfig("jdbc:h2", Collections.emptyMap());
+          ServerConfig config = new ServerConfig();
+          config.loadFromProperties(properties);
+          String jdbcUrl = H2Database.getConnectionUrl(config);
+          assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + mockConfDir.resolve("metadata") + ";"));
+          assertTrue(jdbcUrl.contains(";WRITE_DELAY=0"));
+        });
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testFileStoragePathOverridesJvm(boolean useOverride) throws Throwable {
+    String storagePath = mockConfDir.resolve(useOverride ? "override" : "metadata").toString();
+    withSystemProperty(
+        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
+        mockConfDir.resolve("jvm-metadata").toString(),
+        () -> {
+          Map<String, String> overrides =
+              useOverride
+                  ? Map.of(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), storagePath)
+                  : Collections.emptyMap();
+          Properties properties = rewriteConfig("jdbc:h2", overrides);
+          ServerConfig config = new ServerConfig();
+          config.loadFromProperties(properties);
+          String jdbcUrl = H2Database.getConnectionUrl(config);
+          assertTrue(jdbcUrl.startsWith("jdbc:h2:file:" + storagePath + ";"), jdbcUrl);
+          assertTrue(jdbcUrl.contains(";WRITE_DELAY=0"));
+        });
   }
 
   @Test
@@ -162,10 +237,16 @@ class TestMiniGravitino {
 
   private Properties rewriteConfig(@Nullable String templateUrl, Map<String, String> overrides)
       throws IOException {
+    return rewriteConfig(templateUrl, mockConfDir.resolve("metadata").toString(), overrides);
+  }
+
+  private Properties rewriteConfig(
+      @Nullable String templateUrl, @Nullable String storagePath, Map<String, String> overrides)
+      throws IOException {
     Properties template = new Properties();
-    template.setProperty(
-        Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(),
-        mockConfDir.resolve("metadata").toString());
+    if (storagePath != null) {
+      template.setProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), storagePath);
+    }
     if (templateUrl != null) {
       template.setProperty(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY, templateUrl);
     }
@@ -186,6 +267,19 @@ class TestMiniGravitino {
       properties.load(input);
     }
     return properties;
+  }
+
+  private void withSystemProperty(String key, String value, Executable test) throws Throwable {
+    String previous = System.setProperty(key, value);
+    try {
+      test.execute();
+    } finally {
+      if (previous == null) {
+        System.clearProperty(key);
+      } else {
+        System.setProperty(key, previous);
+      }
+    }
   }
 
   private MiniGravitino createMiniGravitino(ExecutorService executor, RESTClient restClient)

@@ -292,13 +292,11 @@ public class MiniGravitino {
 
     Properties configProperties = serverConfig.loadPropertiesFromFile(new File(configTempFileName));
     configProperties.putAll(configMap);
-    String jdbcUrl =
-        configProperties.getProperty(
-            Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY,
-            Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_URL);
+    // Match server startup: load JVM properties first, then apply the generated file's overrides.
+    ServerConfig config = new ServerConfig();
+    config.loadFromProperties(configProperties);
+    String jdbcUrl = config.get(Configs.ENTITY_RELATIONAL_JDBC_BACKEND_URL);
     if (Configs.DEFAULT_RELATIONAL_JDBC_BACKEND_URL.equals(jdbcUrl)) {
-      Config config = new Config(false) {};
-      config.loadFromProperties(configProperties);
       // H2 2.2.224 can panic when its asynchronous chunk writer checks free-space state while
       // another thread removes unused chunks (h2database/h2database#4048). Synchronous writes
       // avoid that pipeline in the default embedded test database. Preserve explicit JDBC URLs
