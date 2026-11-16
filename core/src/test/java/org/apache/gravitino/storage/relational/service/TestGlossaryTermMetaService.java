@@ -32,6 +32,7 @@ import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
+import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.AfterEach;
@@ -89,6 +90,11 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     Assertions.assertEquals(AUDIT_INFO, read.auditInfo());
     Assertions.assertEquals(2, read.synonyms().length);
     Assertions.assertEquals(1, read.version());
+    Assertions.assertArrayEquals(
+        new long[] {100, 101},
+        new RelationalEntityStoreIdResolver()
+            .getEntityIds(ident("ACTIVE CUSTOMER"), TYPE)
+            .fullIds());
     GlossaryTermEntity updated =
         service.update(
             ident("Active Customer"),

@@ -932,13 +932,15 @@ CREATE TABLE IF NOT EXISTS glossary_term_meta (
     definition MEDIUMTEXT,
     status VARCHAR(16) NOT NULL,
     links MEDIUMTEXT NOT NULL,
-    source_ref VARCHAR(128) COLLATE utf8mb4_0900_bin,
+    source_ref VARCHAR(128) COLLATE utf8mb4_bin,
+    -- MySQL 5.7 collations pad spaces. The binary key preserves exact source references.
+    source_ref_key VARBINARY(512) GENERATED ALWAYS AS (CAST(source_ref AS BINARY)) STORED,
     properties MEDIUMTEXT NOT NULL,
     audit_info MEDIUMTEXT NOT NULL,
     current_version BIGINT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, deleted_at),
-    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, deleted_at)
+    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref_key, deleted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
 
 CREATE TABLE IF NOT EXISTS glossary_term_synonym (

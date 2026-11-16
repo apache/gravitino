@@ -147,8 +147,8 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
         return new NamespacedEntityId(groupId, metalakeId);
 
       case GLOSSARY_TERM:
-        return new NamespacedEntityId(
-            GlossaryTermMetaService.getInstance().get(nameIdentifier).id(), metalakeId);
+        return GlossaryTermMetaService.getInstance().getIds(nameIdentifier);
+
       case TAG:
         long tagId =
             TagMetaService.getInstance().getTagIdByTagName(metalakeId, nameIdentifier.name());

@@ -117,6 +117,9 @@ public final class GlossaryTermSQLProvider {
             .getConfiguration()
             .getDatabaseId();
     // H2 has no shared row-lock clause; use its exclusive lock for the same snapshot guarantee.
-    return write || "h2".equalsIgnoreCase(database) ? " FOR UPDATE" : " FOR SHARE";
+    if (write || "h2".equalsIgnoreCase(database)) {
+      return " FOR UPDATE";
+    }
+    return "mysql".equalsIgnoreCase(database) ? " LOCK IN SHARE MODE" : " FOR SHARE";
   }
 }

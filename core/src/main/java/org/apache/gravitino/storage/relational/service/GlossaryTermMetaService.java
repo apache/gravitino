@@ -40,6 +40,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
@@ -48,7 +49,18 @@ import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
-/** Transactional persistence of glossary definitions and their synonyms. */
+/**
+ * Transactional persistence of glossary definitions and their synonyms.
+ *
+ * <p>Operations join an existing SessionUtils transaction or commit their own. Missing definitions
+ * throw NoSuchEntityException, except delete (false) and batchGet (omitted). Duplicate names,
+ * source references and reserved IDs are translated to EntityAlreadyExistsException. Other database
+ * failures propagate through the existing store exception converter.
+ *
+ * <p>Insert starts at revision 1; update and overwrite increment the stored revision once. Callers
+ * must detect semantic no-ops before invoking a write. Relation validation, authorization and the
+ * name-versus-synonym checks belong to the glossary manager, not this persistence service.
+ */
 public final class GlossaryTermMetaService {
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
 
@@ -93,6 +105,16 @@ public final class GlossaryTermMetaService {
         mapper -> fromPO(require(mapper, ident, false), mapper, ident.namespace()));
   }
 
+  /** Resolves term and metalake identities from the same protected row snapshot. */
+  public NamespacedEntityId getIds(NameIdentifier ident) {
+    return transaction(
+        ident.namespace(),
+        mapper -> {
+          GlossaryTermPO row = require(mapper, ident, false);
+          return new NamespacedEntityId(row.getTermId(), row.getMetalakeId());
+        });
+  }
+
   /** Lists definitions belonging to the requested metalake. */
   public List<GlossaryTermEntity> list(Namespace ns) {
     return transaction(
@@ -114,7 +136,13 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  /** Loads requested terms, omitting missing names. */
+  /**
+   * Loads requested terms, omitting missing names.
+   *
+   * <p>Like the existing user/role fallback, this accepts identifiers from different metalakes and
+   * performs a protected read per identifier. Use list for a complete metalake: it batches synonyms
+   * and does not issue a query per returned term.
+   */
   public List<GlossaryTermEntity> batchGet(List<NameIdentifier> identifiers) {
     List<GlossaryTermEntity> result = new ArrayList<>();
     for (NameIdentifier ident : identifiers) {
