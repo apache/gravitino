@@ -36,6 +36,7 @@ import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.dto.rel.RepresentationDTO;
 import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.utils.WritableDataTypeValidator;
 
 /** Represents a request to create a view. */
 @Getter
@@ -108,6 +109,7 @@ public class ViewCreateRequest implements RESTRequest {
 
   @Override
   public void validate() throws IllegalArgumentException {
+    RequestValidation.properties(properties);
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
     Preconditions.checkArgument(
@@ -126,6 +128,7 @@ public class ViewCreateRequest implements RESTRequest {
                 Preconditions.checkArgument(column != null, "column must not be null");
                 column.validate();
               });
+      WritableDataTypeValidator.validateColumns(columns, "columns");
     }
 
     validateNoDuplicateDialects(representations);

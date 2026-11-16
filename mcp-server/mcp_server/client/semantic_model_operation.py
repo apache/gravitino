@@ -20,13 +20,36 @@ from typing import Optional
 
 
 class SemanticModelOperation(ABC):
-    """Operations on schema-scoped Gravitino Semantic Models."""
+    """Operations on Gravitino Semantic Models and their source associations."""
 
     @abstractmethod
     async def list_of_semantic_models(
         self, catalog_name: str, schema_name: str
     ) -> str:
         """Return Semantic Model identifiers as a JSON array."""
+        pass
+
+    @abstractmethod
+    async def list_semantic_model_datasets(
+        self,
+        source_type: str,
+        catalog_name: str,
+        schema_name: str,
+        source_name: str,
+    ) -> str:
+        """Return visible dataset identifiers associated with a table or view."""
+        pass
+
+    @abstractmethod
+    async def list_metrics(self, catalog_name: str, schema_name: str) -> str:
+        """Return visible metric identifiers with full REST namespaces as JSON."""
+        pass
+
+    @abstractmethod
+    async def list_metric_infos(
+        self, catalog_name: str, schema_name: str
+    ) -> str:
+        """Return complete visible metrics and their full namespaces as JSON."""
         pass
 
     @abstractmethod

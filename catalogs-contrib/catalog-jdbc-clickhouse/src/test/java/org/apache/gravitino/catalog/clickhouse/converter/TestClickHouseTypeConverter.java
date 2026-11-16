@@ -205,7 +205,7 @@ public class TestClickHouseTypeConverter {
     Assertions.assertTrue(exception.getMessage().contains("ClickHouse"));
     Assertions.assertTrue(exception.getMessage().contains("varchar(n)"));
     Assertions.assertTrue(exception.getMessage().contains("string"));
-    Assertions.assertTrue(exception.getMessage().contains("fixedchar(n)"));
+    Assertions.assertTrue(exception.getMessage().contains("char(n)"));
   }
 
   protected void checkGravitinoTypeToJdbcType(String jdbcTypeName, Type gravitinoType) {

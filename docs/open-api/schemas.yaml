@@ -96,6 +96,14 @@ paths:
                   $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
                 NoSuchSchemaException:
                   $ref: "#/components/examples/NoSuchSchemaException"
+        "409":
+          description: >
+            Conflict - An external schema carries an identifier owned by another existing schema.
+            Remove the copied source marker before importing an independent copy.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -148,6 +156,14 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "409":
+          description: >
+            Conflict - The schema is not empty, or the catalog cannot safely support the requested
+            cascading deletion. PostgreSQL rejects non-empty schema deletion even with cascade.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -275,7 +291,11 @@ components:
           description: The name of the property to set
         value:
           type: string
-          description: The value of the property to set
+          description: >
+            The value of the property to set. If the property holds a write-through secret URN of
+            this schema, the value is written as a new version of that secret. If it holds another
+            secret URN, the value is written through that secret's provider right away, and a failed
+            alter does not undo it.
       example:
         "@type": "setProperty"
         property: "key1"

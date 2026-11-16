@@ -22,7 +22,9 @@ import com.google.common.collect.Maps;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.iceberg.IcebergPropertiesConstants;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIf;
+import org.junit.jupiter.api.condition.EnabledIf;
 
 /**
  * This class use Apache Iceberg RESTCatalog for test, and the real backend catalog is HiveCatalog.
@@ -32,6 +34,17 @@ import org.junit.jupiter.api.condition.DisabledIf;
 // version in embedded mode.
 @DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
 public abstract class SparkIcebergCatalogRestBackendIT extends SparkIcebergCatalogIT {
+
+  /**
+   * Tests replacing columns without assuming the case-sensitivity of the catalog behind the REST
+   * service. Gravitino cannot infer that backend capability through the REST protocol.
+   */
+  @Override
+  @Test
+  @EnabledIf("supportsReplaceColumns")
+  protected void testAlterTableReplaceColumns() {
+    runAlterTableReplaceColumnsTest(false);
+  }
 
   @Override
   protected Map<String, String> getCatalogConfigs() {

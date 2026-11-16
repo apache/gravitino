@@ -46,7 +46,7 @@ class MetadataObjectCredentialOperations implements SupportsCredentials {
             "api/metalakes/%s/objects/%s/%s/credentials",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override

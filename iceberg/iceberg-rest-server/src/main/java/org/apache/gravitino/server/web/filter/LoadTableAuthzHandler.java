@@ -20,6 +20,7 @@
 package org.apache.gravitino.server.web.filter;
 
 import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
@@ -87,7 +88,7 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     // 1. Authorize the table access (see performTableAuthorization) -> 403 if unauthorized
     // 2. Let request proceed - the actual loadTable() call will handle non-existence
     IcebergCatalogWrapper catalogWrapper =
-        IcebergLoadAuthzHandlerHelper.getCatalogWrapper(loadContext.catalog());
+        IcebergLoadAuthzHandlerHelper.getCatalogWrapper(loadContext.catalog(), nameIdentifierMap);
 
     // Validate that this is not a metadata table access
     if (isMetadataTable(tableName, namespace, catalogWrapper)) {
@@ -109,21 +110,30 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
     return true;
   }
 
+  @Override
+  public EntityType entityType() {
+    return EntityType.TABLE;
+  }
+
   /**
    * Perform TABLE-level authorization aligned with {@link
    * org.apache.gravitino.iceberg.service.rest.IcebergTableOperations#loadTable}: evaluate the
    * primary expression first; if it denies, evaluate {@link
-   * AuthorizationExpression#allowCheckExistence()} when non-blank. Before primary expression
-   * evaluation, if the catalog supports views and the identifier resolves to a view, throws {@link
-   * NoSuchTableException} so clients can fall back to {@code /views/} (see Iceberg REST spec for
-   * {@code /tables/}).
+   * AuthorizationExpression#allowCheckExistence()} when non-blank.
+   *
+   * <p>If the identifier resolves to a view, a caller who may load the view or check that it exists
+   * gets {@link NoSuchTableException}, so clients can fall back to {@code /views/} (see Iceberg
+   * REST spec for {@code /tables/}). Anyone else is answered as for a table name that does not
+   * exist, so the response does not reveal that a view has that name.
    */
   private void performTableAuthorization(
       Map<EntityType, NameIdentifier> nameIdentifierMap,
       IcebergCatalogWrapper catalogWrapper,
       TableIdentifier tableIdentifier,
       NameIdentifier tableId) {
-    if (catalogWrapper.supportsViewOperations() && catalogWrapper.viewExists(tableIdentifier)) {
+    boolean isView =
+        catalogWrapper.supportsViewOperations() && catalogWrapper.viewExists(tableIdentifier);
+    if (isView && maySeeView(nameIdentifierMap, tableId)) {
       throw new NoSuchTableException("Table %s not found", tableIdentifier.name());
     }
 
@@ -136,10 +146,23 @@ public class LoadTableAuthzHandler implements AuthorizationHandler {
             authorizationExpression,
             AuthorizationExpressionConstants
                 .ICEBERG_TABLE_EXISTS_SECONDARY_AUTHORIZATION_EXPRESSION),
-        () -> catalogWrapper.tableExists(tableIdentifier),
+        () -> !isView && catalogWrapper.tableExists(tableIdentifier),
         () -> new NoSuchTableException("Table %s not found", tableIdentifier.name()),
         "table",
         tableId);
+  }
+
+  private static boolean maySeeView(
+      Map<EntityType, NameIdentifier> nameIdentifierMap, NameIdentifier tableId) {
+    Map<EntityType, NameIdentifier> viewMap = new HashMap<>(nameIdentifierMap);
+    viewMap.remove(EntityType.TABLE);
+    viewMap.put(EntityType.VIEW, NameIdentifier.of(tableId.namespace(), tableId.name()));
+    return IcebergLoadAuthzHandlerHelper.isAllowed(
+            viewMap, AuthorizationExpressionConstants.ICEBERG_LOAD_VIEW_AUTHORIZATION_EXPRESSION)
+        || IcebergLoadAuthzHandlerHelper.isAllowed(
+            viewMap,
+            AuthorizationExpressionConstants
+                .ICEBERG_LOAD_VIEW_EXISTENCE_CHECK_AUTHORIZATION_EXPRESSION);
   }
 
   /**

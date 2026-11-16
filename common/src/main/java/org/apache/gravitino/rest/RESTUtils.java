@@ -31,6 +31,8 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Random;
+import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 
 /**
@@ -108,6 +110,32 @@ public class RESTUtils {
     // URLEncoder follows the form encoding and turns a space into '+', which is a literal '+'
     // in a path segment. A literal '+' in the input is already encoded as %2B at this point.
     return formEncode(toEncode).replace(FORM_ENCODED_SPACE, PERCENT_ENCODED_SPACE);
+  }
+
+  /**
+   * Encodes a domain name as a single path segment, guarding against path normalization.
+   *
+   * @param name The domain name.
+   * @return The encoded path segment.
+   */
+  public static String encodeDomainPathSegment(String name) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(name) && !".".equals(name) && !"..".equals(name),
+        "Unsafe domain path segment: %s",
+        name);
+    return encodeString(name);
+  }
+
+  /**
+   * Encodes the full name used to address a metadata object in a REST path.
+   *
+   * @param object The metadata object.
+   * @return The encoded path segment.
+   */
+  public static String encodeMetadataObjectName(MetadataObject object) {
+    return object.type() == MetadataObject.Type.DOMAIN
+        ? encodeDomainPathSegment(object.fullName())
+        : encodeString(object.fullName());
   }
 
   /**

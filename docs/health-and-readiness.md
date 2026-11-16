@@ -60,6 +60,11 @@ a status of `up` or `down`, and a details map that explains a failure. On the Gr
 normal check names are `httpServer` and `entityStore`. After an observed out-of-memory error, all
 three endpoints instead report the `jvm` failure described below.
 
+The top-level `status` and each `checks[].status` use lowercase `up`/`down` on Gravitino
+and Lance REST, and uppercase `UP`/`DOWN` on Iceberg REST. This applies to liveness, readiness,
+aggregate endpoints, and their root aliases, for all health results. Clients that inspect these
+fields must account for the casing used by the service they call.
+
 ## Out-of-memory Failures
 
 A Metaspace or heap `OutOfMemoryError` can leave already-loaded endpoints responding successfully

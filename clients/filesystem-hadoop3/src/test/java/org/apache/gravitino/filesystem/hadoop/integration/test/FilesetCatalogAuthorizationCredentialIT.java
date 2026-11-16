@@ -195,24 +195,28 @@ public class FilesetCatalogAuthorizationCredentialIT extends BaseIT {
   void testGetCatalogCredentialWithPrivilege() {
     GravitinoMetalake normalUserMetalake = normalUserClient.loadMetalake(metalakeName);
     Catalog catalog = normalUserMetalake.loadCatalog(catalogName);
-    catalog.supportsCredentials().getCredentials();
+    MetadataObject object = MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG);
+    assertThrows(ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+    try {
+      metalake.grantPrivilegesToRole(
+          ROLE_NAME, object, ImmutableSet.of(Privileges.UseSecrets.allow()));
+      assertThrows(ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+      metalake.grantPrivilegesToRole(
+          ROLE_NAME, object, ImmutableSet.of(Privileges.IncludeCredentialSecrets.allow()));
+      Assertions.assertTrue(catalog.supportsCredentials().getCredentials().length > 0);
 
-    metalake.revokePrivilegesFromRole(
-        ROLE_NAME,
-        MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG),
-        ImmutableSet.of(Privileges.UseCatalog.allow()));
-
-    // Normal user without specific catalog privileges cannot get catalog credentials
-    assertThrows(
-        ForbiddenException.class,
-        () -> {
-          catalog.supportsCredentials().getCredentials();
-        });
-
-    metalake.grantPrivilegesToRole(
-        ROLE_NAME,
-        MetadataObjects.of(null, catalogName, MetadataObject.Type.CATALOG),
-        ImmutableSet.of(Privileges.UseCatalog.allow()));
+      metalake.revokePrivilegesFromRole(
+          ROLE_NAME, object, ImmutableSet.of(Privileges.UseCatalog.allow()));
+      assertThrows(ForbiddenException.class, () -> catalog.supportsCredentials().getCredentials());
+    } finally {
+      metalake.grantPrivilegesToRole(
+          ROLE_NAME, object, ImmutableSet.of(Privileges.UseCatalog.allow()));
+      metalake.revokePrivilegesFromRole(
+          ROLE_NAME,
+          object,
+          ImmutableSet.of(
+              Privileges.UseSecrets.allow(), Privileges.IncludeCredentialSecrets.allow()));
+    }
   }
 
   @Test

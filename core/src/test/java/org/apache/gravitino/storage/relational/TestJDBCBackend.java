@@ -218,6 +218,10 @@ public abstract class TestJDBCBackend {
         tableName = "semantic_model_meta";
         idColumnName = "semantic_model_id";
         break;
+      case DOMAIN:
+        tableName = "domain_meta";
+        idColumnName = "domain_id";
+        break;
       default:
         throw new IllegalArgumentException("Unsupported entity type: " + entityType);
     }
@@ -337,6 +341,24 @@ public abstract class TestJDBCBackend {
       } else {
         throw new RuntimeException("Doesn't contain data");
       }
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  protected int countActiveRowsWhere(String table, String whereClause) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, whereClause))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("Doesn't contain data");
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }

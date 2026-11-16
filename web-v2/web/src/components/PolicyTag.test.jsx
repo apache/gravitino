@@ -24,16 +24,30 @@ import { Provider } from 'react-redux'
 import { configureStore } from '@reduxjs/toolkit'
 import { defHttp } from '@/lib/utils/axios'
 import metalakes from '@/lib/store/metalakes'
-import policies, { fetchPolicies } from '@/lib/store/policies'
+import policies, { getPoliciesForTag } from '@/lib/store/policies'
 import PolicyTag from './PolicyTag'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn() }))
+const tagPoliciesUrl = '/api/metalakes/demo/tags/classification.sensitive/policies'
 
-vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), post: vi.fn() } }))
+vi.mock('@/lib/utils/axios', () => ({ defHttp: { get: vi.fn(), post: vi.fn(), delete: vi.fn() } }))
 vi.mock('next/navigation', () => ({
   useRouter: () => navigation,
   useSearchParams: () => new URLSearchParams({ metalake: 'demo' })
 }))
+
+it('keeps tag selectors nested under their own key', async () => {
+  defHttp.get.mockResolvedValue({
+    associations: [{ policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES', name: 'selector' } }]
+  })
+  const store = configureStore({ reducer: { policies } })
+
+  const result = await store.dispatch(getPoliciesForTag({ metalake: 'demo', tag: 'classification.sensitive' }))
+
+  expect(result.payload).toEqual([
+    { name: 'masking', enabled: true, selector: { type: 'ALL_VALUES', name: 'selector' } }
+  ])
+})
 
 let root
 let container
@@ -68,23 +82,10 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   expect(directTag.textContent).toBe('direct')
   expect(inheritedTag.textContent).toBe('inherited')
   expect(inheritedTag.querySelector('.ant-tag-close-icon')).toBeNull()
-  expect(container.textContent.includes('Associate Policy')).toBe(!readOnly)
+  expect(container.textContent.includes('Associate Policy')).toBe(false)
 
   const close = directTag.querySelector('.ant-tag-close-icon')
-  if (readOnly) {
-    expect(close).toBeNull()
-  } else {
-    expect(close).not.toBeNull()
-    defHttp.post.mockResolvedValue({ code: 0 })
-    defHttp.get.mockResolvedValue({ policies: [inheritedPolicy] })
-    await act(async () => close.click())
-    expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
-      url: '/api/metalakes/demo/objects/table/sales.mart.orders/policies',
-      data: { policiesToRemove: ['direct'] }
-    })
-    expect(container.textContent).not.toContain('direct')
-    expect(navigation.push).not.toHaveBeenCalled()
-  }
+  expect(close).toBeNull()
 
   const policyLink = [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'inherited')
   await act(async () => policyLink.click())
@@ -92,25 +93,9 @@ it.each([true, false])('respects readOnly=%s while retaining policy navigation',
   if (readOnly) expect(defHttp.post).not.toHaveBeenCalled()
 })
 
-it.each(['table', 'schema', 'catalog'])('offers only directly assignable policies on %s', async metadataObjectType => {
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-  )
-
-  const options = [
-    { name: 'access', enabled: true, policyType: 'system_access_control' },
-    { name: 'retention', enabled: true, policyType: 'custom' },
-    { name: 'compaction', enabled: true, policyType: 'system_iceberg_compaction' }
-  ]
-  defHttp.get.mockResolvedValue({ policies: [] })
-  defHttp.post.mockResolvedValue({ code: 0 })
+it.each(['table', 'schema', 'catalog'])('keeps policy associations read-only on %s', async metadataObjectType => {
+  defHttp.get.mockResolvedValue({ policies: [{ name: 'access', enabled: true, policyType: 'system_access_control' }] })
   const store = configureStore({ reducer: { metalakes, policies } })
-  store.dispatch(fetchPolicies.fulfilled({ policies: options }, 'load', { metalake: 'demo' }))
   await act(async () =>
     root.render(
       <Provider store={store}>
@@ -118,17 +103,127 @@ it.each(['table', 'schema', 'catalog'])('offers only directly assignable policie
       </Provider>
     )
   )
+
+  expect(container.textContent).toContain('access')
+  expect(container.textContent).not.toContain('Associate Policy')
+  expect(container.querySelector('.ant-tag-close-icon')).toBeNull()
+  expect(defHttp.post).not.toHaveBeenCalled()
+  expect(defHttp.delete).not.toHaveBeenCalled()
+})
+
+const renderTagPolicies = async (options = [{ name: 'masking', enabled: true }]) => {
+  const store = configureStore({
+    reducer: { metalakes, policies },
+    preloadedState: {
+      policies: { policiesData: options, policiesLoading: false, error: null }
+    }
+  })
   await act(async () =>
-    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent.includes('Associate Policy')).click()
+    root.render(
+      <Provider store={store}>
+        <PolicyTag metadataObjectType='tag' metadataObjectFullName='classification.sensitive' />
+      </Provider>
+    )
   )
+}
+
+const selectPolicy = async name => {
   await act(async () =>
     container.querySelector('.ant-select-selector').dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
   )
-  const choices = [...document.querySelectorAll('.ant-select-item-option')]
-  expect(choices.map(option => option.textContent)).toEqual(['retention', 'compaction'])
-  await act(async () => choices.find(option => option.textContent === 'retention').click())
+  const option = [...document.body.querySelectorAll('.ant-select-item-option')].find(item => item.textContent === name)
+  await act(async () => option.click())
+}
+
+it('lists policies associated with a tag using the association response mapping', async () => {
+  defHttp.get.mockResolvedValue({
+    associations: [{ policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES' } }]
+  })
+
+  await renderTagPolicies()
+
+  expect(defHttp.get).toHaveBeenCalledExactlyOnceWith({ url: tagPoliciesUrl, params: { details: true } })
+  expect(container.textContent).toContain('masking')
+  expect(container.textContent).not.toContain('No Policies')
+})
+
+it('adds a policy to a tag with the ALL_VALUES selector', async () => {
+  defHttp.get.mockResolvedValueOnce({ associations: [] }).mockResolvedValueOnce({
+    associations: [{ policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES' } }]
+  })
+  defHttp.post.mockResolvedValue({})
+
+  await renderTagPolicies()
+  await act(async () =>
+    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'Associate Policy').click()
+  )
+  await selectPolicy('masking')
+
   expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
-    url: `/api/metalakes/demo/objects/${metadataObjectType}/sales.mart.orders/policies`,
-    data: { policiesToAdd: ['retention'] }
+    url: `${tagPoliciesUrl}/masking`,
+    data: { selector: { type: 'ALL_VALUES' } }
+  })
+  expect(container.textContent).toContain('masking')
+})
+
+it('removes a tag policy when DELETE returns an empty 204 response', async () => {
+  defHttp.get
+    .mockResolvedValueOnce({
+      associations: [{ policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES' } }]
+    })
+    .mockResolvedValueOnce({ associations: [] })
+  defHttp.delete.mockResolvedValue(undefined)
+
+  await renderTagPolicies()
+  const close = container.querySelector('.ant-tag-close-icon')
+  await act(async () => close.click())
+
+  expect(defHttp.delete).toHaveBeenCalledExactlyOnceWith({ url: `${tagPoliciesUrl}/masking` })
+  expect(container.textContent).toContain('No Policies')
+})
+
+it('handles a rejected tag policy add request', async () => {
+  const association = { policy: { name: 'existing', enabled: true }, selector: { type: 'ALL_VALUES' } }
+  defHttp.get.mockResolvedValue({ associations: [association] })
+  defHttp.post.mockRejectedValue(new Error('add failed'))
+
+  await renderTagPolicies()
+  await act(async () =>
+    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'Associate Policy').click()
+  )
+  await selectPolicy('masking')
+  expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
+    url: `${tagPoliciesUrl}/masking`,
+    data: { selector: { type: 'ALL_VALUES' } }
+  })
+  expect(container.textContent).toContain('existing')
+  expect(container.textContent).not.toContain('No Policies')
+})
+
+it('handles a rejected tag policy removal request', async () => {
+  const association = { policy: { name: 'masking', enabled: true }, selector: { type: 'ALL_VALUES' } }
+  defHttp.get.mockResolvedValue({ associations: [association] })
+  defHttp.delete.mockRejectedValue(new Error('remove failed'))
+
+  await renderTagPolicies()
+
+  const close = container.querySelector('.ant-tag-close-icon')
+  await act(async () => close.click())
+  expect(defHttp.delete).toHaveBeenCalledExactlyOnceWith({ url: `${tagPoliciesUrl}/masking` })
+  expect(container.textContent).toContain('masking')
+})
+
+it('offers access-control policies for tag association', async () => {
+  defHttp.get.mockResolvedValue({ associations: [] })
+  defHttp.post.mockResolvedValue({})
+  await renderTagPolicies([{ name: 'access', enabled: true, policyType: 'system_access_control' }])
+  await act(async () =>
+    [...container.querySelectorAll('.ant-tag')].find(tag => tag.textContent === 'Associate Policy').click()
+  )
+  await selectPolicy('access')
+
+  expect(defHttp.post).toHaveBeenCalledExactlyOnceWith({
+    url: `${tagPoliciesUrl}/access`,
+    data: { selector: { type: 'ALL_VALUES' } }
   })
 })

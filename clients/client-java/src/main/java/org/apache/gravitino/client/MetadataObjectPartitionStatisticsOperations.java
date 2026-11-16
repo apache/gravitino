@@ -62,7 +62,7 @@ class MetadataObjectPartitionStatisticsOperations implements SupportsPartitionSt
             "api/metalakes/%s/objects/%s/%s/statistics/partitions",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
-            RESTUtils.encodeString(metadataObject.fullName()));
+            RESTUtils.encodeMetadataObjectName(metadataObject));
   }
 
   @Override
