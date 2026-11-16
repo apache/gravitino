@@ -51,8 +51,10 @@ import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -281,8 +283,59 @@ public class AuthorizationUtils {
     if (catalogIdents == null) {
       return;
     }
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
     for (NameIdentifier catalogIdent : catalogIdents) {
-      callAuthorizationPluginImpl(consumer, catalogManager, catalogIdent);
+      if (store != null && !isCatalogInUseInStore(store, catalogIdent)) {
+        continue;
+      }
+      catalogManager.doWithCatalog(
+          catalogIdent,
+          catalog -> {
+            if (catalog.entity() != null && !catalog.catalogInUse()) {
+              return null;
+            }
+            AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+            if (authorizationPlugin != null) {
+              consumer.accept(authorizationPlugin);
+            }
+            return null;
+          });
+    }
+  }
+
+  public static boolean isCatalogInUse(NameIdentifier catalogIdent) {
+    org.apache.gravitino.EntityStore store = GravitinoEnv.getInstance().entityStore();
+    if (store == null) {
+      return false;
+    }
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(
+          catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private static boolean isCatalogInUseInStore(
+      org.apache.gravitino.EntityStore store, NameIdentifier catalogIdent) {
+    try {
+      CatalogEntity catalogEntity =
+          store.get(catalogIdent, Entity.EntityType.CATALOG, CatalogEntity.class);
+      if (catalogEntity.getProperties() == null) {
+        return true;
+      }
+      return Boolean.parseBoolean(
+          catalogEntity.getProperties().getOrDefault(Catalog.PROPERTY_IN_USE, "true"));
+    } catch (NoSuchEntityException e) {
+      return true;
+    } catch (Exception e) {
+      LOG.warn("Failed to inspect catalog in-use state for {}", catalogIdent, e);
+      return true;
     }
   }
 

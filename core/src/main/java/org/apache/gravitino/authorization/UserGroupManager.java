@@ -104,7 +104,7 @@ class UserGroupManager {
         return false;
       }
       AuthorizationUtils.callAuthorizationPluginForMetalake(
-          metalake, authorizationPlugin -> authorizationPlugin.onUserRemoved(userEntity));
+          metalake, authorizationPlugin -> authorizationPlugin.onMetalakeUserRemoved(userEntity));
       return store.delete(userIdent, Entity.EntityType.USER);
     } catch (IOException ioe) {
       LOG.error(
@@ -190,7 +190,7 @@ class UserGroupManager {
         return false;
       }
       AuthorizationUtils.callAuthorizationPluginForMetalake(
-          metalake, authorizationPlugin -> authorizationPlugin.onGroupRemoved(groupEntity));
+          metalake, authorizationPlugin -> authorizationPlugin.onMetalakeGroupRemoved(groupEntity));
       return store.delete(groupIdent, Entity.EntityType.GROUP);
     } catch (IOException ioe) {
       LOG.error(

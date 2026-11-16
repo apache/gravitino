@@ -379,8 +379,13 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
     }
 
     String timeoutValue = String.valueOf(getRequestTimeoutMs());
-    adminProps.putIfAbsent(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, timeoutValue);
-    adminProps.putIfAbsent(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, timeoutValue);
+    if (properties.containsKey(REQUEST_TIMEOUT_MS)) {
+      adminProps.put(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, timeoutValue);
+      adminProps.put(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, timeoutValue);
+    } else {
+      adminProps.putIfAbsent(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG, timeoutValue);
+      adminProps.putIfAbsent(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG, timeoutValue);
+    }
 
     rawConfig.forEach(
         (key, value) -> {

@@ -233,6 +233,30 @@ public final class KafkaPrivilegeMapper {
   }
 
   /**
+   * Returns whether the given {@link AclOperation} and {@link AclPermissionType} combination is
+   * managed by Gravitino's Kafka authorization plugin on {@code TOPIC} resources.
+   *
+   * @param operation Kafka ACL operation.
+   * @param permissionType Kafka ACL permission type.
+   * @return {@code true} if managed by Gravitino on {@code TOPIC} resources.
+   */
+  public static boolean isManagedTopicOperation(
+      AclOperation operation, AclPermissionType permissionType) {
+    if (operation == null || permissionType == null) {
+      return false;
+    }
+    if (permissionType == AclPermissionType.ALLOW) {
+      return OWNER_TOPIC_OPERATIONS.contains(operation);
+    }
+    if (permissionType == AclPermissionType.DENY) {
+      return operation == AclOperation.READ
+          || operation == AclOperation.WRITE
+          || operation == AclOperation.CREATE;
+    }
+    return false;
+  }
+
+  /**
    * Resolves the Kafka topic {@link ResourcePattern} targeted by a Gravitino metadata object, or
    * {@code null} if the object type is not relevant to Kafka topics.
    *

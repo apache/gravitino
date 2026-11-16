@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.authorization.kafka;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import javax.annotation.Nullable;
@@ -91,4 +92,36 @@ public interface KafkaAuthorizationStateProvider {
    */
   List<MetadataObject> listOwnedObjectsForPrincipal(
       String metalake, @Nullable String catalogName, Owner.Type ownerType, String ownerName);
+
+  /**
+   * Lists all user names registered in the metalake.
+   *
+   * @param metalake Metalake name.
+   * @return User names in the metalake.
+   */
+  default List<String> listAllUserNames(String metalake) {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Lists all group names registered in the metalake.
+   *
+   * @param metalake Metalake name.
+   * @return Group names in the metalake.
+   */
+  default List<String> listAllGroupNames(String metalake) {
+    return Collections.emptyList();
+  }
+
+  /**
+   * Returns whether the specified user or group currently exists in the metalake.
+   *
+   * @param metalake Metalake name.
+   * @param principalType Principal type ({@link Owner.Type#USER} or {@link Owner.Type#GROUP}).
+   * @param principalName Principal name.
+   * @return {@code true} if the principal is registered in Gravitino.
+   */
+  default boolean principalExists(String metalake, Owner.Type principalType, String principalName) {
+    return true;
+  }
 }

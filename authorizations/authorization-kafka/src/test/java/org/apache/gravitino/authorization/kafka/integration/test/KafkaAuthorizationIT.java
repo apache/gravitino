@@ -45,7 +45,9 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
+import org.apache.gravitino.authorization.kafka.KafkaAuthorizationProperties;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.kafka.clients.admin.AdminClient;
@@ -61,14 +63,18 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.acl.AccessControlEntry;
 import org.apache.kafka.common.acl.AccessControlEntryFilter;
 import org.apache.kafka.common.acl.AclBinding;
 import org.apache.kafka.common.acl.AclBindingFilter;
+import org.apache.kafka.common.acl.AclOperation;
+import org.apache.kafka.common.acl.AclPermissionType;
 import org.apache.kafka.common.config.ConfigResource;
 import org.apache.kafka.common.config.SaslConfigs;
 import org.apache.kafka.common.errors.ClusterAuthorizationException;
 import org.apache.kafka.common.errors.TopicAuthorizationException;
 import org.apache.kafka.common.resource.PatternType;
+import org.apache.kafka.common.resource.ResourcePattern;
 import org.apache.kafka.common.resource.ResourcePatternFilter;
 import org.apache.kafka.common.resource.ResourceType;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -127,17 +133,22 @@ public class KafkaAuthorizationIT extends BaseIT {
             .withEnv("CLUSTER_ID", "MkU3OEVBNTcwNTJENDM2Qk")
             .withEnv("KAFKA_NODE_ID", "1")
             .withEnv("KAFKA_PROCESS_ROLES", "broker,controller")
-            .withEnv("KAFKA_LISTENERS", "CLIENT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093")
-            .withEnv("KAFKA_ADVERTISED_LISTENERS", "CLIENT://" + bootstrapServers)
+            .withEnv(
+                "KAFKA_LISTENERS",
+                "INTERNAL://0.0.0.0:19092,CLIENT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093")
+            .withEnv(
+                "KAFKA_ADVERTISED_LISTENERS",
+                "INTERNAL://localhost:19092,CLIENT://" + bootstrapServers)
             .withEnv(
                 "KAFKA_LISTENER_SECURITY_PROTOCOL_MAP",
-                "CLIENT:SASL_PLAINTEXT,CONTROLLER:SASL_PLAINTEXT")
+                "INTERNAL:SASL_PLAINTEXT,CLIENT:SASL_PLAINTEXT,CONTROLLER:SASL_PLAINTEXT")
             .withEnv("KAFKA_CONTROLLER_LISTENER_NAMES", "CONTROLLER")
-            .withEnv("KAFKA_INTER_BROKER_LISTENER_NAME", "CLIENT")
+            .withEnv("KAFKA_INTER_BROKER_LISTENER_NAME", "INTERNAL")
             .withEnv("KAFKA_CONTROLLER_QUORUM_VOTERS", "1@localhost:9093")
             .withEnv("KAFKA_SASL_ENABLED_MECHANISMS", "PLAIN")
             .withEnv("KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL", "PLAIN")
             .withEnv("KAFKA_SASL_MECHANISM_CONTROLLER_PROTOCOL", "PLAIN")
+            .withEnv("KAFKA_LISTENER_NAME_INTERNAL_PLAIN_SASL_JAAS_CONFIG", LISTENER_JAAS)
             .withEnv("KAFKA_LISTENER_NAME_CLIENT_PLAIN_SASL_JAAS_CONFIG", LISTENER_JAAS)
             .withEnv("KAFKA_LISTENER_NAME_CONTROLLER_PLAIN_SASL_JAAS_CONFIG", LISTENER_JAAS)
             .withCopyToContainer(
@@ -329,47 +340,45 @@ public class KafkaAuthorizationIT extends BaseIT {
         .untilAsserted(() -> assertProduceDenied("alice", "alice-secret", ordersTopic));
     assertConsumeDenied("alice", "alice-secret", ordersTopic);
 
-    // 6. Grant CREATE_TOPIC on schema to creator with topic-level DENY on creator_denied_topic,
-    //    and verify AdminClient.createTopics enforces both ALLOW and topic-level DENY on the
-    //    live StandardAuthorizer broker.
+    // 6. Grant catalog-level ALLOW CREATE_TOPIC to creator, verify live broker topic creation,
+    //    verify schema-level DENY CREATE_TOPIC overrides ALLOW, revoke DENY, and verify
+    //    metalake.removeUser("creator") revokes pushed Kafka ACLs on the live broker.
     assertCreateTopicDenied("bob", "bob-secret", "bob_blocked_topic");
-    String deniedCreateTopic = "creator_denied_topic";
-    catalog
-        .asTopicCatalog()
-        .createTopic(
-            NameIdentifier.of("default", deniedCreateTopic),
-            "Pre-created topic for metadata registration",
-            null,
-            ImmutableMap.of("partition-count", "1", "replication-factor", "1"));
-    superAdminClient.deleteTopics(Collections.singletonList(deniedCreateTopic)).all().get();
-    Awaitility.await()
-        .atMost(15, TimeUnit.SECONDS)
-        .until(
-            () ->
-                !superAdminClient
-                    .listTopics()
-                    .names()
-                    .get(5, TimeUnit.SECONDS)
-                    .contains(deniedCreateTopic));
 
     String creatorRole = GravitinoITUtils.genRandomName("topic_creator");
     metalake.createRole(
         creatorRole,
         Collections.emptyMap(),
-        Arrays.asList(
-            SecurableObjects.ofSchema(
-                catalogObj, "default", Collections.singletonList(Privileges.CreateTopic.allow())),
-            SecurableObjects.ofTopic(
-                schemaObj,
-                deniedCreateTopic,
-                Collections.singletonList(Privileges.CreateTopic.deny()))));
+        Collections.singletonList(
+            SecurableObjects.ofCatalog(
+                catalogName, Collections.singletonList(Privileges.CreateTopic.allow()))));
     metalake.grantRolesToUser(Collections.singletonList(creatorRole), "creator");
 
     String createdTopic = "creator_created_topic";
     Awaitility.await()
         .atMost(15, TimeUnit.SECONDS)
         .untilAsserted(() -> createKafkaTopicAs("creator", "creator-secret", createdTopic));
-    assertCreateTopicDenied("creator", "creator-secret", deniedCreateTopic);
+
+    String creatorDenyRole = GravitinoITUtils.genRandomName("topic_creator_deny");
+    metalake.createRole(
+        creatorDenyRole,
+        Collections.emptyMap(),
+        Collections.singletonList(
+            SecurableObjects.ofSchema(
+                catalogObj, "default", Collections.singletonList(Privileges.CreateTopic.deny()))));
+    metalake.grantRolesToUser(Collections.singletonList(creatorDenyRole), "creator");
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .untilAsserted(
+            () ->
+                assertCreateTopicDenied(
+                    "creator", "creator-secret", "creator_blocked_by_schema_deny"));
+
+    metalake.revokeRolesFromUser(Collections.singletonList(creatorDenyRole), "creator");
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> createKafkaTopicAs("creator", "creator-secret", "creator_created_after_undeny"));
 
     // Removing user from metalake revokes their pushed Kafka ACLs on the broker
     Assertions.assertTrue(metalake.removeUser("creator"));
@@ -379,8 +388,7 @@ public class KafkaAuthorizationIT extends BaseIT {
             () ->
                 assertCreateTopicDenied("creator", "creator-secret", "creator_post_removal_topic"));
 
-    // 7. Set bob as Gravitino owner of orders_topic -> bob can produce, consume, and alterConfigs;
-    //    Wait: first revoke bobRole DENY on orders_topic so ALLOW from owner takes effect clearly.
+    // 7. Set bob as Gravitino owner of orders_topic -> bob can produce, consume, and alterConfigs
     metalake.revokeRolesFromUser(Collections.singletonList(bobRole), "bob");
     MetadataObject ordersMetadataObject =
         MetadataObjects.of(
@@ -395,7 +403,15 @@ public class KafkaAuthorizationIT extends BaseIT {
               alterTopicConfigAs("bob", "bob-secret", ordersTopic, "retention.ms", "86400000");
             });
 
-    // Drop topic via Gravitino and verify topic-level ACL bindings are cleaned up in Kafka
+    // Add an unmanaged external broker ACL on orders_topic and verify Gravitino dropTopic deletes
+    // only Gravitino-managed bindings while preserving the unmanaged external ACL.
+    AclBinding externalOrdersAcl =
+        new AclBinding(
+            new ResourcePattern(ResourceType.TOPIC, ordersTopic, PatternType.LITERAL),
+            new AccessControlEntry(
+                "User:external_svc", "*", AclOperation.READ, AclPermissionType.ALLOW));
+    superAdminClient.createAcls(Collections.singletonList(externalOrdersAcl)).all().get();
+
     Assertions.assertTrue(
         catalog.asTopicCatalog().dropTopic(NameIdentifier.of("default", ordersTopic)));
 
@@ -409,9 +425,104 @@ public class KafkaAuthorizationIT extends BaseIT {
             () -> {
               Collection<AclBinding> remaining =
                   superAdminClient.describeAcls(ordersAclFilter).values().get();
-              Assertions.assertTrue(
-                  remaining.isEmpty(),
-                  "Expected no remaining ACLs for dropped topic, found " + remaining);
+              Assertions.assertEquals(
+                  Collections.singletonList(externalOrdersAcl),
+                  new ArrayList<>(remaining),
+                  "Expected only unmanaged external ACL to remain on dropped topic");
+            });
+
+    // 8. Verify group-acl.enabled=true pushes Group:<name> ACLs and dropCatalog cleans up
+    //    Gravitino-managed catalog ACLs (including TOPIC:* owner wildcards) without touching
+    //    external broker ACLs, and refused non-force dropCatalog on in-use catalog keeps ACLs.
+    metalake.addGroup("analysts");
+    String groupCatalogName = GravitinoITUtils.genRandomName("kafka_group_cat");
+    Catalog groupCatalog =
+        metalake.createCatalog(
+            groupCatalogName,
+            Catalog.Type.MESSAGING,
+            "kafka",
+            "Secondary catalog with group ACL push-down enabled",
+            ImmutableMap.<String, String>builder()
+                .put("bootstrap.servers", bootstrapServers)
+                .put(AUTHORIZATION_PROVIDER, "kafka")
+                .put(KafkaAuthorizationProperties.GROUP_ACL_ENABLED, "true")
+                .put("gravitino.bypass.security.protocol", "SASL_PLAINTEXT")
+                .put("gravitino.bypass.sasl.mechanism", "PLAIN")
+                .put("gravitino.bypass.sasl.jaas.config", plainJaasConfig("admin", "admin-secret"))
+                .build());
+
+    String groupTopic = GravitinoITUtils.genRandomName("group_payments");
+    groupCatalog
+        .asTopicCatalog()
+        .createTopic(
+            NameIdentifier.of("default", groupTopic),
+            "Group ACL topic",
+            null,
+            Collections.emptyMap());
+
+    MetadataObject groupCatalogMetadataObj =
+        MetadataObjects.of(
+            Collections.singletonList(groupCatalogName), MetadataObject.Type.CATALOG);
+    metalake.setOwner(groupCatalogMetadataObj, "alice", Owner.Type.USER);
+
+    SecurableObject groupCatObj =
+        SecurableObjects.ofCatalog(groupCatalogName, Collections.emptyList());
+    SecurableObject groupSchemaObj =
+        SecurableObjects.ofSchema(groupCatObj, "default", Collections.emptyList());
+    String groupRoleName = GravitinoITUtils.genRandomName("analysts_consume");
+    metalake.createRole(
+        groupRoleName,
+        Collections.emptyMap(),
+        Collections.singletonList(
+            SecurableObjects.ofTopic(
+                groupSchemaObj,
+                groupTopic,
+                Collections.singletonList(Privileges.ConsumeTopic.allow()))));
+    metalake.grantRolesToGroup(Collections.singletonList(groupRoleName), "analysts");
+
+    AclBinding expectedGroupReadAcl =
+        new AclBinding(
+            new ResourcePattern(ResourceType.TOPIC, groupTopic, PatternType.LITERAL),
+            new AccessControlEntry(
+                "Group:analysts", "*", AclOperation.READ, AclPermissionType.ALLOW));
+    AclBinding expectedAliceWildcardOwnerAcl =
+        new AclBinding(
+            new ResourcePattern(ResourceType.TOPIC, "*", PatternType.LITERAL),
+            new AccessControlEntry(
+                "User:alice", "*", AclOperation.CREATE, AclPermissionType.ALLOW));
+
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Collection<AclBinding> allAcls =
+                  superAdminClient.describeAcls(AclBindingFilter.ANY).values().get();
+              Assertions.assertTrue(allAcls.contains(expectedGroupReadAcl));
+              Assertions.assertTrue(allAcls.contains(expectedAliceWildcardOwnerAcl));
+            });
+
+    // Refused non-force dropCatalog on an active (in-use=true) catalog must NOT wipe broker ACLs
+    Assertions.assertThrows(
+        CatalogInUseException.class, () -> metalake.dropCatalog(groupCatalogName, false));
+    Collection<AclBinding> afterRefusedDrop =
+        superAdminClient.describeAcls(AclBindingFilter.ANY).values().get();
+    Assertions.assertTrue(afterRefusedDrop.contains(expectedGroupReadAcl));
+    Assertions.assertTrue(afterRefusedDrop.contains(expectedAliceWildcardOwnerAcl));
+
+    // Disable then drop groupCatalog -> cleans up Group:analysts and User:alice TOPIC:* ACLs while
+    // preserving externalOrdersAcl
+    metalake.disableCatalog(groupCatalogName);
+    Assertions.assertTrue(metalake.dropCatalog(groupCatalogName, false));
+
+    Awaitility.await()
+        .atMost(15, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Collection<AclBinding> allAcls =
+                  superAdminClient.describeAcls(AclBindingFilter.ANY).values().get();
+              Assertions.assertFalse(allAcls.contains(expectedGroupReadAcl));
+              Assertions.assertFalse(allAcls.contains(expectedAliceWildcardOwnerAcl));
+              Assertions.assertTrue(allAcls.contains(externalOrdersAcl));
             });
   }
 

@@ -22,14 +22,21 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.exceptions.CatalogInUseException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -139,6 +146,51 @@ public class TestCatalogHookDispatcher {
     } finally {
       FieldUtils.writeField(gravitinoEnv, "internalOwnerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "futureGrantManager", originalFutureGrantManager, true);
+    }
+  }
+
+  @Test
+  public void testDropInUseCatalogWithoutForceSkipsPrivilegeCleanup() throws Exception {
+    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
+    Object originalEntityStore = FieldUtils.readField(gravitinoEnv, "entityStore", true);
+    Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
+
+    NameIdentifier ident = NameIdentifier.of("metalake", "active_catalog");
+    CatalogDispatcher dispatcher = Mockito.mock(CatalogDispatcher.class);
+    EntityStore store = Mockito.mock(EntityStore.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+
+    CatalogEntity activeEntity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(ident.name())
+            .withNamespace(ident.namespace())
+            .withType(Catalog.Type.MESSAGING)
+            .withProvider("kafka")
+            .withProperties(Collections.singletonMap(Catalog.PROPERTY_IN_USE, "true"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    Mockito.when(dispatcher.catalogExists(ident)).thenReturn(true);
+    Mockito.when(dispatcher.dropCatalog(ident, false))
+        .thenThrow(new CatalogInUseException("Catalog %s is in use", ident));
+    Mockito.when(store.get(ident, Entity.EntityType.CATALOG, CatalogEntity.class))
+        .thenReturn(activeEntity);
+
+    FieldUtils.writeField(gravitinoEnv, "entityStore", store, true);
+    FieldUtils.writeField(gravitinoEnv, "catalogManager", catalogManager, true);
+
+    try {
+      CatalogHookDispatcher hookDispatcher = new CatalogHookDispatcher(dispatcher);
+      assertThrowsExactly(
+          CatalogInUseException.class, () -> hookDispatcher.dropCatalog(ident, false));
+
+      Mockito.verify(dispatcher).dropCatalog(ident, false);
+      Mockito.verifyNoInteractions(catalogManager);
+    } finally {
+      FieldUtils.writeField(gravitinoEnv, "entityStore", originalEntityStore, true);
+      FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
     }
   }
 }

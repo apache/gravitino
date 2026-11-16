@@ -63,8 +63,8 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.authorization.BaseAuthorization;
-import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -444,6 +444,8 @@ public class TestKafkaAuthorizationPlugin {
 
   @Test
   public void testMetadataRenameAndDrop() {
+    MetadataObject catalogMetadataObj =
+        MetadataObjects.of(Collections.singletonList(CATALOG), MetadataObject.Type.CATALOG);
     MetadataObject topicOrders =
         MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
     MetadataObject topicOrdersV2 =
@@ -453,33 +455,67 @@ public class TestKafkaAuthorizationPlugin {
         MetadataObjects.of(
             Arrays.asList("other_cat", "default", "orders"), MetadataObject.Type.TOPIC);
 
-    plugin.onOwnerSet(topicOrders, null, testOwner(Owner.Type.USER, "alice"));
+    Owner aliceOwner = testOwner(Owner.Type.USER, "alice");
+    Owner catalogOwner = testOwner(Owner.Type.USER, "cat_owner");
+    stateProvider.owners.put(topicOrders, aliceOwner);
+    stateProvider.owners.put(catalogMetadataObj, catalogOwner);
+    plugin.onOwnerSet(topicOrders, null, aliceOwner);
+    plugin.onOwnerSet(catalogMetadataObj, null, catalogOwner);
     Assertions.assertTrue(brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders")));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "*",
+                "User:cat_owner",
+                AclOperation.CREATE,
+                AclPermissionType.ALLOW)));
 
     // Ignoring topic in another catalog
     plugin.onMetadataUpdated(
         MetadataObjectChange.remove(otherCatalogTopic, Collections.emptyList()));
     Assertions.assertTrue(brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders")));
 
-    // Rename moves topic ACLs from orders -> orders_v2
+    // Rename moves Gravitino-managed topic ACLs from orders -> orders_v2
+    stateProvider.owners.remove(topicOrders);
+    stateProvider.owners.put(topicOrdersV2, aliceOwner);
     plugin.onMetadataUpdated(
         MetadataObjectChange.rename(topicOrders, topicOrdersV2, Collections.emptyList()));
     Assertions.assertFalse(brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders")));
     Assertions.assertTrue(
         brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders_v2")));
 
-    // Dropping a Gravitino Kafka catalog must NOT wipe broker topic ACLs
-    plugin.onMetadataUpdated(
-        MetadataObjectChange.remove(
-            MetadataObjects.of(Collections.singletonList(CATALOG), MetadataObject.Type.CATALOG),
-            Collections.emptyList()));
-    Assertions.assertTrue(
-        brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders_v2")));
+    // Add unmanaged external broker ACLs that Gravitino must preserve when dropping the catalog
+    AclBinding unmanagedTopicAcl =
+        acl(
+            ResourceType.TOPIC,
+            "external_unmanaged_topic",
+            "User:alice",
+            AclOperation.READ,
+            AclPermissionType.ALLOW);
+    AclBinding externalPrincipalAcl =
+        acl(
+            ResourceType.TOPIC,
+            "orders_v2",
+            "User:external_svc",
+            AclOperation.READ,
+            AclPermissionType.ALLOW);
+    brokerAcls.add(unmanagedTopicAcl);
+    brokerAcls.add(externalPrincipalAcl);
 
-    // Dropping the topic deletes orders_v2 ACLs
-    plugin.onMetadataUpdated(MetadataObjectChange.remove(topicOrdersV2, Collections.emptyList()));
+    // Dropping the Gravitino Kafka catalog removes Gravitino-managed ACLs (including catalog owner
+    // TOPIC:* wildcards and topic grants) while preserving unmanaged external broker ACLs.
+    plugin.onMetadataUpdated(
+        MetadataObjectChange.remove(catalogMetadataObj, Collections.emptyList()));
     Assertions.assertFalse(
-        brokerAcls.stream().anyMatch(b -> b.pattern().name().equals("orders_v2")));
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "*",
+                "User:cat_owner",
+                AclOperation.CREATE,
+                AclPermissionType.ALLOW)));
+    Assertions.assertEquals(Set.of(unmanagedTopicAcl, externalPrincipalAcl), brokerAcls);
   }
 
   @Test
@@ -730,17 +766,14 @@ public class TestKafkaAuthorizationPlugin {
   }
 
   @Test
-  public void testGroupOperationsRejectedByDefaultUnlessEnabled() {
+  public void testGroupOperationsSkippedByDefaultWithoutBreakingUserOrOwnerSync() {
     SecurableObject catalogUseOnly =
         SecurableObjects.ofCatalog(
             CATALOG, Collections.singletonList(Privileges.UseCatalog.allow()));
-    Role metadataOnlyRole = testRole("use_catalog_only", catalogUseOnly);
+    Role sharedRole = testRole("shared_role", catalogUseOnly);
 
-    // Non-Kafka metadata privileges (such as USE_CATALOG) produce no Kafka ACL bindings and must
-    // not block group operations in multi-catalog metalakes.
     Assertions.assertTrue(
-        plugin.onGrantedRolesToGroup(
-            Collections.singletonList(metadataOnlyRole), testGroup("analysts")));
+        plugin.onGrantedRolesToGroup(Collections.singletonList(sharedRole), testGroup("analysts")));
     Assertions.assertTrue(plugin.onGroupRemoved(testGroup("analysts")));
 
     SecurableObject schemaObj =
@@ -750,30 +783,76 @@ public class TestKafkaAuthorizationPlugin {
             schemaObj, "orders", Collections.singletonList(Privileges.ConsumeTopic.allow()));
     Role kafkaGroupRole = testRole("kafka_group_reader", kafkaTopicObj);
 
-    Assertions.assertThrows(
-        AuthorizationPluginException.class,
-        () ->
-            plugin.onGrantedRolesToGroup(
-                Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
-    Assertions.assertThrows(
-        AuthorizationPluginException.class,
-        () ->
-            plugin.onRevokedRolesFromGroup(
-                Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
+    // Group role grant/revoke succeeds cleanly without pushing ineffective Group:* ACLs
+    Assertions.assertTrue(
+        plugin.onGrantedRolesToGroup(
+            Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
+    Assertions.assertTrue(
+        plugin.onRevokedRolesFromGroup(
+            Collections.singletonList(kafkaGroupRole), testGroup("analysts")));
+    Assertions.assertTrue(brokerAcls.isEmpty());
 
-    stateProvider.grantRoleToGroup("analysts", metadataOnlyRole);
-    Assertions.assertThrows(
-        AuthorizationPluginException.class,
-        () ->
-            plugin.onRoleUpdated(
-                metadataOnlyRole,
-                RoleChange.addSecurableObject("use_catalog_only", kafkaTopicObj)));
+    // Updating a role bound to BOTH a user and a group still pushes user ACLs when group ACLs are
+    // disabled
+    Role postUpdateRole = testRole("shared_role", catalogUseOnly, kafkaTopicObj);
+    stateProvider.grantRoleToUser("alice", postUpdateRole);
+    stateProvider.grantRoleToGroup("analysts", postUpdateRole);
+    Assertions.assertTrue(
+        plugin.onRoleUpdated(
+            sharedRole, RoleChange.addSecurableObject("shared_role", kafkaTopicObj)));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.stream().anyMatch(b -> b.entry().principal().startsWith("Group:")));
 
+    // Transferring topic ownership from User:alice to Group:analysts revokes User:alice owner-only
+    // ACLs while skipping Group:analysts ACLs (and preserving User:alice role READ)
     MetadataObject ordersMetadataObj =
         MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
-    Assertions.assertThrows(
-        AuthorizationPluginException.class,
-        () -> plugin.onOwnerSet(ordersMetadataObj, null, testOwner(Owner.Type.GROUP, "analysts")));
+    Owner aliceOwner = testOwner(Owner.Type.USER, "alice");
+    Owner groupOwner = testOwner(Owner.Type.GROUP, "analysts");
+    stateProvider.owners.put(ordersMetadataObj, aliceOwner);
+    Assertions.assertTrue(plugin.onOwnerSet(ordersMetadataObj, null, aliceOwner));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.ALTER,
+                AclPermissionType.ALLOW)));
+
+    stateProvider.owners.put(ordersMetadataObj, groupOwner);
+    Assertions.assertTrue(plugin.onOwnerSet(ordersMetadataObj, aliceOwner, groupOwner));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.ALTER,
+                AclPermissionType.ALLOW)));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders",
+                "User:alice",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.stream().anyMatch(b -> b.entry().principal().startsWith("Group:")));
+
+    // FutureGrantManager replay of metalake group ownership during createCatalog must also succeed
+    MetadataObject metalakeObj =
+        MetadataObjects.of(Collections.singletonList(METALAKE), MetadataObject.Type.METALAKE);
+    Assertions.assertTrue(plugin.onOwnerSet(metalakeObj, null, groupOwner));
   }
 
   @Test
@@ -1107,6 +1186,210 @@ public class TestKafkaAuthorizationPlugin {
             eq(SupportsRelationOperations.Type.OWNER_REL), any(), eq(Entity.EntityType.TOPIC));
   }
 
+  @Test
+  public void testFailClosedWhenCatalogIdCannotBeResolved() {
+    InMemoryStateProvider unresolvedState = new InMemoryStateProvider();
+    KafkaAuthorizationProperties props =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers", "localhost:9092", BaseAuthorization.CATALOG_ID, "999"));
+    props.validate();
+    KafkaAuthorizationPlugin unresolvedPlugin =
+        new KafkaAuthorizationPlugin(METALAKE, props, adminClient, unresolvedState, null);
+
+    SecurableObject otherCatObj = SecurableObjects.ofCatalog("other_cat", Collections.emptyList());
+    SecurableObject otherSchemaObj =
+        SecurableObjects.ofSchema(otherCatObj, "default", Collections.emptyList());
+    SecurableObject otherTopicObj =
+        SecurableObjects.ofTopic(
+            otherSchemaObj, "orders", Collections.singletonList(Privileges.ProduceTopic.allow()));
+    Role otherCatalogRole = testRole("other_cat_role", otherTopicObj);
+
+    unresolvedPlugin.onGrantedRolesToUser(
+        Collections.singletonList(otherCatalogRole), testUser("alice"));
+    Assertions.assertTrue(
+        brokerAcls.isEmpty(),
+        "Unresolved catalog name must fail closed rather than pushing cross-catalog ACLs");
+  }
+
+  @Test
+  public void testDropAndRenameTopicPreserveUnmanagedExternalBrokerAcls() {
+    MetadataObject topicOrders =
+        MetadataObjects.of(Arrays.asList(CATALOG, "default", "orders"), MetadataObject.Type.TOPIC);
+    MetadataObject topicOrdersRenamed =
+        MetadataObjects.of(
+            Arrays.asList(CATALOG, "default", "orders_renamed"), MetadataObject.Type.TOPIC);
+
+    Owner aliceOwner = testOwner(Owner.Type.USER, "alice");
+    stateProvider.owners.put(topicOrders, aliceOwner);
+    stateProvider.externalUsers.add("external_svc");
+    plugin.onOwnerSet(topicOrders, null, aliceOwner);
+
+    AclBinding externalUserAcl =
+        acl(
+            ResourceType.TOPIC,
+            "orders",
+            "User:external_svc",
+            AclOperation.READ,
+            AclPermissionType.ALLOW);
+    AclBinding wildcardPrincipalAcl =
+        acl(ResourceType.TOPIC, "orders", "User:*", AclOperation.READ, AclPermissionType.ALLOW);
+    AclBinding hostScopedExternalAcl =
+        new AclBinding(
+            new ResourcePattern(ResourceType.TOPIC, "orders", PatternType.LITERAL),
+            new AccessControlEntry(
+                "User:alice", "10.0.0.9", AclOperation.READ, AclPermissionType.ALLOW));
+    AclBinding unmanagedOpAcl =
+        acl(ResourceType.TOPIC, "orders", "User:alice", AclOperation.ALL, AclPermissionType.ALLOW);
+    AclBinding unmanagedDenyDeleteAcl =
+        acl(
+            ResourceType.TOPIC,
+            "orders",
+            "User:alice",
+            AclOperation.DELETE,
+            AclPermissionType.DENY);
+    brokerAcls.addAll(
+        Arrays.asList(
+            externalUserAcl,
+            wildcardPrincipalAcl,
+            hostScopedExternalAcl,
+            unmanagedOpAcl,
+            unmanagedDenyDeleteAcl));
+
+    // Rename moves only Gravitino-managed bindings on orders -> orders_renamed
+    stateProvider.owners.remove(topicOrders);
+    stateProvider.owners.put(topicOrdersRenamed, aliceOwner);
+    plugin.onMetadataUpdated(
+        MetadataObjectChange.rename(topicOrders, topicOrdersRenamed, Collections.emptyList()));
+
+    Assertions.assertTrue(brokerAcls.contains(externalUserAcl));
+    Assertions.assertTrue(brokerAcls.contains(wildcardPrincipalAcl));
+    Assertions.assertTrue(brokerAcls.contains(hostScopedExternalAcl));
+    Assertions.assertTrue(brokerAcls.contains(unmanagedOpAcl));
+    Assertions.assertTrue(brokerAcls.contains(unmanagedDenyDeleteAcl));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders_renamed",
+                "User:alice",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders_renamed",
+                "User:external_svc",
+                AclOperation.READ,
+                AclPermissionType.ALLOW)));
+
+    // Dropping orders_renamed deletes Gravitino-managed bindings while keeping external ones on
+    // orders_renamed
+    AclBinding externalOnRenamed =
+        acl(
+            ResourceType.TOPIC,
+            "orders_renamed",
+            "User:external_svc",
+            AclOperation.READ,
+            AclPermissionType.ALLOW);
+    brokerAcls.add(externalOnRenamed);
+    stateProvider.owners.remove(topicOrdersRenamed);
+    plugin.onMetadataUpdated(
+        MetadataObjectChange.remove(topicOrdersRenamed, Collections.emptyList()));
+    Assertions.assertTrue(brokerAcls.contains(externalOnRenamed));
+    Assertions.assertFalse(
+        brokerAcls.contains(
+            acl(
+                ResourceType.TOPIC,
+                "orders_renamed",
+                "User:alice",
+                AclOperation.WRITE,
+                AclPermissionType.ALLOW)));
+  }
+
+  @Test
+  public void testDeletedRoleIdExcludedDuringConcurrentRevokeWindow() {
+    AuditInfo audit =
+        AuditInfo.builder().withCreator("admin").withCreateTime(Instant.now()).build();
+    SecurableObject catalogObj = SecurableObjects.ofCatalog(CATALOG, Collections.emptyList());
+    SecurableObject schemaObj =
+        SecurableObjects.ofSchema(catalogObj, "default", Collections.emptyList());
+    SecurableObject ordersTopic =
+        SecurableObjects.ofTopic(
+            schemaObj, "orders", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+    SecurableObject paymentsTopic =
+        SecurableObjects.ofTopic(
+            schemaObj, "payments", Collections.singletonList(Privileges.ConsumeTopic.allow()));
+
+    RoleEntity deletingRole =
+        RoleEntity.builder()
+            .withId(501L)
+            .withName("reusable_role")
+            .withNamespace(NamespaceUtil.ofRole(METALAKE))
+            .withSecurableObjects(Collections.singletonList(ordersTopic))
+            .withAuditInfo(audit)
+            .build();
+    Role otherRole = testRole("payments_reader", paymentsTopic);
+
+    stateProvider.grantRoleToUser("alice", deletingRole);
+    stateProvider.grantRoleToUser("alice", otherRole);
+    plugin.onGrantedRolesToUser(Arrays.asList(deletingRole, otherRole), testUser("alice"));
+
+    // RoleManager invokes onRoleDeleted BEFORE deleting deletingRole from EntityStore.
+    plugin.onRoleDeleted(deletingRole);
+
+    // Before EntityStore deletes deletingRole (501L), a concurrent revoke of otherRole runs:
+    // deletingRole (501L) must NOT keep GROUP:* READ alive!
+    stateProvider.revokeRoleFromUser("alice", "payments_reader");
+    plugin.onRevokedRolesFromUser(Collections.singletonList(otherRole), testUser("alice"));
+    Assertions.assertTrue(
+        brokerAcls.isEmpty(), "Zombie deleted role entity must be excluded: " + brokerAcls);
+
+    // Re-creating a role with the SAME name ("reusable_role") and a NEW entity ID (502L) works
+    RoleEntity recreatedRole =
+        RoleEntity.builder()
+            .withId(502L)
+            .withName("reusable_role")
+            .withNamespace(NamespaceUtil.ofRole(METALAKE))
+            .withSecurableObjects(Collections.singletonList(ordersTopic))
+            .withAuditInfo(audit)
+            .build();
+    stateProvider.grantRoleToUser("alice", recreatedRole);
+    stateProvider.grantRoleToUser("alice", otherRole);
+    plugin.onGrantedRolesToUser(Arrays.asList(recreatedRole, otherRole), testUser("alice"));
+    stateProvider.revokeRoleFromUser("alice", "payments_reader");
+    plugin.onRevokedRolesFromUser(Collections.singletonList(otherRole), testUser("alice"));
+    Assertions.assertTrue(
+        brokerAcls.contains(
+            acl(ResourceType.GROUP, "*", "User:alice", AclOperation.READ, AclPermissionType.ALLOW)),
+        "Recreated role with new entity ID must preserve shared GROUP:* READ");
+  }
+
+  @Test
+  public void testConstructorValidationAndInvalidAdminClientConfig() {
+    KafkaAuthorizationProperties validProps =
+        new KafkaAuthorizationProperties(ImmutableMap.of("bootstrap.servers", "localhost:9092"));
+    validProps.validate();
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new KafkaAuthorizationPlugin("  ", validProps));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new KafkaAuthorizationPlugin(METALAKE, null));
+
+    KafkaAuthorizationProperties invalidAdminProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "authorization.kafka.admin.security.protocol",
+                "NOT_A_VALID_PROTOCOL"));
+    invalidAdminProps.validate();
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> new KafkaAuthorizationPlugin(METALAKE, invalidAdminProps));
+  }
+
   private static AclBinding acl(
       ResourceType type,
       String name,
@@ -1262,6 +1545,8 @@ public class TestKafkaAuthorizationPlugin {
     final Map<String, Map<String, Role>> userRoles = new ConcurrentHashMap<>();
     final Map<String, Map<String, Role>> groupRoles = new ConcurrentHashMap<>();
     final Map<MetadataObject, Owner> owners = new ConcurrentHashMap<>();
+    final Set<String> externalUsers = ConcurrentHashMap.newKeySet();
+    final Set<String> externalGroups = ConcurrentHashMap.newKeySet();
 
     void grantRoleToUser(String user, Role role) {
       userRoles.computeIfAbsent(user, k -> new ConcurrentHashMap<>()).put(role.name(), role);
@@ -1278,6 +1563,35 @@ public class TestKafkaAuthorizationPlugin {
     @Override
     public Optional<String> resolveCatalogName(String metalake, @Nullable Long catalogId) {
       return Optional.ofNullable(catalogNames.get(catalogId));
+    }
+
+    @Override
+    public List<String> listAllUserNames(String metalake) {
+      Set<String> users = new LinkedHashSet<>(userRoles.keySet());
+      owners.values().stream()
+          .filter(o -> o != null && o.type() == Owner.Type.USER)
+          .forEach(o -> users.add(o.name()));
+      return new ArrayList<>(users);
+    }
+
+    @Override
+    public List<String> listAllGroupNames(String metalake) {
+      Set<String> groups = new LinkedHashSet<>(groupRoles.keySet());
+      owners.values().stream()
+          .filter(o -> o != null && o.type() == Owner.Type.GROUP)
+          .forEach(o -> groups.add(o.name()));
+      return new ArrayList<>(groups);
+    }
+
+    @Override
+    public boolean principalExists(String metalake, Owner.Type principalType, String name) {
+      if (principalType == Owner.Type.USER) {
+        return !externalUsers.contains(name);
+      }
+      if (principalType == Owner.Type.GROUP) {
+        return !externalGroups.contains(name);
+      }
+      return false;
     }
 
     @Override

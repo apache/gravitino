@@ -95,6 +95,44 @@ public class TestKafkaAuthorizationProperties {
     Assertions.assertFalse(props.isIdempotentWriteAclEnabled());
     Assertions.assertTrue(props.isGroupAclEnabled());
     Assertions.assertEquals(15000, props.getRequestTimeoutMs());
+
+    // Explicit authorization.kafka.request-timeout-ms overrides gravitino.bypass.* timeouts, while
+    // authorization.kafka.admin.* still takes highest precedence.
+    KafkaAuthorizationProperties overrideBypassTimeout =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "gravitino.bypass.request.timeout.ms",
+                "60000",
+                "gravitino.bypass.default.api.timeout.ms",
+                "60000",
+                "authorization.kafka.request-timeout-ms",
+                "12000"));
+    overrideBypassTimeout.validate();
+    Properties overrideAdminProps = overrideBypassTimeout.toAdminClientProperties();
+    Assertions.assertEquals(
+        "12000", overrideAdminProps.getProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG));
+    Assertions.assertEquals(
+        "12000", overrideAdminProps.getProperty(AdminClientConfig.DEFAULT_API_TIMEOUT_MS_CONFIG));
+
+    KafkaAuthorizationProperties explicitAdminTimeout =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "gravitino.bypass.request.timeout.ms",
+                "60000",
+                "authorization.kafka.request-timeout-ms",
+                "12000",
+                "authorization.kafka.admin.request.timeout.ms",
+                "8000"));
+    explicitAdminTimeout.validate();
+    Assertions.assertEquals(
+        "8000",
+        explicitAdminTimeout
+            .toAdminClientProperties()
+            .getProperty(AdminClientConfig.REQUEST_TIMEOUT_MS_CONFIG));
   }
 
   @Test

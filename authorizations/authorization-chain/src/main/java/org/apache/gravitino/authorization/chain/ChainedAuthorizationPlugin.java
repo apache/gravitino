@@ -42,6 +42,7 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 /** Chained authorization operations plugin class. <br> */
 public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   private List<AuthorizationPlugin> plugins = Lists.newArrayList();
+  private final List<IsolatedClassLoader> classLoaders = Lists.newArrayList();
   private final String metalake;
 
   public ChainedAuthorizationPlugin(
@@ -54,46 +55,76 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
     ChainedAuthorizationProperties chainedAuthzProperties =
         new ChainedAuthorizationProperties(properties);
     chainedAuthzProperties.validate();
-    // Create the plugins
-    chainedAuthzProperties
-        .plugins()
-        .forEach(
-            pluginName -> {
-              String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
-              Map<String, String> pluginConfig =
-                  chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
-              pluginConfig.put(
-                  BaseAuthorization.METALAKE_ID, properties.get(BaseAuthorization.METALAKE_ID));
-              pluginConfig.put(
-                  BaseAuthorization.CATALOG_ID, properties.get(BaseAuthorization.CATALOG_ID));
+    // Create the plugins, closing any already-initialized plugins if a later plugin fails.
+    try {
+      for (String pluginName : chainedAuthzProperties.plugins()) {
+        String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
+        Map<String, String> pluginConfig =
+            chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
+        pluginConfig.put(
+            BaseAuthorization.METALAKE_ID, properties.get(BaseAuthorization.METALAKE_ID));
+        pluginConfig.put(
+            BaseAuthorization.CATALOG_ID, properties.get(BaseAuthorization.CATALOG_ID));
 
-              ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
-              BaseAuthorization.buildAuthorizationPkgPath(
-                      ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authzProvider))
-                  .ifPresent(libAndResourcesPaths::add);
-              IsolatedClassLoader classLoader =
-                  IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
-              try {
-                BaseAuthorization<?> authorization =
-                    BaseAuthorization.createAuthorization(classLoader, authzProvider);
+        ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
+        BaseAuthorization.buildAuthorizationPkgPath(
+                ImmutableMap.of(Catalog.AUTHORIZATION_PROVIDER, authzProvider))
+            .ifPresent(libAndResourcesPaths::add);
+        IsolatedClassLoader classLoader =
+            IsolatedClassLoader.buildClassLoader(libAndResourcesPaths);
+        try {
+          BaseAuthorization<?> authorization =
+              BaseAuthorization.createAuthorization(classLoader, authzProvider);
 
-                // Load the authorization plugin with the class loader of the catalog.
-                // Because the JDBC authorization plugin may load JDBC driver using the class
-                // loader.
-                AuthorizationPlugin authorizationPlugin =
-                    classLoader.withClassLoader(
-                        cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
-                plugins.add(authorizationPlugin);
-              } catch (Exception e) {
-                throw new RuntimeException(e);
-              }
-            });
+          // Load the authorization plugin with the class loader of the catalog.
+          // Because the JDBC authorization plugin may load JDBC driver using the class
+          // loader.
+          AuthorizationPlugin authorizationPlugin =
+              classLoader.withClassLoader(
+                  cl -> authorization.newPlugin(metalake, catalogProvider, pluginConfig));
+          plugins.add(authorizationPlugin);
+          classLoaders.add(classLoader);
+        } catch (Exception e) {
+          classLoader.close();
+          throw new RuntimeException(e);
+        }
+      }
+    } catch (RuntimeException e) {
+      for (AuthorizationPlugin initialized : plugins) {
+        try {
+          initialized.close();
+        } catch (IOException closeEx) {
+          e.addSuppressed(closeEx);
+        }
+      }
+      plugins.clear();
+      for (IsolatedClassLoader initializedLoader : classLoaders) {
+        initializedLoader.close();
+      }
+      classLoaders.clear();
+      throw e;
+    }
   }
 
   @Override
   public void close() throws IOException {
+    IOException firstException = null;
     for (AuthorizationPlugin plugin : plugins) {
-      plugin.close();
+      try {
+        plugin.close();
+      } catch (IOException e) {
+        if (firstException == null) {
+          firstException = e;
+        } else {
+          firstException.addSuppressed(e);
+        }
+      }
+    }
+    for (IsolatedClassLoader classLoader : classLoaders) {
+      classLoader.close();
+    }
+    if (firstException != null) {
+      throw firstException;
     }
   }
 
@@ -164,6 +195,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   }
 
   @Override
+  public Boolean onMetalakeUserRemoved(User user) throws AuthorizationPluginException {
+    return chainedAction(plugin -> plugin.onMetalakeUserRemoved(user));
+  }
+
+  @Override
   public Boolean onUserAcquired(User user) throws AuthorizationPluginException {
     return chainedAction(plugin -> plugin.onUserAcquired(user));
   }
@@ -176,6 +212,11 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
   @Override
   public Boolean onGroupRemoved(Group group) throws AuthorizationPluginException {
     return chainedAction(plugin -> plugin.onGroupRemoved(group));
+  }
+
+  @Override
+  public Boolean onMetalakeGroupRemoved(Group group) throws AuthorizationPluginException {
+    return chainedAction(plugin -> plugin.onMetalakeGroupRemoved(group));
   }
 
   @Override

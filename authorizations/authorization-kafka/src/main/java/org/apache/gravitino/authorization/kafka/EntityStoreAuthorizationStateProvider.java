@@ -61,6 +61,7 @@ public class EntityStoreAuthorizationStateProvider implements KafkaAuthorization
 
   private static final Logger LOG =
       LoggerFactory.getLogger(EntityStoreAuthorizationStateProvider.class);
+  private static final int TOPIC_OWNER_BATCH_SIZE = 500;
 
   /** Creates a new {@link EntityStoreAuthorizationStateProvider}. */
   public EntityStoreAuthorizationStateProvider() {}
@@ -198,6 +199,99 @@ public class EntityStoreAuthorizationStateProvider implements KafkaAuthorization
   }
 
   @Override
+  public List<String> listAllUserNames(String metalake) {
+    if (StringUtils.isBlank(metalake)) {
+      return Collections.emptyList();
+    }
+    return withBaseClassLoader(
+        () -> {
+          try {
+            EntityStore store = entityStore();
+            List<UserEntity> users =
+                store.list(
+                    AuthorizationUtils.ofUserNamespace(metalake),
+                    UserEntity.class,
+                    Entity.EntityType.USER,
+                    false);
+            List<String> names = new ArrayList<>(users.size());
+            for (UserEntity user : users) {
+              if (user != null && StringUtils.isNotBlank(user.name())) {
+                names.add(user.name());
+              }
+            }
+            return Collections.unmodifiableList(names);
+          } catch (NoSuchEntityException e) {
+            return Collections.emptyList();
+          } catch (IOException e) {
+            throw new AuthorizationPluginException(
+                e, "Failed to list users in metalake %s", metalake);
+          }
+        });
+  }
+
+  @Override
+  public List<String> listAllGroupNames(String metalake) {
+    if (StringUtils.isBlank(metalake)) {
+      return Collections.emptyList();
+    }
+    return withBaseClassLoader(
+        () -> {
+          try {
+            EntityStore store = entityStore();
+            List<GroupEntity> groups =
+                store.list(
+                    AuthorizationUtils.ofGroupNamespace(metalake),
+                    GroupEntity.class,
+                    Entity.EntityType.GROUP,
+                    false);
+            List<String> names = new ArrayList<>(groups.size());
+            for (GroupEntity group : groups) {
+              if (group != null && StringUtils.isNotBlank(group.name())) {
+                names.add(group.name());
+              }
+            }
+            return Collections.unmodifiableList(names);
+          } catch (NoSuchEntityException e) {
+            return Collections.emptyList();
+          } catch (IOException e) {
+            throw new AuthorizationPluginException(
+                e, "Failed to list groups in metalake %s", metalake);
+          }
+        });
+  }
+
+  @Override
+  public boolean principalExists(String metalake, Owner.Type principalType, String principalName) {
+    if (StringUtils.isBlank(metalake)
+        || principalType == null
+        || StringUtils.isBlank(principalName)) {
+      return false;
+    }
+    return withBaseClassLoader(
+        () -> {
+          try {
+            EntityStore store = entityStore();
+            if (principalType == Owner.Type.USER) {
+              return store.exists(
+                  AuthorizationUtils.ofUser(metalake, principalName), Entity.EntityType.USER);
+            }
+            if (principalType == Owner.Type.GROUP) {
+              return store.exists(
+                  AuthorizationUtils.ofGroup(metalake, principalName), Entity.EntityType.GROUP);
+            }
+            return false;
+          } catch (IOException e) {
+            throw new AuthorizationPluginException(
+                e,
+                "Failed to check existence of %s %s in metalake %s",
+                principalType,
+                principalName,
+                metalake);
+          }
+        });
+  }
+
+  @Override
   public List<MetadataObject> listOwnedObjectsForPrincipal(
       String metalake, @Nullable String catalogName, Owner.Type ownerType, String ownerName) {
     if (StringUtils.isBlank(metalake) || ownerType == null || StringUtils.isBlank(ownerName)) {
@@ -306,12 +400,19 @@ public class EntityStoreAuthorizationStateProvider implements KafkaAuthorization
     }
 
     try {
-      List<RelationalEntity<?>> ownerRelations =
-          store
-              .relationOperations()
-              .batchListEntitiesByRelation(
-                  SupportsRelationOperations.Type.OWNER_REL, topicIdents, Entity.EntityType.TOPIC);
-      if (ownerRelations != null) {
+      boolean allBatchesSucceeded = true;
+      for (int start = 0; start < topicIdents.size(); start += TOPIC_OWNER_BATCH_SIZE) {
+        int end = Math.min(start + TOPIC_OWNER_BATCH_SIZE, topicIdents.size());
+        List<NameIdentifier> batch = topicIdents.subList(start, end);
+        List<RelationalEntity<?>> ownerRelations =
+            store
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.OWNER_REL, batch, Entity.EntityType.TOPIC);
+        if (ownerRelations == null) {
+          allBatchesSucceeded = false;
+          break;
+        }
         for (RelationalEntity<?> relation : ownerRelations) {
           if (relation != null
               && relation.source() != null
@@ -321,6 +422,8 @@ public class EntityStoreAuthorizationStateProvider implements KafkaAuthorization
                     relation.source(), Entity.EntityType.TOPIC));
           }
         }
+      }
+      if (allBatchesSucceeded) {
         return;
       }
     } catch (UnsupportedOperationException e) {

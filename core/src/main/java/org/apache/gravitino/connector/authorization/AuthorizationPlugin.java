@@ -19,6 +19,9 @@
 package org.apache.gravitino.connector.authorization;
 
 import java.io.Closeable;
+import org.apache.gravitino.authorization.Group;
+import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 
 /**
  * Authorization operations plugin interfaces. <br>
@@ -29,4 +32,37 @@ public interface AuthorizationPlugin
     extends UserGroupAuthorizationPlugin,
         RoleAuthorizationPlugin,
         MetadataAuthorizationPlugin,
-        Closeable {}
+        Closeable {
+
+  /**
+   * Invoked when a user is removed from a Gravitino metalake so plugins that materialize grants
+   * directly per principal (without deleting external identity accounts) can revoke managed grants.
+   *
+   * <p>Defaults to a no-op returning {@link Boolean#TRUE} so plugins whose {@link
+   * #onUserRemoved(User)} drops external database/global accounts are unaffected by metalake
+   * membership removal.
+   *
+   * @param user The user being removed from the metalake.
+   * @return {@code true} if cleanup succeeded.
+   * @throws AuthorizationPluginException If revoking principal grants fails.
+   */
+  default Boolean onMetalakeUserRemoved(User user) throws AuthorizationPluginException {
+    return Boolean.TRUE;
+  }
+
+  /**
+   * Invoked when a group is removed from a Gravitino metalake so plugins that materialize grants
+   * directly per principal (without deleting external identity accounts) can revoke managed grants.
+   *
+   * <p>Defaults to a no-op returning {@link Boolean#TRUE} so plugins whose {@link
+   * #onGroupRemoved(Group)} drops external database/global accounts are unaffected by metalake
+   * membership removal.
+   *
+   * @param group The group being removed from the metalake.
+   * @return {@code true} if cleanup succeeded.
+   * @throws AuthorizationPluginException If revoking principal grants fails.
+   */
+  default Boolean onMetalakeGroupRemoved(Group group) throws AuthorizationPluginException {
+    return Boolean.TRUE;
+  }
+}
