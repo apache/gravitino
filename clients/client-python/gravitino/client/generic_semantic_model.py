@@ -25,6 +25,11 @@ from gravitino.api.policy.policy_list import PolicyList
 from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.semantic.semantic_model import SemanticModel
 from gravitino.api.semantic.semantic_model_definition import SemanticModelDefinition
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.supports_domains import SupportsDomains
+from gravitino.client.metadata_object_domain_operations import (
+    MetadataObjectDomainOperations,
+)
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_list import TagList
@@ -37,7 +42,9 @@ from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
 
-class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
+class GenericSemanticModel(
+    SemanticModel, SupportsTags, SupportsDomains, SupportsPolicies
+):  # pylint: disable=too-many-instance-attributes
     """An immutable client-side Semantic Model returned by the Gravitino REST API."""
 
     def __init__(
@@ -61,6 +68,9 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
         model_object = MetadataObjects.of(
             [semantic_model_ns.level(1), semantic_model_ns.level(2), self._name],
             MetadataObject.Type.SEMANTIC_MODEL,
+        )
+        self._object_domain_operations = MetadataObjectDomainOperations(
+            semantic_model_ns.level(0), model_object, rest_client
         )
         self._model_tag_operations = MetadataObjectTagOperations(
             semantic_model_ns.level(0), model_object, rest_client
@@ -149,3 +159,12 @@ class GenericSemanticModel(SemanticModel, SupportsTags, SupportsPolicies):
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
         return self._model_tag_operations.associate_tags(tags_to_add, tags_to_remove)
+
+    def supports_domains(self) -> SupportsDomains:
+        return self
+
+    def list_domains(self) -> list[str]:
+        return self._object_domain_operations.list_domains()
+
+    def list_domains_info(self) -> list[Domain]:
+        return self._object_domain_operations.list_domains_info()

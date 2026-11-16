@@ -88,4 +88,140 @@ public class TestInMemorySecretsProvider {
     provider.close();
     Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
   }
+
+  @Test
+  public void testWrittenVersionStaysPendingUntilMadeCurrent() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String oldVersion = provider.currentSecretVersion(urn);
+    Assertions.assertNotNull(oldVersion);
+
+    String newVersion = provider.writeSecretVersion(urn, "new");
+    Assertions.assertNotEquals(oldVersion, newVersion);
+    Assertions.assertEquals(oldVersion, provider.currentSecretVersion(urn));
+    Assertions.assertEquals("old", provider.readSecret(urn));
+
+    provider.setCurrentSecretVersion(urn, newVersion);
+    Assertions.assertEquals(newVersion, provider.currentSecretVersion(urn));
+    Assertions.assertEquals("new", provider.readSecret(urn));
+
+    provider.deleteSecretVersion(urn, oldVersion);
+    Assertions.assertEquals("new", provider.readSecret(urn));
+  }
+
+  @Test
+  public void testWrittenVersionBecomesCurrentWhenUrnHasNone() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+
+    String version = provider.writeSecretVersion(urn, "first");
+    Assertions.assertEquals(version, provider.currentSecretVersion(urn));
+    Assertions.assertEquals("first", provider.readSecret(urn));
+  }
+
+  @Test
+  public void testWrittenVersionBecomesCurrentWhenOnlyStaleVersionsRemain() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String oldVersion = provider.currentSecretVersion(urn);
+    provider.writeSecretVersion(urn, "stale");
+    provider.deleteSecretVersion(urn, oldVersion);
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+
+    String version = provider.writeSecretVersion(urn, "new");
+    Assertions.assertEquals(version, provider.currentSecretVersion(urn));
+    Assertions.assertEquals("new", provider.readSecret(urn));
+  }
+
+  @Test
+  public void testWriteSecretVersionRequiresInitialization() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> provider.writeSecretVersion(urn, "s3cr3t"));
+  }
+
+  @Test
+  public void testDeletingCurrentVersionLeavesNoReadableValue() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String oldVersion = provider.currentSecretVersion(urn);
+    String newVersion = provider.writeSecretVersion(urn, "new");
+
+    provider.deleteSecretVersion(urn, oldVersion);
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> provider.readSecret(urn));
+
+    provider.setCurrentSecretVersion(urn, newVersion);
+    Assertions.assertEquals("new", provider.readSecret(urn));
+
+    provider.deleteSecretVersion(urn, newVersion);
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+    Assertions.assertDoesNotThrow(() -> provider.deleteSecretVersion(urn, newVersion));
+  }
+
+  @Test
+  public void testSetCurrentRejectsUnknownVersion() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, "1"));
+
+    String version = provider.writeSecretVersion(urn, "first");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, version + "0"));
+    Assertions.assertEquals("first", provider.readSecret(urn));
+  }
+
+  @Test
+  public void testDeleteSecretRemovesEveryVersion() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String newVersion = provider.writeSecretVersion(urn, "new");
+
+    provider.deleteSecret(urn);
+    Assertions.assertNull(provider.currentSecretVersion(urn));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, newVersion));
+  }
+
+  @Test
+  public void testWriteSecretReplacesEveryVersion() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = provider.writeSecret("old", writeAttributes());
+    String pending = provider.writeSecretVersion(urn, "pending");
+
+    provider.writeSecret("new", writeAttributes());
+    Assertions.assertEquals("new", provider.readSecret(urn));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, pending));
+  }
+
+  @Test
+  public void testVersionMethodsRejectInvalidArguments() {
+    InMemorySecretsProvider provider = new InMemorySecretsProvider();
+    provider.initialize("memory", Map.of());
+    SecretUrn urn = SecretUrn.buildWriteThrough("memory", writeAttributes());
+    SecretUrn otherProvider = SecretUrn.buildWriteThrough("vault", writeAttributes());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecretVersion(null, "s3cr3t"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecretVersion(urn, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.writeSecretVersion(otherProvider, "s3cr3t"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.setCurrentSecretVersion(urn, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.deleteSecretVersion(null, "1"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> provider.currentSecretVersion(null));
+  }
 }

@@ -26,6 +26,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.model.ModelDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
@@ -40,9 +42,12 @@ import org.apache.gravitino.tag.TagList;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic model. */
-class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSecrets {
+class GenericModel
+    implements Model, SupportsTags, SupportsDomains, SupportsPolicies, SupportsSecrets {
 
   private final ModelDTO modelDTO;
+
+  private final MetadataObjectDomainOperations objectDomainOperations;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
@@ -55,6 +60,8 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
     MetadataObject modelObject = MetadataObjects.of(modelFullName, MetadataObject.Type.MODEL);
     this.objectTagOperations =
         new MetadataObjectTagOperations(modelNs.level(0), modelObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(modelNs.level(0), modelObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(modelNs.level(0), modelObject, restClient);
     this.objectSecretOperations =
@@ -84,6 +91,24 @@ class GenericModel implements Model, SupportsTags, SupportsPolicies, SupportsSec
   @Override
   public int latestVersion() {
     return modelDTO.latestVersion();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
   }
 
   @Override

@@ -220,6 +220,24 @@ It adds the OAuth client settings when `oauth` is among the authenticators. Trea
 through `visibleConfigs` as public, and only add properties that a client needs before it can
 authenticate.
 
+Set `gravitino.server.visibleConfigs` when a Web UI or another client needs extra server
+configuration, for example to use the server's session timeout settings rather than local UI
+defaults. Set both the property values and the comma-separated list of keys in
+`conf/gravitino.conf`, then restart the server:
+
+```properties
+gravitino.ui.sessionIdleTimeoutMs = 1800000
+gravitino.ui.sessionMaxDurationMs = 28800000
+gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs
+```
+
+Clients can then read those values from `GET http://localhost:8090/configs`. A key with no
+explicitly configured value is omitted. Leave the list empty when clients do not need additional
+settings; the fixed configuration keys are still returned. This setting controls configuration
+visibility, not access to catalogs or other metadata. Never include passwords, tokens, client
+secrets, or administrator lists. See [Web UI session settings](webui-v2.md#session-timeout-configuration) for the
+UI's configuration lookup order.
+
 Two further groups of `gravitino.server.webserver.*` properties are documented elsewhere, because
 they belong to features rather than to the web server itself. TLS, key stores, trust stores, and
 client certificate authentication are in [HTTPS](security/how-to-use-https.md). The CORS filter
