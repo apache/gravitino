@@ -63,8 +63,7 @@ public class ShellProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    // Mask --updater-options / --spark-conf for the log only; ProcessBuilder keeps the plaintext
-    // commandList.
+    // Mask JSON bags and sensitive --conf for the log only; ProcessBuilder keeps plaintext.
     LOG.info(
         "Starting local shell job with command: {}",
         Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)));

@@ -153,8 +153,7 @@ public class SparkProcessBuilder extends LocalProcessBuilder {
     builder.redirectOutput(outputFile);
     builder.redirectError(errorFile);
 
-    // Mask --updater-options / --spark-conf for the log only; ProcessBuilder keeps the plaintext
-    // commandList.
+    // Mask JSON bags and sensitive --conf for the log only; ProcessBuilder keeps plaintext.
     LOG.info(
         "Starting local Spark job with command: {}, environment variable names: {}",
         Joiner.on(" ").join(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(commandList)),

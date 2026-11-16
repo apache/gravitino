@@ -243,12 +243,10 @@ public final class HiddenPropertyMaskUtils {
       }
       MaskedJson masked = maskJsonNode(root);
       return masked.changed ? NEST_JSON_MAPPER.writeValueAsString(masked.value) : value;
-    } catch (Exception e) {
+    } catch (Exception ignored) {
       // Malformed object/array JSON on a caller-declared nest key — do not leave a secret blob.
-      // Do not log the value; it may contain credentials.
-      LOG.warn(
-          "Replacing malformed nest JSON with masked placeholder after parse failure: {}",
-          e.toString());
+      // Fixed message only: Jackson exception text can embed the input (and credentials).
+      LOG.warn("Replacing malformed nest JSON with masked placeholder after parse failure");
       return MASKED_VALUE;
     }
   }
