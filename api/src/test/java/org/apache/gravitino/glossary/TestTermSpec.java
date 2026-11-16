@@ -19,7 +19,10 @@
 package org.apache.gravitino.glossary;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -107,5 +110,81 @@ public class TestTermSpec {
         IllegalArgumentException.class, () -> builder.withRelated("Order", null));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> builder.withLinks((TermLink) null));
+  }
+
+  /** Creation and mutation reject the same invalid property names, including Unicode whitespace. */
+  @Test
+  public void testInvalidPropertyNames() {
+    for (String invalid : Arrays.asList(null, "", " ", "\t", "\n", "\u2003")) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              TermSpec.builder("Customer")
+                  .withProperties(Collections.singletonMap(invalid, "value")));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> TermChange.setProperty(invalid, "value"));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> TermChange.removeProperty(invalid));
+    }
+  }
+
+  /** Reject null values while preserving empty values, empty maps and omitted properties. */
+  @Test
+  public void testPropertyValuesAndOmission() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            TermSpec.builder("Customer")
+                .withProperties(Collections.singletonMap("description", null)));
+    TermSpec spec =
+        TermSpec.builder("Customer")
+            .withProperties(Collections.singletonMap("description", ""))
+            .build();
+    Assertions.assertEquals("", spec.properties().get("description"));
+    Assertions.assertTrue(
+        TermSpec.builder("Customer")
+            .withProperties(Collections.emptyMap())
+            .build()
+            .properties()
+            .isEmpty());
+    TermSpec.Builder builder =
+        TermSpec.builder("Customer").withProperties(Collections.singletonMap("description", ""));
+    TermSpec before = builder.build();
+    Assertions.assertTrue(builder.withProperties(null).build().properties().isEmpty());
+    Assertions.assertEquals("", before.properties().get("description"));
+  }
+
+  /** Copy caller maps and preserve exact valid names so the same keys can be changed or removed. */
+  @Test
+  public void testPropertiesAreCopiedWithoutNormalization() {
+    Map<String, String> source = new HashMap<>();
+    source.put(" display name ", "");
+    TermSpec spec = TermSpec.builder("Customer").withProperties(source).build();
+    source.put(" display name ", "changed");
+    Assertions.assertEquals(Collections.singletonMap(" display name ", ""), spec.properties());
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> spec.properties().put("other", "value"));
+    Assertions.assertEquals(
+        " display name ",
+        ((TermChange.SetProperty) TermChange.setProperty(" display name ", "")).getProperty());
+    Assertions.assertEquals(
+        " display name ",
+        ((TermChange.RemoveProperty) TermChange.removeProperty(" display name ")).getProperty());
+  }
+
+  /** A rejected replacement must not publish the valid prefix or clear the previous properties. */
+  @Test
+  public void testInvalidPropertiesLeaveBuilderUnchanged() {
+    TermSpec.Builder builder =
+        TermSpec.builder("Customer").withProperties(Collections.singletonMap("existing", "value"));
+    Map<String, String> replacement = new LinkedHashMap<>();
+    replacement.put("valid", "new");
+    replacement.put(" ", "invalid");
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> builder.withProperties(replacement));
+    Assertions.assertEquals(
+        Collections.singletonMap("existing", "value"), builder.build().properties());
+    builder.withProperties(Collections.singletonMap("next", ""));
+    Assertions.assertEquals(Collections.singletonMap("next", ""), builder.build().properties());
   }
 }

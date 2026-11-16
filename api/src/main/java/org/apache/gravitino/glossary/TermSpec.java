@@ -159,7 +159,7 @@ public final class TermSpec {
   /**
    * Returns the properties of the term.
    *
-   * @return The properties, or an empty map.
+   * @return The immutable properties, or an empty map.
    */
   public Map<String, String> properties() {
     return properties;
@@ -327,13 +327,26 @@ public final class TermSpec {
     }
 
     /**
-     * Sets the properties of the term.
+     * Sets the properties of the term, copying them without trimming or normalizing their names.
+     * Property names must be nonblank and values must be non-null; empty values are supported,
+     * consistently with {@link TermChange#setProperty(String, String)}.
      *
      * @param properties The properties, or null for none.
      * @return This builder.
+     * @throws IllegalArgumentException If a property name is null or blank, or a value is null.
      */
     public Builder withProperties(@Nullable Map<String, String> properties) {
-      this.properties = properties == null ? ImmutableMap.of() : ImmutableMap.copyOf(properties);
+      ImmutableMap.Builder<String, String> validatedProperties = ImmutableMap.builder();
+      if (properties != null) {
+        properties.forEach(
+            (property, value) -> {
+              Preconditions.checkArgument(
+                  StringUtils.isNotBlank(property), "Property name cannot be blank");
+              Preconditions.checkArgument(value != null, "Property value cannot be null");
+              validatedProperties.put(property, value);
+            });
+      }
+      this.properties = validatedProperties.build();
       return this;
     }
 
