@@ -32,16 +32,18 @@ import org.apache.gravitino.dto.job.SparkJobTemplateDTO;
 
 /**
  * Display-masks credentials in a Spark job's {@code updater_options} and {@code spark_conf} JSON
- * before that JSON is returned by an API or placed on an event. Sensitive-named keys inside the
- * JSON are replaced with {@link HiddenPropertyMaskUtils#MASKED_VALUE}. This is not encryption: the
- * stored runtime template and the map passed to job execution stay plaintext.
+ * before that JSON is returned by an API, placed on an event, or written to a local-executor INFO
+ * log. Sensitive-named keys inside the JSON are replaced with {@link
+ * HiddenPropertyMaskUtils#MASKED_VALUE}. This is not encryption: the stored runtime template and
+ * the command list / map passed to job execution stay plaintext.
  *
  * <p>Only those two JSON bags are masked.
  *
  * <ul>
  *   <li>Spark template arguments {@code --updater-options} and {@code --spark-conf}. One list
  *       element is one argument, so the JSON is the whole next element (or the text after {@code =}
- *       in {@code --flag=json}). It is not split on whitespace.
+ *       in {@code --flag=json}). It is not split on whitespace. The same walk applies to a full
+ *       process command list (for example {@code spark-submit ...}) used only for logging.
  *   <li>{@code jobConf} entries {@code updater_options} and {@code spark_conf} on the run-job
  *       events. Those names are the Spark template placeholders {@code {{updater_options}}} and
  *       {@code {{spark_conf}}}, not the hyphenated CLI flags.
@@ -158,11 +160,16 @@ public final class JobRuntimeTemplateMaskUtils {
   }
 
   /**
-   * Masks the JSON value of {@link #JSON_ARGUMENT_FLAGS}. The value is one list element, including
-   * any spaces inside the JSON. Other arguments are copied unchanged.
+   * Returns a copy of {@code arguments} with the JSON value of {@link #JSON_ARGUMENT_FLAGS} masked.
+   * The value is one list element, including any spaces inside the JSON. Other arguments are copied
+   * unchanged. Does not mutate the input; callers must pass the original list to process execution
+   * and use this copy only for display (API, events, or logs).
+   *
+   * @param arguments process command tokens or template arguments; may be null
+   * @return a masked copy, or null when {@code arguments} is null
    */
   @Nullable
-  private static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
+  public static List<String> maskSensitiveArguments(@Nullable List<String> arguments) {
     if (arguments == null) {
       return null;
     }

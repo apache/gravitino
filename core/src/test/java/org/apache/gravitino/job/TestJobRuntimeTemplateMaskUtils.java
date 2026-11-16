@@ -154,6 +154,42 @@ public class TestJobRuntimeTemplateMaskUtils {
   @Test
   void testMaskSensitiveFieldsNull() {
     Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveFields(null));
+    Assertions.assertNull(JobRuntimeTemplateMaskUtils.maskSensitiveArguments(null));
+  }
+
+  @Test
+  void testMaskSensitiveArgumentsOnFullSparkSubmitCommand() {
+    // Same shape as SparkProcessBuilder.generateSparkSubmitCommand: mask for INFO logs only.
+    List<String> command =
+        ImmutableList.of(
+            "/path/to/spark-submit",
+            "--class",
+            "org.example.App",
+            "--conf",
+            "spark.executor.memory=2g",
+            "local:///app.jar",
+            "--updater-options",
+            "{\"password\":\"arg-pw\",\"gravitino_uri\":\"http://localhost\"}",
+            "--spark-conf",
+            "{\"spark.sql.catalog.ice.rest.auth.basic.password\":\"jdbc-pw\","
+                + "\"spark.executor.memory\":\"1g\"}",
+            "--table",
+            "db.t");
+
+    List<String> masked = JobRuntimeTemplateMaskUtils.maskSensitiveArguments(command);
+
+    Assertions.assertEquals(command.size(), masked.size());
+    Assertions.assertEquals("/path/to/spark-submit", masked.get(0));
+    Assertions.assertEquals("spark.executor.memory=2g", masked.get(4));
+    Assertions.assertFalse(masked.get(7).contains("arg-pw"));
+    Assertions.assertTrue(masked.get(7).contains("http://localhost"));
+    Assertions.assertTrue(masked.get(7).contains(HiddenPropertyMaskUtils.MASKED_VALUE));
+    Assertions.assertFalse(masked.get(9).contains("jdbc-pw"));
+    Assertions.assertTrue(masked.get(9).contains("1g"));
+    Assertions.assertEquals("db.t", masked.get(11));
+    // Original list used for ProcessBuilder must stay plaintext.
+    Assertions.assertTrue(command.get(7).contains("arg-pw"));
+    Assertions.assertTrue(command.get(9).contains("jdbc-pw"));
   }
 
   @Test
