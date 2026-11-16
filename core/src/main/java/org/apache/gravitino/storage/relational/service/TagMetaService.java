@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.SupportsDomainOperations.MEMBERSHIP_LOOKUP_BATCH_SIZE;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -82,6 +83,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 public class TagMetaService {
 
   // One domain batch can contribute many more object IDs than domains.
+  private static final int JOINED_DOMAIN_BATCH_SIZE = 5_000;
   private static final int NAME_LOOKUP_BATCH_SIZE = 10_000;
   private static final TagMetaService INSTANCE = new TagMetaService();
 
@@ -292,7 +294,10 @@ public class TagMetaService {
     if (types.isEmpty()) {
       return result;
     }
-    for (List<DomainEntity> batch : Lists.partition(domains, 500)) {
+    // The candidate semijoin limits the returned objects even for a wide domain batch.
+    int domainBatchSize =
+        candidateDomainIds.isEmpty() ? MEMBERSHIP_LOOKUP_BATCH_SIZE : JOINED_DOMAIN_BATCH_SIZE;
+    for (List<DomainEntity> batch : Lists.partition(domains, domainBatchSize)) {
       Map<Long, DomainEntity> selected =
           batch.stream().collect(Collectors.toMap(DomainEntity::id, Function.identity()));
       List<DomainAssignmentPO> rows =
@@ -340,7 +345,7 @@ public class TagMetaService {
   public Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
       String metalake, MetadataObject.Type type, List<Long> objectIds) {
     Map<Long, List<TagEntity>> result = new LinkedHashMap<>();
-    for (List<Long> batch : Lists.partition(objectIds, 500)) {
+    for (List<Long> batch : Lists.partition(objectIds, MEMBERSHIP_LOOKUP_BATCH_SIZE)) {
       List<TagRelationTagPO> rows =
           SessionUtils.getWithoutCommit(
               TagMetadataObjectRelMapper.class,

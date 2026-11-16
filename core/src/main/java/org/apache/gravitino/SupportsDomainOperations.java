@@ -59,6 +59,9 @@ import org.apache.gravitino.tag.TagValue;
  */
 public interface SupportsDomainOperations {
 
+  /** Number of domain or object IDs per direct membership lookup batch. */
+  int MEMBERSHIP_LOOKUP_BATCH_SIZE = 500;
+
   /**
    * Deletes a domain after checking its current state under the domain row lock.
    *

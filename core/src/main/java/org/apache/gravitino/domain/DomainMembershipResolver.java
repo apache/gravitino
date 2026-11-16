@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.domain;
 
+import static org.apache.gravitino.SupportsDomainOperations.MEMBERSHIP_LOOKUP_BATCH_SIZE;
+
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -128,21 +130,53 @@ final class DomainMembershipResolver {
     boolean joinPaths =
         needsOtherBindings
             && !selectedIds.isEmpty()
-            && selectedIds.size() <= 500
+            && selectedIds.size() <= MEMBERSHIP_LOOKUP_BATCH_SIZE
             && !filter.nameContains().isPresent();
-    List<DomainEntity> lookupDomains = joinPaths ? scopeDomains : selectedDomains;
     Set<MetadataObject> selectedObjects = new HashSet<>();
     Map<MetadataObject.Type, Map<Long, MetadataObject>> candidates =
         new EnumMap<>(MetadataObject.Type.class);
     Map<MetadataObject, Set<DomainRelation>> relations = new LinkedHashMap<>();
     List<DomainMember> members = new ArrayList<>();
     try {
-      Map<Long, List<GenericEntity>> assigned =
-          listAssignments(
-              metalake,
-              lookupDomains,
-              filter.types().isEmpty() ? DIRECT_MEMBER_TYPES : filter.types(),
-              joinPaths ? selectedIds : Collections.emptySet());
+      Set<MetadataObject.Type> types =
+          filter.types().isEmpty() ? DIRECT_MEMBER_TYPES : filter.types();
+      List<DomainEntity> lookupDomains = joinPaths ? scopeDomains : selectedDomains;
+      Map<Long, List<GenericEntity>> assigned;
+      if (joinPaths
+          && scopeDomains.stream()
+                  .filter(d -> d.backingTagId() != null)
+                  .limit(MEMBERSHIP_LOOKUP_BATCH_SIZE + 1)
+                  .count()
+              > MEMBERSHIP_LOOKUP_BATCH_SIZE) {
+        assigned =
+            new HashMap<>(
+                listAssignments(metalake, selectedDomains, types, Collections.emptySet()));
+        if (assigned.values().stream().allMatch(List::isEmpty)) {
+          return members;
+        }
+        List<DomainEntity> remaining =
+            scopeDomains.stream()
+                .filter(d -> d.backingTagId() != null && !selectedIds.contains(d.id()))
+                .collect(Collectors.toList());
+        // Use the smaller set of lookup keys: object IDs for sparse selections, remaining
+        // domain IDs for dense selections. The first lookup is reused in both cases.
+        joinPaths =
+            assigned.values().stream()
+                    .flatMap(List::stream)
+                    .distinct()
+                    .limit(remaining.size() + 1L)
+                    .count()
+                > remaining.size();
+        if (joinPaths) {
+          assigned.putAll(listAssignments(metalake, remaining, types, selectedIds));
+        } else {
+          lookupDomains = selectedDomains;
+        }
+      } else {
+        assigned =
+            listAssignments(
+                metalake, lookupDomains, types, joinPaths ? selectedIds : Collections.emptySet());
+      }
       for (DomainEntity domain : lookupDomains) {
         if (domain.backingTagId() == null) {
           continue;

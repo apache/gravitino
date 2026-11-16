@@ -323,6 +323,43 @@ class TestDomainMembershipResolver {
   }
 
   @Test
+  void testWideScopeUsesCandidateCountToChooseLookup() throws Exception {
+    DomainEntity parent = domain(1, "Finance", null, 1L, null);
+    DomainEntity[] children = new DomainEntity[500];
+    for (int i = 0; i < children.length; i++) {
+      children[i] = domain(i + 2, "Child" + i, "Finance", (long) i + 2, null);
+    }
+    DomainMemberFilter filter = direct().withDomains("Child0").build();
+    assertEquals(0, resolver.listMembers(METALAKE, parent, children, filter).length);
+    candidate(2, TABLE);
+    assign(TABLE, tag(2, "selected"));
+    assertArrayEquals(
+        new MetadataObject[] {TABLE},
+        objects(resolver.listMembers(METALAKE, parent, children, filter)));
+    verify(domainOperations)
+        .listDirectTagsByObjectIds(
+            METALAKE, MetadataObject.Type.TABLE, List.of(objectIds.get(TABLE)));
+
+    MetadataObject[] tables = new MetadataObject[501];
+    for (int i = 0; i < tables.length; i++) {
+      tables[i] = object("cat.db.table" + i, MetadataObject.Type.TABLE);
+    }
+    candidate(2, tables);
+    candidate(3, tables[0]);
+    DomainMember[] members = resolver.listMembers(METALAKE, parent, children, filter);
+    assertEquals(tables.length, members.length);
+    assertArrayEquals(
+        new DomainRelation[] {
+          DomainRelation.viaSubdomain("Child0"), DomainRelation.viaSubdomain("Child1")
+        },
+        members[0].relations());
+    verify(domainOperations, times(3))
+        .listDomainAssignments(
+            eq(METALAKE), eq(List.of(children[0])), any(), eq(Collections.emptySet()));
+    verify(domainOperations).listDomainAssignments(eq(METALAKE), anyList(), any(), eq(Set.of(2L)));
+  }
+
+  @Test
   void testFilteredListingOnlyEnumeratesSelectedDomain() throws Exception {
     DomainEntity finance = domain(1, "Finance", null, 10L, null);
     DomainEntity trading = domain(2, "Trading", "Finance", 20L, null);
