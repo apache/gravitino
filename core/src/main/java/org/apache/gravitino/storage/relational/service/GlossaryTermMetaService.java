@@ -65,10 +65,12 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * <p>Insert starts at revision 1; update and overwrite increment the stored revision once. Callers
  * must detect semantic no-ops before invoking a write. Relation validation, authorization and the
  * name-versus-synonym checks belong to the glossary manager, not this persistence service. Shared
- * synonyms across terms are allowed. The manager must take the per-metalake hierarchy lock before
- * checking name/synonym conflicts and keep it through the write in the same transaction. Reads use
- * a single statement snapshot for definitions, synonyms and the live parent name without taking row
- * locks.
+ * synonyms across terms are allowed. Name/synonym conflicts are not rejected here, even for
+ * sequential writes; the parent lock and database unique keys do not enforce that cross-table rule.
+ * Before exposing manager/API writes, the manager must take the per-metalake hierarchy lock, read
+ * fresh state, and check conflicts in both directions. It must keep that lock through commit in the
+ * same transaction for create, rename, overwrite and synonym changes. Reads use a single statement
+ * snapshot for definitions, synonyms and the live parent name without taking row locks.
  */
 public final class GlossaryTermMetaService {
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
@@ -256,7 +258,10 @@ public final class GlossaryTermMetaService {
           MetalakePO observed = metalake(ns);
           // Fence metalake deletion; definition row locks keep the root and synonyms consistent.
           // MySQL/PostgreSQL share the parent lock across terms. H2 uses an exclusive parent
-          // lock instead, serializing operations within a metalake.
+          // lock instead, serializing operations within a metalake. This is not the glossary
+          // hierarchy mutex: a caller's name/synonym precheck before this lock can become stale,
+          // even on H2. The manager must perform that check under the dedicated hierarchy mutex
+          // in this same transaction; making only this parent lock exclusive is insufficient.
           MetalakePO locked =
               SessionUtils.getWithoutCommit(
                   MetalakeMetaMapper.class,
