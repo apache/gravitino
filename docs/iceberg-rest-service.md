@@ -82,6 +82,7 @@ The standalone Iceberg REST server package has the following layout:
     |   └── hdfs-site.xml & core-site.xml       # HDFS configuration files.
     |── libs/                                   # Gravitino Iceberg REST server dependencies libraries.
     |── logs/                                   # Gravitino Iceberg REST server logs. Automatically created after the server starts.
+    |── scripts/                                # SQL scripts for database initialization.
 ```
 
 ## Configuration

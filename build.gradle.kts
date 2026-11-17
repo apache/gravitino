@@ -1426,6 +1426,14 @@ tasks {
       }
 
       copy {
+        from(projectDir.dir("scripts")) {
+          include("**/iceberg-*.sql")
+          into("${rootProject.name}-iceberg-rest-server/scripts")
+        }
+        into(outputDir)
+      }
+
+      copy {
         from(projectDir.dir("licenses")) { into("${rootProject.name}-iceberg-rest-server/licenses") }
         from(projectDir.file("LICENSE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
         from(projectDir.file("NOTICE.iceberg")) { into("${rootProject.name}-iceberg-rest-server") }
