@@ -23,15 +23,25 @@ import java.util.Map;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
 public final class GlossaryTermSQLProvider {
-  /** Returns SQL for get. */
-  public static String get(Map<String, Object> params) {
+  private static final String LIVE_METALAKE_JOIN =
+      " JOIN metalake_meta m ON m.metalake_id=t.metalake_id "
+          + "AND m.metalake_name=#{metalakeName} AND m.deleted_at=0 ";
+
+  /** Locks a definition after the caller has fenced its metalake. */
+  public static String getForUpdate() {
     return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
         + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
         + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
         + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta WHERE metalake_id = "
-        + "#{metalakeId} AND name_key = #{key} AND deleted_at=0"
-        + (Boolean.TRUE.equals(params.get("write")) ? " FOR UPDATE" : "");
+        + "#{metalakeId} AND name_key = #{key} AND deleted_at=0 FOR UPDATE";
   }
+  /** Resolves IDs only while the parent still has the requested live name. */
+  public static String getIds() {
+    return "SELECT t.term_id AS termId, t.metalake_id AS metalakeId FROM glossary_term_meta t"
+        + LIVE_METALAKE_JOIN
+        + "WHERE t.metalake_id=#{metalakeId} AND t.name_key=#{key} AND t.deleted_at=0";
+  }
+
   /** Returns SQL for insert. */
   public static String insert() {
     return "INSERT INTO glossary_term_meta (term_id, name, name_key, metalake_id, definition, "
@@ -97,12 +107,14 @@ public final class GlossaryTermSQLProvider {
   }
   /** Reads definitions and synonyms together, including definitions without synonyms. */
   public static String snapshot(Map<String, Object> params) {
+    // Validate the parent name in this snapshot too: it can be renamed after ID resolution.
     // A single statement avoids mixed revisions at READ_COMMITTED without locking readers.
     return "SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
         + "t.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
         + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
         + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
-        + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM glossary_term_meta t "
+        + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM glossary_term_meta t"
+        + LIVE_METALAKE_JOIN
         + "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
         + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
         + "WHERE t.metalake_id=#{metalakeId} AND t.deleted_at=0"

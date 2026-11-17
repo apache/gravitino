@@ -32,12 +32,19 @@ import org.apache.ibatis.annotations.UpdateProvider;
 
 /** Glossary definition and synonym persistence in the caller transaction. */
 public interface GlossaryTermMetaMapper {
-  /** Executes get within the current transaction. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "get")
-  GlossaryTermPO get(
+  /** Locks the live definition, or returns null; the caller must fence its metalake first. */
+  @Nullable
+  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "getForUpdate")
+  GlossaryTermPO getForUpdate(@Param("metalakeId") long metalakeId, @Param("key") String key);
+
+  /** Returns only term/metalake IDs, or null if the term or requested parent name is absent. */
+  @Nullable
+  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "getIds")
+  GlossaryTermPO getIds(
       @Param("metalakeId") long metalakeId,
-      @Param("key") String key,
-      @Param("write") boolean write);
+      @Param("metalakeName") String metalakeName,
+      @Param("key") String key);
+
   /** Executes insert within the current transaction. */
   @InsertProvider(type = GlossaryTermSQLProvider.class, method = "insert")
   void insert(@Param("p") GlossaryTermPO p);
@@ -53,7 +60,7 @@ public interface GlossaryTermMetaMapper {
       @Param("id") long id,
       @Param("metalakeId") long metalakeId,
       @Param("synonym") String synonym,
-      @Param("key") @Nullable String key);
+      @Param("key") String key);
   /** Executes clearSynonyms within the current transaction. */
   @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "clearSynonyms")
   void clearSynonyms(@Param("id") long id);
@@ -79,8 +86,10 @@ public interface GlossaryTermMetaMapper {
   /** Executes purge within the current transaction. */
   @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "purge")
   int purge(@Param("id") long id);
-  /** Reads definitions and their synonyms in one statement snapshot without row locks. */
+  /** Reads definitions, synonyms and the live parent name in one snapshot without row locks. */
   @SelectProvider(type = GlossaryTermSQLProvider.class, method = "snapshot")
   List<GlossaryTermSnapshotPO> snapshot(
-      @Param("metalakeId") long metalakeId, @Param("key") @Nullable String key);
+      @Param("metalakeId") long metalakeId,
+      @Param("metalakeName") String metalakeName,
+      @Param("key") @Nullable String key);
 }

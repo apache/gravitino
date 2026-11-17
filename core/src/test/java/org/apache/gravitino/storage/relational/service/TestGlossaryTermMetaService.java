@@ -34,6 +34,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.glossary.GlossaryTerm.Status;
 import org.apache.gravitino.glossary.TermLink;
 import org.apache.gravitino.meta.GlossaryTermEntity;
@@ -41,10 +42,14 @@ import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 /** Backend contract tests for persisted glossary definitions. */
 public class TestGlossaryTermMetaService extends TestJDBCBackend {
@@ -412,5 +417,80 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
       reader.shutdownNow();
       Assertions.assertTrue(reader.awaitTermination(10, TimeUnit.SECONDS));
     }
+  }
+
+  @TestTemplate
+  public void testGetDoesNotFollowRenamedMetalake() throws Exception {
+    assertReadAfterMetalakeRename(
+        () ->
+            Assertions.assertThrows(
+                NoSuchEntityException.class, () -> backend.get(ident("New term"), TYPE)));
+  }
+
+  @TestTemplate
+  public void testListDoesNotFollowRenamedMetalake() throws Exception {
+    assertReadAfterMetalakeRename(
+        () -> Assertions.assertTrue(backend.list(NS, TYPE, true).isEmpty()));
+  }
+
+  @TestTemplate
+  public void testBatchGetDoesNotFollowRenamedMetalake() throws Exception {
+    assertReadAfterMetalakeRename(
+        () -> Assertions.assertTrue(backend.batchGet(List.of(ident("New term")), TYPE).isEmpty()));
+  }
+
+  @TestTemplate
+  public void testIdsDoNotFollowRenamedMetalake() throws Exception {
+    assertReadAfterMetalakeRename(
+        () ->
+            Assertions.assertThrows(
+                NoSuchEntityException.class,
+                () -> new RelationalEntityStoreIdResolver().getEntityIds(ident("New term"), TYPE)));
+  }
+
+  private void assertReadAfterMetalakeRename(Executable read) throws Exception {
+    setupMetalake();
+    Namespace renamed =
+        Namespace.of("renamed", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
+    ExecutorService writer = Executors.newSingleThreadExecutor();
+    MetalakeMetaService metalakes = Mockito.spy(MetalakeMetaService.getInstance());
+    Mockito.doAnswer(
+            invocation -> {
+              MetalakePO observed = (MetalakePO) invocation.callRealMethod();
+              // Commit on an independent session after name resolution but before the term SELECT.
+              // This term has never existed under the old namespace, so returning it cannot
+              // represent
+              // an earlier valid snapshot. The spy changes timing only; all reads and writes hit
+              // the DB.
+              writer
+                  .submit(
+                      () -> {
+                        backend.update(
+                            NameIdentifier.of("glossary"),
+                            Entity.EntityType.METALAKE,
+                            old -> createBaseMakeLake(100L, "renamed", AUDIT_INFO));
+                        backend.insert(
+                            term(101L, "New term")
+                                .withNamespace(renamed)
+                                .withSynonyms(new String[] {"new synonym"})
+                                .build(),
+                            false);
+                        return null;
+                      })
+                  .get(10, TimeUnit.SECONDS);
+              return observed;
+            })
+        .when(metalakes)
+        .requireMetalakeByName("glossary");
+    try (MockedStatic<MetalakeMetaService> services =
+        Mockito.mockStatic(MetalakeMetaService.class, Mockito.CALLS_REAL_METHODS)) {
+      services.when(MetalakeMetaService::getInstance).thenReturn(metalakes);
+      Assertions.assertDoesNotThrow(read);
+      Mockito.verify(metalakes).requireMetalakeByName("glossary");
+    } finally {
+      writer.shutdownNow();
+      Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+    }
+    Assertions.assertEquals(101L, service.get(NameIdentifier.of(renamed, "New term")).id());
   }
 }

@@ -67,7 +67,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * name-versus-synonym checks belong to the glossary manager, not this persistence service. Shared
  * synonyms across terms are allowed. The manager must take the per-metalake hierarchy lock before
  * checking name/synonym conflicts and keep it through the write in the same transaction. Reads use
- * a single statement snapshot for definitions and synonyms without taking row locks.
+ * a single statement snapshot for definitions, synonyms and the live parent name without taking row
+ * locks.
  */
 public final class GlossaryTermMetaService {
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
@@ -89,7 +90,8 @@ public final class GlossaryTermMetaService {
       transaction(
           entity.namespace(),
           (mapper, metalakeId) -> {
-            GlossaryTermPO old = mapper.get(metalakeId, GlossaryTermNames.key(entity.name()), true);
+            GlossaryTermPO old =
+                mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()));
             GlossaryTermPO row = toPO(entity, metalakeId);
             if (overwritten && old != null) {
               if (!Objects.equals(old.getTermId(), entity.id())) {
@@ -134,7 +136,9 @@ public final class GlossaryTermMetaService {
         GlossaryTermMetaMapper.class,
         mapper -> {
           long metalakeId = metalake(ident.namespace()).getMetalakeId();
-          GlossaryTermPO row = mapper.get(metalakeId, GlossaryTermNames.key(ident.name()), false);
+          GlossaryTermPO row =
+              mapper.getIds(
+                  metalakeId, ident.namespace().level(0), GlossaryTermNames.key(ident.name()));
           if (row == null) {
             throw new NoSuchEntityException("Glossary term %s does not exist", ident);
           }
@@ -269,7 +273,8 @@ public final class GlossaryTermMetaService {
     return SessionUtils.getWithoutCommit(
         GlossaryTermMetaMapper.class,
         mapper -> {
-          List<GlossaryTermSnapshotPO> rows = mapper.snapshot(metalake(ns).getMetalakeId(), key);
+          List<GlossaryTermSnapshotPO> rows =
+              mapper.snapshot(metalake(ns).getMetalakeId(), ns.level(0), key);
           Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
           Map<Long, List<String>> synonyms = new LinkedHashMap<>();
           for (GlossaryTermSnapshotPO row : rows) {
@@ -292,7 +297,7 @@ public final class GlossaryTermMetaService {
 
   private GlossaryTermPO require(
       GlossaryTermMetaMapper mapper, NameIdentifier ident, long metalakeId) {
-    GlossaryTermPO row = mapper.get(metalakeId, GlossaryTermNames.key(ident.name()), true);
+    GlossaryTermPO row = mapper.getForUpdate(metalakeId, GlossaryTermNames.key(ident.name()));
     if (row == null) throw new NoSuchEntityException("Glossary term %s does not exist", ident);
     return row;
   }
