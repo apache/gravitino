@@ -112,7 +112,7 @@ public class TestJdbcDatabaseOperations {
 
   @Test
   public void testExistBindsDatabaseNameAsParameter() throws SQLException {
-    String databaseName = "db' OR '1'='1";
+    String databaseName = "o'reilly\\db";
     ResultSet resultSet = Mockito.mock(ResultSet.class);
     PreparedStatement statement = Mockito.mock(PreparedStatement.class);
     Connection connection = Mockito.mock(Connection.class);
