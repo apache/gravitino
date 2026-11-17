@@ -19,13 +19,13 @@
 
 package org.apache.gravitino.storage.relational.po;
 
+import javax.annotation.Nullable;
 import lombok.Getter;
 import lombok.Setter;
 
-/** A live synonym projected with its owning term identity. */
+/** One row of a definition/synonym snapshot; synonym is null for terms without synonyms. */
 @Getter
 @Setter
-public class GlossaryTermSynonymPO {
-  private Long termId;
-  private String synonym;
+public class GlossaryTermSnapshotPO extends GlossaryTermPO {
+  @Nullable private String synonym;
 }

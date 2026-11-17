@@ -20,7 +20,6 @@
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
 import java.util.Map;
-import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 
 /** Portable SQL for glossary definitions and synonyms on H2, MySQL and PostgreSQL. */
 public final class GlossaryTermSQLProvider {
@@ -31,16 +30,7 @@ public final class GlossaryTermSQLProvider {
         + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
         + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta WHERE metalake_id = "
         + "#{metalakeId} AND name_key = #{key} AND deleted_at=0"
-        + lock(Boolean.TRUE.equals(params.get("write")));
-  }
-  /** Returns SQL for list. */
-  public static String list() {
-    return "SELECT term_id AS termId, name AS name, name_key AS nameKey, metalake_id AS "
-        + "metalakeId, definition AS definition, status AS status, links AS links, source_ref AS "
-        + "sourceRef, properties AS properties, audit_info AS auditInfo, current_version AS "
-        + "currentVersion, deleted_at AS deletedAt FROM glossary_term_meta WHERE metalake_id = "
-        + "#{metalakeId} AND deleted_at=0 ORDER BY term_id"
-        + lock(false);
+        + (Boolean.TRUE.equals(params.get("write")) ? " FOR UPDATE" : "");
   }
   /** Returns SQL for insert. */
   public static String insert() {
@@ -105,21 +95,18 @@ public final class GlossaryTermSQLProvider {
   public static String purge() {
     return "DELETE FROM glossary_term_meta WHERE term_id=#{id} AND deleted_at>0";
   }
-  /** Returns all live synonyms of a metalake, grouped by term and normalized key. */
-  public static String listSynonyms() {
-    return "SELECT term_id AS termId, synonym FROM glossary_term_synonym WHERE metalake_id=#{metalakeId} AND deleted_at=0 ORDER BY term_id,synonym_key";
-  }
-
-  private static String lock(boolean write) {
-    String database =
-        SqlSessionFactoryHelper.getInstance()
-            .getSqlSessionFactory()
-            .getConfiguration()
-            .getDatabaseId();
-    // H2 has no shared row-lock clause; use its exclusive lock for the same snapshot guarantee.
-    if (write || "h2".equalsIgnoreCase(database)) {
-      return " FOR UPDATE";
-    }
-    return "mysql".equalsIgnoreCase(database) ? " LOCK IN SHARE MODE" : " FOR SHARE";
+  /** Reads definitions and synonyms together, including definitions without synonyms. */
+  public static String snapshot(Map<String, Object> params) {
+    // A single statement avoids mixed revisions at READ_COMMITTED without locking readers.
+    return "SELECT t.term_id AS termId, t.name AS name, t.name_key AS nameKey, "
+        + "t.metalake_id AS metalakeId, t.definition AS definition, t.status AS status, "
+        + "t.links AS links, t.source_ref AS sourceRef, t.properties AS properties, "
+        + "t.audit_info AS auditInfo, t.current_version AS currentVersion, "
+        + "t.deleted_at AS deletedAt, s.synonym AS synonym FROM glossary_term_meta t "
+        + "LEFT JOIN glossary_term_synonym s ON s.term_id=t.term_id "
+        + "AND s.metalake_id=t.metalake_id AND s.deleted_at=0 "
+        + "WHERE t.metalake_id=#{metalakeId} AND t.deleted_at=0"
+        + (params.get("key") == null ? "" : " AND t.name_key=#{key}")
+        + " ORDER BY t.term_id,s.synonym_key";
   }
 }

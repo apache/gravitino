@@ -22,8 +22,14 @@ package org.apache.gravitino.storage.relational.service;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -233,6 +239,12 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
           IllegalArgumentException.class, () -> backend.list(wrong, TYPE, true));
       Assertions.assertThrows(IllegalArgumentException.class, () -> service.getIds(invalid));
       Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> new RelationalEntityStoreIdResolver().getEntityIds(invalid, TYPE));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> new RelationalEntityStoreIdResolver().getEntityId(invalid, TYPE));
+      Assertions.assertThrows(
           IllegalArgumentException.class, () -> service.batchGet(Arrays.asList(invalid)));
       Assertions.assertThrows(
           IllegalArgumentException.class,
@@ -307,10 +319,98 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
   public void testOverwritePreservesIdentity() throws Exception {
     setupMetalake();
     backend.insert(term(101, "One").withSynonyms(new String[] {"first"}).build(), false);
-    backend.insert(term(102, "ONE").withSynonyms(new String[] {"second"}).build(), true);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                backend.insert(
+                    term(102, "ONE").withSynonyms(new String[] {"second"}).build(), true));
+    Assertions.assertTrue(error.getMessage().contains(ident("ONE").toString()));
+    Assertions.assertTrue(error.getMessage().contains("102"));
+    Assertions.assertTrue(error.getMessage().contains("101"));
+    Assertions.assertTrue(error.getMessage().contains("load and retain existing ID"));
+    GlossaryTermEntity unchanged = service.get(ident("one"));
+    Assertions.assertEquals(101, unchanged.id());
+    Assertions.assertEquals(1, unchanged.version());
+    Assertions.assertArrayEquals(new String[] {"first"}, unchanged.synonyms());
+    backend.insert(term(101, "ONE").withSynonyms(new String[] {"second"}).build(), true);
     GlossaryTermEntity read = service.get(ident("one"));
     Assertions.assertEquals(101, read.id());
     Assertions.assertEquals(2, read.version());
     Assertions.assertArrayEquals(new String[] {"second"}, read.synonyms());
+  }
+
+  @TestTemplate
+  public void testReadsDoNotWaitForUncommittedWriter() throws Exception {
+    setupMetalake();
+    backend.insert(
+        term(101, "One")
+            .withDefinition("before")
+            .withSynonyms(new String[] {"first", "shared"})
+            .build(),
+        false);
+    backend.insert(term(102, "Two").withSynonyms(new String[] {"shared"}).build(), false);
+    backend.insert(term(103, "Empty").build(), false);
+    ExecutorService reader = Executors.newSingleThreadExecutor();
+    try {
+      // The update has executed but its parent/term locks remain held by this outer transaction.
+      // An independent reader must finish before commit and observe the complete old definition.
+      SessionUtils.beginTransaction();
+      try {
+        service.update(
+            ident("One"),
+            old ->
+                term(101, "One")
+                    .withDefinition("after")
+                    .withSynonyms(new String[] {"replacement"})
+                    .build());
+        Future<?> read =
+            reader.submit(
+                () -> {
+                  try {
+                    GlossaryTermEntity value = backend.get(ident("One"), TYPE);
+                    Assertions.assertEquals("before", value.definition());
+                    Assertions.assertEquals(1, value.version());
+                    Assertions.assertArrayEquals(
+                        new String[] {"first", "shared"}, value.synonyms());
+                    List<GlossaryTermEntity> all = backend.list(NS, TYPE, true);
+                    Assertions.assertEquals(3, all.size());
+                    Map<String, GlossaryTermEntity> byName =
+                        all.stream()
+                            .collect(Collectors.toMap(GlossaryTermEntity::name, item -> item));
+                    Assertions.assertArrayEquals(value.synonyms(), byName.get("One").synonyms());
+                    Assertions.assertEquals("before", byName.get("One").definition());
+                    Assertions.assertArrayEquals(
+                        new String[] {"shared"}, byName.get("Two").synonyms());
+                    Assertions.assertEquals(0, byName.get("Empty").synonyms().length);
+                    Assertions.assertArrayEquals(
+                        new long[] {100, 101},
+                        new RelationalEntityStoreIdResolver()
+                            .getEntityIds(ident("One"), TYPE)
+                            .fullIds());
+                    List<GlossaryTermEntity> batch =
+                        backend.batchGet(Arrays.asList(ident("One"), ident("absent")), TYPE);
+                    Assertions.assertEquals(1, batch.size());
+                    Assertions.assertEquals("before", batch.get(0).definition());
+                    Assertions.assertArrayEquals(value.synonyms(), batch.get(0).synonyms());
+                  } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                  }
+                });
+        read.get(10, TimeUnit.SECONDS);
+        SessionUtils.commitTransaction();
+      } finally {
+        if (SessionUtils.isInTransaction()) {
+          SessionUtils.rollbackTransaction();
+        }
+      }
+      GlossaryTermEntity committed = service.get(ident("One"));
+      Assertions.assertEquals("after", committed.definition());
+      Assertions.assertEquals(2, committed.version());
+      Assertions.assertArrayEquals(new String[] {"replacement"}, committed.synonyms());
+    } finally {
+      reader.shutdownNow();
+      Assertions.assertTrue(reader.awaitTermination(10, TimeUnit.SECONDS));
+    }
   }
 }

@@ -28,7 +28,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
@@ -44,7 +46,7 @@ import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
-import org.apache.gravitino.storage.relational.po.GlossaryTermSynonymPO;
+import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -62,7 +64,10 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  *
  * <p>Insert starts at revision 1; update and overwrite increment the stored revision once. Callers
  * must detect semantic no-ops before invoking a write. Relation validation, authorization and the
- * name-versus-synonym checks belong to the glossary manager, not this persistence service.
+ * name-versus-synonym checks belong to the glossary manager, not this persistence service. Shared
+ * synonyms across terms are allowed. The manager must take the per-metalake hierarchy lock before
+ * checking name/synonym conflicts and keep it through the write in the same transaction. Reads use
+ * a single statement snapshot for definitions and synonyms without taking row locks.
  */
 public final class GlossaryTermMetaService {
   private static final GlossaryTermMetaService INSTANCE = new GlossaryTermMetaService();
@@ -73,17 +78,29 @@ public final class GlossaryTermMetaService {
     return INSTANCE;
   }
 
-  /** Inserts a definition. Overwrite retains the stored identity and increments its revision. */
+  /**
+   * Inserts a definition, or overwrites the same identity and increments its revision.
+   *
+   * @throws IllegalArgumentException if overwrite finds the name with a different entity ID; load
+   *     the existing entity and use its ID before overwriting
+   */
   public void insert(GlossaryTermEntity entity, boolean overwritten) throws IOException {
     try {
       transaction(
           entity.namespace(),
-          mapper -> {
-            long metalakeId = metalake(entity.namespace()).getMetalakeId();
+          (mapper, metalakeId) -> {
             GlossaryTermPO old = mapper.get(metalakeId, GlossaryTermNames.key(entity.name()), true);
             GlossaryTermPO row = toPO(entity, metalakeId);
             if (overwritten && old != null) {
-              row.setTermId(old.getTermId());
+              if (!Objects.equals(old.getTermId(), entity.id())) {
+                throw new IllegalArgumentException(
+                    "Cannot overwrite glossary term "
+                        + entity.nameIdentifier()
+                        + " with ID "
+                        + entity.id()
+                        + "; load and retain existing ID "
+                        + old.getTermId());
+              }
               row.setCurrentVersion(Math.addExact(old.getCurrentVersion(), 1));
               requireUpdated(mapper.update(row, old.getCurrentVersion()), entity.nameIdentifier());
               mapper.clearSynonyms(row.getTermId());
@@ -101,50 +118,41 @@ public final class GlossaryTermMetaService {
     }
   }
 
-  /** Loads a definition and its synonyms in one protected transaction. */
+  /** Loads a definition and its synonyms from one statement snapshot without row locks. */
   public GlossaryTermEntity get(NameIdentifier ident) {
-    return transaction(
-        ident.namespace(),
-        mapper -> fromPO(require(mapper, ident, false), mapper, ident.namespace()));
+    List<GlossaryTermEntity> terms = read(ident.namespace(), GlossaryTermNames.key(ident.name()));
+    if (terms.isEmpty()) {
+      throw new NoSuchEntityException("Glossary term %s does not exist", ident);
+    }
+    return terms.get(0);
   }
 
-  /** Resolves term and metalake identities from the same protected row snapshot. */
+  /** Resolves term and metalake identities without row locks. */
   public NamespacedEntityId getIds(NameIdentifier ident) {
-    return transaction(
-        ident.namespace(),
+    validateNamespace(ident.namespace());
+    return SessionUtils.getWithoutCommit(
+        GlossaryTermMetaMapper.class,
         mapper -> {
-          GlossaryTermPO row = require(mapper, ident, false);
+          long metalakeId = metalake(ident.namespace()).getMetalakeId();
+          GlossaryTermPO row = mapper.get(metalakeId, GlossaryTermNames.key(ident.name()), false);
+          if (row == null) {
+            throw new NoSuchEntityException("Glossary term %s does not exist", ident);
+          }
           return new NamespacedEntityId(row.getTermId(), row.getMetalakeId());
         });
   }
 
-  /** Lists definitions belonging to the requested metalake. */
+  /** Lists definitions and synonyms from one statement snapshot without row locks. */
   public List<GlossaryTermEntity> list(Namespace ns) {
-    return transaction(
-        ns,
-        mapper -> {
-          long metalakeId = metalake(ns).getMetalakeId();
-          List<GlossaryTermPO> rows = mapper.list(metalakeId);
-          Map<Long, List<String>> synonyms = new LinkedHashMap<>();
-          for (GlossaryTermSynonymPO synonym : mapper.listSynonyms(metalakeId)) {
-            synonyms
-                .computeIfAbsent(synonym.getTermId(), ignored -> new ArrayList<>())
-                .add(synonym.getSynonym());
-          }
-          List<GlossaryTermEntity> result = new ArrayList<>();
-          for (GlossaryTermPO row : rows) {
-            result.add(fromPO(row, synonyms.getOrDefault(row.getTermId(), List.of()), ns));
-          }
-          return result;
-        });
+    return read(ns, null);
   }
 
   /**
    * Loads requested terms, omitting missing names.
    *
    * <p>Like the existing user/role fallback, this accepts identifiers from different metalakes and
-   * performs a protected read per identifier. Use list for a complete metalake: it batches synonyms
-   * and does not issue a query per returned term.
+   * performs a snapshot read per identifier. Use list for a complete metalake: it reads definitions
+   * and synonyms together without issuing a query per returned term.
    */
   public List<GlossaryTermEntity> batchGet(List<NameIdentifier> identifiers) {
     List<GlossaryTermEntity> result = new ArrayList<>();
@@ -164,8 +172,8 @@ public final class GlossaryTermMetaService {
     try {
       return transaction(
           ident.namespace(),
-          mapper -> {
-            GlossaryTermPO old = require(mapper, ident, true);
+          (mapper, metalakeId) -> {
+            GlossaryTermPO old = require(mapper, ident, metalakeId);
             GlossaryTermEntity updated =
                 (GlossaryTermEntity) updater.apply((E) fromPO(old, mapper, ident.namespace()));
             if (!Objects.equals(old.getTermId(), updated.id())
@@ -190,8 +198,8 @@ public final class GlossaryTermMetaService {
     try {
       return transaction(
           ident.namespace(),
-          mapper -> {
-            GlossaryTermPO row = require(mapper, ident, true);
+          (mapper, metalakeId) -> {
+            GlossaryTermPO row = require(mapper, ident, metalakeId);
             long deletedAt = Math.max(1, System.currentTimeMillis());
             requireUpdated(
                 mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
@@ -228,12 +236,16 @@ public final class GlossaryTermMetaService {
         });
   }
 
-  private <T> T transaction(Namespace ns, Function<GlossaryTermMetaMapper, T> work) {
+  private void validateNamespace(Namespace ns) {
     if (ns.length() != 3
         || !Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ns.level(1))
         || !"glossary_term".equals(ns.level(2))) {
       throw new IllegalArgumentException("Expected glossary term namespace: " + ns);
     }
+  }
+
+  private <T> T transaction(Namespace ns, BiFunction<GlossaryTermMetaMapper, Long, T> work) {
+    validateNamespace(ns);
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
@@ -248,7 +260,29 @@ public final class GlossaryTermMetaService {
           if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0)))
             throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
           SessionUtils.clearSessionCache();
-          return work.apply(mapper);
+          return work.apply(mapper, locked.getMetalakeId());
+        });
+  }
+
+  private List<GlossaryTermEntity> read(Namespace ns, @Nullable String key) {
+    validateNamespace(ns);
+    return SessionUtils.getWithoutCommit(
+        GlossaryTermMetaMapper.class,
+        mapper -> {
+          List<GlossaryTermSnapshotPO> rows = mapper.snapshot(metalake(ns).getMetalakeId(), key);
+          Map<Long, GlossaryTermPO> definitions = new LinkedHashMap<>();
+          Map<Long, List<String>> synonyms = new LinkedHashMap<>();
+          for (GlossaryTermSnapshotPO row : rows) {
+            definitions.putIfAbsent(row.getTermId(), row);
+            List<String> values =
+                synonyms.computeIfAbsent(row.getTermId(), ignored -> new ArrayList<>());
+            if (row.getSynonym() != null) {
+              values.add(row.getSynonym());
+            }
+          }
+          List<GlossaryTermEntity> result = new ArrayList<>();
+          definitions.forEach((id, row) -> result.add(fromPO(row, synonyms.get(id), ns)));
+          return result;
         });
   }
 
@@ -257,12 +291,8 @@ public final class GlossaryTermMetaService {
   }
 
   private GlossaryTermPO require(
-      GlossaryTermMetaMapper mapper, NameIdentifier ident, boolean write) {
-    GlossaryTermPO row =
-        mapper.get(
-            metalake(ident.namespace()).getMetalakeId(),
-            GlossaryTermNames.key(ident.name()),
-            write);
+      GlossaryTermMetaMapper mapper, NameIdentifier ident, long metalakeId) {
+    GlossaryTermPO row = mapper.get(metalakeId, GlossaryTermNames.key(ident.name()), true);
     if (row == null) throw new NoSuchEntityException("Glossary term %s does not exist", ident);
     return row;
   }

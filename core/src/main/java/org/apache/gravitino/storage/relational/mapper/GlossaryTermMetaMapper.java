@@ -20,9 +20,10 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import javax.annotation.Nullable;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GlossaryTermSQLProvider;
 import org.apache.gravitino.storage.relational.po.GlossaryTermPO;
-import org.apache.gravitino.storage.relational.po.GlossaryTermSynonymPO;
+import org.apache.gravitino.storage.relational.po.GlossaryTermSnapshotPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -37,9 +38,6 @@ public interface GlossaryTermMetaMapper {
       @Param("metalakeId") long metalakeId,
       @Param("key") String key,
       @Param("write") boolean write);
-  /** Executes list within the current transaction. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "list")
-  List<GlossaryTermPO> list(@Param("metalakeId") long metalakeId);
   /** Executes insert within the current transaction. */
   @InsertProvider(type = GlossaryTermSQLProvider.class, method = "insert")
   void insert(@Param("p") GlossaryTermPO p);
@@ -55,7 +53,7 @@ public interface GlossaryTermMetaMapper {
       @Param("id") long id,
       @Param("metalakeId") long metalakeId,
       @Param("synonym") String synonym,
-      @Param("key") String key);
+      @Param("key") @Nullable String key);
   /** Executes clearSynonyms within the current transaction. */
   @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "clearSynonyms")
   void clearSynonyms(@Param("id") long id);
@@ -81,7 +79,8 @@ public interface GlossaryTermMetaMapper {
   /** Executes purge within the current transaction. */
   @DeleteProvider(type = GlossaryTermSQLProvider.class, method = "purge")
   int purge(@Param("id") long id);
-  /** Lists all live synonyms for one metalake in one query. */
-  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "listSynonyms")
-  List<GlossaryTermSynonymPO> listSynonyms(@Param("metalakeId") long metalakeId);
+  /** Reads definitions and their synonyms in one statement snapshot without row locks. */
+  @SelectProvider(type = GlossaryTermSQLProvider.class, method = "snapshot")
+  List<GlossaryTermSnapshotPO> snapshot(
+      @Param("metalakeId") long metalakeId, @Param("key") @Nullable String key);
 }

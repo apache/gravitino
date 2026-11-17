@@ -120,6 +120,9 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
 
   private NamespacedEntityId getEntityIdsRequiringMetalakeId(
       NameIdentifier nameIdentifier, Entity.EntityType type) {
+    if (type == Entity.EntityType.GLOSSARY_TERM) {
+      return GlossaryTermMetaService.getInstance().getIds(nameIdentifier);
+    }
     long metalakeId =
         MetalakeMetaService.getInstance()
             .getMetalakeIdByName(NameIdentifierUtil.getMetalake(nameIdentifier));
@@ -145,9 +148,6 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
             GroupMetaService.getInstance()
                 .getGroupIdByMetalakeIdAndName(metalakeId, nameIdentifier.name());
         return new NamespacedEntityId(groupId, metalakeId);
-
-      case GLOSSARY_TERM:
-        return GlossaryTermMetaService.getInstance().getIds(nameIdentifier);
 
       case TAG:
         long tagId =
