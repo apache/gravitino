@@ -97,6 +97,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableDorisSupport = false;
 
   /**
    * Creates the plugin from the classes a connector build supplies.
@@ -159,8 +160,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
                 return;
               }
-              // The provider is read once, here, and every decision below is made from the kind, so
-              // no two places can disagree about what this catalog is.
+              // Resolve the default kind from the provider. Opt-in settings below may select a
+              // specialized kind for the same provider.
               SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
               if (kind == null) {
                 LOG.warn(
@@ -172,6 +173,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               }
               if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
+              }
+              if ("jdbc-doris".equalsIgnoreCase(provider) && enableDorisSupport) {
+                if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.DORIS)) {
+                  throw new IllegalArgumentException(
+                      "Specialized Doris Spark support is unavailable in this Spark build");
+                }
+                kind = SparkCatalogKind.DORIS;
               }
               String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
               if (sparkConf.contains(sparkCatalogConfigName)) {
@@ -239,6 +247,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableDorisSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, false);
     if (enablePaimonSupport) {
       registerPaimonExtensionsIfSupported();
     }
