@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import static org.apache.gravitino.SupportsDomainOperations.JOINED_DOMAIN_BATCH_SIZE;
+import static org.apache.gravitino.SupportsDomainOperations.MEMBERSHIP_LOOKUP_BATCH_SIZE;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.HashBasedTable;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Table;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -53,6 +57,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TagEntity;
@@ -63,6 +68,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.po.DomainAssignmentPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
@@ -77,6 +83,8 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 public class TagMetaService {
 
+  // One domain batch can contribute many more object IDs than domains.
+  private static final int NAME_LOOKUP_BATCH_SIZE = 10_000;
   private static final TagMetaService INSTANCE = new TagMetaService();
 
   public static TagMetaService getInstance() {
@@ -249,28 +257,13 @@ public class TagMetaService {
                       columns.stream().map(NameIdentifier::name).collect(Collectors.toList()));
           columns.forEach(column -> identifiersById.put(ids.get(column.name()), column));
         });
-    List<TagRelationTagPO> rows = new ArrayList<>();
-    String metadataObjectType =
-        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType)
-            .type()
-            .toString();
-    for (List<Long> batch : Lists.partition(new ArrayList<>(identifiersById.keySet()), 500)) {
-      rows.addAll(
-          SessionUtils.getWithoutCommit(
-              TagMetadataObjectRelMapper.class,
-              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(batch, metadataObjectType)));
-    }
-    Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
-    rows.forEach(
-        row ->
-            rowsByObject
-                .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
-                .add(row));
+    MetadataObject.Type type =
+        NameIdentifierUtil.toMetadataObjectForRead(objectIdentifiers.get(0), objectType).type();
     List<RelationalEntity<?>> result = new ArrayList<>();
-    rowsByObject.forEach(
-        (id, tagRows) ->
-            tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))
-                .forEach(
+    listDirectTagsByObjectIds(metalake, type, new ArrayList<>(identifiersById.keySet()))
+        .forEach(
+            (id, tags) ->
+                tags.forEach(
                     tag ->
                         result.add(
                             new RelationalEntity<>(
@@ -278,6 +271,105 @@ public class TagMetaService {
                                 identifiersById.get(id),
                                 objectType,
                                 tag))));
+    return result;
+  }
+
+  /**
+   * Lists live directly assigned objects for the selected domain bindings and object types.
+   *
+   * @param metalake The metalake containing the domains.
+   * @param domains Selected domains with backing tags.
+   * @param types The candidate metadata object types.
+   * @param selectedAssignments Previously resolved objects by selected domain ID. An empty map
+   *     resolves names; otherwise only these objects can match, and their names are reused.
+   * @return Assigned objects keyed by domain ID.
+   * @throws IOException If the assignments cannot be read.
+   */
+  public Map<Long, List<GenericEntity>> listDomainAssignments(
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Map<Long, List<GenericEntity>> selectedAssignments)
+      throws IOException {
+    Map<Long, List<GenericEntity>> result = new LinkedHashMap<>();
+    if (types.isEmpty()) {
+      return result;
+    }
+    Table<String, Long, GenericEntity> knownObjects = HashBasedTable.create();
+    for (List<GenericEntity> assignments : selectedAssignments.values()) {
+      for (GenericEntity object : assignments) {
+        knownObjects.put(object.type().name(), object.id(), object);
+      }
+    }
+    // The candidate semijoin limits the returned objects even for a wide domain batch.
+    int domainBatchSize =
+        selectedAssignments.isEmpty() ? MEMBERSHIP_LOOKUP_BATCH_SIZE : JOINED_DOMAIN_BATCH_SIZE;
+    for (List<DomainEntity> batch : Lists.partition(domains, domainBatchSize)) {
+      Map<Long, DomainEntity> selected =
+          batch.stream().collect(Collectors.toMap(DomainEntity::id, Function.identity()));
+      List<DomainAssignmentPO> rows =
+          SessionUtils.getWithoutCommit(
+              TagMetadataObjectRelMapper.class,
+              mapper ->
+                  mapper.listDomainAssignments(
+                      metalake, selected.keySet(), types, selectedAssignments.keySet()));
+      // Compare with the caller's stable binding and enforce case-sensitive value matching
+      // independently of the database collation.
+      List<DomainAssignmentPO> matching =
+          rows.stream()
+              .filter(
+                  row -> {
+                    DomainEntity domain = selected.get(row.getDomainId());
+                    return Objects.equals(domain.backingTagId(), row.getTagId())
+                        && (domain.backingTagValue() == null
+                            || domain.backingTagValue().equals(row.getTagValue()));
+                  })
+              .collect(Collectors.toList());
+      Table<String, Long, GenericEntity> objects = knownObjects;
+      if (selectedAssignments.isEmpty()) {
+        objects = HashBasedTable.create();
+        for (GenericEntity object : metadataObjectsForRelations(matching)) {
+          objects.put(object.type().name(), object.id(), object);
+        }
+      }
+      Map<Long, Set<GenericEntity>> byDomain = new LinkedHashMap<>();
+      for (DomainAssignmentPO row : matching) {
+        GenericEntity object = objects.get(row.getMetadataObjectType(), row.getMetadataObjectId());
+        if (object != null) {
+          byDomain.computeIfAbsent(row.getDomainId(), ignored -> new LinkedHashSet<>()).add(object);
+        }
+      }
+      byDomain.forEach((id, assigned) -> result.put(id, new ArrayList<>(assigned)));
+    }
+    return result;
+  }
+
+  /**
+   * Reads direct tag assignments in bounded batches without resolving object names to IDs.
+   *
+   * @param metalake The metalake containing the objects.
+   * @param type The metadata object type.
+   * @param objectIds Stable metadata object IDs.
+   * @return Tags with assignment values keyed by object ID.
+   */
+  public Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) {
+    Map<Long, List<TagEntity>> result = new LinkedHashMap<>();
+    for (List<Long> batch : Lists.partition(objectIds, MEMBERSHIP_LOOKUP_BATCH_SIZE)) {
+      List<TagRelationTagPO> rows =
+          SessionUtils.getWithoutCommit(
+              TagMetadataObjectRelMapper.class,
+              mapper -> mapper.listTagPOsByMetadataObjectIdsAndType(metalake, batch, type.name()));
+      Map<Long, List<TagPO>> rowsByObject = new LinkedHashMap<>();
+      rows.forEach(
+          row ->
+              rowsByObject
+                  .computeIfAbsent(row.getMetadataObjectId(), ignored -> new ArrayList<>())
+                  .add(row));
+      rowsByObject.forEach(
+          (id, tagRows) ->
+              result.put(id, tagPOsToTagEntities(tagRows, NamespaceUtil.ofTag(metalake))));
+    }
     return result;
   }
 
@@ -1098,7 +1190,7 @@ public class TagMetaService {
   }
 
   private List<GenericEntity> metadataObjectsForRelations(
-      List<TagMetadataObjectRelPO> tagMetadataObjectRelPOs) {
+      List<? extends TagMetadataObjectRelPO> tagMetadataObjectRelPOs) {
     List<GenericEntity> metadataObjects = Lists.newArrayList();
     Map<String, List<TagMetadataObjectRelPO>> tagMetadataObjectRelPOsByType =
         tagMetadataObjectRelPOs.stream()
@@ -1114,23 +1206,25 @@ public class TagMetaService {
               .map(TagMetadataObjectRelPO::getMetadataObjectId)
               .distinct()
               .collect(Collectors.toList());
-      Map<Long, String> metadataObjectNames =
-          MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
-              .get(MetadataObject.Type.valueOf(metadataObjectType))
-              .apply(metadataObjectIds);
+      for (List<Long> batch : Lists.partition(metadataObjectIds, NAME_LOOKUP_BATCH_SIZE)) {
+        Map<Long, String> metadataObjectNames =
+            MetadataObjectService.TYPE_TO_FULLNAME_FUNCTION_MAP
+                .get(MetadataObject.Type.valueOf(metadataObjectType))
+                .apply(batch);
 
-      for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
-        String fullName = metadataObjectName.getValue();
+        for (Map.Entry<Long, String> metadataObjectName : metadataObjectNames.entrySet()) {
+          String fullName = metadataObjectName.getValue();
 
-        // Metadata object may be deleted asynchronously when we query the name, so it will
-        // return null, we should skip this metadata object.
-        if (fullName != null) {
-          metadataObjects.add(
-              GenericEntity.builder()
-                  .withName(fullName)
-                  .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
-                  .withId(metadataObjectName.getKey())
-                  .build());
+          // Metadata object may be deleted asynchronously when we query the name, so it will
+          // return null, we should skip this metadata object.
+          if (fullName != null) {
+            metadataObjects.add(
+                GenericEntity.builder()
+                    .withName(fullName)
+                    .withEntityType(Entity.EntityType.valueOf(metadataObjectType))
+                    .withId(metadataObjectName.getKey())
+                    .build());
+          }
         }
       }
     }

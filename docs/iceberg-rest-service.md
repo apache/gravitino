@@ -178,13 +178,39 @@ The settings below tune the background workers and are optional.
 | `gravitino.iceberg-rest.async-cleanup.max-attempts`           | Number of failed attempts before a cleanup job is marked `FAILED`.                                   | `5`           | No       |
 | `gravitino.iceberg-rest.async-cleanup.retention-hours`        | Retention time for terminal `SUCCEEDED` or `FAILED` cleanup rows before pruning.                     | `720`         | No       |
 
+#### Idempotency Key
+
+The Iceberg REST spec defines an optional `Idempotency-Key` header on mutation endpoints so that a client can safely retry a request whose response it never saw. When enabled and the header is present, the server reserves the key, executes the mutation, and stores the response for replay while the record remains available.
+
+Support is disabled by default. Once enabled, the reuse window is advertised as `idempotency-key-lifetime` in `GET /v1/config`; per the spec, clients must assume idempotency is unsupported when that field is absent.
+
+The header applies to the create, update, drop, register, and rename endpoints for tables, namespaces, and views. Its value must be a UUIDv7 in string form ([RFC 9562](https://www.rfc-editor.org/rfc/rfc9562)); anything else returns `400 Bad Request`. Keys must be globally unique: reusing one with a different HTTP method, path, or query returns `409 Conflict`, and so does a retry that arrives while the first request is still running (with a `Retry-After` header). Successful and deterministic terminal `4xx` responses are stored and replayed, while `5xx`, `401`, `403`, and `419` responses release the key so the client can retry with it.
+
+| Configuration item                                | Description                                                                                                                                                                  | Default value | Required |
+|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.idempotency-enabled`      | Whether to honor the `Idempotency-Key` header. When `false`, the header is ignored and no lifetime is advertised.                                                             | `false`       | No       |
+| `gravitino.iceberg-rest.idempotency-key-lifetime` | The client reuse window for a key, an ISO-8601 duration such as `PT30M`. Advertised to clients as `idempotency-key-lifetime`.                                                 | `PT30M`       | No       |
+| `gravitino.iceberg-rest.idempotency-store-type`   | The store holding idempotency records: `in-memory`, `jdbc` in auxiliary mode, or the fully-qualified class name of an `IdempotencyStore` implementation.                       | `in-memory`   | No       |
+| `gravitino.iceberg-rest.idempotency-max-entries`  | The maximum number of records retained by the in-memory store. Records beyond it are evicted before their reuse window elapses.                                               | `10000`       | No       |
+
+Limitations:
+
+- Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
+- Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
+- The in-memory store reclaims expired entries through Caffeine. The JDBC store schedules bounded cleanup as described below. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup.
+
+:::caution
+Enabling `idempotency-enabled=true` with the default `idempotency-store-type=in-memory` on more than one replica does **not** provide cluster-wide deduplication: retries can execute a mutation twice. The `in-memory` store is node-local and not durable. A retry routed to another replica, or to a replica that restarted, finds no record and re-executes the mutation, and its size bound can evict a record before its reuse window elapses, including an in-flight reservation. A retry can then run concurrently with the original mutation. Use it for single-node deployments, development, and testing.
+:::
+
 ### JDBC Idempotency Storage
 
 The `jdbc` idempotency store persists request reservations and response bodies in Gravitino's
 relational entity store. Replicas connected to the same database share records, and finalized
-responses survive Iceberg REST service restarts. This supplies the storage backend for
-[Idempotency-Key endpoint integration](https://github.com/apache/gravitino/pull/12474); the storage
-backend alone does not enable HTTP request replay.
+responses survive Iceberg REST service restarts. Set `gravitino.iceberg-rest.idempotency-enabled=true`
+and `gravitino.iceberg-rest.idempotency-store-type=jdbc` to enable durable request replay on the
+mutation endpoints described above.
 
 Use this backend in auxiliary mode, with an initialized relational entity store. Standalone Iceberg
 REST servers cannot use it. It reuses Gravitino's connection pool and supports H2, MySQL, and

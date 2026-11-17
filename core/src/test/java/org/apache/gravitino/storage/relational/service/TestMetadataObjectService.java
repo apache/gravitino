@@ -30,6 +30,7 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -303,6 +304,14 @@ public class TestMetadataObjectService extends TestJDBCBackend {
 
     // Verify all are TABLE type
     assertTrue(metadataObjects.stream().allMatch(obj -> obj.type() == MetadataObject.Type.TABLE));
+    Long schemaId =
+        EntityIdService.getEntityId(
+            NameIdentifier.of(METALAKE_NAME, catalogName, schemaName), Entity.EntityType.SCHEMA);
+    softDeleteSchemaMeta(schemaId);
+    Map<Long, String> missingParents =
+        MetadataObjectService.getTableObjectsFullName(List.of(table1.id(), table2.id()));
+    assertEquals(Set.of(table1.id(), table2.id()), missingParents.keySet());
+    assertTrue(missingParents.values().stream().allMatch(Objects::isNull));
   }
 
   @TestTemplate
