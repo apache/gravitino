@@ -39,6 +39,11 @@ dependencies {
   // consumers of this artifact would still resolve 1.10.1 through kafka-clients.
   runtimeOnly(libs.yawk.lz4.java)
 
+  // kafka-clients pulls snappy-java 1.1.10.5, which has known HIGH CVEs. The root build forces the
+  // patched version for the binary distribution, but a force does not reach the published POM, so
+  // declare it directly for Maven consumers as well.
+  runtimeOnly(libs.snappy.java)
+
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
