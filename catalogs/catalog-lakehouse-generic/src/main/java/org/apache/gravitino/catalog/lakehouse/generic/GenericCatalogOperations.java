@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.TABLE;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -26,12 +25,10 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Suppliers;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
@@ -83,7 +80,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
   private final Map<String, Supplier<ManagedTableOperations>> tableOpsCache;
 
-  private volatile TableLocationProvider tableLocationProvider;
+  private volatile LocationProvider locationProvider;
 
   private volatile Map<String, String> catalogProperties = Map.of();
 
@@ -143,7 +140,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
 
     // getOrDefault returns decode(null) rather than the default when the key is present with a
     // null value, and the decoder of a string property is the identity, so an explicitly null
-    // `table-location-provider` arrives here as null. Falling back to the built-in provider is
+    // `location-provider` arrives here as null. Falling back to the built-in provider is
     // the same answer as leaving the property out, which is what a null value means; failing the
     // whole catalog with "must not be blank" would contradict the null tolerance just above.
     String providerName =
@@ -151,9 +148,9 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
             (String)
                 propertiesMetadata
                     .catalogPropertiesMetadata()
-                    .getOrDefault(conf, GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER),
-            DefaultTableLocationProvider.NAME);
-    this.tableLocationProvider = TableLocationProviderFactory.create(providerName);
+                    .getOrDefault(conf, GenericCatalogPropertiesMetadata.LOCATION_PROVIDER),
+            DefaultLocationProvider.NAME);
+    this.locationProvider = LocationProviderFactory.create(providerName);
   }
 
   @Override
@@ -173,12 +170,12 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   /**
-   * Creates a schema, asking the {@link TableLocationProvider} for its location first when the
-   * provider implements {@link SupportsSchemaLocations}.
+   * Creates a schema, asking the {@link LocationProvider} for its location first.
    *
-   * <p>A schema that already exists is rejected before the provider is consulted, so that a
-   * provider is never asked to allocate for a name that is taken. A provider that throws fails the
-   * creation, and a non-null location it returns is stored as the schema's {@code location}.
+   * <p>A provider that throws fails the creation, and a location it returns that is not blank is
+   * stored as the schema's {@code location}. The provider is consulted before the schema is stored,
+   * so a schema that already exists is rejected by the schema operations after it was asked, unless
+   * the provider rejects it first.
    *
    * @param ident the identifier of the schema to create
    * @param comment the comment of the schema
@@ -190,34 +187,14 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    TableLocationProvider provider = tableLocationProvider;
-    if (!(provider instanceof SupportsSchemaLocations)) {
-      return schemaOps.createSchema(ident, comment, properties);
-    }
-
-    try {
-      if (store.exists(ident, SCHEMA)) {
-        throw new SchemaAlreadyExistsException("Schema %s already exists", ident);
-      }
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to check if schema " + ident + " exists", e);
-    }
-
     String location =
-        ((SupportsSchemaLocations) provider)
-            .provisionSchemaLocation(
-                SchemaLocationContext.builder()
-                    .withSchemaIdentifier(ident)
-                    .withSchemaProperties(properties)
-                    .withCatalogProperties(catalogProperties)
-                    .build());
+        locationProvider.provisionSchemaLocation(
+            SchemaLocationContext.builder()
+                .withSchemaIdentifier(ident)
+                .withSchemaProperties(properties)
+                .build());
     Map<String, String> schemaProperties = properties;
-    if (location != null) {
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(location),
-          "Table location provider '%s' returned a blank location for schema %s",
-          provider.name(),
-          ident);
+    if (StringUtils.isNotBlank(location)) {
       schemaProperties = properties == null ? Maps.newHashMap() : Maps.newHashMap(properties);
       schemaProperties.put(Schema.PROPERTY_LOCATION, location);
     }
@@ -242,14 +219,14 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * the table operations, so that the location of each of them is unprovisioned and its cached
    * format invalidated. A table failing to drop aborts the cascade: the tables handled so far are
    * gone, the remaining ones and the schema itself are untouched, and the call can safely be
-   * retried. A {@link TableLocationProvider} failing to unprovision a location does not abort it,
+   * retried. A {@link LocationProvider} failing to unprovision a location does not abort it,
    * because the table it belongs to is already gone.
    *
-   * <p>When the provider implements {@link SupportsSchemaLocations}, it is asked to unprovision the
-   * schema location after the cascaded tables are dropped and before the schema itself is removed,
-   * together with the tables the cascade dropped without deleting their data. A provider failing to
-   * unprovision fails the drop and leaves the schema in place, so the call can be retried. For any
-   * other provider an empty schema is dropped without being read.
+   * <p>The provider is then asked to unprovision the schema location, after the tables are dropped
+   * and before the schema itself is removed, so a provider failing to unprovision fails the drop
+   * and leaves the schema in place for a retry. It is not asked when the cascade dropped an
+   * external table whose data was left in place, because that data may still be under the schema
+   * location.
    *
    * @param ident the identifier of the schema to drop
    * @param cascade whether to drop the tables contained in the schema
@@ -273,29 +250,40 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
           "Schema %s is not empty, cannot drop it without cascade", ident);
     }
 
-    TableLocationProvider provider = tableLocationProvider;
-    boolean schemaHooks = provider instanceof SupportsSchemaLocations;
-    Schema schema = schemaHooks || tableIdents.length > 0 ? loadSchema(ident) : null;
+    Schema schema = loadSchema(ident);
 
     // Drop all tables under the schema first if cascade is true. This goes through the same path
     // as the catalog level dropTable, so that the location of each table is unprovisioned and its
     // cached format invalidated. The schema is resolved once for the whole cascade rather than
-    // once per table: every table here has the same parent, and the provider may not ask for it at
-    // all.
-    List<NameIdentifier> tablesWithRetainedData = Lists.newArrayList();
+    // once per table: every table here has the same parent.
+    boolean dataRetained = false;
     for (NameIdentifier tableIdent : tableIdents) {
-      dropOrPurgeTable(tableIdent, false /* purge */, schema, tablesWithRetainedData);
+      dataRetained |=
+          dropOrPurgeTable(tableIdent, false /* purge */, schema)
+              == TableDropOutcome.DROPPED_DATA_RETAINED;
     }
 
-    if (schemaHooks) {
-      ((SupportsSchemaLocations) provider)
-          .unprovisionSchemaLocation(
+    if (dataRetained) {
+      LOG.warn(
+          "Schema {} had external tables whose data was left in place, so its location '{}' is "
+              + "not handed back to location provider '{}'.",
+          ident,
+          schema.properties().get(Schema.PROPERTY_LOCATION),
+          locationProvider.name());
+    } else {
+      boolean released =
+          locationProvider.unprovisionSchemaLocation(
               SchemaLocationContext.builder()
                   .withSchemaIdentifier(ident)
                   .withSchemaProperties(schema.properties())
-                  .withCatalogProperties(catalogProperties)
-                  .withTablesWithRetainedData(tablesWithRetainedData)
                   .build());
+      if (!released) {
+        LOG.debug(
+            "Location provider '{}' had nothing to release for schema {} at '{}'.",
+            locationProvider.name(),
+            ident,
+            schema.properties().get(Schema.PROPERTY_LOCATION));
+      }
     }
     return schemaOps.dropSchema(ident, cascade);
   }
@@ -406,7 +394,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   /**
-   * Drops or purges a table, and hands its location back to the {@link TableLocationProvider}
+   * Drops or purges a table, and hands its location back to the {@link LocationProvider}
    * afterwards.
    *
    * <p>The table properties are read before the removal, because they carry the location the
@@ -421,8 +409,8 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * @return true if the table was dropped, false if it did not exist
    */
   private boolean dropOrPurgeTable(NameIdentifier ident, boolean purge) {
-    return dropOrPurgeTable(
-        ident, purge, loadSchema(NameIdentifier.of(ident.namespace().levels())), null);
+    return dropOrPurgeTable(ident, purge, loadSchema(NameIdentifier.of(ident.namespace().levels())))
+        != TableDropOutcome.NOT_FOUND;
   }
 
   /**
@@ -437,20 +425,14 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    * @param ident the identifier of the table to drop
    * @param purge whether to purge the table instead of dropping it
    * @param schema the table's parent schema
-   * @param tablesWithRetainedData if not null, receives the identifier of the table when it is
-   *     dropped without its data being deleted
-   * @return true if the table was dropped, false if it did not exist
+   * @return what the drop did
    */
-  private boolean dropOrPurgeTable(
-      NameIdentifier ident,
-      boolean purge,
-      Schema schema,
-      @Nullable List<NameIdentifier> tablesWithRetainedData) {
+  private TableDropOutcome dropOrPurgeTable(NameIdentifier ident, boolean purge, Schema schema) {
     Map<String, String> tableProperties;
     try {
       tableProperties = store.get(ident, TABLE, TableEntity.class).properties();
     } catch (NoSuchEntityException e) {
-      return false;
+      return TableDropOutcome.NOT_FOUND;
     } catch (IOException e) {
       throw new RuntimeException(
           String.format("Failed to load table %s before dropping it", ident), e);
@@ -484,11 +466,11 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       // same reasoning as limitation (2) on a failed creation.
       LOG.warn(
           "Table format failed to {} table {}. If the metadata was already removed, its location "
-              + "'{}' is not handed back to table location provider '{}' and may be leaked.",
+              + "'{}' is not handed back to location provider '{}' and may be leaked.",
           purge ? "purge" : "drop",
           ident,
           context.tableProperties().get(Table.PROPERTY_LOCATION),
-          tableLocationProvider.name(),
+          locationProvider.name(),
           e);
       throw e;
     } finally {
@@ -516,12 +498,18 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // Use the same effective ownership as the format, including legacy Lance registrations.
     boolean external = LancePropertiesUtils.isExternalTable(context.tableProperties());
     if (dropped && (purge || !external)) {
-      TableLocationProvider provider = tableLocationProvider;
+      LocationProvider provider = locationProvider;
       try {
-        provider.unprovisionTableLocation(context);
+        if (!provider.unprovisionTableLocation(context)) {
+          LOG.debug(
+              "Location provider '{}' had nothing to release for table {} at '{}'.",
+              provider.name(),
+              ident,
+              context.tableProperties().get(Table.PROPERTY_LOCATION));
+        }
       } catch (Exception e) {
         LOG.warn(
-            "Table {} was already {}, but table location provider '{}' failed to unprovision its "
+            "Table {} was already {}, but location provider '{}' failed to unprovision its "
                 + "location '{}'. The storage may be leaked and needs to be reclaimed manually.",
             ident,
             purge ? "purged" : "dropped",
@@ -532,17 +520,15 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     } else if (dropped) {
       LOG.debug(
           "Table {} is external and was dropped rather than purged, so its location '{}' is left "
-              + "alone rather than handed back to table location provider '{}': the data is still "
+              + "alone rather than handed back to location provider '{}': the data is still "
               + "there and the catalog does not own it.",
           ident,
           context.tableProperties().get(Table.PROPERTY_LOCATION),
-          tableLocationProvider.name());
-      if (tablesWithRetainedData != null) {
-        tablesWithRetainedData.add(ident);
-      }
+          locationProvider.name());
+      return TableDropOutcome.DROPPED_DATA_RETAINED;
     }
 
-    return dropped;
+    return dropped ? TableDropOutcome.DROPPED : TableDropOutcome.NOT_FOUND;
   }
 
   private ManagedTableOperations tableOps(NameIdentifier tableIdent) {
@@ -605,7 +591,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   /**
-   * Asks the {@link TableLocationProvider} where the table being created should live.
+   * Asks the {@link LocationProvider} where the table being created should live.
    *
    * <p>Called for every creation, including one whose request carries a location of its own, which
    * reaches the provider as the {@code location} entry of the context's table properties. Deciding
@@ -627,7 +613,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
    */
   private String provisionTableLocation(
       NameIdentifier ident, Map<String, String> properties, Schema schema) {
-    TableLocationProvider provider = tableLocationProvider;
+    LocationProvider provider = locationProvider;
     String location =
         provider.provisionTableLocation(
             TableLocationContext.builder()
@@ -642,10 +628,20 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
     // it later sees exactly the string it returned.
     Preconditions.checkArgument(
         StringUtils.isNotBlank(location),
-        "Table location provider '%s' returned a null or blank location for table %s",
+        "Location provider '%s' returned a null or blank location for table %s",
         provider.name(),
         ident);
 
     return location;
+  }
+
+  /** What dropping or purging one table did. */
+  private enum TableDropOutcome {
+    /** The table did not exist. */
+    NOT_FOUND,
+    /** The table was removed, and its data with it. */
+    DROPPED,
+    /** The table was an external table dropped rather than purged, so its data is still there. */
+    DROPPED_DATA_RETAINED
   }
 }

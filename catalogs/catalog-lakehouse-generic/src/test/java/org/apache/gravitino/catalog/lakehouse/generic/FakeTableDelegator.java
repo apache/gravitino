@@ -39,8 +39,8 @@ import org.apache.gravitino.storage.IdGenerator;
 /**
  * A {@link LakehouseTableDelegator} registered only in the test classpath, whose table operations
  * touch nothing but the entity store. It lets the tests drive the catalog level table operations,
- * and the {@link TableLocationProvider} callbacks hanging off them, without a real table format
- * behind them.
+ * and the {@link LocationProvider} callbacks hanging off them, without a real table format behind
+ * them.
  */
 public class FakeTableDelegator implements LakehouseTableDelegator {
 

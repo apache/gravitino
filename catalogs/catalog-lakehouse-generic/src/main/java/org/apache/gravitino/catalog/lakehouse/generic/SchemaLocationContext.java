@@ -19,17 +19,15 @@
 package org.apache.gravitino.catalog.lakehouse.generic;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Collections;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 
 /**
- * The context passed to a {@link SupportsSchemaLocations} provider on both of its callbacks: when a
- * schema is being created, and when a schema is being dropped.
+ * The context passed to the schema callbacks of a {@link LocationProvider}: when a schema is being
+ * created, and when a schema is being dropped.
  *
  * <p>As with {@link TableLocationContext}, one type serves both callbacks so that a new input
  * becomes an additional accessor rather than a signature change. Build instances through {@link
@@ -41,19 +39,10 @@ public class SchemaLocationContext {
 
   private final Map<String, String> schemaProperties;
 
-  private final Map<String, String> catalogProperties;
-
-  private final List<NameIdentifier> tablesWithRetainedData;
-
   private SchemaLocationContext(
-      NameIdentifier schemaIdentifier,
-      Map<String, String> schemaProperties,
-      Map<String, String> catalogProperties,
-      List<NameIdentifier> tablesWithRetainedData) {
+      NameIdentifier schemaIdentifier, Map<String, String> schemaProperties) {
     this.schemaIdentifier = schemaIdentifier;
     this.schemaProperties = schemaProperties;
-    this.catalogProperties = catalogProperties;
-    this.tablesWithRetainedData = tablesWithRetainedData;
   }
 
   /**
@@ -71,12 +60,12 @@ public class SchemaLocationContext {
    * on the callback being served:
    *
    * <ul>
-   *   <li>{@link SupportsSchemaLocations#provisionSchemaLocation(SchemaLocationContext)} gets the
+   *   <li>{@link LocationProvider#provisionSchemaLocation(SchemaLocationContext)} gets the
    *       properties of the creation request, so the {@code location} entry holds whatever the
    *       caller supplied, which may be nothing at all.
-   *   <li>{@link SupportsSchemaLocations#unprovisionSchemaLocation(SchemaLocationContext)} gets the
-   *       stored properties of the schema being dropped, so the {@code location} entry holds the
-   *       location that was stored for it.
+   *   <li>{@link LocationProvider#unprovisionSchemaLocation(SchemaLocationContext)} gets the stored
+   *       properties of the schema being dropped, so the {@code location} entry holds the location
+   *       that was stored for it.
    * </ul>
    *
    * <p>Values are carried through as they were given, null ones included.
@@ -85,33 +74,6 @@ public class SchemaLocationContext {
    */
   public Map<String, String> schemaProperties() {
     return schemaProperties;
-  }
-
-  /**
-   * Returns the properties of the catalog this provider belongs to, as they were given when the
-   * catalog was created. See {@link TableLocationContext#catalogProperties()}.
-   *
-   * @return the catalog properties, never null but possibly empty
-   */
-  public Map<String, String> catalogProperties() {
-    return catalogProperties;
-  }
-
-  /**
-   * Returns the tables the cascade dropped without deleting their data: external tables that were
-   * dropped rather than purged, whose datasets the table format left in place and whose locations
-   * were not unprovisioned. Whether a table is external is decided the same way the drop path
-   * decides it.
-   *
-   * <p>A non-empty list means the schema location may still hold data. Always empty when the
-   * context is passed to {@link
-   * SupportsSchemaLocations#provisionSchemaLocation(SchemaLocationContext)} or when the drop did
-   * not cascade.
-   *
-   * @return the identifiers of the tables whose data was retained, never null but possibly empty
-   */
-  public List<NameIdentifier> tablesWithRetainedData() {
-    return tablesWithRetainedData;
   }
 
   /**
@@ -129,10 +91,6 @@ public class SchemaLocationContext {
     private NameIdentifier schemaIdentifier;
 
     private Map<String, String> schemaProperties = ImmutableMap.of();
-
-    private Map<String, String> catalogProperties = ImmutableMap.of();
-
-    private List<NameIdentifier> tablesWithRetainedData = ImmutableList.of();
 
     private Builder() {}
 
@@ -160,41 +118,13 @@ public class SchemaLocationContext {
     }
 
     /**
-     * Sets the properties of the catalog the schema belongs to. A null map is treated as an empty
-     * one; a null value under a key is kept as it is.
-     *
-     * @param catalogProperties the catalog properties
-     * @return this builder
-     */
-    public Builder withCatalogProperties(Map<String, String> catalogProperties) {
-      this.catalogProperties = copyOf(catalogProperties);
-      return this;
-    }
-
-    /**
-     * Sets the tables the cascade dropped without deleting their data. A null list is treated as an
-     * empty one.
-     *
-     * @param tablesWithRetainedData the identifiers of those tables
-     * @return this builder
-     */
-    public Builder withTablesWithRetainedData(List<NameIdentifier> tablesWithRetainedData) {
-      this.tablesWithRetainedData =
-          tablesWithRetainedData == null
-              ? ImmutableList.of()
-              : ImmutableList.copyOf(tablesWithRetainedData);
-      return this;
-    }
-
-    /**
      * Builds the {@link SchemaLocationContext}.
      *
      * @return the built context
      */
     public SchemaLocationContext build() {
       Preconditions.checkArgument(schemaIdentifier != null, "schemaIdentifier must not be null");
-      return new SchemaLocationContext(
-          schemaIdentifier, schemaProperties, catalogProperties, tablesWithRetainedData);
+      return new SchemaLocationContext(schemaIdentifier, schemaProperties);
     }
 
     // Tolerates null values, which ImmutableMap.copyOf would reject; see

@@ -182,6 +182,8 @@ public class TestGenericCatalogOperations {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
 
     ops = new GenericCatalogOperations(store, idGenerator);
+    // Schema operations consult the location provider, which initialization selects.
+    ops.initialize(ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
 
     // A second instance, initialized so that it uses the test provider, to exercise the provision
     // and unprovision callbacks. The shared instance above is never initialized and has no
@@ -189,8 +191,7 @@ public class TestGenericCatalogOperations {
     opsWithFakeProvider = new GenericCatalogOperations(store, idGenerator);
     opsWithFakeProvider.initialize(
         ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeTableLocationProvider.NAME),
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, FakeLocationProvider.NAME),
         null /* CatalogInfo, unused */,
         new GenericCatalog());
 
@@ -200,13 +201,11 @@ public class TestGenericCatalogOperations {
     opsWithDefaultProvider.initialize(
         ImmutableMap.of(), null /* CatalogInfo, unused */, new GenericCatalog());
 
-    // A fourth instance whose provider also implements SupportsSchemaLocations, to exercise the
-    // schema callbacks.
+    // A fourth instance whose provider overrides the schema callbacks, to exercise them.
     opsWithSchemaProvider = new GenericCatalogOperations(store, idGenerator);
     opsWithSchemaProvider.initialize(
         ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeSchemaLocationProvider.NAME),
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, FakeSchemaLocationProvider.NAME),
         null /* CatalogInfo, unused */,
         new GenericCatalog());
   }
@@ -234,7 +233,7 @@ public class TestGenericCatalogOperations {
             .execute()) {
       // Registration now requires an existing dataset at the provider-resolved location.
     }
-    FakeTableLocationProvider.provisionLocation(location);
+    FakeLocationProvider.provisionLocation(location);
     Map<String, String> properties =
         Maps.newHashMap(
             Map.of(
@@ -265,13 +264,10 @@ public class TestGenericCatalogOperations {
     Assertions.assertEquals("true", created.properties().get(Table.PROPERTY_EXTERNAL));
     Assertions.assertEquals(
         "true",
-        FakeTableLocationProvider.provisioned()
-            .get(0)
-            .tableProperties()
-            .get(Table.PROPERTY_EXTERNAL));
+        FakeLocationProvider.provisioned().get(0).tableProperties().get(Table.PROPERTY_EXTERNAL));
     Assertions.assertEquals(original, properties);
     Assertions.assertTrue(opsWithFakeProvider.dropTable(ident));
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(FakeLocationProvider.unprovisioned().isEmpty());
   }
 
   /** Legacy registrations preserve real data and avoid provider reclamation on drop/cascade. */
@@ -335,7 +331,7 @@ public class TestGenericCatalogOperations {
     }
 
     Assertions.assertEquals("purge".equals(operation), opsWithFakeProvider.tableExists(ident));
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(FakeLocationProvider.unprovisioned().isEmpty());
     try (Dataset dataset = Dataset.open().uri(location).build()) {
       Assertions.assertEquals("id", dataset.getSchema().getFields().get(0).getName());
     }
@@ -343,7 +339,7 @@ public class TestGenericCatalogOperations {
 
   @BeforeEach
   public void resetProvider() {
-    FakeTableLocationProvider.reset();
+    FakeLocationProvider.reset();
     FakeSchemaLocationProvider.reset();
     FakeTableDelegator.reset();
   }
@@ -456,7 +452,7 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertTrue(opsWithFakeProvider.dropTable(tableIdent));
 
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     TableLocationContext context = unprovisioned.get(0);
     Assertions.assertEquals(tableIdent, context.tableIdentifier());
@@ -477,7 +473,7 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertTrue(opsWithFakeProvider.purgeTable(tableIdent));
 
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     Assertions.assertEquals(tableIdent, unprovisioned.get(0).tableIdentifier());
     Assertions.assertEquals(
@@ -487,8 +483,7 @@ public class TestGenericCatalogOperations {
   @Test
   public void testACatalogPropertyWithANullValueDoesNotFailInitialization() throws IOException {
     Map<String, String> conf = Maps.newHashMap();
-    conf.put(
-        GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER, FakeTableLocationProvider.NAME);
+    conf.put(GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, FakeLocationProvider.NAME);
     conf.put("a-property-with-no-value", null);
 
     // A null property value must not be able to fail the creation of a whole catalog. This is the
@@ -516,8 +511,7 @@ public class TestGenericCatalogOperations {
     GenericCatalogOperations catalogOps = new GenericCatalogOperations(spiedStore, idGenerator);
     catalogOps.initialize(
         ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeTableLocationProvider.NAME),
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, FakeLocationProvider.NAME),
         null /* CatalogInfo, unused */,
         new GenericCatalog());
 
@@ -539,7 +533,7 @@ public class TestGenericCatalogOperations {
         NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "no-such-table");
 
     Assertions.assertFalse(opsWithFakeProvider.dropTable(tableIdent));
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(FakeLocationProvider.unprovisioned().isEmpty());
   }
 
   @Test
@@ -558,7 +552,7 @@ public class TestGenericCatalogOperations {
     Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true /* cascade */));
 
     Set<NameIdentifier> unprovisionedIdents =
-        FakeTableLocationProvider.unprovisioned().stream()
+        FakeLocationProvider.unprovisioned().stream()
             .map(TableLocationContext::tableIdentifier)
             .collect(Collectors.toSet());
     Assertions.assertEquals(Set.of(tableIdent1, tableIdent2), unprovisionedIdents);
@@ -573,12 +567,12 @@ public class TestGenericCatalogOperations {
   public void testFailedUnprovisionStillReportsTheDropAsSuccessful() {
     NameIdentifier schemaIdent = createSchema();
     NameIdentifier tableIdent = createTable(schemaIdent, "table1");
-    FakeTableLocationProvider.failOnUnprovision(true);
+    FakeLocationProvider.failOnUnprovision(true);
 
     // The table is already gone by the time the provider is called, so failing the request would
     // report a drop that did happen as unsuccessful. The failure is logged instead.
     Assertions.assertTrue(opsWithFakeProvider.dropTable(tableIdent));
-    Assertions.assertEquals(1, FakeTableLocationProvider.unprovisioned().size());
+    Assertions.assertEquals(1, FakeLocationProvider.unprovisioned().size());
     Assertions.assertThrows(
         NoSuchTableException.class, () -> opsWithFakeProvider.loadTable(tableIdent));
   }
@@ -588,12 +582,12 @@ public class TestGenericCatalogOperations {
     NameIdentifier schemaIdent = createSchema();
     createTable(schemaIdent, "table1");
     createTable(schemaIdent, "table2");
-    FakeTableLocationProvider.failOnUnprovision(true);
+    FakeLocationProvider.failOnUnprovision(true);
 
     Assertions.assertTrue(opsWithFakeProvider.dropSchema(schemaIdent, true /* cascade */));
 
     // Both tables are attempted, rather than the first failure leaving the second one behind.
-    Assertions.assertEquals(2, FakeTableLocationProvider.unprovisioned().size());
+    Assertions.assertEquals(2, FakeLocationProvider.unprovisioned().size());
     Assertions.assertThrows(
         NoSuchSchemaException.class, () -> opsWithFakeProvider.loadSchema(schemaIdent));
   }
@@ -613,8 +607,8 @@ public class TestGenericCatalogOperations {
     // Registering data that already exists is the case a provider most needs to see rather than
     // have decided for it: both facts it would rule on are on the context, so it can return the
     // supplied path unchanged, place the table elsewhere, or refuse the creation outright.
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
-    TableLocationContext context = FakeTableLocationProvider.provisioned().get(0);
+    Assertions.assertEquals(1, FakeLocationProvider.provisioned().size());
+    TableLocationContext context = FakeLocationProvider.provisioned().get(0);
     Assertions.assertTrue(
         Boolean.parseBoolean(context.tableProperties().get(Table.PROPERTY_EXTERNAL)));
     Assertions.assertEquals(
@@ -667,15 +661,12 @@ public class TestGenericCatalogOperations {
     // as the `location` property of the context, and what happens to it is the provider's call: a
     // provider enforcing a placement policy exists precisely for this request, and one that keeps
     // the caller's choice returns it unchanged. This provider allocates, so it allocates.
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
+    Assertions.assertEquals(1, FakeLocationProvider.provisioned().size());
     Assertions.assertEquals(
         suppliedLocation,
-        FakeTableLocationProvider.provisioned()
-            .get(0)
-            .tableProperties()
-            .get(Table.PROPERTY_LOCATION));
+        FakeLocationProvider.provisioned().get(0).tableProperties().get(Table.PROPERTY_LOCATION));
     Assertions.assertEquals(
-        FakeTableLocationProvider.LOCATION_PREFIX + "managed_table/",
+        FakeLocationProvider.LOCATION_PREFIX + "managed_table/",
         created.properties().get(Table.PROPERTY_LOCATION));
   }
 
@@ -692,8 +683,8 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertEquals(
         locationOf("null_value_table"), created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
-    Map<String, String> seen = FakeTableLocationProvider.provisioned().get(0).tableProperties();
+    Assertions.assertEquals(1, FakeLocationProvider.provisioned().size());
+    Map<String, String> seen = FakeLocationProvider.provisioned().get(0).tableProperties();
     Assertions.assertTrue(seen.containsKey("a-property-with-no-value"));
     Assertions.assertNull(seen.get("a-property-with-no-value"));
   }
@@ -713,7 +704,7 @@ public class TestGenericCatalogOperations {
     // format decides whether an external table without a location is valid at all.
     Assertions.assertEquals(
         locationOf("external_no_location"), created.properties().get(Table.PROPERTY_LOCATION));
-    Assertions.assertEquals(1, FakeTableLocationProvider.provisioned().size());
+    Assertions.assertEquals(1, FakeLocationProvider.provisioned().size());
   }
 
   @Test
@@ -734,7 +725,7 @@ public class TestGenericCatalogOperations {
     // The data under an external table's location is not the catalog's to reclaim: the table
     // formats leave it in place on drop, and asking a provider to hand the location back would
     // invite it to delete exactly that data. Leaking beats deleting, so the callback is skipped.
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(FakeLocationProvider.unprovisioned().isEmpty());
   }
 
   @Test
@@ -755,7 +746,7 @@ public class TestGenericCatalogOperations {
 
     // Only the managed table's location comes back; the external one is left alone, exactly as on
     // a single drop.
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     Assertions.assertEquals("managed_table", unprovisioned.get(0).tableIdentifier().name());
   }
@@ -771,7 +762,7 @@ public class TestGenericCatalogOperations {
 
     // Three tables, one parent schema. Every context hands back the very same Schema instance,
     // which it could only do if the cascade resolved it once and shared it.
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(3, unprovisioned.size());
     Schema resolvedOnce = unprovisioned.get(0).schema();
     Assertions.assertSame(resolvedOnce, unprovisioned.get(1).schema());
@@ -798,14 +789,14 @@ public class TestGenericCatalogOperations {
     // destroy the data, and LanceTableOperations#purgeTable honours it for an external table --
     // deleting the dataset its dropTable leaves alone. Skipping here would leak an allocation
     // whose data the catalog had just deleted.
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     Assertions.assertTrue(
         Boolean.parseBoolean(unprovisioned.get(0).tableProperties().get(Table.PROPERTY_EXTERNAL)));
     // The location handed back is the one that was stored, which for this catalog is the one the
     // provider itself returned when it saw the supplied value.
     Assertions.assertEquals(
-        FakeTableLocationProvider.LOCATION_PREFIX + "external_purged/",
+        FakeLocationProvider.LOCATION_PREFIX + "external_purged/",
         unprovisioned.get(0).tableProperties().get(Table.PROPERTY_LOCATION));
   }
 
@@ -829,7 +820,7 @@ public class TestGenericCatalogOperations {
     // make: by the time the callback runs the data is gone, so there is nothing left for a
     // provider to decide differently, and the skipped case is the one where reclaiming by path
     // would destroy a user's data.
-    List<TableLocationContext> unprovisioned = FakeTableLocationProvider.unprovisioned();
+    List<TableLocationContext> unprovisioned = FakeLocationProvider.unprovisioned();
     Assertions.assertEquals(1, unprovisioned.size());
     Assertions.assertEquals("to_purge", unprovisioned.get(0).tableIdentifier().name());
   }
@@ -851,13 +842,13 @@ public class TestGenericCatalogOperations {
     Assertions.assertNull(opsWithFakeProvider.tableFormatCache().getIfPresent(tableIdent));
     // Not unprovisioned: the format may equally have failed before touching storage, and handing
     // back a location that still has data under it is the unrecoverable direction.
-    Assertions.assertTrue(FakeTableLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertTrue(FakeLocationProvider.unprovisioned().isEmpty());
   }
 
   @Test
   public void testANullProviderNameFallsBackToTheBuiltInProvider() throws IOException {
     Map<String, String> conf = Maps.newHashMap();
-    conf.put(GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER, null);
+    conf.put(GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, null);
     conf.put("a-property-with-no-value", null);
 
     // getOrDefault returns decode(null) rather than the default when the key is present with a
@@ -875,20 +866,19 @@ public class TestGenericCatalogOperations {
       // The built-in chain, not the test provider: a null name means the property was not set.
       Assertions.assertEquals(
           "s3://schema-bucket/db/table1/", created.properties().get(Table.PROPERTY_LOCATION));
-      Assertions.assertTrue(FakeTableLocationProvider.provisioned().isEmpty());
+      Assertions.assertTrue(FakeLocationProvider.provisioned().isEmpty());
     } finally {
       catalogOps.close();
     }
   }
 
   @Test
-  public void testDroppingAnEmptySchemaDoesNotResolveIt() throws IOException {
+  public void testDroppingAnEmptySchemaResolvesItOnce() throws IOException {
     EntityStore spy = Mockito.spy(store);
     GenericCatalogOperations catalogOps = new GenericCatalogOperations(spy, idGenerator);
     catalogOps.initialize(
         ImmutableMap.of(
-            GenericCatalogPropertiesMetadata.TABLE_LOCATION_PROVIDER,
-            FakeTableLocationProvider.NAME),
+            GenericCatalogPropertiesMetadata.LOCATION_PROVIDER, FakeLocationProvider.NAME),
         null /* CatalogInfo, unused */,
         new GenericCatalog());
 
@@ -898,10 +888,9 @@ public class TestGenericCatalogOperations {
 
       Assertions.assertTrue(catalogOps.dropSchema(schemaIdent, true /* cascade */));
 
-      // The schema is resolved to build the contexts of the tables being cascaded, so with no
-      // tables there is nothing to resolve it for. Dropping the schema itself is a single delete,
-      // so this read is the catalog's alone and every drop of an empty schema would pay for it.
-      Mockito.verify(spy, Mockito.never())
+      // The schema is resolved once, for the context of the provider's schema callback, and not
+      // again by anything else on the way.
+      Mockito.verify(spy, Mockito.times(1))
           .get(Mockito.eq(schemaIdent), Mockito.eq(SCHEMA), Mockito.any());
     } finally {
       catalogOps.close();
@@ -911,7 +900,7 @@ public class TestGenericCatalogOperations {
   @Test
   public void testAProviderRefusingTheCreationLeavesNoTable() {
     NameIdentifier schemaIdent = createSchema();
-    FakeTableLocationProvider.provisionLocation(null);
+    FakeLocationProvider.provisionLocation(null);
 
     Assertions.assertThrows(
         IllegalArgumentException.class,
@@ -934,7 +923,6 @@ public class TestGenericCatalogOperations {
     List<SchemaLocationContext> provisioned = FakeSchemaLocationProvider.provisioned();
     Assertions.assertEquals(1, provisioned.size());
     Assertions.assertEquals(schemaIdent, provisioned.get(0).schemaIdentifier());
-    Assertions.assertTrue(provisioned.get(0).tablesWithRetainedData().isEmpty());
 
     Schema schema = opsWithSchemaProvider.loadSchema(schemaIdent);
     String schemaLocation = FakeSchemaLocationProvider.LOCATION_PREFIX + schemaIdent.name() + "/";
@@ -967,17 +955,13 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testABlankSchemaLocationFailsTheCreation() {
+  public void testABlankSchemaLocationKeepsTheRequest() {
     FakeSchemaLocationProvider.provisionLocation("   ");
-    NameIdentifier schemaIdent =
-        NameIdentifierUtil.ofSchema(METALAKE_NAME, CATALOG_NAME, randomSchemaName());
 
-    IllegalArgumentException e =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> createSchemaWithSchemaProvider(schemaIdent, null));
-    Assertions.assertTrue(e.getMessage().contains(FakeSchemaLocationProvider.NAME), e.getMessage());
-    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+
+    Assertions.assertNull(
+        opsWithSchemaProvider.loadSchema(schemaIdent).properties().get(Schema.PROPERTY_LOCATION));
   }
 
   @Test
@@ -992,16 +976,21 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testAnExistingSchemaIsRejectedBeforeTheProviderIsConsulted() {
+  public void testAnExistingSchemaIsRejectedAndKeepsItsLocation() {
     NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    String location = FakeSchemaLocationProvider.LOCATION_PREFIX + schemaIdent.name() + "/";
     FakeSchemaLocationProvider.reset();
+    FakeSchemaLocationProvider.provisionLocation("testing://another-bucket/");
 
     Assertions.assertThrows(
         SchemaAlreadyExistsException.class,
         () -> createSchemaWithSchemaProvider(schemaIdent, null));
-    // Asking a provider to allocate for a taken name could hand back the allocation of the schema
-    // that exists, which nothing could then safely release.
-    Assertions.assertTrue(FakeSchemaLocationProvider.provisioned().isEmpty());
+    // The provider is asked before the store finds the name taken, and what it returned for the
+    // rejected creation is not stored over the location of the schema that exists.
+    Assertions.assertEquals(1, FakeSchemaLocationProvider.provisioned().size());
+    Assertions.assertEquals(
+        location,
+        opsWithSchemaProvider.loadSchema(schemaIdent).properties().get(Schema.PROPERTY_LOCATION));
   }
 
   @Test
@@ -1014,7 +1003,6 @@ public class TestGenericCatalogOperations {
     Assertions.assertEquals(1, unprovisioned.size());
     SchemaLocationContext context = unprovisioned.get(0);
     Assertions.assertEquals(schemaIdent, context.schemaIdentifier());
-    Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
     // The stored properties are read before the schema is removed.
     Assertions.assertEquals(
         FakeSchemaLocationProvider.LOCATION_PREFIX + schemaIdent.name() + "/",
@@ -1031,7 +1019,7 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testACascadeReportsTheTablesThatKeptTheirData() {
+  public void testACascadeThatLeftExternalDataInPlaceSkipsTheSchemaUnprovision() {
     NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
     createTableThroughCatalog(
         opsWithSchemaProvider,
@@ -1047,15 +1035,21 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, true /* cascade */));
 
-    // The external table was dropped rather than purged, so its data is still under the schema
-    // location. The catalog reports it; whether to release the schema location is the provider's
-    // decision.
-    List<SchemaLocationContext> unprovisioned = FakeSchemaLocationProvider.unprovisioned();
-    Assertions.assertEquals(1, unprovisioned.size());
-    Assertions.assertEquals(
-        List.of(
-            NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, schemaIdent.name(), "external_table")),
-        unprovisioned.get(0).tablesWithRetainedData());
+    // The external table was dropped rather than purged, so its data may still be under the schema
+    // location, which is therefore not handed back. The schema is dropped all the same.
+    Assertions.assertTrue(FakeSchemaLocationProvider.unprovisioned().isEmpty());
+    Assertions.assertFalse(opsWithSchemaProvider.schemaExists(schemaIdent));
+  }
+
+  @Test
+  public void testACascadeThatDeletedAllDataUnprovisionsTheSchema() {
+    NameIdentifier schemaIdent = createSchemaWithSchemaProvider(null);
+    createTableThroughCatalog(
+        opsWithSchemaProvider, schemaIdent, "managed_table", ImmutableMap.of());
+
+    Assertions.assertTrue(opsWithSchemaProvider.dropSchema(schemaIdent, true /* cascade */));
+
+    Assertions.assertEquals(1, FakeSchemaLocationProvider.unprovisioned().size());
   }
 
   @Test
@@ -1096,7 +1090,7 @@ public class TestGenericCatalogOperations {
   }
 
   @Test
-  public void testAProviderWithoutSchemaSupportIsNotConsultedForSchemas() {
+  public void testAProviderNotOverridingTheSchemaCallbacksLeavesSchemasAlone() {
     NameIdentifier schemaIdent = createSchema();
     Assertions.assertNull(
         opsWithFakeProvider.loadSchema(schemaIdent).properties().get(Schema.PROPERTY_LOCATION));
@@ -1194,7 +1188,7 @@ public class TestGenericCatalogOperations {
   }
 
   private static String locationOf(String tableName) {
-    return FakeTableLocationProvider.LOCATION_PREFIX + tableName + "/";
+    return FakeLocationProvider.LOCATION_PREFIX + tableName + "/";
   }
 
   private String randomSchemaName() {
@@ -1206,7 +1200,7 @@ public class TestGenericCatalogOperations {
     NameIdentifier schemaIdent = createSchema();
 
     for (String location : Arrays.asList(null, "", "   ")) {
-      FakeTableLocationProvider.provisionLocation(location);
+      FakeLocationProvider.provisionLocation(location);
       IllegalArgumentException e =
           Assertions.assertThrows(
               IllegalArgumentException.class,
@@ -1215,8 +1209,7 @@ public class TestGenericCatalogOperations {
                       opsWithFakeProvider, schemaIdent, "blank_location", ImmutableMap.of()));
       Assertions.assertTrue(
           e.getMessage().contains("returned a null or blank location"), e.getMessage());
-      Assertions.assertTrue(
-          e.getMessage().contains(FakeTableLocationProvider.NAME), e.getMessage());
+      Assertions.assertTrue(e.getMessage().contains(FakeLocationProvider.NAME), e.getMessage());
     }
   }
 
@@ -1227,7 +1220,7 @@ public class TestGenericCatalogOperations {
     // exactly as returned rather than normalizing it, and the provider unprovisioning it later
     // sees the same string it handed out.
     String opaque = "testing://bucket/9f1c2e04-6b3a-4a17-bd6e-1c0a5f2d8e77";
-    FakeTableLocationProvider.provisionLocation(opaque);
+    FakeLocationProvider.provisionLocation(opaque);
 
     Table created =
         createTableThroughCatalog(
@@ -1240,7 +1233,7 @@ public class TestGenericCatalogOperations {
     // provider is not told its location was declined over a slash; that normalization belongs to
     // the comparison and must not reach the stored property.
     String directory = "testing://bucket/9f1c2e04-6b3a-4a17-bd6e-1c0a5f2d8e77/";
-    FakeTableLocationProvider.provisionLocation(directory);
+    FakeLocationProvider.provisionLocation(directory);
 
     Table createdInDirectory =
         createTableThroughCatalog(
@@ -1270,7 +1263,7 @@ public class TestGenericCatalogOperations {
 
     Assertions.assertEquals(
         1,
-        FakeTableLocationProvider.unprovisioned().size(),
+        FakeLocationProvider.unprovisioned().size(),
         "'yes' is not read as external by the formats, so the catalog must not read it so either");
   }
 
@@ -1307,7 +1300,7 @@ public class TestGenericCatalogOperations {
 
     // The fourth cell of the external x supplied-location matrix: no location and not external is
     // the ordinary case the provider exists for.
-    List<TableLocationContext> provisioned = FakeTableLocationProvider.provisioned();
+    List<TableLocationContext> provisioned = FakeLocationProvider.provisioned();
     Assertions.assertEquals(1, provisioned.size());
     Assertions.assertEquals("managed_table", provisioned.get(0).tableIdentifier().name());
     Assertions.assertFalse(

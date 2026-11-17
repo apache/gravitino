@@ -18,9 +18,7 @@
  */
 package org.apache.gravitino.catalog.lakehouse.generic;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
-import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.junit.jupiter.api.Assertions;
@@ -37,8 +35,6 @@ public class TestSchemaLocationContext {
 
     Assertions.assertEquals(SCHEMA, context.schemaIdentifier());
     Assertions.assertTrue(context.schemaProperties().isEmpty());
-    Assertions.assertTrue(context.catalogProperties().isEmpty());
-    Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
   }
 
   @Test
@@ -47,13 +43,9 @@ public class TestSchemaLocationContext {
         SchemaLocationContext.builder()
             .withSchemaIdentifier(SCHEMA)
             .withSchemaProperties(null)
-            .withCatalogProperties(null)
-            .withTablesWithRetainedData(null)
             .build();
 
     Assertions.assertTrue(context.schemaProperties().isEmpty());
-    Assertions.assertTrue(context.catalogProperties().isEmpty());
-    Assertions.assertTrue(context.tablesWithRetainedData().isEmpty());
   }
 
   @Test
@@ -65,31 +57,24 @@ public class TestSchemaLocationContext {
         SchemaLocationContext.builder()
             .withSchemaIdentifier(SCHEMA)
             .withSchemaProperties(properties)
-            .withCatalogProperties(properties)
             .build();
 
     Assertions.assertTrue(context.schemaProperties().containsKey("a-property-with-no-value"));
-    Assertions.assertTrue(context.catalogProperties().containsKey("a-property-with-no-value"));
   }
 
   @Test
   public void testTheContextIsNotAffectedByLaterChangesToItsInputs() {
     Map<String, String> properties = Maps.newHashMap();
     properties.put("location", "s3://bucket/db/");
-    NameIdentifier table = NameIdentifier.of("metalake", "catalog", "schema", "t1");
-    List<NameIdentifier> retained = Lists.newArrayList(table);
 
     SchemaLocationContext context =
         SchemaLocationContext.builder()
             .withSchemaIdentifier(SCHEMA)
             .withSchemaProperties(properties)
-            .withTablesWithRetainedData(retained)
             .build();
     properties.clear();
-    retained.clear();
 
     Assertions.assertEquals("s3://bucket/db/", context.schemaProperties().get("location"));
-    Assertions.assertEquals(List.of(table), context.tablesWithRetainedData());
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> context.schemaProperties().put("k", "v"));
   }

@@ -24,10 +24,10 @@ import java.util.List;
 import org.apache.gravitino.rel.Table;
 
 /**
- * A {@link TableLocationProvider} that also implements {@link SupportsSchemaLocations}, registered
- * only in the test classpath, used to verify that the generic catalog consults it for schemas.
+ * A {@link LocationProvider} that overrides the schema callbacks, registered only in the test
+ * classpath, used to verify that the generic catalog consults it for schemas.
  */
-public class FakeSchemaLocationProvider implements TableLocationProvider, SupportsSchemaLocations {
+public class FakeSchemaLocationProvider implements LocationProvider {
 
   /** The name under which this provider is registered. */
   public static final String NAME = "testing-schema";
@@ -123,7 +123,9 @@ public class FakeSchemaLocationProvider implements TableLocationProvider, Suppor
   }
 
   @Override
-  public void unprovisionTableLocation(TableLocationContext context) {}
+  public boolean unprovisionTableLocation(TableLocationContext context) {
+    return false;
+  }
 
   @Override
   public String provisionSchemaLocation(SchemaLocationContext context) {
@@ -137,10 +139,11 @@ public class FakeSchemaLocationProvider implements TableLocationProvider, Suppor
   }
 
   @Override
-  public void unprovisionSchemaLocation(SchemaLocationContext context) {
+  public boolean unprovisionSchemaLocation(SchemaLocationContext context) {
     UNPROVISIONED.add(context);
     if (failOnUnprovision) {
       throw new IllegalStateException("The path allocation service is unavailable");
     }
+    return true;
   }
 }
