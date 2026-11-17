@@ -148,26 +148,27 @@ public class MaintenanceJobManager {
   }
 
   /**
-   * Runs the Iceberg maintenance template. When a job submitter is configured (authorization
-   * enabled), submits as that USER so {@link org.apache.gravitino.job.JobManager} does not attach
-   * {@code anonymous} and GROUP-owned metalakes still get a valid USER job owner.
+   * Runs the Iceberg maintenance template.
+   *
+   * <p>Without a submitter (authorization off), calls {@code runJob} on the current thread.
+   * With a submitter, runs the same {@code runJob} under {@code doAs(jobSubmitter)} so {@link
+   * org.apache.gravitino.job.JobManager} records that USER as the job owner.
    */
   JobEntity runIcebergMaintenanceJob(String metalake, Map<String, String> jobConf) {
     if (jobSubmitter == null) {
-      // Authorization disabled: JobManager skips setOwner.
-      return jobOperationDispatcher.runJob(
-          metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
+      return runJob(metalake, jobConf);
     }
     try {
-      return PrincipalUtils.doAs(
-          new UserPrincipal(jobSubmitter),
-          () ->
-              jobOperationDispatcher.runJob(
-                  metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf));
+      return PrincipalUtils.doAs(new UserPrincipal(jobSubmitter), () -> runJob(metalake, jobConf));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
       throw new RuntimeException("Failed to submit TMS job as submitter " + jobSubmitter, e);
     }
+  }
+
+  private JobEntity runJob(String metalake, Map<String, String> jobConf) {
+    return jobOperationDispatcher.runJob(
+        metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
   }
 }

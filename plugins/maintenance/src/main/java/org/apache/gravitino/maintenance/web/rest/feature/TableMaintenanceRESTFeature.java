@@ -99,6 +99,12 @@ public class TableMaintenanceRESTFeature implements Feature {
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
+    // Authorization on => jobSubmitter must be set so TMS can doAs a USER for runJob.
+    String jobSubmitter = null;
+    if (config.get(Configs.ENABLE_AUTHORIZATION)) {
+      jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).get();
+    }
+
     TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(config);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
@@ -112,7 +118,6 @@ public class TableMaintenanceRESTFeature implements Feature {
             env.internalSchemaDispatcher(),
             env.internalTableDispatcher());
 
-    String jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).orElse(null);
     DataSource dataSource = AutocommitDataSources.entityStore();
     MaintenanceSchedulerPools pools = new MaintenanceSchedulerPools();
     pools.start(
