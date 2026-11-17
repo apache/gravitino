@@ -2056,3 +2056,95 @@ test('retargeted base results bypass ordering guards from the previous base', as
     assert.equal(statuses[0].state, ['running', 'missing'].includes(scenario) ? 'pending' : 'failure', scenario);
   }
 }));
+
+
+test('publisher logs attention diagnostics with the PR while deduplicating statuses', async () => withPublisher(async ({ ctx, core }) => {
+  const messages = [];
+  core.info = message => messages.push(message);
+  const { github, statuses } = publisherMock({ rerun: { ...run(), run_attempt: 2, conclusion: 'cancelled' } });
+  const snapshot = [...jobs(pr()).map(job => ({ ...job, run_attempt: 1 })),
+    { name: 'Resolve fork CI eligibility', run_attempt: 2, conclusion: 'success' },
+    { name: FAIL_FAST, run_attempt: 1, conclusion: 'cancelled' }];
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? snapshot;
+  await update({ github, context: ctx, core });
+  assert.equal(statuses.length, 1);
+  assert.equal(statuses[0].state, 'error');
+  assert.ok(messages.some(message => message.startsWith('Fork CI #7: Required CI has not confirmed') &&
+    message.includes('rerun Required CI as well')));
+  await update({ github, context: ctx, core });
+  assert.equal(statuses.length, 1);
+}));
+
+
+test('current other-head trusted summaries override retained exact gates when selecting a run', async () => {
+  for (const changed of [false, true]) {
+    for (const retained of ['success', 'failure', undefined]) {
+      for (const conclusion of ['success', 'failure', 'cancelled']) {
+        const p = pr(), other = pr(); other.head.sha = C;
+        const trustedJobs = jobs(other).map((job, i) => ({ ...job, id: 100 + i, run_attempt: 2 }));
+        trustedJobs[0].conclusion = conclusion;
+        if (retained) trustedJobs.push({ name: requiredName(p), conclusion: retained, id: 1, run_attempt: 1 });
+        const forkJobs = [...jobs(p), { name: 'backend / test', conclusion: 'failure', run_attempt: 1 }];
+        const github = serviceMock({ changed, trusted: true, forkJobs, trustedJobs });
+        const list = github.rest.actions.listWorkflowRuns;
+        github.rest.actions.listWorkflowRuns = async args => {
+          const response = await list(args);
+          if (args.event === 'workflow_dispatch') Object.assign(response.data.workflow_runs[0],
+            { run_attempt: 2, conclusion });
+          return response;
+        };
+        const mirrored = await createService(github).mirror(p);
+        assert.equal(mirrored.trusted, false);
+        assert.equal(mirrored.run.id, 1);
+        assert.equal(mirrored.result.conclusion, 'failure');
+        assert.equal(mirrored.result.title, 'Failed: backend / test');
+      }
+    }
+  }
+});
+
+test('other-head summaries cannot discard a trusted snapshot containing future exact jobs', async () => {
+  const other = pr(); other.head.sha = C;
+  const trustedJobs = jobs(other).map((job, i) => ({ ...job, id: i + 1, run_attempt: 2 }));
+  trustedJobs.push({ name: requiredName(pr()), conclusion: 'success', id: 100, run_attempt: 3 });
+  const github = serviceMock({ trusted: true, trustedJobs });
+  const list = github.rest.actions.listWorkflowRuns;
+  github.rest.actions.listWorkflowRuns = async args => {
+    const response = await list(args);
+    if (args.event === 'workflow_dispatch') response.data.workflow_runs[0].run_attempt = 2;
+    return response;
+  };
+  const mirrored = await createService(github).mirror(pr());
+  assert.equal(mirrored.trusted, true);
+  assert.equal(mirrored.result.conclusion, 'action_required');
+  assert.match(mirrored.result.note, /newer attempt/);
+});
+
+test('scheduled publisher reports fork failure when a trusted rerun explicitly tested another head', async () => withPublisher(async ({ ctx, core }) => {
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const other = pr(); other.head.sha = C;
+  const trustedJobs = [...jobs(other).map((job, i) => ({ ...job, id: 100 + i, run_attempt: 2 })),
+    { name: requiredName(pr()), id: 1, run_attempt: 1, conclusion: 'success' }];
+  const forkJobs = [...jobs(pr()), { name: 'backend / test', conclusion: 'failure', run_attempt: 1 }];
+  const service = serviceMock({ changed: true, trusted: true, trustedJobs, forkJobs });
+  const { github, statuses } = publisherMock({ current: recent,
+    latest: forkStatus('error', 'Fork CI needs attention', url(2, 2, 'apache', 'gravitino', run())) });
+  github.rest.git = service.rest.git;
+  github.rest.pulls.get = async () => ({ data: recent });
+  github.rest.actions.listWorkflowRuns = async args => {
+    const response = await service.rest.actions.listWorkflowRuns(args);
+    for (const candidate of response.data.workflow_runs) {
+      if (args.event === 'workflow_dispatch') candidate.run_attempt = 2;
+      else candidate.updated_at = '2026-01-03T00:00:00Z';
+    }
+    return response;
+  };
+  github.paginate = async (endpoint, args) => endpoint === github.rest.pulls.list ? [recent]
+    : runsOf(github, endpoint, args) ?? (args.run_id === 2 ? trustedJobs : forkJobs);
+  ctx.eventName = 'schedule'; ctx.payload = {};
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.length, 1);
+  assert.equal(statuses[0].state, 'failure');
+  assert.match(statuses[0].description, /Failed: backend \/ test/);
+  assert.equal(statuses[0].target_url, url());
+}));

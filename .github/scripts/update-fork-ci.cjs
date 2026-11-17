@@ -125,6 +125,8 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     if (run && shown && sameBase && shown.owner === mirror.owner && shown.repo === mirror.repo && (shown.run_id > run.id ||
         (shown.run_id === run.id && (shown.run_attempt > run.run_attempt ||
           (shown.run_attempt === run.run_attempt && statusCompleted(latest) && result.status !== 'completed'))))) return;
+    // Commit-status descriptions are short; retain the detailed recovery instructions in the publisher log.
+    if (result.note) core.info(`Fork CI #${pr.number}: ${result.note}`);
     await publishStatus({ github, repo: context.repo, sha: pr.head.sha, context: 'Fork CI',
       state: statusState(result), description: describe(result, mirror), targetUrl: target, previous: latest ?? null });
   }

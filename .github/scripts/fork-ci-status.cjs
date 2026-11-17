@@ -299,7 +299,8 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
         const match = /^Required CI \/ (.+) \/ ([0-9a-f]{40}) \/ ([0-9a-f]{40})$/.exec(job.name);
         return match && match[3] !== pr.head.sha;
       });
-      if (!trustedExact && otherHead && !incompleteAttempt(trusted.run, trustedJobs)) trusted = undefined;
+      // Retained gates from earlier attempts do not identify the current attempt's PR head.
+      if (otherHead && !incompleteAttempt(trusted.run, trustedJobs)) trusted = undefined;
     }
     let selected = trusted && (!ordinary || (trusted.run.updated_at || trusted.run.created_at) >= (ordinary.run.updated_at || ordinary.run.created_at) || !sameDefinitions)
       ? trusted : ordinary;
