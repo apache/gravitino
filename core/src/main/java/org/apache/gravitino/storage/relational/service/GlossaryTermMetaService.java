@@ -238,8 +238,9 @@ public final class GlossaryTermMetaService {
         GlossaryTermMetaMapper.class,
         mapper -> {
           MetalakePO observed = metalake(ns);
-          // Fence metalake deletion; definition row locks keep the root and synonyms consistent
-          // without serializing unrelated term writes across the entire metalake.
+          // Fence metalake deletion; definition row locks keep the root and synonyms consistent.
+          // MySQL/PostgreSQL share the parent lock across terms. H2 uses an exclusive parent
+          // lock instead, serializing operations within a metalake.
           MetalakePO locked =
               SessionUtils.getWithoutCommit(
                   MetalakeMetaMapper.class,

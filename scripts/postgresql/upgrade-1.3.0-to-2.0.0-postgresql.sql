@@ -569,7 +569,7 @@ CREATE TABLE IF NOT EXISTS glossary_term_meta (
     current_version BIGINT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0
 );
--- Only live rows reserve names and source references; deletion times remain available for GC.
+-- Only live rows reserve names and source references. Deletion times remain available for GC.
 CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_name ON glossary_term_meta (metalake_id, name_key) WHERE deleted_at = 0;
 CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_source ON glossary_term_meta (metalake_id, source_ref) WHERE deleted_at = 0;
 
