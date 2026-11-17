@@ -69,9 +69,11 @@ public final class GlossaryTermRelService {
   /**
    * Runs work under the live metalake fence and exclusive database hierarchy mutex. The lock stays
    * held until the outermost transaction commits or rolls back, including after this method
-   * returns. Cached reads made before acquiring the lock are discarded. A thrown exception rolls
-   * back the transaction. The callback must not acquire locks earlier than the hierarchy mutex in
-   * lock order.
+   * returns. Cached reads made before acquiring the lock are discarded. A standalone failure rolls
+   * back this operation. Nested transactions have no savepoints: an enclosing owner must propagate
+   * the failure or explicitly roll back, rather than catch it and commit partial work. The callback
+   * must not acquire new locks earlier than the hierarchy mutex in lock order. Reacquiring an
+   * already-held parent fence in the same mode (as add/remove do) is safe.
    *
    * @param metalakeId the live metalake ID
    * @param work the complete read/validate/write operation

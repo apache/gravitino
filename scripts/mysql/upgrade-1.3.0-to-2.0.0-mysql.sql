@@ -963,7 +963,8 @@ CREATE TABLE IF NOT EXISTS glossary_term_rel (
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live',
     PRIMARY KEY (from_term_id, to_term_id, rel_type, deleted_at),
     KEY idx_glossary_rel_to (to_term_id, rel_type, deleted_at),
-    KEY idx_glossary_rel_metalake (metalake_id, deleted_at)
+    KEY idx_glossary_rel_metalake (metalake_id, deleted_at),
+    KEY idx_glossary_rel_deleted (deleted_at, from_term_id, to_term_id, rel_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary directed broader and canonical related edges';
 
 CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (

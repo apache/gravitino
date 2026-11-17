@@ -614,6 +614,7 @@ CREATE TABLE IF NOT EXISTS glossary_term_rel (
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_rel_to ON glossary_term_rel (to_term_id, rel_type, deleted_at);
 CREATE INDEX IF NOT EXISTS idx_glossary_rel_metalake ON glossary_term_rel (metalake_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_rel_deleted ON glossary_term_rel (deleted_at, from_term_id, to_term_id, rel_type);
 COMMENT ON TABLE glossary_term_rel IS 'glossary directed broader and canonical related edges';
 COMMENT ON COLUMN glossary_term_rel.metalake_id IS 'owning metalake id';
 COMMENT ON COLUMN glossary_term_rel.from_term_id IS 'child id for BROADER, smaller endpoint id for RELATED';

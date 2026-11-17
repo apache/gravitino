@@ -197,6 +197,22 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
                 }));
     Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
     Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
+    SessionUtils.beginTransaction();
+    try {
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () ->
+              service.withHierarchyLock(
+                  100,
+                  () -> {
+                    service.add(100, 101, 102, RelationType.BROADER);
+                    throw new IllegalStateException("nested callback failed");
+                  }));
+    } finally {
+      // SessionUtils has no savepoints. A caller catching a nested failure owns the rollback.
+      SessionUtils.rollbackTransaction();
+    }
+    Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
     ExecutorService writer = Executors.newSingleThreadExecutor();
     try {
       SessionUtils.beginTransaction();
@@ -340,6 +356,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
   @TestTemplate
   public void testMutexExcludesIndependentDatabaseWriter() throws Exception {
     setupTerms(2);
+    service.withHierarchyLock(100, () -> null);
     ExecutorService worker = Executors.newSingleThreadExecutor();
     CountDownLatch attempted = new CountDownLatch(1);
     try {
