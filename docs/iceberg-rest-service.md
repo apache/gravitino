@@ -191,6 +191,14 @@ REST servers cannot use it. It reuses Gravitino's connection pool and supports H
 PostgreSQL. For multiple replicas, use the same shared MySQL or PostgreSQL database; separate local
 H2 databases do not provide cross-replica deduplication.
 
+The `jdbc` implementation is packaged in the Iceberg REST server JAR, which must be available to
+the auxiliary service's class loader. The `iceberg-common` JAR alone is insufficient: resolving the
+`jdbc` alias then fails at store creation with a `ClassNotFoundException` cause.
+
+Create one store instance per Iceberg REST service instance and share it across requests. Each
+store starts its own cleanup scheduler; creating stores per request adds redundant purge work and
+database lock contention. Close the store when stopping the service to shut down its scheduler.
+
 | Configuration item | Description | Default value | Required |
 |--------------------|-------------|---------------|----------|
 | `gravitino.iceberg-rest.idempotency-store-type` | Select `jdbc` for durable storage, `in-memory` for node-local storage, or a custom implementation class. | `in-memory` | No |
@@ -205,8 +213,23 @@ modify catalog metadata.
 Reservations are atomic across replicas. A claim token prevents an old request from finalizing or
 releasing a newer reservation. Expiry is enforced on reads, finalization, and reservation attempts;
 reusing an expired key does not depend on the cleanup schedule. Each cleanup pass deletes at most
-100 batches of 1,000 expired rows, and transient failures are retried on the next pass. Synchronize
-replica clocks because reuse-window deadlines are evaluated using each server's UTC clock.
+100 batches of 1,000 expired rows, and transient failures are retried on the next pass.
+
+:::warning Clock synchronization is required for safe replay
+All replicas sharing the JDBC store must maintain synchronized system clocks, for example through
+NTP or chrony. Monitor clock offset and synchronization health. Stop the Iceberg REST service on an
+unsynchronized replica until its clock is corrected so neither requests nor its cleanup task can
+expire records early. A fast clock can reclaim or purge a key while another replica still considers
+it live, allowing the mutation to execute again within that
+replica's reuse window. This affects replay safety, not just cleanup timing. The store does not add
+a clock-skew grace period; changing the cleanup interval does not prevent early reclaim by
+`reserve()`.
+:::
+
+The 100,000-row cleanup cap applies to each pass, and remaining expired rows wait for later passes.
+Monitor expired-row backlog and database storage growth; shorten the cleanup interval if cleanup
+falls behind, while checking database load and lock waits. Cleanup lag does not extend record
+validity because expiry is checked on access.
 
 Durable storage does not make catalog mutations and response persistence one transaction. A crash
 or response-persistence failure after the catalog mutation can still allow re-execution after the

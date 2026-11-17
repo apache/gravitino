@@ -52,6 +52,11 @@ import org.slf4j.LoggerFactory;
  * <p>Reservations commit independently of catalog transactions. Claim tokens fence stale finalize
  * and release calls, but cannot undo catalog side effects or make the catalog mutation and response
  * persistence atomic. Expired keys can be reserved again without waiting for background cleanup.
+ * Replicas must synchronize system clocks: a fast clock can reclaim a key another replica still
+ * considers live. There is no clock-skew grace period.
+ *
+ * <p>Share one store per service instance across requests. Each store owns a cleanup scheduler that
+ * is stopped by {@link #close()}; the relational entity store owns the shared connection pool.
  */
 public class JdbcIdempotencyStore implements IdempotencyStore {
   private static final Logger LOG = LoggerFactory.getLogger(JdbcIdempotencyStore.class);
@@ -82,8 +87,9 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
     long intervalMs = interval.toMillis();
     Preconditions.checkArgument(
         intervalMs > 0, "Idempotency cleanup interval must be at least 1ms");
+    SqlSessionFactory factory;
     try {
-      sessionFactory = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
+      factory = SqlSessionFactoryHelper.getInstance().getSqlSessionFactory();
     } catch (IllegalStateException e) {
       throw new IllegalStateException(
           "JDBC idempotency storage requires an initialized Gravitino relational entity store "
@@ -91,14 +97,20 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
           e);
     }
     // Core cannot discover mappers in the auxiliary service's class loader during its startup.
-    Configuration configuration = sessionFactory.getConfiguration();
+    Configuration configuration = factory.getConfiguration();
     synchronized (configuration) {
       if (!configuration.hasMapper(IcebergIdempotencyKeyMapper.class)) {
         configuration.addMapper(IcebergIdempotencyKeyMapper.class);
       }
     }
     // Fail startup, rather than the first mutation, when the database has not been upgraded.
-    execute(mapper -> mapper.selectRecord("00000000-0000-7000-8000-000000000000", clock.millis()));
+    try (SqlSession session = factory.openSession()) {
+      session
+          .getMapper(IcebergIdempotencyKeyMapper.class)
+          .selectRecord("00000000-0000-7000-8000-000000000000", clock.millis());
+      session.commit();
+    }
+    sessionFactory = factory;
     purgeScheduler =
         Executors.newSingleThreadScheduledExecutor(
             runnable -> {
@@ -148,14 +160,22 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
   public void finalizeRecord(
       String idempotencyKey, long claim, int httpStatus, @Nullable String responseSummary) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
-    execute(
-        mapper -> mapper.finalizeRecord(key, claim, httpStatus, responseSummary, clock.millis()));
+    int updated =
+        execute(
+            mapper ->
+                mapper.finalizeRecord(key, claim, httpStatus, responseSummary, clock.millis()));
+    if (updated == 0) {
+      LOG.debug("No live unfinalized reservation to finalize for key {} and claim {}", key, claim);
+    }
   }
 
   @Override
   public void release(String idempotencyKey, long claim) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
-    execute(mapper -> mapper.deleteReservation(key, claim));
+    int deleted = execute(mapper -> mapper.deleteReservation(key, claim));
+    if (deleted == 0) {
+      LOG.debug("No unfinalized reservation to release for key {} and claim {}", key, claim);
+    }
   }
 
   @Override

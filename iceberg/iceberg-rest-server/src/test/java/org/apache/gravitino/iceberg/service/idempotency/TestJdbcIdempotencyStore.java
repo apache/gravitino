@@ -218,6 +218,60 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testStaleFinalizeAfterReReservationIsIgnored() {
+    store.reserve(KEY, BINDING, 1, FAR_FUTURE_MS);
+    store.release(KEY, 1);
+    Assertions.assertEquals(ReserveResult.RESERVED, peer.reserve(KEY, BINDING, 2, FAR_FUTURE_MS));
+
+    store.finalizeRecord(KEY, 1, 500, "stale");
+
+    Assertions.assertTrue(peer.load(KEY).isEmpty());
+    Assertions.assertEquals(ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, 3, FAR_FUTURE_MS));
+    peer.finalizeRecord(KEY, 2, 201, "current");
+    IdempotencyRecord record = store.load(KEY).orElseThrow();
+    Assertions.assertEquals(2, record.claim());
+    Assertions.assertEquals(201, record.httpStatus());
+    Assertions.assertEquals("current", record.responseSummary());
+  }
+
+  @TestTemplate
+  void testStaleReleaseAfterReReservationIsIgnored() {
+    store.reserve(KEY, BINDING, 1, FAR_FUTURE_MS);
+    store.release(KEY, 1);
+    Assertions.assertEquals(ReserveResult.RESERVED, peer.reserve(KEY, BINDING, 2, FAR_FUTURE_MS));
+
+    store.release(KEY, 1);
+
+    Assertions.assertEquals(ReserveResult.DUPLICATE, store.reserve(KEY, BINDING, 3, FAR_FUTURE_MS));
+    Assertions.assertTrue(peer.load(KEY).isEmpty());
+    peer.finalizeRecord(KEY, 2, 201, "current");
+    IdempotencyRecord record = store.load(KEY).orElseThrow();
+    Assertions.assertEquals(2, record.claim());
+    Assertions.assertEquals("current", record.responseSummary());
+  }
+
+  @TestTemplate
+  void testDifferentBindingStillReturnsDuplicateWithoutReplacingOriginal() {
+    String otherBinding = "DELETE v1/cat1/namespaces/ns1/tables/t1";
+    store.reserve(KEY, BINDING, 1, FAR_FUTURE_MS);
+
+    Assertions.assertEquals(
+        ReserveResult.DUPLICATE, peer.reserve(KEY, otherBinding, 2, FAR_FUTURE_MS));
+    Assertions.assertTrue(peer.load(KEY).isEmpty());
+
+    store.finalizeRecord(KEY, 1, 201, "original");
+    IdempotencyRecord original = store.load(KEY).orElseThrow();
+    Assertions.assertEquals(1, original.claim());
+    Assertions.assertEquals(BINDING, original.operationBinding());
+    Assertions.assertEquals(201, original.httpStatus());
+    Assertions.assertEquals("original", original.responseSummary());
+    Assertions.assertEquals(FAR_FUTURE_MS, original.expiresAtMs());
+    Assertions.assertEquals(
+        ReserveResult.DUPLICATE, peer.reserve(KEY, otherBinding, 2, FAR_FUTURE_MS));
+    Assertions.assertEquals(original, peer.load(KEY).orElseThrow());
+  }
+
+  @TestTemplate
   void testPurgeExpiredRemovesOnlyExpiredRecords() {
     long now = this.now.get();
     store.reserve(KEY, BINDING, 1, now - 1);
@@ -403,8 +457,9 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   }
 
   @TestTemplate
-  void testMissingSchemaFailsInitializationAndDoesNotHideSqlErrors() throws Exception {
-    try (SqlSession session =
+  void testMissingSchemaFailsInitializationAndCanRetryAfterRepair() throws Exception {
+    try (JdbcIdempotencyStore retrying = new JdbcIdempotencyStore();
+        SqlSession session =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         var statement = session.getConnection().createStatement()) {
       statement.execute(
@@ -417,10 +472,21 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
                     new IcebergConfig(ImmutableMap.of("idempotency-store-type", "jdbc"))));
         Assertions.assertThrows(
             RuntimeException.class, () -> store.reserve(KEY, BINDING, 1, FAR_FUTURE_MS));
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> retrying.initialize(ImmutableMap.of("idempotency-cleanup-interval", "PT1H")));
       } finally {
         statement.execute(
             "ALTER TABLE saved_idempotency_keys RENAME TO iceberg_idempotency_key_meta");
       }
+      retrying.initialize(ImmutableMap.of("idempotency-cleanup-interval", "PT1H"));
+      Assertions.assertEquals(
+          ReserveResult.RESERVED, retrying.reserve(KEY, BINDING, 1, FAR_FUTURE_MS));
+      retrying.finalizeRecord(KEY, 1, 201, "recovered");
+      Assertions.assertEquals("recovered", peer.load(KEY).orElseThrow().responseSummary());
+      Assertions.assertThrows(
+          IllegalStateException.class,
+          () -> retrying.initialize(ImmutableMap.of("idempotency-cleanup-interval", "PT1H")));
     }
   }
 

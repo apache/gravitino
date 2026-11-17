@@ -226,6 +226,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
+        assertIdempotencySchema("schema " + versionScripts.getKey());
       }
     }
   }
@@ -260,6 +261,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
+        assertIdempotencySchema(upgradeScript.getName());
       }
     }
   }
@@ -838,6 +840,33 @@ public class TestSQLScripts extends TestJDBCBackend {
         }
       }
     }
+  }
+
+  private void assertIdempotencySchema(String source) throws SQLException {
+    Map<String, Set<String>> columns = readSchemaColumns();
+    String table =
+        columns.keySet().stream()
+            .filter(name -> name.equalsIgnoreCase("iceberg_idempotency_key_meta"))
+            .findFirst()
+            .orElseThrow(
+                () -> new AssertionFailedError("Missing idempotency table after " + source));
+    Assertions.assertEquals(
+        Set.of(
+            "idempotency_key",
+            "operation_binding",
+            "claim",
+            "http_status",
+            "response_summary",
+            "audit_info",
+            "created_at",
+            "expires_at"),
+        Set.copyOf(columns.get(table).stream().map(name -> name.toLowerCase(Locale.ROOT)).toList()),
+        "Idempotency columns after " + source);
+    Assertions.assertTrue(
+        readSchemaIndexes(Set.of(table)).stream()
+            .anyMatch(
+                index -> index.equalsIgnoreCase(table + ":idx_iik_expires:1:expires_at:true")),
+        "Missing idempotency expiry index after " + source);
   }
 
   private void assertCleanupIndexes(String source) throws SQLException {

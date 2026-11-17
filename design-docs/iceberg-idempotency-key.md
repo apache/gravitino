@@ -281,8 +281,9 @@ MySQL:
 ```sql
 CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
     `idempotency_key`   VARCHAR(36)         NOT NULL COMMENT 'client-provided UUIDv7 idempotency key',
-    `operation_binding` VARCHAR(512)        NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
-    `http_status`       INT UNSIGNED        DEFAULT NULL COMMENT 'HTTP status of finalized response; NULL while reserved',
+    `operation_binding` TEXT               NOT NULL COMMENT 'request identity, e.g. POST /v1/{prefix}/namespaces/{ns}/tables',
+    `claim`             BIGINT             NOT NULL COMMENT 'reservation fencing token',
+    `http_status`       INT UNSIGNED        DEFAULT NULL COMMENT 'HTTP status of finalized response, NULL while reserved',
     `response_summary`  MEDIUMTEXT          DEFAULT NULL COMMENT 'serialized response body (JSON) for replay',
     `audit_info`        MEDIUMTEXT          NOT NULL COMMENT 'idempotency record audit info',
     `created_at`        BIGINT(20) UNSIGNED NOT NULL COMMENT 'record created at (unix epoch millis)',
@@ -292,25 +293,28 @@ CREATE TABLE IF NOT EXISTS `iceberg_idempotency_key_meta` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'Iceberg REST idempotency key records';
 ```
 
-The H2 and PostgreSQL variants follow the same column names and types (with
-database-specific keywords) and are shipped alongside the existing scripts as
-`scripts/h2/iceberg-idempotency-schema-<version>-h2.sql` and
-`scripts/postgresql/iceberg-idempotency-schema-<version>-postgresql.sql`,
-mirroring the layout of the existing `iceberg-metrics-schema-<version>-*.sql`
-files.
+The H2 and PostgreSQL variants follow the same column names with
+database-specific types. All three backends include the table and expiry index
+in `scripts/<backend>/schema-2.0.0-<backend>.sql` and
+`scripts/<backend>/upgrade-1.3.0-to-2.0.0-<backend>.sql`. The signed `claim`
+column holds the reservation's fencing token; finalize and release only affect
+the matching unfinalized reservation.
 
 ### 4.1 Row Lifecycle
 
 1. **RESERVED**: Row inserted with `http_status = NULL`. Mutation is executing.
 2. **FINALIZED**: `http_status` and `response_summary` written. Ready for replay.
-3. **EXPIRED**: `expires_at < now()`. Purged by background cleanup
+3. **EXPIRED**: `expires_at <= now()`. Eligible for reclaim or background cleanup
    (see [Section 5.4](#54-expiry-and-cleanup-of-outdated-data)).
 
 ### 4.2 Conflict Handling
 
-`reserve()` uses `INSERT ... ON CONFLICT DO NOTHING` (PostgreSQL),
-`INSERT IGNORE` (MySQL), or equivalent. If zero rows inserted, the key is
-already reserved or finalized - return `DUPLICATE` and load the existing record
+`reserve()` attempts a plain `INSERT` in its own transaction. On a duplicate-key
+error, it rolls back before attempting to replace an expired row in a separate
+transaction. If replacement affects no rows, it retries `INSERT` once in case
+purge or release freed the key in between. A second duplicate returns
+`DUPLICATE`; other SQL errors propagate. A live row is never overwritten, even
+when its operation binding differs. Finalized, unexpired records can be loaded
 for replay.
 
 ---
@@ -360,20 +364,26 @@ Every record carries `expires_at = created_at + idempotency-key-lifetime`. The
 spec states catalogs SHOULD NOT expire keys before the advertised lifetime, so
 cleanup only ever removes records whose window has already elapsed.
 
-**JDBC store.** A background task scheduled every
-`idempotency-cleanup-interval` calls `store.purgeExpired(now)`, which runs:
+**JDBC store.** Each store owns a background task scheduled every
+`idempotency-cleanup-interval` that calls `store.purgeExpired(now)`. Use one
+store per service instance and close it at service shutdown. MySQL and H2 use:
 
 ```sql
-DELETE FROM iceberg_idempotency_key_meta WHERE expires_at < ? LIMIT ?;
+DELETE FROM iceberg_idempotency_key_meta WHERE expires_at <= ? LIMIT ?;
 ```
 
-- Deletes are performed in bounded batches (using `LIMIT` / repeated execution)
-  to avoid long-held locks and large transactions.
+- Deletes are performed in at most 100 batches of 1,000 rows per pass to avoid
+  long-held locks and large transactions. Larger backlogs wait for later passes;
+  expiry is enforced on access independently of cleanup.
 - The `idx_iik_expires` index makes the predicate efficient.
-- The delete is safe to run concurrently on multiple nodes: it is idempotent
-  and only targets already-expired rows, so no leader election or distributed
-  lock is required. A small grace period is added to the cutoff to tolerate
-  clock skew between nodes.
+- PostgreSQL selects a bounded set of candidate keys in a subquery and rechecks
+  expiry on the target row. MySQL and H2 recheck the target-row predicate after
+  a lock wait, preserving reservations concurrently reclaimed with a future
+  deadline.
+- Concurrent cleanup does not require leader election. Replicas must synchronize
+  system clocks: there is no clock-skew grace period, and a fast replica can
+  reclaim or purge a key another replica still considers live. Monitor clock
+  offset and synchronization health as a replay-safety requirement.
 
 **In-memory store.** No separate task is needed: Caffeine's
 `expireAfterWrite(lifetime)` removes expired entries lazily/automatically, and
@@ -423,21 +433,18 @@ clients MUST assume idempotency is not supported.
 
 ### 6.2 Database Configuration (`jdbc` store)
 
-When `idempotency-store-type=jdbc`, the store connects to a relational database
-using the following keys, mirroring the JDBC configuration style already used by
-Gravitino's Iceberg REST metrics store:
+When `idempotency-store-type=jdbc`, the store reuses the initialized Gravitino
+relational entity store's connection pool in auxiliary mode. It supports H2,
+MySQL, and PostgreSQL and has no separate `idempotency-jdbc-*` connection
+settings. Multiple replicas must connect to the same shared MySQL or PostgreSQL
+database. The store does not own or close the shared pool.
 
-| Config Key                                              | Default | Description                                                        |
-| ------------------------------------------------------- | ------- | ------------------------------------------------------------------ |
-| `gravitino.iceberg-rest.idempotency-jdbc-url`           | (none)  | JDBC connection URL, e.g. `jdbc:mysql://host:3306/gravitino`.       |
-| `gravitino.iceberg-rest.idempotency-jdbc-driver`        | (none)  | JDBC driver class name.                                            |
-| `gravitino.iceberg-rest.idempotency-jdbc-user`          | (none)  | Database user.                                                     |
-| `gravitino.iceberg-rest.idempotency-jdbc-password`      | (none)  | Database password. Supplied via secret/env; never logged.          |
-| `gravitino.iceberg-rest.idempotency-jdbc-max-pool-size` | `10`    | Maximum JDBC connection pool size.                                |
-
-By default the `jdbc` store reuses the same backend as Gravitino's relational
-entity store; the keys above allow pointing it at a dedicated database when
-needed.
+Standalone Iceberg REST servers cannot use this backend. The implementation
+lives in the Iceberg REST server JAR, which must be visible to the auxiliary
+service's class loader; `iceberg-common` resolves the `jdbc` alias at creation
+time. Apply the schema or upgrade scripts before enabling the store. See the
+[JDBC operations guidance](../docs/iceberg-rest-service.md#jdbc-idempotency-storage)
+for clock synchronization, cleanup limits, and deployment requirements.
 
 ---
 
