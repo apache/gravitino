@@ -119,8 +119,7 @@ public class TableMaintenanceRESTFeature implements Feature {
         dataSource,
         maintenanceConfig,
         config,
-        MaintenanceJobManager.getInstance(
-            env.jobOperationDispatcher(), env.internalAccessControlDispatcher(), jobSubmitter),
+        MaintenanceJobManager.getInstance(env.jobOperationDispatcher(), jobSubmitter),
         MaintenanceActionManager.getInstance(),
         TableMaintenanceActionMetaService.getInstance(),
         tableEnumerator,

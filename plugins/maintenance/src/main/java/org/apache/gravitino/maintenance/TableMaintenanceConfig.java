@@ -36,8 +36,7 @@ public final class TableMaintenanceConfig {
       new ConfigBuilder("gravitino.maintenance.jobSubmitter")
           .doc(
               "USER that TMS uses to submit maintenance jobs when authorization is enabled."
-                  + " Required when gravitino.authorization.enable=true; the user must exist in"
-                  + " each metalake that runs TMS jobs.")
+                  + " Required when gravitino.authorization.enable=true.")
           .version(ConfigConstants.VERSION_2_0_0)
           .stringConf()
           .createWithOptional();
@@ -161,8 +160,7 @@ public final class TableMaintenanceConfig {
    * Resolves the TMS job-submit USER when authorization is enabled.
    *
    * <p>When {@link Configs#ENABLE_AUTHORIZATION} is {@code false}, returns empty (submitters do not
-   * {@code doAs}). When authorization is enabled, {@link #JOB_SUBMITTER} must be a non-blank name;
-   * existence in each metalake is checked at submit time.
+   * {@code doAs}). When authorization is enabled, {@link #JOB_SUBMITTER} must be a non-blank name.
    *
    * @param config gravitino server config
    * @return submitter user name, or empty when authorization is disabled

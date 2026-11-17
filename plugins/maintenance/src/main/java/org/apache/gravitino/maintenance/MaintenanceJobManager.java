@@ -25,8 +25,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.maintenance.model.OccupancyClaim;
@@ -57,7 +55,6 @@ public class MaintenanceJobManager {
   private static volatile MaintenanceJobManager instance;
 
   private final JobOperationDispatcher jobOperationDispatcher;
-  @Nullable private final AccessControlDispatcher accessControlDispatcher;
   @Nullable private final String jobSubmitter;
 
   /**
@@ -67,21 +64,15 @@ public class MaintenanceJobManager {
    * {@link org.apache.gravitino.GravitinoEnv} and pass them in.
    *
    * @param jobOperationDispatcher job submit/cancel dispatcher
-   * @param accessControlDispatcher access-control dispatcher when authorization is enabled, else
-   *     {@code null}
    * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
    * @return singleton manager
    */
   public static MaintenanceJobManager getInstance(
-      JobOperationDispatcher jobOperationDispatcher,
-      @Nullable AccessControlDispatcher accessControlDispatcher,
-      @Nullable String jobSubmitter) {
+      JobOperationDispatcher jobOperationDispatcher, @Nullable String jobSubmitter) {
     if (instance == null) {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
-          instance =
-              new MaintenanceJobManager(
-                  jobOperationDispatcher, accessControlDispatcher, jobSubmitter);
+          instance = new MaintenanceJobManager(jobOperationDispatcher, jobSubmitter);
         }
       }
     }
@@ -92,25 +83,17 @@ public class MaintenanceJobManager {
    * Test / override constructor. Production code should use {@link #getInstance}.
    *
    * @param jobOperationDispatcher job submit/cancel dispatcher
-   * @param accessControlDispatcher access-control dispatcher when authorization is enabled, else
-   *     {@code null}
    * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
    */
   MaintenanceJobManager(
-      JobOperationDispatcher jobOperationDispatcher,
-      @Nullable AccessControlDispatcher accessControlDispatcher,
-      @Nullable String jobSubmitter) {
+      JobOperationDispatcher jobOperationDispatcher, @Nullable String jobSubmitter) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
     if (jobSubmitter != null) {
       Preconditions.checkArgument(
           !jobSubmitter.trim().isEmpty(), "jobSubmitter must be non-blank when set");
-      Preconditions.checkNotNull(
-          accessControlDispatcher, "accessControlDispatcher is required when jobSubmitter is set");
       this.jobSubmitter = jobSubmitter.trim();
-      this.accessControlDispatcher = accessControlDispatcher;
     } else {
       this.jobSubmitter = null;
-      this.accessControlDispatcher = null;
     }
   }
 
@@ -174,18 +157,6 @@ public class MaintenanceJobManager {
       // Authorization disabled: JobManager skips setOwner.
       return jobOperationDispatcher.runJob(
           metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
-    }
-    try {
-      accessControlDispatcher.getUser(metalake, jobSubmitter);
-    } catch (NoSuchUserException e) {
-      throw new IllegalStateException(
-          "TMS job submitter '"
-              + jobSubmitter
-              + "' does not exist in metalake "
-              + metalake
-              + "; create the user or fix "
-              + TableMaintenanceConfig.JOB_SUBMITTER.getKey(),
-          e);
     }
     try {
       return PrincipalUtils.doAs(

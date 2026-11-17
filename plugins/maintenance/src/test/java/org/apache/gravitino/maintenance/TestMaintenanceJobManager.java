@@ -27,9 +27,6 @@ import static org.mockito.Mockito.when;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
-import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.authorization.User;
-import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 import org.apache.gravitino.meta.JobEntity;
@@ -50,7 +47,7 @@ class TestMaintenanceJobManager {
             eq(METALAKE), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(job);
 
-    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, null, null);
+    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, null);
     Map<String, String> conf = new HashMap<>();
     Assertions.assertSame(job, manager.runIcebergMaintenanceJob(METALAKE, conf));
     verify(jobs)
@@ -58,11 +55,9 @@ class TestMaintenanceJobManager {
   }
 
   @Test
-  void runJobAsConfiguredSubmitterWhenAuthorizationEnabled() throws Exception {
+  void runJobAsConfiguredSubmitterWhenAuthorizationEnabled() {
     JobOperationDispatcher jobs = mock(JobOperationDispatcher.class);
-    AccessControlDispatcher access = mock(AccessControlDispatcher.class);
     JobEntity job = mock(JobEntity.class);
-    when(access.getUser(METALAKE, SUBMITTER)).thenReturn(mock(User.class));
 
     AtomicReference<String> principalDuringRun = new AtomicReference<>();
     when(jobs.runJob(
@@ -73,26 +68,9 @@ class TestMaintenanceJobManager {
               return job;
             });
 
-    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, access, SUBMITTER);
+    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, SUBMITTER);
     Map<String, String> conf = new HashMap<>();
     Assertions.assertSame(job, manager.runIcebergMaintenanceJob(METALAKE, conf));
     Assertions.assertEquals(SUBMITTER, principalDuringRun.get());
-    verify(access).getUser(METALAKE, SUBMITTER);
-  }
-
-  @Test
-  void runJobFailsWhenSubmitterMissingInMetalake() {
-    JobOperationDispatcher jobs = mock(JobOperationDispatcher.class);
-    AccessControlDispatcher access = mock(AccessControlDispatcher.class);
-    when(access.getUser(METALAKE, SUBMITTER))
-        .thenThrow(new NoSuchUserException("User does not exist: %s", SUBMITTER));
-
-    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, access, SUBMITTER);
-    IllegalStateException thrown =
-        Assertions.assertThrows(
-            IllegalStateException.class,
-            () -> manager.runIcebergMaintenanceJob(METALAKE, new HashMap<>()));
-    Assertions.assertTrue(thrown.getMessage().contains(SUBMITTER));
-    Assertions.assertTrue(thrown.getMessage().contains(METALAKE));
   }
 }
