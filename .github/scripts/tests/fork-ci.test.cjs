@@ -365,7 +365,7 @@ function publisherMock({ current = pr(), latest, rerun = run(), failTrees = fals
     return { data: { workflow_runs: args.event !== 'workflow_dispatch' ? [rerun] : [] } };
   };
   if (failTrees) github.rest.git.getTree = async () => { throw new Error('API unavailable'); };
-  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? (endpoint === listPulls ? [pr()] : jobs(pr()));
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? (endpoint === listPulls ? [pr()] : jobs(pr()).map(job => ({ ...job, run_attempt: rerun.run_attempt })));
   github.hook = { before() {} };
   return { github, counters, statuses, stored };
 }
@@ -555,13 +555,13 @@ test('partial reruns use only the latest available suite result', async () => {
 test('a partial rerun with a cancelled watcher still requires the exact Required CI result', () => {
   const p = pr(), cancelled = { ...run(), run_attempt: 3, conclusion: 'cancelled' };
   for (const conclusion of ['failure', 'timed_out', 'cancelled', 'skipped', null]) {
-    const current = [...jobs(p), { name: FAIL_FAST, conclusion: 'cancelled' }];
+    const current = [...jobs(p).map(job => ({ ...job, run_attempt: 3 })), { name: FAIL_FAST, conclusion: 'cancelled' }];
     current[0].conclusion = conclusion;
     assert.notEqual(evaluate(p, cancelled, current).conclusion, 'success');
   }
   for (const change of [q => q.head.sha = C, q => q.base.sha = C, q => q.base.ref = 'branch-1.3']) {
     const q = pr(); change(q);
-    assert.equal(evaluate(q, cancelled, [...jobs(p), { name: FAIL_FAST, conclusion: 'cancelled' }]).conclusion, 'action_required');
+    assert.equal(evaluate(q, cancelled, [...jobs(p).map(job => ({ ...job, run_attempt: 3 })), { name: FAIL_FAST, conclusion: 'cancelled' }]).conclusion, 'action_required');
   }
   for (const status of ['queued', 'in_progress']) {
     assert.notEqual(evaluate(p, { ...cancelled, status, conclusion: null }, jobs(p)).status, 'completed');
@@ -696,7 +696,7 @@ test('trusted partial reruns also recover with a cancelled watcher', async () =>
 });
 
 test('recovered cancelled runs still require trusted verification for changed CI definitions', async () => {
-  const forkJobs = [...jobs(pr()), { name: FAIL_FAST, conclusion: 'cancelled' }];
+  const forkJobs = [...jobs(pr()).map(job => ({ ...job, run_attempt: 3 })), { name: FAIL_FAST, conclusion: 'cancelled' }];
   const github = serviceMock({ changed: true, forkJobs });
   github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
     event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion: 'cancelled' }] : [] } });
@@ -1695,4 +1695,52 @@ test('scheduled sweeps recheck incomplete summaries without a new run or attempt
   const settledReads = jobReads;
   await update({ github, context: ctx, core, sleep: async () => {} });
   assert.equal(jobReads, settledReads); // Recovered successes regain the cheap settled probe.
+}));
+
+
+test('completed reruns cannot reuse a jobs snapshot entirely from an older attempt', async () => {
+  for (const trusted of [false, true]) {
+    const current = [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+      { name: FAIL_FAST, id: 100, run_attempt: 1, conclusion: 'cancelled' }];
+    const github = serviceMock({ trusted, forkJobs: current, trustedJobs: current });
+    const list = github.rest.actions.listWorkflowRuns;
+    github.rest.actions.listWorkflowRuns = async args => {
+      const response = await list(args);
+      for (const run of response.data.workflow_runs) Object.assign(run, { run_attempt: 2, conclusion: 'cancelled' });
+      return response;
+    };
+    const { result } = await createService(github).mirror(pr());
+    assert.equal(result.conclusion, 'action_required');
+    assert.match(result.note, /not reported the completed current attempt/);
+  }
+});
+
+test('scheduled sweeps recover from an entirely stale jobs snapshot without caching false success', async () => withPublisher(async ({ ctx, core }) => {
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const { github, statuses } = publisherMock({ current: recent,
+    latest: forkStatus('success', 'All required suites passed'),
+    rerun: { ...run(), run_attempt: 2, conclusion: 'cancelled' } });
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  github.rest.pulls.get = async () => ({ data: recent });
+  let stale = true, reads = 0;
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (endpoint === github.rest.pulls.list) return [recent];
+    if (args.run_id !== 1) return paginate(endpoint, args);
+    reads++;
+    const snapshot = [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+      { name: FAIL_FAST, id: 100, run_attempt: 1, conclusion: 'cancelled' }];
+    if (!stale) snapshot.push({ name: 'backend / changes', id: 200, run_attempt: 2, conclusion: 'cancelled' });
+    return snapshot;
+  };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.at(-1).state, 'error');
+  assert.match(statuses.at(-1).description, /needs attention/);
+  stale = false;
+  const previous = reads;
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.ok(reads > previous);
+  assert.equal(statuses.at(-1).state, 'error');
+  assert.match(statuses.at(-1).description, /cancelled/);
+  assert.equal(statuses.at(-1).target_url, url(1, 2));
 }));

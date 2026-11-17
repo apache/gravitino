@@ -62,12 +62,23 @@ const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this b
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
   title: NEEDS_ATTENTION, note });
 
-const newerAttempt = (run, jobs) => jobs.some(job => job.run_attempt > run.run_attempt);
-const incompleteAttempt = () => requiredAction('The jobs API reports a newer attempt than the run listing. ' +
-  'Waiting for consistent results; the publisher will automatically check again.');
+function incompleteAttempt(run, jobs) {
+  if (jobs.some(job => job.run_attempt > run.run_attempt)) {
+    return requiredAction('The jobs API reports a newer attempt than the run listing. ' +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+  // A completed rerun must expose at least one job from that attempt. Otherwise all
+  // retained successes (and auxiliary cancellations) could belong to the previous run.
+  if (run.status === 'completed' && run.run_attempt > 1 &&
+      !jobs.some(job => job.run_attempt === run.run_attempt)) {
+    return requiredAction('The jobs API has not reported the completed current attempt yet. ' +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+}
 
 function evaluateExecution(pr, run, jobs, baseSha) {
-  if (newerAttempt(run, jobs)) return incompleteAttempt();
+  const incomplete = incompleteAttempt(run, jobs);
+  if (incomplete) return incomplete;
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') {
     // A workflow can remain queued while some of its matrix jobs already have runners.
@@ -263,9 +274,8 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const { owner, repo, run } = selected;
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = selected.trusted ? trustedJobs : await jobsFor(owner, repo, run);
-    if (newerAttempt(run, jobs)) {
-      return { ...selected, fork: ordinary?.run, result: incompleteAttempt() };
-    }
+    const incomplete = incompleteAttempt(run, jobs);
+    if (incomplete) return { ...selected, fork: ordinary?.run, result: incomplete };
     const base = selected.trusted ? run.head_sha : !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
     let result = evaluateExecution(pr, run, jobs, base);
     const needsSuiteChecks = !result;
