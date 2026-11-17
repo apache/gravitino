@@ -928,19 +928,19 @@ CREATE TABLE IF NOT EXISTS glossary_term_meta (
     term_id BIGINT NOT NULL PRIMARY KEY COMMENT 'globally unique glossary term id',
     metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
     name VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT 'glossary term display name, preserving case and internal whitespace',
-    name_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'lookup and uniqueness key: trimmed, whitespace-collapsed and lowercased name',
+    name_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'lookup and uniqueness key: trimmed, whitespace-collapsed and lowercased name, e.g. " Active   Customer " -> "active customer"',
     definition MEDIUMTEXT COMMENT 'optional glossary term definition',
     status VARCHAR(16) NOT NULL COMMENT 'glossary term status: DRAFT, APPROVED or DEPRECATED',
     links MEDIUMTEXT NOT NULL COMMENT 'documentation links as a JSON array of label and URL pairs',
-    source_ref VARCHAR(128) COLLATE utf8mb4_bin COMMENT 'optional external source identifier, case and trailing spaces are significant',
+    source_ref VARCHAR(128) COLLATE utf8mb4_bin COMMENT 'optional external source identifier, e.g. "crm:123", case and trailing spaces are significant',
     -- MySQL 5.7 collations pad spaces. The binary key preserves exact source references.
-    source_ref_key VARBINARY(512) GENERATED ALWAYS AS (CAST(source_ref AS BINARY)) STORED COMMENT 'generated binary source reference key for exact uniqueness, including trailing spaces',
+    source_ref_key VARBINARY(512) GENERATED ALWAYS AS (CAST(source_ref AS BINARY)) STORED COMMENT 'generated binary source reference key for exact uniqueness, e.g. "ref:A" -> 0x7265663A41 but "ref:A " -> 0x7265663A4120',
     properties MEDIUMTEXT NOT NULL COMMENT 'glossary term properties as a JSON object',
     audit_info MEDIUMTEXT NOT NULL COMMENT 'glossary term audit info as a JSON object',
     current_version BIGINT NOT NULL DEFAULT 1 COMMENT 'glossary term revision, starting at 1 and incremented on update or overwrite',
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'soft deletion time in epoch milliseconds, 0 means live',
     -- NULL exempts deleted generations from uniqueness, even at the same deletion time.
-    live_row INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'generated live-row discriminator: 1 for live, NULL for deleted, only live rows reserve unique keys',
+    live_row INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'generated live-row discriminator, only live rows reserve unique keys, e.g. deleted_at=0 -> 1 and deleted_at=1700000000000 -> NULL',
     CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, live_row),
     CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref_key, live_row)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term definitions';
@@ -949,7 +949,7 @@ CREATE TABLE IF NOT EXISTS glossary_term_synonym (
     term_id BIGINT NOT NULL COMMENT 'globally unique glossary term id',
     metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
     synonym VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT 'glossary term synonym display name',
-    synonym_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'synonym lookup key: trimmed, whitespace-collapsed and lowercased synonym',
+    synonym_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'synonym lookup key: trimmed, whitespace-collapsed and lowercased synonym, e.g. " ACTIVE   USER " -> "active user"',
     deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'soft deletion time in epoch milliseconds, 0 means live',
     PRIMARY KEY (term_id, synonym_key, deleted_at),
     KEY idx_glossary_synonym (metalake_id, synonym_key, deleted_at)
