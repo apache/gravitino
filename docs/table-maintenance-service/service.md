@@ -95,9 +95,9 @@ Scheduler pool sizes have these defaults:
 
 When `gravitino.authorization.enable=true`, set a TMS submit identity:
 
-| Configuration item                   | Default | Description                                      |
-|--------------------------------------|---------|--------------------------------------------------|
-| `gravitino.maintenance.jobSubmitter` | (none)  | USER principal TMS uses to submit maintenance jobs |
+| Configuration item                              | Default | Description                                        |
+|-------------------------------------------------|---------|----------------------------------------------------|
+| `gravitino.maintenance.jobSubmitter`            | (none)  | USER principal TMS uses to submit maintenance jobs |
 
 Create that user under every metalake that runs maintenance jobs. Grant the user metalake `RUN_JOB` and `USE_JOB_TEMPLATE` on the Iceberg maintenance job template so `runJob` can succeed; grant any further table or catalog privileges your maintenance Spark jobs need when they call back into Gravitino.
 
