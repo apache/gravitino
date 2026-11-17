@@ -51,7 +51,6 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.ResolvedTagPolicy;
 import org.apache.gravitino.authorization.TagPolicyMatcher;
-import org.apache.gravitino.authorization.TagPolicyReader;
 import org.apache.gravitino.authorization.TagPolicyResolver;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
@@ -377,7 +376,7 @@ public class TestObjectPolicyResolver {
     stubTags(CATALOG, List.of(gold));
     stubBindings(
         List.of(relation(PolicyAssociationSelectorSerde.serialize(TagValueSelector.of("gold")))));
-    TagPolicyReader preloaded = mock(TagPolicyReader.class);
+    ObjectPolicyResolver preloaded = mock(ObjectPolicyResolver.class);
     when(preloaded.loadTags(METALAKE, OBJECT)).thenReturn(List.of(bronze));
     when(preloaded.loadTags(METALAKE, CATALOG)).thenReturn(List.of(gold));
     when(preloaded.loadPolicyBindings(eq(METALAKE), anyList()))
@@ -388,7 +387,7 @@ public class TestObjectPolicyResolver {
                   new ResolvedTagPolicy(tags.get(0), access, TagValueSelector.of("gold")));
             });
 
-    for (TagPolicyReader input : Arrays.asList(resolver, preloaded)) {
+    for (ObjectPolicyResolver input : Arrays.asList(resolver, preloaded)) {
       List<ResolvedTagPolicy> result =
           new TagPolicyResolver(input).resolve(METALAKE, OBJECT, new AuthorizationRequestContext());
       Assertions.assertArrayEquals(

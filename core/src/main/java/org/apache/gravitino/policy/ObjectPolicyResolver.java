@@ -38,7 +38,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.ResolvedTagPolicy;
-import org.apache.gravitino.authorization.TagPolicyReader;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -60,7 +59,7 @@ import org.slf4j.LoggerFactory;
  * <p>The reader methods expose direct tag assignments and unfiltered policy bindings for
  * authorization, which evaluates selectors after checking privileges and active roles.
  */
-public class ObjectPolicyResolver implements TagPolicyReader {
+public class ObjectPolicyResolver {
 
   private static final Logger LOG = LoggerFactory.getLogger(ObjectPolicyResolver.class);
 
@@ -173,8 +172,14 @@ public class ObjectPolicyResolver implements TagPolicyReader {
     return result;
   }
 
-  /** {@inheritDoc} */
-  @Override
+  /**
+   * Loads only the tags directly assigned to an object, including their assignment values.
+   *
+   * @param metalake the containing metalake
+   * @param object the canonical object whose direct assignments are requested
+   * @return direct assignments, empty if none exist or the object is missing
+   * @throws RuntimeException if the assignments cannot be read
+   */
   public List<TagEntity> loadTags(String metalake, MetadataObject object) {
     try {
       return entityStore
@@ -190,8 +195,16 @@ public class ObjectPolicyResolver implements TagPolicyReader {
     }
   }
 
-  /** {@inheritDoc} */
-  @Override
+  /**
+   * Loads policy bindings for effective tags resolved at one target object.
+   *
+   * @param metalake the containing metalake
+   * @param effectiveTags the target object's effective tags, one per tag name
+   * @return bindings paired with the supplied effective tags, empty if none exist
+   * @throws IllegalArgumentException if effective tag names are duplicated
+   * @throws IllegalStateException if a stored selector is invalid
+   * @throws RuntimeException if the bindings cannot be read
+   */
   public List<ResolvedTagPolicy> loadPolicyBindings(
       String metalake, List<TagEntity> effectiveTags) {
     if (effectiveTags.isEmpty()) {
@@ -235,6 +248,25 @@ public class ObjectPolicyResolver implements TagPolicyReader {
     } catch (IOException e) {
       throw new UncheckedIOException("Failed to read policy bindings in " + metalake, e);
     }
+  }
+
+  /**
+   * Tests whether a selector accepts a tag assignment.
+   *
+   * @param selector the policy-to-tag association selector
+   * @param assignment the effective tag assignment
+   * @return whether the selector matches
+   * @throws IllegalArgumentException if the selector type is unsupported
+   */
+  public static boolean matches(PolicyAssociationSelector selector, TagAssignment assignment) {
+    if (selector instanceof AllValuesSelector) {
+      return true;
+    }
+    if (selector instanceof TagValueSelector) {
+      return Arrays.asList(assignment.values()).contains(((TagValueSelector) selector).value());
+    }
+    throw new IllegalArgumentException(
+        "Unsupported policy association selector type: " + selector.type());
   }
 
   private List<RelationalEntity<?>> loadRelations(
@@ -284,7 +316,7 @@ public class ObjectPolicyResolver implements TagPolicyReader {
               .map(PolicyAssociationSelectorSerde::deserialize)
               .orElseGet(AllValuesSelector::get);
       TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
-      boolean matches = PolicySelectorMatcher.matches(selector, assignment);
+      boolean matches = matches(selector, assignment);
       MatchState state =
           matchStates.computeIfAbsent(policy.id(), ignored -> new MatchState(policy));
       state.record(matches, tag.inherited().orElse(false), resolvedTag.source());

@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.authorization;
 
+import static org.mockito.Mockito.mock;
+
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,10 +28,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyContents;
@@ -87,13 +91,17 @@ final class TagPolicyTestUtils {
   }
 
   /** Counts reads and allows tests to inject assignment or policy-read failures. */
-  static final class InMemoryReader implements TagPolicyReader {
+  static final class InMemoryReader extends ObjectPolicyResolver {
     final Map<MetadataObject, List<TagEntity>> assignments = new HashMap<>();
     final Map<String, List<ResolvedTagPolicy>> bindings = new HashMap<>();
     final AtomicInteger tagReads = new AtomicInteger();
     final AtomicInteger policyReads = new AtomicInteger();
     RuntimeException tagFailure;
     RuntimeException policyFailure;
+
+    InMemoryReader() {
+      super(mock(EntityStore.class));
+    }
 
     void bind(TagEntity tag, PolicyEntity policy, PolicyAssociationSelector selector) {
       bindings

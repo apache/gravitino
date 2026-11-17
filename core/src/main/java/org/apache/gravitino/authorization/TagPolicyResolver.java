@@ -27,20 +27,21 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.tag.EffectiveTagResolver;
 
 /** Resolves tag assignments and policy bindings once per target object and request. */
 public final class TagPolicyResolver {
-  private final TagPolicyReader reader;
+  private final ObjectPolicyResolver policyResolver;
 
   /**
-   * Creates a resolver with a storage-backed or preloaded reader.
+   * Creates a resolver with the object policy resolver.
    *
-   * @param reader the source of direct assignments and policy bindings
+   * @param policyResolver the source of direct assignments and policy bindings
    */
-  public TagPolicyResolver(TagPolicyReader reader) {
-    this.reader = Objects.requireNonNull(reader, "reader must not be null");
+  public TagPolicyResolver(ObjectPolicyResolver policyResolver) {
+    this.policyResolver = Objects.requireNonNull(policyResolver, "policyResolver must not be null");
   }
 
   /**
@@ -68,11 +69,11 @@ public final class TagPolicyResolver {
             target,
             object ->
                 context.computeDirectTagsIfAbsent(
-                    metalake, object, () -> reader.loadTags(metalake, object)));
+                    metalake, object, () -> policyResolver.loadTags(metalake, object)));
     if (tags.length == 0) {
       return Collections.emptyList();
     }
-    return reader.loadPolicyBindings(metalake, Arrays.asList(tags)).stream()
+    return policyResolver.loadPolicyBindings(metalake, Arrays.asList(tags)).stream()
         .filter(binding -> binding.policy().enabled())
         .filter(binding -> binding.policy().policyType() == Policy.BuiltInType.ACCESS_CONTROL)
         .sorted(
