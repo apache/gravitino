@@ -196,8 +196,7 @@ export default function CreatePolicyDialog({ ...props }) {
             {isAccessControl ? (
               <>
                 <Paragraph type='secondary'>
-                  Grants the selected privileges when any applicable role matches. Associate this policy with a tag; it
-                  cannot be assigned directly to a table, schema, or other metadata object.
+                  Users still need USE_CATALOG and USE_SCHEMA, and an RBAC deny overrides this policy.
                 </Paragraph>
                 <Form.Item
                   name='applicableRoles'
