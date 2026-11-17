@@ -77,8 +77,7 @@ public class MaintenanceJobManager {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
           instance =
-              new MaintenanceJobManager(
-                  jobOperationDispatcher, authorizationEnabled, jobSubmitter);
+              new MaintenanceJobManager(jobOperationDispatcher, authorizationEnabled, jobSubmitter);
         }
       }
     }
