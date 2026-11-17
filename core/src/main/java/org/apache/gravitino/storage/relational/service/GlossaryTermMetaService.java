@@ -57,6 +57,9 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
  * source references and reserved IDs are translated to EntityAlreadyExistsException. Other database
  * failures propagate through the existing store exception converter.
  *
+ * <p>Namespace-based operations reject namespaces other than {@code
+ * <metalake>.system.glossary_term} with IllegalArgumentException before accessing storage.
+ *
  * <p>Insert starts at revision 1; update and overwrite increment the stored revision once. Callers
  * must detect semantic no-ops before invoking a write. Relation validation, authorization and the
  * name-versus-synonym checks belong to the glossary manager, not this persistence service.
@@ -226,6 +229,11 @@ public final class GlossaryTermMetaService {
   }
 
   private <T> T transaction(Namespace ns, Function<GlossaryTermMetaMapper, T> work) {
+    if (ns.length() != 3
+        || !Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ns.level(1))
+        || !"glossary_term".equals(ns.level(2))) {
+      throw new IllegalArgumentException("Expected glossary term namespace: " + ns);
+    }
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {

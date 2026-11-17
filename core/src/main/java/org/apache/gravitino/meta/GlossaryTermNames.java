@@ -30,9 +30,16 @@ public final class GlossaryTermNames {
   private GlossaryTermNames() {}
   /** Removes surrounding Unicode whitespace while preserving display spelling. */
   public static String display(String value) {
-    return SPACE.matcher(Objects.requireNonNull(value, "name")).replaceAll(" ").trim().isEmpty()
-        ? ""
-        : value.replaceAll("(?U)^\\s+|\\s+$", "");
+    Objects.requireNonNull(value, "name");
+    int start = 0;
+    int end = value.length();
+    while (start < end && isWhitespace(value.codePointAt(start))) {
+      start += Character.charCount(value.codePointAt(start));
+    }
+    while (start < end && isWhitespace(value.codePointBefore(end))) {
+      end -= Character.charCount(value.codePointBefore(end));
+    }
+    return value.substring(start, end);
   }
   /** Returns the locale-independent lookup key. */
   public static String key(String value) {
@@ -43,5 +50,12 @@ public final class GlossaryTermNames {
     if (key(value).isEmpty() || value.codePointCount(0, value.length()) > 128)
       throw new IllegalArgumentException(
           "Glossary name or source reference must contain 1 to 128 code points");
+  }
+
+  private static boolean isWhitespace(int codePoint) {
+    // Match Unicode White_Space, including NEL and non-breaking spaces, as (?U)\\s does.
+    return codePoint >= 0x09 && codePoint <= 0x0D
+        || codePoint == 0x85
+        || Character.isSpaceChar(codePoint);
   }
 }

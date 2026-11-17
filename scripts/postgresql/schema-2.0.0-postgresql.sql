@@ -1428,10 +1428,11 @@ CREATE TABLE IF NOT EXISTS glossary_term_meta (
     properties TEXT NOT NULL,
     audit_info TEXT NOT NULL,
     current_version BIGINT NOT NULL DEFAULT 1,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, deleted_at),
-    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, deleted_at)
+    deleted_at BIGINT NOT NULL DEFAULT 0
 );
+-- Only live rows reserve names and source references; deletion times remain available for GC.
+CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_name ON glossary_term_meta (metalake_id, name_key) WHERE deleted_at = 0;
+CREATE UNIQUE INDEX IF NOT EXISTS uk_glossary_source ON glossary_term_meta (metalake_id, source_ref) WHERE deleted_at = 0;
 
 CREATE TABLE IF NOT EXISTS glossary_term_synonym (
     term_id BIGINT NOT NULL,

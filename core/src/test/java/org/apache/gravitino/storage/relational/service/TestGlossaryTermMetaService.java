@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.GlossaryTermEntity;
 import org.apache.gravitino.meta.GlossaryTermNames;
 import org.apache.gravitino.storage.relational.RelationalEntityStoreIdResolver;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.GlossaryTermMetaMapper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -208,6 +209,86 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
     Assertions.assertEquals(0, service.collect(1, 10));
     Assertions.assertEquals(1, service.collect(Long.MAX_VALUE, 10));
     Assertions.assertEquals(102, service.get(ident("Churn")).id());
+  }
+
+  @TestTemplate
+  public void testWrongNamespaceCannotAccessTerm() throws Exception {
+    setupMetalake();
+    backend.insert(term(101, "Churn").withSynonyms(new String[] {"loss"}).build(), false);
+    for (Namespace wrong :
+        new Namespace[] {
+          Namespace.empty(),
+          Namespace.of("glossary"),
+          Namespace.of("glossary", "system"),
+          Namespace.of("glossary", "catalog", "schema"),
+          Namespace.of("glossary", "system", "schema"),
+          Namespace.of("glossary", "catalog", "glossary_term"),
+          Namespace.of("glossary", "system", "glossary_term", "extra")
+        }) {
+      NameIdentifier invalid = NameIdentifier.of(wrong, "Churn");
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> backend.delete(invalid, TYPE, false));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> backend.get(invalid, TYPE));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> backend.list(wrong, TYPE, true));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> service.getIds(invalid));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> service.batchGet(Arrays.asList(invalid)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              service.update(
+                  invalid,
+                  old -> {
+                    Assertions.fail(
+                        "Invalid namespace must be rejected before calling the updater");
+                    return old;
+                  }));
+      GlossaryTermEntity read = service.get(ident("Churn"));
+      Assertions.assertEquals(101, read.id());
+      Assertions.assertEquals(1, read.version());
+      Assertions.assertArrayEquals(new String[] {"loss"}, read.synonyms());
+    }
+  }
+
+  @TestTemplate
+  public void testSameTimestampDeletionAndCollection() throws Exception {
+    setupMetalake();
+    long deletedAt = 123456L;
+    // Cover name reuse and independent source-reference reuse, including metalake cleanup.
+    for (int generation = 0; generation < 3; generation++) {
+      long id = 101L + generation;
+      String name = generation == 2 ? "Other name" : "Churn";
+      backend.insert(
+          term(id, name).withSourceRef("import:churn").withSynonyms(new String[] {"loss"}).build(),
+          false);
+      final boolean dropMetalake = generation == 2;
+      SessionUtils.doWithCommit(
+          GlossaryTermMetaMapper.class,
+          mapper -> {
+            if (dropMetalake) {
+              mapper.dropMetalake(100L, deletedAt);
+              mapper.dropMetalakeSynonyms(100L, deletedAt);
+            } else {
+              Assertions.assertEquals(1, mapper.delete(id, 1, deletedAt));
+              mapper.deleteSynonyms(id, deletedAt);
+            }
+          });
+      Assertions.assertFalse(backend.exists(ident(name), TYPE));
+    }
+    backend.insert(
+        term(104, "Churn")
+            .withSourceRef("import:churn")
+            .withSynonyms(new String[] {"live synonym"})
+            .build(),
+        false);
+    Assertions.assertEquals(0, service.collect(deletedAt, 10));
+    Assertions.assertEquals(2, service.collect(deletedAt + 1, 2));
+    Assertions.assertEquals(1, service.collect(deletedAt + 1, 2));
+    Assertions.assertEquals(0, service.collect(Long.MAX_VALUE, 10));
+    Assertions.assertEquals(104, service.get(ident("Churn")).id());
+    Assertions.assertArrayEquals(
+        new String[] {"live synonym"}, service.get(ident("Churn")).synonyms());
   }
 
   @TestTemplate

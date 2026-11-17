@@ -19,8 +19,10 @@
 
 package org.apache.gravitino.meta;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.glossary.TermLink;
@@ -53,6 +55,34 @@ public class TestGlossaryTermEntity {
     Assertions.assertThrows(IllegalArgumentException.class, () -> builder().withName(" ").build());
     Assertions.assertThrows(IllegalArgumentException.class, () -> builder().withVersion(0).build());
     Assertions.assertEquals("active customer", GlossaryTermNames.key("　Active\t Customer　"));
+  }
+
+  @Test
+  public void testLinearDisplayNormalization() {
+    String internal = "a" + " ".repeat(1_000_000) + "b";
+    Assertions.assertTimeoutPreemptively(
+        Duration.ofSeconds(5),
+        () -> {
+          Assertions.assertEquals(internal, GlossaryTermNames.display(internal));
+          Assertions.assertEquals("a b", GlossaryTermNames.key(internal));
+          Assertions.assertThrows(
+              IllegalArgumentException.class, () -> builder().withName(internal).build());
+        });
+  }
+
+  @Test
+  public void testUnicodeWhitespaceBoundaries() {
+    Pattern whitespace = Pattern.compile("\\s", Pattern.UNICODE_CHARACTER_CLASS);
+    for (int codePoint = 0; codePoint <= Character.MAX_CODE_POINT; codePoint++) {
+      String boundary = new String(Character.toChars(codePoint));
+      String value = boundary + "😀a" + boundary;
+      boolean matches = whitespace.matcher(boundary).matches();
+      Assertions.assertEquals(
+          matches ? "😀a" : value, GlossaryTermNames.display(value), "Code point " + codePoint);
+      if (matches) Assertions.assertEquals("", GlossaryTermNames.display(boundary.repeat(3)));
+    }
+    Assertions.assertEquals("", GlossaryTermNames.display(""));
+    Assertions.assertThrows(NullPointerException.class, () -> GlossaryTermNames.display(null));
   }
 
   @Test

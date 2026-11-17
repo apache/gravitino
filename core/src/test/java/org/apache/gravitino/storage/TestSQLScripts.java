@@ -225,6 +225,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       }
       if ("2.0.0".equals(versionScripts.getKey())) {
         assertGlossarySchema();
+        assertGlossaryLiveUniqueness();
         assertCleanupIndexes("schema " + versionScripts.getKey());
         assertNameColumnWidths("schema " + versionScripts.getKey());
       }
@@ -260,6 +261,7 @@ public class TestSQLScripts extends TestJDBCBackend {
       executeScript(upgradeScript);
       if ("2.0.0".equals(upgradeMatcher.group(2))) {
         assertGlossarySchema();
+        assertGlossaryLiveUniqueness();
         assertCleanupIndexes(upgradeScript.getName());
         assertNameColumnWidths(upgradeScript.getName());
       }
@@ -1115,6 +1117,36 @@ public class TestSQLScripts extends TestJDBCBackend {
 
     for (String table : tableList) {
       connection.createStatement().execute("DROP TABLE " + table);
+    }
+  }
+
+  private void assertGlossaryLiveUniqueness() throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      String insert =
+          "INSERT INTO glossary_term_meta (term_id, metalake_id, name, name_key, "
+              + "status, links, source_ref, properties, audit_info) VALUES (%d, 100, '%s', '%s', "
+              + "'DRAFT', '[]', '%s', '{}', '{}')";
+      for (int generation = 1; generation <= 3; generation++) {
+        String name = generation == 3 ? "other" : "churn";
+        statement.executeUpdate(String.format(insert, generation, name, name, "source"));
+        Assertions.assertThrows(
+            SQLException.class,
+            () -> statement.executeUpdate(String.format(insert, 10, name, name, "different")));
+        Assertions.assertThrows(
+            SQLException.class,
+            () -> statement.executeUpdate(String.format(insert, 11, "unused", "unused", "source")));
+        statement.executeUpdate(
+            "UPDATE glossary_term_meta SET deleted_at=123456 WHERE deleted_at=0");
+      }
+      try (ResultSet rows =
+          statement.executeQuery(
+              "SELECT COUNT(*) FROM glossary_term_meta WHERE deleted_at=123456")) {
+        Assertions.assertTrue(rows.next());
+        Assertions.assertEquals(3, rows.getInt(1));
+      }
     }
   }
 

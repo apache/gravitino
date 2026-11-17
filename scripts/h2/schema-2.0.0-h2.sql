@@ -842,8 +842,10 @@ CREATE TABLE IF NOT EXISTS glossary_term_meta (
     audit_info CLOB NOT NULL,
     current_version BIGINT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, deleted_at),
-    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, deleted_at)
+    -- NULL exempts deleted generations from uniqueness, even at the same deletion time.
+    live_row INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END),
+    CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, live_row),
+    CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref, live_row)
 );
 
 CREATE TABLE IF NOT EXISTS glossary_term_synonym (
