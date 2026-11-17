@@ -70,10 +70,17 @@ function evaluateExecution(pr, run, jobs, baseSha) {
     return { status: running ? 'in_progress' : 'queued',
       title: running ? 'Fork CI is running' : 'Fork CI is queued, waiting for a runner' };
   }
-  // Full reruns can resolve a newer base. Required CI jobs for older contexts must not
-  // override the exact context selected above; its successful result is still mandatory.
-  const isAuxiliary = job => job.name === FAIL_FAST ||
-    (job.name.startsWith('Required CI / ') && job !== required);
+  // A nonmatching summary is obsolete only when it is provably from an older attempt.
+  // A newer (possibly unexpanded) summary must not reuse an earlier exact success.
+  const otherSummary = job => job.name.startsWith('Required CI / ') && job !== required;
+  const obsoleteSummary = job => otherSummary(job) && required &&
+    Number.isInteger(job.run_attempt) && job.run_attempt > 0 &&
+    Number.isInteger(required.run_attempt) && required.run_attempt > job.run_attempt;
+  if (jobs.some(job => otherSummary(job) && !obsoleteSummary(job))) {
+    return requiredAction('A Required CI record from the same, newer or unknown attempt does not match ' +
+      'this head and base. Rerun Required CI for the current context before publishing success.');
+  }
+  const isAuxiliary = job => job.name === FAIL_FAST || obsoleteSummary(job);
   const currentJobs = jobs.filter(job => !isAuxiliary(job));
   const failed = currentJobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion))
     .map(job => job.name);

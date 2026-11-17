@@ -624,6 +624,65 @@ test('obsolete Required CI results cannot block recovered suites after the watch
   }
 });
 
+test('nonmatching Required CI summaries must be provably older than the exact success', async () => {
+  const p = pr();
+  const unexpanded = 'Required CI / ${{ needs.eligibility.outputs.base-ref }} / ${{ needs.eligibility.outputs.base-sha }} / ${{ needs.eligibility.outputs.head-sha }}';
+  for (const trusted of [false, true]) {
+    for (const name of [unexpanded, requiredName(p, C)]) {
+      for (const attempt of [1, 2, 3, undefined, 0, '1']) {
+        for (const conclusion of ['success', 'failure', 'timed_out', 'cancelled', 'skipped', null]) {
+          const current = jobs(p).map((job, i) => ({ ...job, id: 100 + i, run_attempt: 2 }));
+          current.push({ name, id: 999, run_attempt: attempt, conclusion });
+          current.push({ name: FAIL_FAST, id: 1000, run_attempt: 3, conclusion: 'cancelled' });
+          const github = serviceMock({ trusted, forkJobs: current, trustedJobs: current });
+          const list = github.rest.actions.listWorkflowRuns;
+          github.rest.actions.listWorkflowRuns = async args => {
+            const response = await list(args);
+            for (const run of response.data.workflow_runs) Object.assign(run,
+              { run_attempt: 3, conclusion: 'cancelled' });
+            return response;
+          };
+          // A fully expanded newer base is selected by testedBase, not an obsolete summary.
+          github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'diverged' } });
+          const { result } = await createService(github).mirror(p);
+          assert.equal(result.conclusion === 'success', attempt === 1,
+            JSON.stringify({ trusted, name, attempt, conclusion, result }));
+        }
+      }
+    }
+  }
+});
+
+test('scheduled publication cannot link an older exact success to a newer cancelled summary', async () => withPublisher(async ({ ctx, core }) => {
+  const { github, statuses } = publisherMock({ rerun: { ...run(), run_attempt: 2, conclusion: 'cancelled' },
+    latest: forkStatus('success', 'All required suites passed', url(1, 1)) });
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  github.rest.pulls.get = async () => ({ data: recent });
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (endpoint === github.rest.pulls.list) return [recent];
+    if (args.run_id !== 1) return paginate(endpoint, args);
+    return [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+      { name: 'Required CI / unresolved', id: 100, run_attempt: 2, conclusion: 'cancelled' }];
+  };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.ok(statuses.length > 0);
+  assert.ok(statuses.every(status => status.state !== 'success'));
+  assert.equal(statuses.at(-1).target_url, url(1, 2));
+}));
+
+test('a successful aggregate cannot hide a newer or ambiguous Required CI summary', () => {
+  const p = pr();
+  for (const exactAttempt of [1, undefined]) {
+    for (const attempt of [1, 2, undefined]) {
+      const current = jobs(p).map(job => ({ ...job, run_attempt: exactAttempt }));
+      current.push({ name: 'Required CI / unresolved', run_attempt: attempt, conclusion: 'cancelled' });
+      assert.notEqual(evaluate(p, { ...run(), run_attempt: 2 }, current).conclusion, 'success');
+    }
+  }
+});
+
 test('trusted partial reruns also recover with a cancelled watcher', async () => {
   const github = serviceMock({ trusted: true, trustedJobs: partialRerunJobs(pr()) });
   const list = github.rest.actions.listWorkflowRuns;
