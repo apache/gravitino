@@ -25,7 +25,6 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.domain.Domain;
-import org.apache.gravitino.tag.TagValue;
 
 /** A domain snapshot for event listeners, without storage identifiers. */
 @DeveloperApi
@@ -35,7 +34,7 @@ public final class DomainInfo {
   private final Map<String, String> properties;
   private final Domain.Status status;
   @Nullable private final String parent;
-  @Nullable private final TagValue backingTag;
+  @Nullable private final String backingTag;
   @Nullable private final Audit audit;
 
   /**
@@ -46,7 +45,7 @@ public final class DomainInfo {
    * @param properties The properties, or null for none.
    * @param status The domain status.
    * @param parent The parent name, or null for a top-level domain.
-   * @param backingTag The backing tag, or null if unbound.
+   * @param backingTag The name of the backing tag, or null if unbound.
    * @param audit The audit information, or null for a creation request.
    */
   public DomainInfo(
@@ -55,7 +54,7 @@ public final class DomainInfo {
       @Nullable Map<String, String> properties,
       Domain.Status status,
       @Nullable String parent,
-      @Nullable TagValue backingTag,
+      @Nullable String backingTag,
       @Nullable Audit audit) {
     this.name = name;
     this.comment = comment;
@@ -97,9 +96,9 @@ public final class DomainInfo {
     return Optional.ofNullable(parent);
   }
   /**
-   * @return The backing tag, or empty if unbound.
+   * @return The name of the backing tag, or empty if unbound.
    */
-  public Optional<TagValue> backingTag() {
+  public Optional<String> backingTag() {
     return Optional.ofNullable(backingTag);
   }
   /**

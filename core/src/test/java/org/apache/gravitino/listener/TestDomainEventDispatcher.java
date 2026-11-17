@@ -441,6 +441,15 @@ class TestDomainEventDispatcher {
     assertFalse(
         ((UpdateDomainBackingTagEvent) observed.get(1)).domainInfo().backingTag().isPresent());
     observed.clear();
+    when(delegate.updateBackingTag(metalake, name, backingTag)).thenReturn(domain);
+    dispatcher.updateBackingTag(metalake, name, backingTag);
+    assertEquals(
+        backingTag.name(), ((UpdateDomainBackingTagPreEvent) observed.get(0)).backingTag());
+    assertEquals(backingTag.name(), ((UpdateDomainBackingTagEvent) observed.get(1)).backingTag());
+    assertEquals(
+        backingTag.name(),
+        ((UpdateDomainBackingTagEvent) observed.get(1)).domainInfo().backingTag().orElse(null));
+    observed.clear();
     when(delegate.attachDomain(metalake, name, parent)).thenReturn(domain);
     dispatcher.attachDomain(metalake, name, parent);
     assertEquals(parent, ((AttachDomainPreEvent) observed.get(0)).parent());
@@ -672,7 +681,7 @@ class TestDomainEventDispatcher {
     assertEquals(properties, info.properties());
     assertEquals(status, info.status());
     assertEquals(expectedParent, info.parent().orElse(null));
-    assertEquals(backingTag, info.backingTag().orElse(null));
+    assertEquals(backingTag.name(), info.backingTag().orElse(null));
     assertEquals(audit, info.auditInfo());
   }
 }

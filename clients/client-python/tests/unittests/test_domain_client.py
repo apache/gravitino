@@ -115,7 +115,7 @@ class TestDomainClient(unittest.TestCase):
             "properties": {"a": "b"},
             "status": "draft",
             "parent": None,
-            "backingTag": {"name": "department", "value": "finance"},
+            "backingTag": {"name": "department"},
             "audit": {"creator": "user", "createTime": "2026-10-01T00:00:00Z"},
         }
         data.update(overrides)
@@ -149,7 +149,7 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual("comment", domain.comment())
         self.assertEqual(Domain.Status.DRAFT, domain.status())
         self.assertIsNone(domain.parent())
-        self.assertEqual(TagValue("department", "finance"), domain.backing_tag())
+        self.assertEqual("department", domain.backing_tag())
         self.assertEqual("user", domain.audit_info().creator())
         domain.properties()["a"] = "changed"
         self.assertEqual({"a": "b"}, domain.properties())
@@ -159,8 +159,8 @@ class TestDomainClient(unittest.TestCase):
     def test_create_top_level_and_subdomain(self):
         for parent in (None, self.NAME):
             for create, tag in (
-                (True, TagValue("new/tag")),
-                (False, TagValue("dept", "finance")),
+                (True, "new/tag"),
+                (False, "dept"),
             ):
                 with self.subTest(parent=parent, create=create):
                     self._respond(
@@ -184,11 +184,7 @@ class TestDomainClient(unittest.TestCase):
                             "comment": None,
                             "properties": None,
                             "parent": parent,
-                            "backingTag": {
-                                "name": tag.name(),
-                                "value": tag.value(),
-                                "create": create,
-                            },
+                            "backingTag": {"name": tag, "create": create},
                         },
                     )
 
@@ -317,11 +313,11 @@ class TestDomainClient(unittest.TestCase):
             ),
             (old.detach_from_parent, "DELETE", "/parent", None, {"parent": None}),
             (
-                lambda: old.update_backing_tag(TagValue("tag/new", "v")),
+                lambda: old.update_backing_tag("tag/new"),
                 "PUT",
                 "/backingTag",
-                {"backingTag": {"name": "tag/new", "value": "v"}},
-                {"backingTag": {"name": "tag/new", "value": "v"}},
+                {"backingTag": {"name": "tag/new"}},
+                {"backingTag": {"name": "tag/new"}},
             ),
             (
                 lambda: old.update_backing_tag(None),
@@ -338,7 +334,7 @@ class TestDomainClient(unittest.TestCase):
                 self.assertIsNot(old, result)
                 self.assertEqual(Domain.Status.DRAFT, old.status())
                 self.assertIsNone(old.parent())
-                self.assertEqual(TagValue("department", "finance"), old.backing_tag())
+                self.assertEqual("department", old.backing_tag())
                 self.assertEqual(
                     DomainDTO.from_dict(self._dto(**changes)).status(), result.status()
                 )
@@ -681,15 +677,12 @@ class TestDomainClient(unittest.TestCase):
                         request.validate()
         invalid_operations = (
             lambda: self.metalake.create_domain("name", None, None, None, False),
+            lambda: self.metalake.create_domain("name", None, None, " ", True),
+            lambda: self.metalake.create_domain(None, None, None, "tag", False),
             lambda: self.metalake.create_domain(
-                "name", None, None, TagValue("tag", "v"), True
+                "name", None, {"key": None}, "tag", False
             ),
-            lambda: self.metalake.create_domain(
-                None, None, None, TagValue("tag"), False
-            ),
-            lambda: self.metalake.create_domain(
-                "name", None, {"key": None}, TagValue("tag"), False
-            ),
+            lambda: self._domain().update_backing_tag(" "),
             lambda: self.metalake.alter_domain("name", None),
             lambda: self.metalake.alter_domain("name", DomainChange.rename(None)),
             lambda: self.metalake.alter_domain(
@@ -772,7 +765,7 @@ class TestDomainClient(unittest.TestCase):
         )
         dto = DomainDTO.from_json(json.dumps(data))
         self.assertEqual("child.with.dots", dto.relations()[0].source().name())
-        self.assertEqual(TagValue("department", "finance"), dto.backing_tag())
+        self.assertEqual("department", dto.backing_tag())
         self.assertEqual(dto, DomainDTO.from_json(dto.to_json()))
         self.assertEqual(
             "child.with.dots",
@@ -821,7 +814,7 @@ class TestDomainClient(unittest.TestCase):
             self.assertEqual(self.NAME, client.get_domain(self.NAME).name())
             self.assertEqual(
                 self.NAME,
-                client.create_domain(self.NAME, None, {}, TagValue("tag"), True).name(),
+                client.create_domain(self.NAME, None, {}, "tag", True).name(),
             )
             self.assertEqual(
                 self.NAME,

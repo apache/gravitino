@@ -41,7 +41,8 @@ named `test`, with clients connected to that metalake. Java uses `lake` (`Gravit
 Python uses `lake` (`GravitinoClient`). `domain` refers to a loaded Finance domain. Import Java
 Domain types from `org.apache.gravitino.domain`, `TagValue` from `org.apache.gravitino.tag`, and
 `MetadataObject` from `org.apache.gravitino`. Python uses `gravitino.api.domain`,
-`gravitino.api.tag` and `gravitino.api.metadata_object` respectively.
+`gravitino.api.tag` and `gravitino.api.metadata_object` respectively. Domain APIs take the backing
+tag as a tag name.
 REST examples use simple authentication as the configured administrator `anonymous`.
 These are independent operation examples; the [complete examples](#complete-java-example) below
 show a runnable sequence with setup and cleanup.
@@ -74,14 +75,14 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Content-Type: application/j
 ```java
 Domain domain = lake.createDomain(
     "Finance", "Financial assets", Collections.emptyMap(),
-    TagValue.noValue("finance"), true);
+    "finance", true);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-domain = lake.create_domain("Finance", "Financial assets", {}, TagValue("finance"), True)
+domain = lake.create_domain("Finance", "Financial assets", {}, "finance", True)
 ```
 
 </TabItem>
@@ -334,14 +335,14 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Content-Type: application/j
 
 ```java
 Domain child = domain.createSubdomain(
-    "Planning_US", null, null, TagValue.noValue("planning"), true);
+    "Planning_US", null, null, "planning", true);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-child = domain.create_subdomain("Planning_US", None, None, TagValue("planning"), True)
+child = domain.create_subdomain("Planning_US", None, None, "planning", True)
 ```
 
 </TabItem>
@@ -478,24 +479,19 @@ Creation always requires an explicit backing tag:
 
 | Intent | Java | Python | REST `backingTag` |
 | --- | --- | --- | --- |
-| Create a new valueless tag | `TagValue.noValue("finance"), true` | `TagValue("finance"), True` | `{"name":"finance","create":true}` |
-| Bind an existing tag, any assignment | `TagValue.noValue("department"), false` | `TagValue("department"), False` | `{"name":"department","create":false}` |
-| Bind an existing tag value | `TagValue.of("department", "finance"), false` | `TagValue("department", "finance"), False` | `{"name":"department","value":"finance","create":false}` |
+| Create a new valueless tag | `"finance", true` | `"finance", True` | `{"name":"finance","create":true}` |
+| Bind an existing tag | `"finance_data", false` | `"finance_data", False` | `{"name":"finance_data","create":false}` |
 
 New backing tags allow no values and are owned by the creator. Creation never implicitly adopts an
-existing tag: `create=true` with an existing name conflicts. Supplying a value with `create=true` is
-invalid. For an existing tag, the value must satisfy its immutable allowed-values constraint. See
-[Tag value constraints](./manage-tags-in-gravitino.md#create-a-tag-with-a-value-constraint).
+existing tag: `create=true` with an existing name conflicts. Any existing tag can be bound, whatever
+values it allows. Each domain has its own backing tag: a tag backs at most one domain, so binding a
+tag that already backs another domain conflicts, even between a parent and its child.
 
-A tag can back one domain without a value, or multiple domains with distinct values. A valueless
-binding conflicts with every other binding of the same tag; two bindings of the same exact value
-also conflict. Bindings with distinct values are allowed, even between a parent and its child.
-A valueless binding matches every effective assignment of that tag, including assignments with values;
-a valued binding matches when the effective assignment contains that exact, case-sensitive value.
+Membership depends only on the presence of the backing tag. An object that carries the tag, with or
+without values, matches; any value on an assignment is ignored.
 
-`domain.updateBackingTag(TagValue.of("department", "finance"))` or Python
-`domain.update_backing_tag(TagValue("department", "finance"))` replaces the binding with an existing
-tag. Pass `null` / `None` to remove it. Repeating a binding is a no-op. Removing a binding does not
+`domain.updateBackingTag("finance_data")` or Python `domain.update_backing_tag("finance_data")`
+replaces the binding with an existing tag. Pass `null` / `None` to remove it. Repeating a binding is a no-op. Removing a binding does not
 delete the tag, change assignments, or remove child membership roll-ups. Replacing it does not migrate
 members: only effective assignments matching the new binding contribute the domain's own members.
 
@@ -506,8 +502,9 @@ Domain rename, move, detach and deletion never rename or delete its backing tag.
 
 ### Create a Domain with an Existing Backing Tag
 
-Assume `department` already exists and allows the value `finance`. Bind it explicitly with
-`create=false`; omit the value to match any effective assignment of that tag. Binding requires
+Assume the tag `finance_data` already exists. Bind it explicitly with `create=false`; the tag can
+be bound whatever values it allows, and objects carrying it are members whatever values their
+assignments have. Binding requires
 ownership of the existing tag or metalake when authorization is enabled.
 
 <Tabs groupId='language' queryString>
@@ -515,7 +512,7 @@ ownership of the existing tag or metalake when authorization is enabled.
 
 ```shell
 curl --fail-with-body -u anonymous:dummy -X POST -H 'Content-Type: application/json' \
-  -d '{"name":"Finance","backingTag":{"name":"department","value":"finance","create":false}}' \
+  -d '{"name":"Finance","backingTag":{"name":"finance_data","create":false}}' \
   "http://127.0.0.1:8090/api/metalakes/test/domains"
 ```
 
@@ -524,7 +521,7 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Content-Type: application/j
 
 ```java
 Domain domain = lake.createDomain(
-    "Finance", null, null, TagValue.of("department", "finance"), false);
+    "Finance", null, null, "finance_data", false);
 ```
 
 </TabItem>
@@ -532,7 +529,7 @@ Domain domain = lake.createDomain(
 
 ```python
 domain = lake.create_domain(
-    "Finance", None, None, TagValue("department", "finance"), False
+    "Finance", None, None, "finance_data", False
 )
 ```
 
@@ -541,7 +538,7 @@ domain = lake.create_domain(
 
 ### Replace a Backing Tag
 
-Bind an existing tag, optionally with a value. Members are not migrated and previous assignments
+Bind an existing tag by name. Members are not migrated and previous assignments
 remain unchanged. Repeating the current binding is a no-op.
 
 <Tabs groupId='language' queryString>
@@ -549,7 +546,7 @@ remain unchanged. Repeating the current binding is a no-op.
 
 ```shell
 curl --fail-with-body -u anonymous:dummy -X PUT -H 'Content-Type: application/json' \
-  -d '{"backingTag":{"name":"department","value":"finance"}}' \
+  -d '{"backingTag":{"name":"finance_data"}}' \
   "http://127.0.0.1:8090/api/metalakes/test/domains/Finance/backingTag"
 ```
 
@@ -557,14 +554,14 @@ curl --fail-with-body -u anonymous:dummy -X PUT -H 'Content-Type: application/js
 <TabItem value="java" label="Java">
 
 ```java
-Domain updated = domain.updateBackingTag(TagValue.of("department", "finance"));
+Domain updated = domain.updateBackingTag("finance_data");
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-updated = domain.update_backing_tag(TagValue("department", "finance"))
+updated = domain.update_backing_tag("finance_data")
 ```
 
 </TabItem>
@@ -605,12 +602,13 @@ unbound = domain.update_backing_tag(None)
 
 Members are managed through the existing tag API. There is no separate Domain add/remove-member
 endpoint. In the assignment examples, `model` is a loaded model named `models.sales.forecast` and
-`department` is an existing tag allowing `finance`. See [tag operations](./manage-tags-in-gravitino.md)
+`finance` is the backing tag of the Finance domain. See [tag operations](./manage-tags-in-gravitino.md)
 for creating constrained tags and assigning them to catalogs or schemas.
 
 ### Assign a Backing Tag to an Object
 
-Assign the Finance backing-tag value to the model using normal tag permissions. The same API
+Assign the Finance backing tag to the model using normal tag permissions. Assign it without a value;
+a value on the assignment is allowed by the tag API but ignored by Domain membership. The same API
 works for leaf, schema and catalog assignments. A tagged container and its directly tagged descendants
 appear separately. Use `expand=true` to include recorded leaves that inherit the binding.
 Tag-value requests use `application/vnd.gravitino.v2+json`; Domain endpoints use the v1 API.
@@ -621,7 +619,7 @@ Tag-value requests use `application/vnd.gravitino.v2+json`; Domain endpoints use
 ```shell
 curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gravitino.v2+json' \
   -H 'Content-Type: application/vnd.gravitino.v2+json' \
-  -d '{"tagsToAdd":[{"name":"department","value":"finance"}],"tagsToRemove":[]}' \
+  -d '{"tagsToAdd":[{"name":"finance"}],"tagsToRemove":[]}' \
   "http://127.0.0.1:8090/api/metalakes/test/objects/model/models.sales.forecast/tags"
 ```
 
@@ -630,7 +628,7 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gra
 
 ```java
 model.supportsTags().associateTags(
-    new TagValue[] {TagValue.of("department", "finance")}, new TagValue[0]);
+    new TagValue[] {TagValue.noValue("finance")}, new TagValue[0]);
 ```
 
 </TabItem>
@@ -638,7 +636,7 @@ model.supportsTags().associateTags(
 
 ```python
 model.supports_tags().assign_tags(
-    tags_to_add=[{"name": "department", "value": "finance"}]
+    tags_to_add=["finance"]
 )
 ```
 
@@ -647,7 +645,7 @@ model.supports_tags().assign_tags(
 
 ### Remove a Backing Tag Assignment
 
-Remove the value assigned directly to the model. An ancestor assignment can then become
+Remove the backing tag assigned directly to the model. An ancestor assignment can then become
 effective again, so this does not necessarily remove inherited Domain membership.
 
 <Tabs groupId='language' queryString>
@@ -656,7 +654,7 @@ effective again, so this does not necessarily remove inherited Domain membership
 ```shell
 curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gravitino.v2+json' \
   -H 'Content-Type: application/vnd.gravitino.v2+json' \
-  -d '{"tagsToAdd":[],"tagsToRemove":[{"name":"department","value":"finance"}]}' \
+  -d '{"tagsToAdd":[],"tagsToRemove":[{"name":"finance"}]}' \
   "http://127.0.0.1:8090/api/metalakes/test/objects/model/models.sales.forecast/tags"
 ```
 
@@ -665,7 +663,7 @@ curl --fail-with-body -u anonymous:dummy -X POST -H 'Accept: application/vnd.gra
 
 ```java
 model.supportsTags().associateTags(
-    new TagValue[0], new TagValue[] {TagValue.of("department", "finance")});
+    new TagValue[0], new TagValue[] {TagValue.noValue("finance")});
 ```
 
 </TabItem>
@@ -673,7 +671,7 @@ model.supportsTags().associateTags(
 
 ```python
 model.supports_tags().assign_tags(
-    tags_to_remove=[{"name": "department", "value": "finance"}]
+    tags_to_remove=["finance"]
 )
 ```
 
@@ -868,7 +866,6 @@ import org.apache.gravitino.domain.DomainMember;
 import org.apache.gravitino.domain.DomainMemberFilter;
 import org.apache.gravitino.domain.DomainRelation;
 import org.apache.gravitino.model.Model;
-import org.apache.gravitino.tag.TagValue;
 
 /** Demonstrates Domain discovery and cleanup on a local Gravitino server. */
 public class DomainExample {
@@ -886,9 +883,9 @@ public class DomainExample {
         Model model = catalog.asModelCatalog().registerModel(
             NameIdentifier.of("sales", "forecast"), "", Collections.emptyMap());
         Domain draft = lake.createDomain(
-            "Finance", "Financial assets", Collections.emptyMap(), TagValue.noValue("finance"), true);
+            "Finance", "Financial assets", Collections.emptyMap(), "finance", true);
         Domain child = draft.createSubdomain(
-            "Planning_US", null, null, TagValue.noValue("planning"), true);
+            "Planning_US", null, null, "planning", true);
         model.supportsTags().associateTags(new String[] {"planning"}, new String[0]);
         Domain published = draft.publish();
         child = child.publish();
@@ -940,7 +937,6 @@ import uuid
 
 from gravitino import Catalog, GravitinoAdminClient, GravitinoClient, NameIdentifier
 from gravitino.api.domain import Domain, DomainMemberFilter, DomainRelation
-from gravitino.api.tag import TagValue
 from gravitino.auth.simple_auth_provider import SimpleAuthProvider
 
 os.environ["GRAVITINO_USER"] = "anonymous"
@@ -958,8 +954,8 @@ try:
     model = catalog.as_model_catalog().register_model(
         NameIdentifier.of("sales", "forecast"), "", {}
     )
-    draft = lake.create_domain("Finance", "Financial assets", {}, TagValue("finance"), True)
-    child = draft.create_subdomain("Planning_US", None, None, TagValue("planning"), True)
+    draft = lake.create_domain("Finance", "Financial assets", {}, "finance", True)
+    child = draft.create_subdomain("Planning_US", None, None, "planning", True)
     model.supports_tags().associate_tags(["planning"], [])
     published = draft.publish()
     child = child.publish()
@@ -1003,10 +999,10 @@ Encode metadata path parameters individually and supply query values with `--dat
 | HTTP status | Typical Domain behavior |
 | --- | --- |
 | 200 | Success with `code: 0`; empty queries return empty arrays; deleting an absent domain returns `dropped: false`. |
-| 400 | Invalid request: invalid domain names or filters, unsupported member types, illegal hierarchy/status transition, disallowed tag value, or a value supplied while creating a new backing tag. |
+| 400 | Invalid request: invalid domain names or filters, unsupported member types, or illegal hierarchy/status transition. |
 | 403 | Insufficient permission on a published domain, a required backing tag, or a reverse-lookup object. |
 | 404 | Missing metalake/domain/parent/tag/object, or a draft hidden from the caller. |
-| 409 | Duplicate domain/tag name, backing-tag binding conflict, deleting a parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
+| 409 | Duplicate domain/tag name, a tag that already backs another domain, deleting a parent with children, disabled metalake, or an optimistic lock conflict during domain alteration or deletion. |
 | 415 | Unsupported request Content-Type; the error response uses `application/json`. |
 | 5xx | Server failure; inspect the error response and server log. |
 

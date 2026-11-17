@@ -29,16 +29,14 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchDomainException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
-import org.apache.gravitino.tag.TagValue;
 
 /**
  * A domain groups metadata objects from any catalog under a business name, such as "Finance". A
  * leaf metadata object, of a type in {@link DomainMember#SUPPORTED_TYPES}, is a member of a domain
  * when it carries the domain's backing tag, directly or inherited from its catalog or schema. The
- * default member listing includes catalogs and schemas that directly carry a backing tag. For a
- * leaf object, the nearest assignment of the same tag wins: a table that carries {@code dept=hr}
- * under a schema that carries {@code dept=finance} is a member of the domain backed by {@code
- * dept=hr} only.
+ * default member listing includes catalogs and schemas that directly carry a backing tag.
+ * Membership depends only on the presence of the backing tag: a value on an assignment of the tag
+ * is ignored.
  *
  * <p>Names have 1 to 64 ASCII letters, digits, underscores or hyphens and may not start with a
  * hyphen. The names {@code *} and {@code system} (in any letter case) are reserved.
@@ -111,18 +109,17 @@ public interface Domain extends Auditable {
   Optional<String> parent();
 
   /**
-   * Returns the backing tag of the domain. The metadata objects whose effective assignment of this
-   * tag matches it are the members of the domain. A backing tag without a value matches every
-   * assignment of the tag, with or without values. A backing tag with a value matches the
-   * assignments whose values contain it, compared exactly and case-sensitively.
+   * Returns the name of the backing tag of the domain. The metadata objects that carry this tag,
+   * with or without values, are the members of the domain; any value on an assignment of the tag is
+   * ignored. A tag backs at most one domain.
    *
    * <p>The domain refers to the tag itself, not to its name: a renamed tag keeps backing the
    * domain, and a new tag with the name of a deleted one does not.
    *
-   * @return The backing tag of the domain, or empty if the backing tag has been removed or deleted
-   *     and no new one has been set.
+   * @return The name of the backing tag of the domain, or empty if the backing tag has been removed
+   *     or deleted and no new one has been set.
    */
-  Optional<TagValue> backingTag();
+  Optional<String> backingTag();
 
   /**
    * Returns how the metadata object relates to this domain. It is set only on the domains returned
@@ -194,27 +191,25 @@ public interface Domain extends Auditable {
    * snapshot shows. Members are not migrated: objects that carry only the old backing tag are no
    * longer members of the domain. Setting the current backing tag has no effect.
    *
-   * @param backingTag The existing tag, with an optional value, that backs the domain, or null to
-   *     remove the backing tag.
+   * @param backingTag The name of the existing tag that backs the domain, or null to remove the
+   *     backing tag.
    * @return The updated domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws NoSuchTagException If the tag does not exist.
-   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
-   *     another domain.
+   * @throws BackingTagAlreadyBoundException If the tag already backs another domain.
    * @throws ForbiddenException If a tag is set and the caller owns neither the tag nor the
    *     metalake. Removing the backing tag needs no privilege on the tag.
-   * @throws IllegalArgumentException If the value is not allowed by the tag.
    */
-  Domain updateBackingTag(@Nullable TagValue backingTag)
+  Domain updateBackingTag(@Nullable String backingTag)
       throws NoSuchDomainException, NoSuchTagException, BackingTagAlreadyBoundException,
-          ForbiddenException, IllegalArgumentException;
+          ForbiddenException;
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
    *
    * <p>The backing tag is always given explicitly. With {@code createBackingTag} set, a new tag
    * without values is created with the given name and owned by the caller; otherwise the given
-   * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
+   * existing tag is bound, whatever values it allows. An existing tag is never adopted implicitly.
    *
    * <p>The sub-domain, a new backing tag and the link to this domain are created together: if the
    * creation fails, none of them is created, and an existing tag to bind is left unchanged.
@@ -222,27 +217,25 @@ public interface Domain extends Auditable {
    * @param name The name of the sub-domain.
    * @param comment The comment of the sub-domain, or null.
    * @param properties The properties of the sub-domain, or null.
-   * @param backingTag The backing tag of the sub-domain: the name of the tag to create, or an
-   *     existing tag with an optional value.
+   * @param backingTag The name of the backing tag of the sub-domain: the tag to create, or an
+   *     existing tag.
    * @param createBackingTag Whether to create the backing tag as a new tag.
    * @return The created sub-domain.
    * @throws NoSuchDomainException If this domain does not exist or is not visible to the caller.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
    * @throws NoSuchTagException If the existing backing tag to bind does not exist.
    * @throws TagAlreadyExistsException If the backing tag to create already exists.
-   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
-   *     another domain.
+   * @throws BackingTagAlreadyBoundException If the existing tag already backs another domain.
    * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
    *     or may not create tags.
-   * @throws IllegalArgumentException If the backing tag is null, a value is given for a tag to
-   *     create, the value is not allowed by the existing tag, this domain is itself a sub-domain,
-   *     or the sub-domain cannot be created under this domain.
+   * @throws IllegalArgumentException If the backing tag is null, this domain is itself a
+   *     sub-domain, or the sub-domain cannot be created under this domain.
    */
   Domain createSubdomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      TagValue backingTag,
+      String backingTag,
       boolean createBackingTag)
       throws NoSuchDomainException, DomainAlreadyExistsException, NoSuchTagException,
           TagAlreadyExistsException, BackingTagAlreadyBoundException, ForbiddenException,

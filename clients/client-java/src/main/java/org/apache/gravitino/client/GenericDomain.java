@@ -49,7 +49,6 @@ import org.apache.gravitino.dto.responses.DomainMemberListResponse;
 import org.apache.gravitino.dto.responses.DomainResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.tag.TagValue;
 
 /** A domain snapshot with operations addressed by its name. */
 class GenericDomain implements Domain {
@@ -96,8 +95,8 @@ class GenericDomain implements Domain {
 
   /** {@inheritDoc} */
   @Override
-  public Optional<TagValue> backingTag() {
-    return Optional.ofNullable(domain.getBackingTag()).map(DomainBackingTagDTO::tagValue);
+  public Optional<String> backingTag() {
+    return Optional.ofNullable(domain.getBackingTag()).map(DomainBackingTagDTO::getName);
   }
 
   /** {@inheritDoc} */
@@ -151,12 +150,10 @@ class GenericDomain implements Domain {
 
   /** {@inheritDoc} */
   @Override
-  public Domain updateBackingTag(@Nullable TagValue backingTag) {
+  public Domain updateBackingTag(@Nullable String backingTag) {
     DomainBackingTagSetRequest request =
         new DomainBackingTagSetRequest(
-            backingTag == null
-                ? null
-                : new DomainBackingTagDTO(backingTag.name(), backingTag.value().orElse(null)));
+            backingTag == null ? null : new DomainBackingTagDTO(backingTag));
     request.validate();
     return snapshot(
         restClient.put(
@@ -173,7 +170,7 @@ class GenericDomain implements Domain {
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      TagValue backingTag,
+      String backingTag,
       boolean createBackingTag) {
     Preconditions.checkArgument(backingTag != null, "backingTag must not be null");
     DomainCreateRequest request =
@@ -182,8 +179,7 @@ class GenericDomain implements Domain {
             comment,
             properties,
             name(),
-            new DomainCreateRequest.BackingTag(
-                backingTag.name(), backingTag.value().orElse(null), createBackingTag));
+            new DomainCreateRequest.BackingTag(backingTag, createBackingTag));
     request.validate();
     DomainResponse response =
         restClient.post(

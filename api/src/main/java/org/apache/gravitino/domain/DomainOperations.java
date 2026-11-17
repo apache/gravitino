@@ -29,7 +29,6 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NonEmptyDomainException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
-import org.apache.gravitino.tag.TagValue;
 
 /**
  * Interface for the domain operations of a metalake. Operations on a single domain, such as
@@ -69,11 +68,12 @@ public interface DomainOperations {
 
   /**
    * Creates a top-level domain in {@link Domain.Status#DRAFT} status. Use {@link
-   * Domain#createSubdomain(String, String, Map, TagValue, boolean)} to create a sub-domain.
+   * Domain#createSubdomain(String, String, Map, String, boolean)} to create a sub-domain.
    *
    * <p>The backing tag is always given explicitly. With {@code createBackingTag} set, a new tag
    * without values is created with the given name and owned by the caller; otherwise the given
-   * existing tag, with its optional value, is bound. An existing tag is never adopted implicitly.
+   * existing tag is bound, whatever values it allows. An existing tag is never adopted implicitly.
+   * A tag backs at most one domain.
    *
    * <p>The domain and a new backing tag are created together: if the creation fails, neither is
    * created, and an existing tag to bind is left unchanged.
@@ -81,25 +81,23 @@ public interface DomainOperations {
    * @param name The name of the domain.
    * @param comment The comment of the domain, or null.
    * @param properties The properties of the domain, or null.
-   * @param backingTag The backing tag of the domain: the name of the tag to create, or an existing
-   *     tag with an optional value.
+   * @param backingTag The name of the backing tag of the domain: the tag to create, or an existing
+   *     tag.
    * @param createBackingTag Whether to create the backing tag as a new tag.
    * @return The created domain.
    * @throws DomainAlreadyExistsException If a domain with the same name already exists.
    * @throws NoSuchTagException If the existing backing tag to bind does not exist.
    * @throws TagAlreadyExistsException If the backing tag to create already exists.
-   * @throws BackingTagAlreadyBoundException If the binding conflicts with the backing tag of
-   *     another domain.
+   * @throws BackingTagAlreadyBoundException If the existing tag already backs another domain.
    * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
    *     or may not create tags.
-   * @throws IllegalArgumentException If the backing tag is null, a value is given for a tag to
-   *     create, or the value is not allowed by the existing tag.
+   * @throws IllegalArgumentException If the backing tag is null.
    */
   Domain createDomain(
       String name,
       @Nullable String comment,
       @Nullable Map<String, String> properties,
-      TagValue backingTag,
+      String backingTag,
       boolean createBackingTag)
       throws DomainAlreadyExistsException, NoSuchTagException, TagAlreadyExistsException,
           BackingTagAlreadyBoundException, ForbiddenException, IllegalArgumentException;

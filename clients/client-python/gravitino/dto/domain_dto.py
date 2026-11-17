@@ -25,7 +25,6 @@ from gravitino.api.domain.domain_member import DomainMember
 from gravitino.api.domain.domain_relation import DomainRelation
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
-from gravitino.api.tag.tag_value import TagValue
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metadata_object_dto import MetadataObjectDTO
 from gravitino.utils.precondition import Precondition
@@ -34,13 +33,17 @@ from gravitino.utils.precondition import Precondition
 @dataclass_json
 @dataclass
 class DomainBackingTagDTO:
-    """The backing tag on the wire."""
+    """The name of the backing tag on the wire."""
 
     _name: str = field(metadata=config(field_name="name"))
-    _value: Optional[str] = field(default=None, metadata=config(field_name="value"))
 
-    def tag_value(self) -> TagValue:
-        return TagValue(self._name, self._value)
+    def name(self) -> str:
+        return self._name
+
+    def validate(self) -> None:
+        Precondition.check_string_not_empty(
+            self._name, "backingTag.name must not be blank"
+        )
 
 
 @dataclass_json
@@ -122,8 +125,8 @@ class DomainDTO:  # pylint: disable=too-many-instance-attributes
     def parent(self) -> Optional[str]:
         return self._parent
 
-    def backing_tag(self) -> Optional[TagValue]:
-        return self._backing_tag.tag_value() if self._backing_tag else None
+    def backing_tag(self) -> Optional[str]:
+        return self._backing_tag.name() if self._backing_tag else None
 
     def audit_info(self) -> AuditDTO:
         return self._audit
