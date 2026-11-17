@@ -2202,3 +2202,55 @@ test('unexplained unsuccessful aggregates recheck late job evidence without a ne
     }
   }
 });
+
+
+test('trusted rerun failures stay retryable until the current summary identifies their head', async () => {
+  for (const changed of [false, true]) {
+    for (const summary of ['missing', 'unexpanded']) {
+      for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
+        for (const sameHead of [false, true]) {
+          await withPublisher(async ({ ctx, core }) => {
+            const recent = { ...pr(), updated_at: new Date().toISOString() };
+            const other = pr(); other.head.sha = C;
+            let ready = false, reads = 0;
+            const service = serviceMock({ changed, trusted: true });
+            const { github, statuses } = publisherMock({ current: recent });
+            github.rest.git = service.rest.git;
+            github.rest.pulls.get = async () => ({ data: recent });
+            github.rest.actions.listWorkflowRuns = async args => {
+              const response = await service.rest.actions.listWorkflowRuns(args);
+              if (args.event === 'workflow_dispatch') Object.assign(response.data.workflow_runs[0],
+                { run_attempt: 2, conclusion });
+              return response;
+            };
+            github.paginate = async (endpoint, args) => {
+              if (endpoint === github.rest.pulls.list) return [recent];
+              const runs = runsOf(github, endpoint, args); if (runs) return runs;
+              if (args.run_id !== 2) return jobs(pr());
+              reads++;
+              const current = [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+                { name: 'backend / test', id: 100, run_attempt: 2, conclusion }];
+              if (ready) current.push({ name: requiredName(sameHead ? pr() : other), id: 200,
+                run_attempt: 2, conclusion });
+              else if (summary === 'unexpanded') current.push({ name: 'Required CI / unresolved',
+                id: 200, run_attempt: 2, conclusion: 'cancelled' });
+              return current;
+            };
+            ctx.eventName = 'schedule'; ctx.payload = {};
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(statuses.at(-1).state, 'error');
+            assert.match(statuses.at(-1).description, /needs attention/);
+            const initialReads = reads, writes = statuses.length;
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.ok(reads > initialReads); assert.equal(statuses.length, writes);
+            ready = true;
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(statuses.at(-1).state, sameHead
+              ? conclusion === 'cancelled' ? 'error' : 'failure' : changed ? 'pending' : 'success');
+            assert.doesNotMatch(statuses.at(-1).description, /needs attention/);
+          });
+        }
+      }
+    }
+  }
+});

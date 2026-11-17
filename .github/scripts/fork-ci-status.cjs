@@ -295,9 +295,12 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     let trusted = await findRun(pr, true);
     let trustedJobs;
     let trustedExact = false;
+    let trustedCurrentExact = false;
     if (trusted) {
       trustedJobs = await jobsFor(trusted.owner, trusted.repo, trusted.run);
       trustedExact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha));
+      trustedCurrentExact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha) &&
+        (job.run_attempt || 1) === trusted.run.run_attempt);
       // A missing or unexpanded gate is unknown context, not evidence of an older PR head.
       // Only discard a run whose current summaries all explicitly identify another head.
       const summaries = trustedJobs.filter(job => job.name.startsWith('Required CI / ') &&
@@ -331,6 +334,15 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     // CI edits change who may attest success, not which base the run actually tested.
     const base = selected.trusted ? run.head_sha : await testedBase(pr, jobs);
     let result = evaluateExecution(pr, run, jobs, base);
+    // A retained exact gate identifies an earlier attempt. Do not settle a newer
+    // failure/cancellation until that attempt identifies its head too: a full rerun
+    // may have resolved a different PR head whose summary has not arrived yet.
+    // Successful watcher-only reruns still reach the suite checks below.
+    if (selected.trusted && !trustedCurrentExact && result?.status === 'completed' &&
+        result.title !== NEEDS_ATTENTION) {
+      result = requiredAction('Trusted CI has not identified this attempt\'s PR head and base. ' +
+        'The publisher will check again before attributing its unsuccessful jobs to this PR.');
+    }
     const needsSuiteChecks = !result;
     if (needsSuiteChecks) {
       // Require the callers of the commit the run tested: the upstream dispatch commit for trusted
