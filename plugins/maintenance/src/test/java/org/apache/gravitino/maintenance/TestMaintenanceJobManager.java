@@ -40,6 +40,16 @@ class TestMaintenanceJobManager {
   private static final String SUBMITTER = "tms";
 
   @Test
+  void constructorRequiresJobSubmitterWhenAuthorizationEnabled() {
+    JobOperationDispatcher jobs = mock(JobOperationDispatcher.class);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new MaintenanceJobManager(jobs, true, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new MaintenanceJobManager(jobs, true, "  "));
+    Assertions.assertDoesNotThrow(() -> new MaintenanceJobManager(jobs, false, null));
+  }
+
+  @Test
   void runJobWithoutDoAsWhenAuthorizationDisabled() {
     JobOperationDispatcher jobs = mock(JobOperationDispatcher.class);
     JobEntity job = mock(JobEntity.class);
