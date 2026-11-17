@@ -284,6 +284,27 @@ tests:
             value: "5432"
           any: true
 
+  - it: does not render init-postgresql when init.enabled but entity.jdbcUrl is not PostgreSQL
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      entity:
+        jdbcUrl: jdbc:mysql://mysql.example.ci.local:3306/gravitino
+        jdbcDriver: com.mysql.cj.jdbc.Driver
+        jdbcUser: gravitino
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+
   - it: does not render init-postgresql for external PostgreSQL unless init.enabled
     template: deployment.yaml
     release:
@@ -617,7 +638,10 @@ tests:
           any: true
       - matchRegex:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
-          pattern: "CREATE SCHEMA IF NOT EXISTS"
+          pattern: "pg_namespace WHERE nspname"
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: 'CREATE SCHEMA.*PG_CURRENT_SCHEMA'
 
   - it: overrides JDBC currentSchema with postgresql.init.currentSchema
     template: deployment.yaml
@@ -721,6 +745,73 @@ tests:
       - matchRegex:
           path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
           pattern: "timed out after"
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: 'timeout "\$remaining"'
+
+  - it: renders PGCONNECT_TIMEOUT for init-postgresql
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: false
+        init:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+          connectTimeoutSeconds: 10
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGCONNECT_TIMEOUT
+            value: "10"
+          any: true
+
+  - it: applies ON_ERROR_STOP to baseline schema psql
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+    asserts:
+      - matchRegex:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].command[2]
+          pattern: 'ON_ERROR_STOP=1 -f "\$schema_file"'
+
+  - it: does not inherit entity.jdbcUrl sslmode or currentSchema when Bitnami PostgreSQL is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      postgresql:
+        enabled: true
+      entity:
+        jdbcUrl: jdbc:postgresql://ignored.example.ci.local:5432/gravitino?sslmode=verify-full&currentSchema=ignored_schema
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGSSLMODE
+            value: verify-full
+          any: true
+      - notContains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PGOPTIONS
+            value: "-c search_path=ignored_schema"
+          any: true
+      - notContains:
+          path: spec.template.spec.initContainers[?(@.name == "init-postgresql")].env
+          content:
+            name: PG_CURRENT_SCHEMA
+            value: ignored_schema
+          any: true
 
   - it: evaluates postgresql.auth.existingSecret as a template for Bitnami init
     template: deployment.yaml
