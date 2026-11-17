@@ -1962,3 +1962,25 @@ test('scheduled sweeps invalidate settled base context and upgrade legacy links 
     assert.equal(reads, 1); assert.equal(statuses.length, 1);
   }
 }));
+
+test('retargeted base results bypass ordering guards from the previous base', async () => withPublisher(async ({ ctx, core }) => {
+  for (const scenario of ['older-run', 'older-attempt', 'running', 'missing']) {
+    const p = pr(); p.base = { sha: C, ref: 'release/2.0' }; p.updated_at = new Date().toISOString();
+    const { github, statuses } = publisherMock({ latest: forkStatus('success', 'All required suites passed',
+      url(3, 2, 'apache', 'gravitino', { id: 1, run_attempt: 1 })) });
+    github.rest.pulls.get = async () => ({ data: p });
+    github.rest.git = serviceMock({ changed: true }).rest.git;
+    const candidate = { ...run(), id: scenario === 'older-run' ? 2 : 3,
+      run_attempt: scenario === 'older-attempt' ? 1 : 2, head_sha: C, head_branch: p.base.ref,
+      display_title: 'Trusted Fork CI #7', status: scenario === 'running' ? 'in_progress' : 'completed',
+      conclusion: scenario === 'running' ? null : 'failure' };
+    github.rest.actions.listWorkflowRuns = async args => ({ data: { workflow_runs:
+      args.event === 'workflow_dispatch' && scenario !== 'missing' ? [candidate] : [] } });
+    github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ??
+      (endpoint === github.rest.pulls.list ? [p] : jobs(p).map(j => ({ ...j, run_attempt: candidate.run_attempt })));
+    ctx.eventName = 'schedule'; ctx.payload = {};
+    await update({ github, context: ctx, core, sleep: async () => {} });
+    assert.equal(statuses.length, 1, scenario);
+    assert.equal(statuses[0].state, ['running', 'missing'].includes(scenario) ? 'pending' : 'failure', scenario);
+  }
+}));

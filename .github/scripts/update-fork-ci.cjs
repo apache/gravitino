@@ -113,13 +113,16 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
     if (current.head.sha !== pr.head.sha || current.base.sha !== pr.base.sha || current.base.ref !== pr.base.ref || current.state !== 'open') return;
     // Signals and sweeps can publish concurrently. Read the status last and never replace a newer
-    // attempt of a run from the same repository, or a completed result with a running one. Any
+    // attempt of a run from the same repository and base context, or a completed result with a running one. Any
     // remaining interleaving is repaired by the next pass, which compares the status with the runs.
     const latest = await forkStatus(pr);
     const shown = parseRunUrl(latest?.target_url);
-    // A run already shown for this commit still exists; a listing that missed it is incomplete.
-    if (!run && shown) return;
-    if (run && shown && shown.owner === mirror.owner && shown.repo === mirror.repo && (shown.run_id > run.id ||
+    // Ordering applies within the same base context. A retarget may select an older
+    // trusted run (or none), so a result for the previous base cannot suppress it.
+    const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
+    // A run already shown for this context still exists; a listing that missed it is incomplete.
+    if (!run && shown && sameBase) return;
+    if (run && shown && sameBase && shown.owner === mirror.owner && shown.repo === mirror.repo && (shown.run_id > run.id ||
         (shown.run_id === run.id && (shown.run_attempt > run.run_attempt ||
           (shown.run_attempt === run.run_attempt && statusCompleted(latest) && result.status !== 'completed'))))) return;
     await publishStatus({ github, repo: context.repo, sha: pr.head.sha, context: 'Fork CI',
