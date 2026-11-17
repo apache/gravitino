@@ -43,6 +43,8 @@ public enum SparkCatalogKind {
   GLUE,
   /** Every {@code jdbc-*} catalog except PostgreSQL, which has its own kind. */
   JDBC,
+  /** Apache Doris catalogs, when the specialized read path is explicitly enabled. */
+  DORIS,
   /** PostgreSQL catalogs, provider {@code jdbc-postgresql}. */
   JDBC_POSTGRESQL;
 
