@@ -115,12 +115,18 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
   the catalog cannot run Kafka operations, so apply it right after the upgrade.
   - Set a non-sensitive value, such as a timeout, as a literal value.
   - Do not set a credential as a literal value. Bypass properties can be returned in plaintext by
-    the REST API: Gravitino masks only keys that match
-    [sensitive key keywords](./gravitino-server-config.md#sensitive-property-key-matching), so a
-    password inside `gravitino.bypass.sasl.jaas.config` is returned unchanged. With a Gravitino
-    secret provider configured, bind the whole property with `CatalogChange.setSecretBinding`
-    (REST update type `setSecretBinding`) in the same call. `setSecretBinding` is not available in
-    the 1.3 client or REST API.
+    the REST API: Gravitino masks only keys that match the
+    [sensitive key keywords](./gravitino-server-config.md#sensitive-property-key-matching). With
+    the default keywords, a password inside `gravitino.bypass.sasl.jaas.config` is returned
+    unchanged, while `gravitino.bypass.ssl.truststore.password` is masked. Changing
+    `gravitino.secret.sensitiveKeyKeywords` replaces the default list, so check the server
+    configuration. With a Gravitino secret provider configured, bind the whole property in the same
+    call. Use `CatalogChange.setSecretBinding` (REST update type `setSecretBinding`) with a provider
+    that supports versioned writes. With a provider that only builds external references, that call
+    fails and leaves the catalog unable to run Kafka operations, so use
+    `CatalogChange.setSecretReference` (REST update type `setSecretReference`) with an external
+    secret that holds the whole property value. Record that secret's locator during the inventory.
+    Neither `setSecretBinding` nor `setSecretReference` is available in the 1.3 client or REST API.
 - The Kafka 3.9 client rejects `com.sun.security.auth.module.LdapLoginModule` in JAAS
   configurations by default. `JndiLoginModule` was already rejected by the 3.4 client. Check both
   the `sasl.jaas.config` of each Kafka catalog and the `KafkaClient` entry in the file named by the
