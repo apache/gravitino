@@ -22,6 +22,10 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -40,6 +44,8 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
 
 public class TestJdbcDatabaseOperations {
 
@@ -91,34 +97,7 @@ public class TestJdbcDatabaseOperations {
   public void testCreateWithCommentNamesSchemaInRejection() {
     // SqliteDatabaseOperations overrides create(), so exercise the shared check through a
     // minimal subclass that does not support schema comments.
-    JdbcDatabaseOperations operations =
-        new JdbcDatabaseOperations() {
-          @Override
-          public JdbcSchema load(String databaseName) {
-            throw new UnsupportedOperationException();
-          }
-
-          @Override
-          protected String generateCreateDatabaseSql(
-              String databaseName, String comment, Map<String, String> properties) {
-            return "CREATE DATABASE " + databaseName;
-          }
-
-          @Override
-          protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
-            return "DROP DATABASE " + databaseName;
-          }
-
-          @Override
-          protected boolean supportSchemaComment() {
-            return false;
-          }
-
-          @Override
-          protected Set<String> createSysDatabaseNameSet() {
-            return Collections.emptySet();
-          }
-        };
+    JdbcDatabaseOperations operations = new MinimalDatabaseOperations();
     // A null DataSource makes any attempt to open a connection fail with an NPE, so the
     // assertion below also proves the request is rejected before a connection is opened.
     operations.initialize(null, EXCEPTION_MAPPER, Collections.emptyMap());
@@ -129,6 +108,29 @@ public class TestJdbcDatabaseOperations {
             () -> operations.create("commented", "probe", null));
     Assertions.assertEquals(
         "Schema commented: catalog does not support schema comments", exception.getMessage());
+  }
+
+  @Test
+  public void testExistBindsDatabaseNameAsParameter() throws SQLException {
+    String databaseName = "db' OR '1'='1";
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    Connection connection = Mockito.mock(Connection.class);
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    JdbcDatabaseOperations operations = new MinimalDatabaseOperations();
+    operations.initialize(dataSource, EXCEPTION_MAPPER, Collections.emptyMap());
+
+    Assertions.assertFalse(operations.exist(databaseName));
+
+    ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+    Mockito.verify(connection).prepareStatement(sql.capture());
+    Assertions.assertEquals(
+        "SELECT * FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?", sql.getValue());
+    Mockito.verify(statement).setString(1, databaseName);
+    Mockito.verify(connection, Mockito.never()).createStatement();
   }
 
   @Test
@@ -162,5 +164,34 @@ public class TestJdbcDatabaseOperations {
     // drop non-existent database
     Assertions.assertFalse(
         JDBC_DATABASE_OPERATIONS.delete(database1), "database should be non-existent");
+  }
+
+  /** A minimal subclass that keeps the shared MySQL-style defaults of JdbcDatabaseOperations. */
+  private static class MinimalDatabaseOperations extends JdbcDatabaseOperations {
+    @Override
+    public JdbcSchema load(String databaseName) {
+      throw new UnsupportedOperationException();
+    }
+
+    @Override
+    protected String generateCreateDatabaseSql(
+        String databaseName, String comment, Map<String, String> properties) {
+      return "CREATE DATABASE " + databaseName;
+    }
+
+    @Override
+    protected String generateDropDatabaseSql(String databaseName, boolean cascade) {
+      return "DROP DATABASE " + databaseName;
+    }
+
+    @Override
+    protected boolean supportSchemaComment() {
+      return false;
+    }
+
+    @Override
+    protected Set<String> createSysDatabaseNameSet() {
+      return Collections.emptySet();
+    }
   }
 }
