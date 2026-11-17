@@ -55,7 +55,8 @@ test('the head, base branch and base SHA must all match the tested context', () 
 test('running and failed reruns cannot remain successful', () => {
   assert.equal(evaluate(pr(), { ...run(), status: 'in_progress' }, jobs(pr())).status, 'in_progress');
   for (const conclusion of ['failure', 'timed_out', 'cancelled']) {
-    assert.equal(evaluate(pr(), { ...run(), conclusion }, jobs(pr())).conclusion, conclusion);
+    assert.equal(evaluate(pr(), { ...run(), conclusion }, [...jobs(pr()),
+      { name: 'backend / test', conclusion }]).conclusion, conclusion === 'timed_out' ? 'failure' : conclusion);
   }
 });
 // Mirrors Octokit, which returns the workflow_runs array when paginating listWorkflowRuns.
@@ -160,7 +161,7 @@ test('only a trusted default-branch run for the exact PR and current base covers
   assert.equal((await createService(serviceMock({ changed: true, trusted: true, trustedSha: C })).mirror(pr())).result.conclusion, 'action_required');
 });
 test('a trusted rerun failure overrides an earlier fork success', async () => {
-  const github = serviceMock({ trusted: true });
+  const github = serviceMock({ trusted: true, trustedJobs: [...jobs(pr()), { name: 'backend / test', conclusion: 'failure' }] });
   const list = github.rest.actions.listWorkflowRuns;
   github.rest.actions.listWorkflowRuns = async args => {
     const response = await list(args);
@@ -283,7 +284,7 @@ test('allowlist downloads only immutable YAML data outside the trusted checkout'
 });
 
 test('a newer fork rerun failure is not hidden by an older trusted success', async () => {
-  const github = serviceMock({ trusted: true });
+  const github = serviceMock({ trusted: true, forkJobs: [...jobs(pr()), { name: 'backend / test', conclusion: 'failure' }] });
   const list = github.rest.actions.listWorkflowRuns;
   github.rest.actions.listWorkflowRuns = async args => {
     const response = await list(args);
@@ -365,7 +366,13 @@ function publisherMock({ current = pr(), latest, rerun = run(), failTrees = fals
     return { data: { workflow_runs: args.event !== 'workflow_dispatch' ? [rerun] : [] } };
   };
   if (failTrees) github.rest.git.getTree = async () => { throw new Error('API unavailable'); };
-  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? (endpoint === listPulls ? [pr()] : jobs(pr()).map(job => ({ ...job, run_attempt: rerun.run_attempt })));
+  // The default fixture is a consistent snapshot. Incomplete-snapshot tests provide their own jobs.
+  const currentJobs = jobs(pr());
+  if (['failure', 'timed_out', 'cancelled'].includes(rerun.conclusion)) {
+    currentJobs.push({ name: 'backend / test', conclusion: rerun.conclusion });
+  }
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ??
+    (endpoint === listPulls ? [pr()] : currentJobs.map(job => ({ ...job, run_attempt: rerun.run_attempt })));
   github.hook = { before() {} };
   return { github, counters, statuses, stored };
 }
@@ -772,7 +779,7 @@ test('a failed fork run reports failure and points the author to re-run it in th
   const { github, statuses } = publisherMock({ rerun: { ...run(), conclusion: 'failure' } });
   await update({ github, context: ctx, core, sleep: async () => {} });
   assert.equal(statuses[0].state, 'failure');
-  assert.equal(statuses[0].description, 'Fork CI failure; re-run it in your fork');
+  assert.equal(statuses[0].description, 'Failed: backend / test; re-run it in your fork');
   assert.equal(statuses[0].target_url, url());
 }));
 
@@ -873,7 +880,8 @@ test('a run cancelled by fail-fast is reported as the failed job', () => {
   const failed = [...jobs(p), { name: 'backend / BackendIT (h2)', conclusion: 'failure' }, { name: 'spark / SparkIT', conclusion: 'cancelled' }];
   const result = evaluate(p, { ...run(), conclusion: 'cancelled' }, failed);
   assert.equal(result.conclusion, 'failure'); assert.equal(result.title, 'Failed: backend / BackendIT (h2)');
-  assert.equal(evaluate(p, { ...run(), conclusion: 'cancelled' }, jobs(p)).conclusion, 'cancelled');
+  assert.equal(evaluate(p, { ...run(), conclusion: 'cancelled' }, [...jobs(p),
+    { name: 'backend / test', conclusion: 'cancelled' }]).conclusion, 'cancelled');
 });
 
 test('only the fail-fast job can cancel the run', async () => {
@@ -1025,7 +1033,7 @@ test('closed-PR checks never cancel upstream runs and tolerate API errors', asyn
 
 test('failed and cancelled fork results suggest re-running in the fork when it fits', async () => withPublisher(async ({ ctx, core }) => {
   for (const [rerun, forkJobs, expected] of [
-    [{ ...run(), conclusion: 'cancelled' }, jobs(pr()), 'Fork CI cancelled; re-run it in your fork'],
+    [{ ...run(), conclusion: 'cancelled' }, [...jobs(pr()), { name: 'backend / test', conclusion: 'cancelled' }], 'Fork CI cancelled; re-run it in your fork'],
     [{ ...run(), conclusion: 'failure' }, [...jobs(pr()), { name: 'x'.repeat(130), conclusion: 'failure' }], `Failed: ${'x'.repeat(130)}`.slice(0, 140)],
     [run(), jobs(pr()), 'All required suites passed']]) {
     const { github, statuses } = publisherMock({ rerun });
@@ -1194,8 +1202,8 @@ test('fork results publish a visible commit status for every lifecycle state', a
   for (const [status, conclusion, expected, description] of [
     ['queued', null, 'pending', 'Fork CI is queued, waiting for a runner'], ['in_progress', null, 'pending', 'Fork CI is running'],
     ['completed', 'success', 'success', 'All required suites passed'],
-    ['completed', 'failure', 'failure', 'Fork CI failure; re-run it in your fork'],
-    ['completed', 'timed_out', 'failure', 'Fork CI timed_out; re-run it in your fork'],
+    ['completed', 'failure', 'failure', 'Failed: backend / test; re-run it in your fork'],
+    ['completed', 'timed_out', 'failure', 'Failed: backend / test; re-run it in your fork'],
     ['completed', 'cancelled', 'error', 'Fork CI cancelled; re-run it in your fork']]) {
     const { github, statuses } = publisherMock({ rerun: { ...run(), status, conclusion } });
     await update({ github, context: ctx, core, sleep: async () => {} });
@@ -1226,7 +1234,7 @@ test('CI edits mirror execution progress and failures without self-approving suc
   for (const [status, conclusion, state, description] of [
     ['queued', null, 'pending', 'Fork CI is queued, waiting for a runner'],
     ['in_progress', null, 'pending', 'Fork CI is running'],
-    ['completed', 'failure', 'failure', 'Fork CI failure; re-run it in your fork'],
+    ['completed', 'failure', 'failure', 'Failed: backend / test; re-run it in your fork'],
     ['completed', 'cancelled', 'error', 'Fork CI cancelled; re-run it in your fork'],
     ['completed', 'success', 'pending', 'Fork CI passed; trusted verification required']]) {
     const { github, statuses } = publisherMock({ rerun: { ...run(), status, conclusion } });
@@ -1327,7 +1335,8 @@ test('CI edits keep the failed job visible after fail-fast cancellation', async 
 
 test('trusted verification of CI edits mirrors running, failure and success', async () => {
   for (const [status, conclusion] of [['in_progress', null], ['completed', 'failure'], ['completed', 'success']]) {
-    const github = serviceMock({ changed: true, trusted: true });
+    const github = serviceMock({ changed: true, trusted: true, trustedJobs: [...jobs(pr()),
+      { name: 'backend / test', conclusion: conclusion || null }] });
     const list = github.rest.actions.listWorkflowRuns;
     github.rest.actions.listWorkflowRuns = async args => {
       const response = await list(args);
@@ -1525,7 +1534,8 @@ test('trusted workflow suite metadata is cached by immutable definition SHA', as
 });
 test('running, failed and untrusted runs do not depend on workflow contents API', async () => {
   for (const kind of ['running', 'failed', 'untrusted']) {
-    const github = serviceMock({ changed: kind === 'untrusted' });
+    const github = serviceMock({ changed: kind === 'untrusted', forkJobs: kind === 'failed'
+      ? [...jobs(pr()), { name: 'backend / test', conclusion: 'failure' }] : jobs(pr()) });
     github.rest.repos.getContent = async () => { throw new Error('must not fetch workflow'); };
     const list = github.rest.actions.listWorkflowRuns;
     github.rest.actions.listWorkflowRuns = async args => {
@@ -2049,7 +2059,8 @@ test('retargeted base results bypass ordering guards from the previous base', as
     github.rest.actions.listWorkflowRuns = async args => ({ data: { workflow_runs:
       args.event === 'workflow_dispatch' && scenario !== 'missing' ? [candidate] : [] } });
     github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ??
-      (endpoint === github.rest.pulls.list ? [p] : jobs(p).map(j => ({ ...j, run_attempt: candidate.run_attempt })));
+      (endpoint === github.rest.pulls.list ? [p] : [...jobs(p), { name: 'backend / test', conclusion: 'failure' }]
+        .map(j => ({ ...j, run_attempt: candidate.run_attempt })));
     ctx.eventName = 'schedule'; ctx.payload = {};
     await update({ github, context: ctx, core, sleep: async () => {} });
     assert.equal(statuses.length, 1, scenario);
@@ -2148,3 +2159,46 @@ test('scheduled publisher reports fork failure when a trusted rerun explicitly t
   assert.match(statuses[0].description, /Failed: backend \/ test/);
   assert.equal(statuses[0].target_url, url());
 }));
+
+
+test('unexplained unsuccessful aggregates recheck late job evidence without a new attempt', async () => {
+  for (const attempt of [1, 2]) {
+    for (const aggregate of ['failure', 'timed_out', 'cancelled']) {
+      for (const visible of ['eligibility', 'gate']) {
+        for (const recovered of [false, true]) {
+          await withPublisher(async ({ ctx, core }) => {
+            const recent = { ...pr(), updated_at: new Date().toISOString() };
+            const rerun = { ...run(), run_attempt: attempt, conclusion: aggregate };
+            const { github, statuses } = publisherMock({ current: recent, rerun });
+            github.rest.pulls.get = async () => ({ data: recent });
+            let ready = false, reads = 0;
+            const paginate = github.paginate;
+            github.paginate = async (endpoint, args) => {
+              if (endpoint === github.rest.pulls.list) return [recent];
+              if (args.run_id !== 1) return paginate(endpoint, args);
+              reads++;
+              const current = jobs(pr()).map(job => ({ ...job, run_attempt: attempt }));
+              if (!ready) return visible === 'gate' ? current
+                : [{ name: 'Resolve fork CI eligibility', run_attempt: attempt, conclusion: 'success' }];
+              return [...current, { name: recovered ? FAIL_FAST : 'backend / test',
+                run_attempt: attempt, conclusion: recovered ? aggregate : 'cancelled' }];
+            };
+            ctx.eventName = 'schedule'; ctx.payload = {};
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(statuses.at(-1).state, 'error');
+            assert.match(statuses.at(-1).description, /needs attention/);
+            const writes = statuses.length, initialReads = reads;
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(statuses.length, writes); assert.ok(reads > initialReads);
+            ready = true;
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(statuses.at(-1).state, recovered ? 'success' : aggregate === 'failure' || aggregate === 'timed_out' ? 'failure' : 'error');
+            const finalReads = reads, finalWrites = statuses.length;
+            await update({ github, context: ctx, core, sleep: async () => {} });
+            assert.equal(reads, finalReads); assert.equal(statuses.length, finalWrites);
+          });
+        }
+      }
+    }
+  }
+});

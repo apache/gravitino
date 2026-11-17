@@ -139,6 +139,13 @@ function evaluateExecution(pr, run, jobs, baseSha) {
       'The publisher will check the results again automatically.');
   }
   if (run.conclusion !== 'success' && !auxiliaryOnly) {
+    // The aggregate may arrive before its unsuccessful job (including the watcher).
+    // Without that evidence a settled cancellation would suppress the next jobs read.
+    if (['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
+        currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion))) {
+      return requiredAction('The unsuccessful run has no corresponding unsuccessful job result yet. ' +
+        'Waiting for consistent results; the publisher will automatically check again.');
+    }
     return { status: 'completed',
       conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
         ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
