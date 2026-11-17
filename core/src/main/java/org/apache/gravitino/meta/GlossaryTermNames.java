@@ -47,9 +47,9 @@ public final class GlossaryTermNames {
   }
   /** Checks the persisted 128-code-point bound. */
   public static void validate(String value) {
-    if (key(value).isEmpty() || value.codePointCount(0, value.length()) > 128)
-      throw new IllegalArgumentException(
-          "Glossary name or source reference must contain 1 to 128 code points");
+    Preconditions.checkArgument(
+        !key(value).isEmpty() && value.codePointCount(0, value.length()) <= 128,
+        "Glossary name or source reference must contain 1 to 128 code points");
   }
 
   private static boolean isWhitespace(int codePoint) {

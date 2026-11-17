@@ -224,6 +224,9 @@ public class TestGlossaryTermMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testWrongNamespaceCannotAccessTerm() throws Exception {
+    IllegalArgumentException nullNamespace =
+        Assertions.assertThrows(IllegalArgumentException.class, () -> service.list(null));
+    Assertions.assertEquals("Expected glossary term namespace: null", nullNamespace.getMessage());
     setupMetalake();
     backend.insert(term(101, "Churn").withSynonyms(new String[] {"loss"}).build(), false);
     for (Namespace wrong :

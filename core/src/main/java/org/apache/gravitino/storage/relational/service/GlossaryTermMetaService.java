@@ -20,6 +20,7 @@
 package org.apache.gravitino.storage.relational.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
@@ -96,15 +97,12 @@ public final class GlossaryTermMetaService {
                 mapper.getForUpdate(metalakeId, GlossaryTermNames.key(entity.name()));
             GlossaryTermPO row = toPO(entity, metalakeId);
             if (overwritten && old != null) {
-              if (!Objects.equals(old.getTermId(), entity.id())) {
-                throw new IllegalArgumentException(
-                    "Cannot overwrite glossary term "
-                        + entity.nameIdentifier()
-                        + " with ID "
-                        + entity.id()
-                        + "; load and retain existing ID "
-                        + old.getTermId());
-              }
+              Preconditions.checkArgument(
+                  Objects.equals(old.getTermId(), entity.id()),
+                  "Cannot overwrite glossary term %s with ID %s; load and retain existing ID %s",
+                  entity.nameIdentifier(),
+                  entity.id(),
+                  old.getTermId());
               row.setCurrentVersion(Math.addExact(old.getCurrentVersion(), 1));
               requireUpdated(mapper.update(row, old.getCurrentVersion()), entity.nameIdentifier());
               mapper.clearSynonyms(row.getTermId());
@@ -182,10 +180,10 @@ public final class GlossaryTermMetaService {
             GlossaryTermPO old = require(mapper, ident, metalakeId);
             GlossaryTermEntity updated =
                 (GlossaryTermEntity) updater.apply((E) fromPO(old, mapper, ident.namespace()));
-            if (!Objects.equals(old.getTermId(), updated.id())
-                || !ident.namespace().equals(updated.namespace()))
-              throw new IllegalArgumentException(
-                  "A glossary update must retain identity and namespace");
+            Preconditions.checkArgument(
+                Objects.equals(old.getTermId(), updated.id())
+                    && ident.namespace().equals(updated.namespace()),
+                "A glossary update must retain identity and namespace");
             GlossaryTermPO row = toPO(updated, old.getMetalakeId());
             row.setCurrentVersion(Math.addExact(old.getCurrentVersion(), 1));
             requireUpdated(mapper.update(row, old.getCurrentVersion()), ident);
@@ -243,11 +241,13 @@ public final class GlossaryTermMetaService {
   }
 
   private void validateNamespace(Namespace ns) {
-    if (ns.length() != 3
-        || !Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ns.level(1))
-        || !"glossary_term".equals(ns.level(2))) {
-      throw new IllegalArgumentException("Expected glossary term namespace: " + ns);
-    }
+    Preconditions.checkArgument(
+        ns != null
+            && ns.length() == 3
+            && Entity.SYSTEM_CATALOG_RESERVED_NAME.equals(ns.level(1))
+            && "glossary_term".equals(ns.level(2)),
+        "Expected glossary term namespace: %s",
+        ns);
   }
 
   private <T> T transaction(Namespace ns, BiFunction<GlossaryTermMetaMapper, Long, T> work) {

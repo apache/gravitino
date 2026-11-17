@@ -226,22 +226,23 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       Preconditions.checkArgument(value.auditInfo != null, "auditInfo cannot be null");
       Preconditions.checkArgument(value.status != null, "status cannot be null");
       value.name = GlossaryTermNames.display(value.name);
-      if (value.namespace.length() != 3
-          || !value.namespace.level(1).equals(Entity.SYSTEM_CATALOG_RESERVED_NAME)
-          || !value.namespace.level(2).equals("glossary_term"))
-        throw new IllegalArgumentException("Expected glossary term namespace");
+      Preconditions.checkArgument(
+          value.namespace.length() == 3
+              && value.namespace.level(1).equals(Entity.SYSTEM_CATALOG_RESERVED_NAME)
+              && value.namespace.level(2).equals("glossary_term"),
+          "Expected glossary term namespace");
       GlossaryTermNames.validate(value.name);
-      if (value.version < 1) throw new IllegalArgumentException("Revision must be positive");
-      if (value.synonyms.length > 100)
-        throw new IllegalArgumentException("At most 100 synonyms are allowed");
+      Preconditions.checkArgument(value.version >= 1, "Revision must be positive");
+      Preconditions.checkArgument(value.synonyms.length <= 100, "At most 100 synonyms are allowed");
       for (int i = 0; i < value.synonyms.length; i++) {
         value.synonyms[i] = GlossaryTermNames.display(value.synonyms[i]);
         GlossaryTermNames.validate(value.synonyms[i]);
       }
       if (value.sourceRef != null) GlossaryTermNames.validate(value.sourceRef);
-      if (value.definition != null
-          && value.definition.getBytes(StandardCharsets.UTF_8).length > 16384)
-        throw new IllegalArgumentException("Definition exceeds 16384 UTF-8 bytes");
+      Preconditions.checkArgument(
+          value.definition == null
+              || value.definition.getBytes(StandardCharsets.UTF_8).length <= 16384,
+          "Definition exceeds 16384 UTF-8 bytes");
       GlossaryTermEntity copy = new GlossaryTermEntity();
       copy.id = value.id;
       copy.name = value.name;
