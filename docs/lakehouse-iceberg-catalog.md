@@ -152,6 +152,14 @@ on the URI scheme:
 - To override the default, explicitly configure `io-impl`.
 - Ensure that the corresponding storage bundle is available in the Iceberg catalog classpath.
 
+Catalogs with a remote warehouse reject client-supplied local filesystem locations, including
+`file:` URIs and paths without a scheme, with HTTP 400. This applies to table and view creation
+(including staged table creation), registration, location updates, namespace locations, and the
+`write.metadata.path` and `write.data.path` properties. An existing local namespace location is
+also rejected when a create request inherits it. ResolvingFileIO still permits locations on
+different remote storage systems, such as S3 and GCS, in the same catalog. Catalogs whose warehouse
+is a local path or `file:` URI retain local filesystem support for development and testing.
+
 Supports using static access-key-id and secret-access-key to access S3 data.
 
 | Configuration item     | Description                                                                                                                                                                                                         | Default value                           | Required |
