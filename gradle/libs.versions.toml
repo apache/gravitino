@@ -182,6 +182,7 @@ woodstox-core = "6.5.1"
 mail = "1.4.1"
 rome = "1.0"
 jettison = "1.5.4"
+org-json = "20260814"
 thrift = "0.12.0"
 derby = "10.14.2.0"
 datanucleus-core = "4.1.17"
@@ -404,6 +405,7 @@ servlet = { group = "javax.servlet", name = "javax.servlet-api", version.ref = "
 mail = { group = "javax.mail", name = "mail", version.ref = "mail" }
 rome = { group = "rome", name = "rome", version.ref = "rome" }
 jettison = { group = "org.codehaus.jettison", name = "jettison", version.ref = "jettison" }
+org-json = { group = "org.json", name = "json", version.ref = "org-json" }
 
 google-auth-http = { group = "com.google.auth", name = "google-auth-library-oauth2-http", version.ref = "google-auth" }
 google-auth-credentials = { group = "com.google.auth", name = "google-auth-library-credentials", version.ref = "google-auth" }
