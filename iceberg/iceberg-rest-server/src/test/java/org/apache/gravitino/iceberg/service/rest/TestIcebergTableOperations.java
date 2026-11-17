@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.restriction.IcebergReadRestrictionLoader;
 import org.apache.gravitino.listener.api.event.Event;
@@ -1440,7 +1441,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
         .thenThrow(new IllegalNameIdentifierException("Dotted names are unsupported"));
 
     IcebergTableOperations operations =
-        new IcebergTableOperations(Mockito.mock(IcebergMetricsManager.class), dispatcher, loader);
+        new IcebergTableOperations(
+            Mockito.mock(IcebergMetricsManager.class),
+            dispatcher,
+            Mockito.mock(IcebergIdempotencyManager.class),
+            loader);
     HttpServletRequest request = Mockito.mock(HttpServletRequest.class);
     Mockito.when(request.getRemoteAddr()).thenReturn("127.0.0.1");
     Mockito.when(request.getHeaderNames()).thenReturn(Collections.emptyEnumeration());

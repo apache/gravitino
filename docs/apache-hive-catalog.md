@@ -78,6 +78,27 @@ When using Gravitino with Spark, pass the Spark Hive connector configuration usi
 
 When using Gravitino authorization for Hive with Apache Ranger, see the [Authorization Hive with Ranger properties](security/authorization-pushdown.md#configure-the-ranger-hadoop-sql-plugin)
 
+### Identifier Case Behavior
+
+Schema, table, and view identifiers are case-insensitive; you can use any casing. Column identifiers
+remain case-sensitive.
+
+:::caution
+After upgrading, if loading an existing mixed-case object reports a retained identifier conflict,
+Gravitino does not support metadata-only unregister of an individual external object. Use this
+catalog-wide recovery procedure:
+
+1. Have an administrator [force-drop the Gravitino catalog](./manage-catalogs-and-schemas.md#drop-a-catalog).
+   This deletes every Gravitino registration and its privileges, tags, and other relationships in
+   the catalog. It does not drop the Hive Metastore databases, tables, views, or physical data.
+2. Recreate the Gravitino catalog and load the objects again. Keep the existing
+   `gravitino.identifier` properties; deleted registrations do not block new imports.
+3. Reapply any privileges, tags, or other governance relationships that the new registrations need.
+
+A source identifier can have only one active Gravitino registration. Coordinate with other
+Gravitino catalogs that share the external source before resetting a catalog.
+:::
+
 ### Catalog Operations
 
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
@@ -245,11 +266,11 @@ Support for altering partitions is under development.
 - Each view must contain exactly one SQL representation.
 - Supports creating views with the `hive`, `trino`, `flink`, or `spark` dialect.
 - When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, `flink`, or `spark` dialect.
-- For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
+- For the `hive`, `flink`, and `spark` dialects, omit `defaultCatalog` and `defaultSchema` or set both to `null`.
 - For the `trino` dialect, `defaultSchema` requires `defaultCatalog` to also be set (a schema without a catalog cannot be represented).
 - The `trino` dialect requires at least one output column, and is stored using Trino's own native "Presto View" Hive Metastore encoding, so a view created through Gravitino is interoperable with a native Trino/Presto Hive connector pointed at the same Hive Metastore, and vice versa. The HMS `presto_view` property this relies on is reserved and managed internally based on the view's dialect; it cannot be set or removed directly. Gravitino's view model cannot represent a native Trino view's owner, `runAsInvoker`, or SQL path, so replacing an existing native view that has a non-default value for any of them is rejected rather than silently discarding it.
 - The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
-- The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
+- The `spark` dialect requires the `spark.sql.create.version` view property so the Hive catalog can identify Spark views when it loads them.
 
 ### View Operations
 

@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
@@ -308,10 +309,17 @@ class TestRegisterTableAuthzHandler {
       throws Throwable {
     Method method =
         IcebergNamespaceOperations.class.getMethod(
-            "registerTable", String.class, String.class, RegisterTableRequest.class, String.class);
+            "registerTable",
+            String.class,
+            String.class,
+            RegisterTableRequest.class,
+            String.class,
+            String.class,
+            UriInfo.class);
     MethodInvocation invocation = mock(MethodInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
-    when(invocation.getArguments()).thenReturn(new Object[] {CATALOG + "/", SCHEMA, request, null});
+    when(invocation.getArguments())
+        .thenReturn(new Object[] {CATALOG + "/", SCHEMA, request, null, null, null});
     when(invocation.proceed()).thenReturn(PROCEEDED);
     return invocation;
   }

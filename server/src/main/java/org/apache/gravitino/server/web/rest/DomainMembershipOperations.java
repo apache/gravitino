@@ -26,6 +26,7 @@ import java.util.Locale;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -49,7 +50,7 @@ import org.apache.gravitino.utils.NameValidationUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** REST queries for the recorded leaf members in a domain's scope. */
+/** REST queries for the members in a domain's scope. */
 @Path("/metalakes/{metalake}/domains/{domain}/objects")
 public class DomainMembershipOperations {
 
@@ -72,10 +73,11 @@ public class DomainMembershipOperations {
    *
    * @param metalake The metalake name.
    * @param domain The domain name.
-   * @param types Comma-separated leaf types, or null for all supported types.
+   * @param types Comma-separated member types, or null for all types.
    * @param nameContains Case-insensitive full-name substring, or null for any name.
    * @param domains Repeated domain names selecting the union of their scopes.
-   * @return The matching recorded members with all applicable relations.
+   * @param expand Whether to expand catalogs and schemas into the recorded leaf objects under them.
+   * @return The matching members with all applicable relations.
    */
   @GET
   @Produces("application/vnd.gravitino.v1+json")
@@ -88,14 +90,15 @@ public class DomainMembershipOperations {
       @PathParam("domain") String domain,
       @QueryParam("types") @Nullable String types,
       @QueryParam("nameContains") @Nullable String nameContains,
-      @QueryParam("domains") List<String> domains) {
+      @QueryParam("domains") List<String> domains,
+      @QueryParam("expand") @DefaultValue("false") boolean expand) {
     LOG.info("Received list members request for domain {} under metalake {}", domain, metalake);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             DomainMemberFilter.Builder filter =
-                DomainMemberFilter.builder().withNameContains(nameContains);
+                DomainMemberFilter.builder().withNameContains(nameContains).withExpand(expand);
             if (types != null) {
               filter.withTypes(
                   Arrays.stream(types.split(",", -1))
@@ -122,7 +125,8 @@ public class DomainMembershipOperations {
   private static MetadataObject.Type parseMemberType(String value) {
     try {
       MetadataObject.Type type = MetadataObject.Type.valueOf(value.trim().toUpperCase(Locale.ROOT));
-      if (DomainMember.SUPPORTED_TYPES.contains(type)) {
+      if (DomainMember.SUPPORTED_TYPES.contains(type)
+          || DomainMember.CONTAINER_TYPES.contains(type)) {
         return type;
       }
     } catch (IllegalArgumentException ignored) {
@@ -132,6 +136,8 @@ public class DomainMembershipOperations {
         "Unsupported domain member type '"
             + value
             + "'. Supported types: "
-            + DomainMember.SUPPORTED_TYPES);
+            + DomainMember.SUPPORTED_TYPES
+            + " and, without expand, "
+            + DomainMember.CONTAINER_TYPES);
   }
 }

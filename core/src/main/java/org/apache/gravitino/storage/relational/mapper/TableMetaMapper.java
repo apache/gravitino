@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
 import javax.annotation.Nullable;
+import org.apache.gravitino.storage.relational.po.TableNamePO;
 import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
@@ -29,6 +30,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Result;
 import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -42,6 +44,24 @@ import org.apache.ibatis.annotations.UpdateProvider;
  */
 public interface TableMetaMapper {
   String TABLE_NAME = "table_meta";
+
+  /**
+   * Looks up table and ancestor names in one statement. An absent parent has a null name.
+   *
+   * @param ids Stable table IDs.
+   * @return Name components of the live tables.
+   */
+  @Select({
+    "<script>",
+    "SELECT t.table_id AS tableId, t.table_name AS tableName, s.schema_name AS schemaName,",
+    "c.catalog_name AS catalogName FROM table_meta t",
+    "LEFT JOIN schema_meta s ON s.schema_id = t.schema_id AND s.deleted_at = 0",
+    "LEFT JOIN catalog_meta c ON c.catalog_id = s.catalog_id AND c.deleted_at = 0",
+    "WHERE t.deleted_at = 0 AND t.table_id IN",
+    "<foreach collection='ids' item='id' open='(' separator=',' close=')'>#{id}</foreach>",
+    "</script>"
+  })
+  List<TableNamePO> listTableNamesByIds(@Param("ids") List<Long> ids);
 
   /**
    * Reads table metadata, its current version, and columns from one database statement snapshot.
@@ -160,17 +180,24 @@ public interface TableMetaMapper {
       @Param("newSchemaId") Long newSchemaId);
 
   /**
-   * Soft-deletes a table only if its version has not changed since the caller read it.
+   * Soft-deletes an observed table registration in the same catalog lifetime.
    *
-   * @param tableId the table ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of deleted rows; zero means the table changed or disappeared
+   * @param tableId the stable external identity
+   * @param currentVersion the observed row version
+   * @param catalogId the observed parent catalog identity
+   * @param schemaId the observed parent schema identity
+   * @param tableName the observed table name
+   * @return the number of affected rows
    */
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
       method = "softDeleteTableMetasByTableId")
   Integer softDeleteTableMetasByTableId(
-      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion);
+      @Param("tableId") Long tableId,
+      @Param("currentVersion") Long currentVersion,
+      @Param("catalogId") Long catalogId,
+      @Param("schemaId") Long schemaId,
+      @Param("tableName") String tableName);
 
   @UpdateProvider(
       type = TableMetaSQLProviderFactory.class,
