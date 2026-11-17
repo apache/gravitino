@@ -202,12 +202,14 @@ public final class GlossaryTermMetaService {
     try {
       return transaction(
           ident.namespace(),
+          true,
           (mapper, metalakeId) -> {
             GlossaryTermPO row = require(mapper, ident, metalakeId);
             long deletedAt = Math.max(1, System.currentTimeMillis());
             requireUpdated(
                 mapper.delete(row.getTermId(), row.getCurrentVersion(), deletedAt), ident);
             mapper.deleteSynonyms(row.getTermId(), deletedAt);
+            GlossaryTermRelService.getInstance().removeTerm(metalakeId, row.getTermId());
             return true;
           });
     } catch (NoSuchEntityException e) {
@@ -223,16 +225,22 @@ public final class GlossaryTermMetaService {
         mapper -> {
           mapper.dropMetalake(metalakeId, deletedAt);
           mapper.dropMetalakeSynonyms(metalakeId, deletedAt);
+          GlossaryTermRelService.getInstance().dropMetalake(metalakeId);
         });
   }
 
-  /** Purges at most limit expired definitions and their deleted synonyms atomically. */
+  /**
+   * Purges at most limit expired relations/definitions and the definitions' synonyms atomically.
+   */
   public int collect(long cutoff, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
         mapper -> {
-          int count = 0;
-          for (Long id : mapper.expired(cutoff, limit)) {
+          int count = GlossaryTermRelService.getInstance().collect(cutoff, limit);
+          if (count == limit) {
+            return count;
+          }
+          for (Long id : mapper.expired(cutoff, limit - count)) {
             mapper.purgeSynonyms(id);
             count += mapper.purge(id);
           }
@@ -251,6 +259,11 @@ public final class GlossaryTermMetaService {
   }
 
   private <T> T transaction(Namespace ns, BiFunction<GlossaryTermMetaMapper, Long, T> work) {
+    return transaction(ns, false, work);
+  }
+
+  private <T> T transaction(
+      Namespace ns, boolean hierarchyLock, BiFunction<GlossaryTermMetaMapper, Long, T> work) {
     validateNamespace(ns);
     return SessionUtils.doWithCommitAndFetchResult(
         GlossaryTermMetaMapper.class,
@@ -268,6 +281,10 @@ public final class GlossaryTermMetaService {
                   m -> m.selectMetalakeMetaByIdForShare(observed.getMetalakeId()));
           if (locked == null || !Objects.equals(locked.getMetalakeName(), ns.level(0)))
             throw new NoSuchEntityException("Metalake %s no longer exists", ns.level(0));
+          if (hierarchyLock) {
+            // Term deletion must exclude new edges before locking the term itself.
+            GlossaryTermRelService.getInstance().lockHierarchy(locked.getMetalakeId());
+          }
           SessionUtils.clearSessionCache();
           return work.apply(mapper, locked.getMetalakeId());
         });

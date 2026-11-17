@@ -53,6 +53,42 @@ import org.opentest4j.AssertionFailedError;
 public class TestSQLScripts extends TestJDBCBackend {
 
   @TestTemplate
+  void testGlossaryRelationSchemasAndUpgrade() throws Exception {
+    Path scripts = upgradeScriptDirectory();
+    String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";
+    File upgrade = scripts.resolve("upgrade-1.3.0-to-2.0.0" + suffix).toFile();
+    for (String initialVersion : List.of("1.3.0", "2.0.0")) {
+      dropAllTables();
+      executeScript(scripts.resolve("schema-" + initialVersion + suffix).toFile());
+      if (initialVersion.equals("1.3.0")) {
+        executeScript(upgrade);
+        executeScript(upgrade);
+      }
+      try (SqlSession session =
+              SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+          Connection connection = session.getConnection();
+          Statement statement = connection.createStatement()) {
+        statement.executeUpdate("INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (100)");
+        Assertions.assertThrows(
+            SQLException.class,
+            () ->
+                statement.executeUpdate(
+                    "INSERT INTO glossary_hierarchy_lock (metalake_id) VALUES (100)"));
+        String edge =
+            "INSERT INTO glossary_term_rel (metalake_id,from_term_id,to_term_id,rel_type,deleted_at) VALUES (100,101,102,'BROADER',0)";
+        statement.executeUpdate(edge);
+        Assertions.assertThrows(SQLException.class, () -> statement.executeUpdate(edge));
+        statement.executeUpdate("UPDATE glossary_term_rel SET deleted_at=123 WHERE deleted_at=0");
+        statement.executeUpdate(edge);
+        try (ResultSet rows = statement.executeQuery("SELECT COUNT(*) FROM glossary_term_rel")) {
+          Assertions.assertTrue(rows.next());
+          Assertions.assertEquals(2, rows.getInt(1));
+        }
+      }
+    }
+  }
+
+  @TestTemplate
   void testReimportedIdentifiersWithFreshAndUpgradedSchemas() throws SQLException, IOException {
     Path scripts = upgradeScriptDirectory();
     String suffix = "-" + backendType.toLowerCase(Locale.ROOT) + ".sql";

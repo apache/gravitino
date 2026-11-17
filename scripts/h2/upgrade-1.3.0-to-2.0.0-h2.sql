@@ -456,3 +456,26 @@ CREATE TABLE IF NOT EXISTS glossary_term_synonym (
 );
 COMMENT ON TABLE glossary_term_synonym IS 'glossary term synonyms, different terms may share the same synonym';
 CREATE INDEX IF NOT EXISTS idx_glossary_synonym ON glossary_term_synonym (metalake_id, synonym_key, deleted_at);
+
+CREATE TABLE IF NOT EXISTS glossary_term_rel (
+    metalake_id BIGINT NOT NULL,
+    from_term_id BIGINT NOT NULL,
+    to_term_id BIGINT NOT NULL,
+    rel_type VARCHAR(16) NOT NULL,
+    deleted_at BIGINT NOT NULL DEFAULT 0,
+    PRIMARY KEY (from_term_id, to_term_id, rel_type, deleted_at)
+);
+CREATE INDEX IF NOT EXISTS idx_glossary_rel_to ON glossary_term_rel (to_term_id, rel_type, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_glossary_rel_metalake ON glossary_term_rel (metalake_id, deleted_at);
+COMMENT ON TABLE glossary_term_rel IS 'glossary directed broader and canonical related edges';
+COMMENT ON COLUMN glossary_term_rel.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_rel.from_term_id IS 'child id for BROADER, smaller endpoint id for RELATED';
+COMMENT ON COLUMN glossary_term_rel.to_term_id IS 'parent id for BROADER, larger endpoint id for RELATED';
+COMMENT ON COLUMN glossary_term_rel.rel_type IS 'BROADER or RELATED, e.g. A BROADER B means A is a kind of B';
+COMMENT ON COLUMN glossary_term_rel.deleted_at IS 'retirement time in epoch milliseconds, advanced past retained generations to avoid collisions, 0 means live';
+
+CREATE TABLE IF NOT EXISTS glossary_hierarchy_lock (
+    metalake_id BIGINT NOT NULL PRIMARY KEY
+);
+COMMENT ON TABLE glossary_hierarchy_lock IS 'serializes glossary hierarchy and name checks within a metalake';
+COMMENT ON COLUMN glossary_hierarchy_lock.metalake_id IS 'owning metalake id, one database mutex row per metalake';
