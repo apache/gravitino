@@ -46,7 +46,7 @@ import Icons from '@/components/Icons'
 import SectionContainer from '@/components/SectionContainer'
 import AssociatedTable from '@/components/AssociatedTable'
 import CreatePolicyDialog from './CreatePolicyDialog'
-import { accessControlPrivilegeOptions } from './constants'
+import { accessControlPrivilegeOptions, policyTypeLabels } from './constants'
 import { formatToDateTime } from '@/lib/utils'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import { use } from 'react'
@@ -182,7 +182,7 @@ export default function PoliciesPage() {
         key: 'policyType',
         ellipsis: true,
         width: 150,
-        render: (_, record) => <>{record.policyType}</>
+        render: (_, record) => <>{policyTypeLabels[record.policyType] || record.policyType}</>
       },
       {
         title: 'Comment',
@@ -290,7 +290,9 @@ export default function PoliciesPage() {
             <Descriptions.Item label='Enabled'>
               <Switch checked={currentPolicy?.enabled} disabled size='small' />
             </Descriptions.Item>
-            <Descriptions.Item label='Policy Type'>{currentPolicy?.policyType}</Descriptions.Item>
+            <Descriptions.Item label='Policy Type'>
+              {policyTypeLabels[currentPolicy?.policyType] || currentPolicy?.policyType}
+            </Descriptions.Item>
             {currentPolicy?.policyType === 'system_access_control' ? (
               <>
                 <Descriptions.Item label='Applicable Roles'>

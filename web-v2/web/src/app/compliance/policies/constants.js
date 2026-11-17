@@ -17,6 +17,11 @@
  * under the License.
  */
 
+export const policyTypeLabels = {
+  custom: 'Custom',
+  system_access_control: 'System Access Control'
+}
+
 // Keep in sync with AccessControlContent.PERMITTED_PRIVILEGES and the OpenAPI enum.
 export const accessControlPrivilegeOptions = [
   { label: 'Select Table', value: 'select_table' },

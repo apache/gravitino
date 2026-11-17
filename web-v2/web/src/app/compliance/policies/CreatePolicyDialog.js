@@ -29,7 +29,7 @@ import { genUpdates } from '@/lib/utils'
 import { useAppDispatch, useAppSelector } from '@/lib/hooks/useStore'
 import { getPolicyDetails, createPolicy, updatePolicy } from '@/lib/store/policies'
 import { fetchRoles } from '@/lib/store/roles'
-import { accessControlPrivilegeOptions } from './constants'
+import { accessControlPrivilegeOptions, policyTypeLabels } from './constants'
 
 const { Paragraph } = Typography
 const { TextArea } = Input
@@ -187,9 +187,9 @@ export default function CreatePolicyDialog({ ...props }) {
             </Form.Item>
             <Form.Item name='policyType' label='Policy Type'>
               <Select disabled={!!editPolicy}>
-                <Select.Option value='custom'>Custom</Select.Option>
+                <Select.Option value='custom'>{policyTypeLabels.custom}</Select.Option>
                 <Select.Option value='system_access_control' disabled={!anthEnable}>
-                  System Access Control
+                  {policyTypeLabels.system_access_control}
                 </Select.Option>
               </Select>
             </Form.Item>
