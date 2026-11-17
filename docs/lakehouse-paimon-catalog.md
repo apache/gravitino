@@ -345,7 +345,7 @@ is an exception, because it publishes a full snapshot, so the first write is vis
 Run a full compaction to establish the visibility boundary:
 
 ```sql
-CALL paimon_catalog.sys.compact(table => 'db.tbl', compact_strategy => 'full');
+CALL paimon_catalog.sys.compact(`table` => 'db.tbl', compact_strategy => 'full');
 ```
 
 Alternatively, let Paimon compact periodically with `compaction.optimization-interval` or
