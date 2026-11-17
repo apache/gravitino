@@ -82,7 +82,7 @@ public class PolicyRoleRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  /** Returns SQL for soft-deleting references when a policy is deleted or its content changes. */
+  /** Returns SQL for soft-deleting references when a policy is deleted. */
   public String softDeleteByPolicyId(@Param("policyId") Long policyId) {
     return "UPDATE "
         + POLICY_ROLE_RELATION_TABLE_NAME
