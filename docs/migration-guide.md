@@ -100,9 +100,12 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
 - Before starting the 2.0 server, update `catalogs/kafka/conf/kafka.conf`:
   - Remove all provider properties.
   - Replace every non-sensitive `${<alias>:...}` reference with the value it resolved to, for
-    example a numeric timeout. Removing only the provider properties leaves the reference
-    unresolved: a new catalog inherits it, is created, and then fails to connect, because the
-    Kafka client cannot parse the value.
+    example a timeout. Removing only the provider properties leaves the reference unresolved,
+    and a new catalog inherits the literal `${...}` text. A numeric option such as
+    `gravitino.bypass.request.timeout.ms` then fails to connect because the Kafka client cannot
+    parse it. A string option such as `gravitino.bypass.metrics.context.region` is kept as the
+    literal placeholder and a connection test can still succeed, so replace every reference even
+    when the connection test passes.
   - Remove every credential-bearing setting from the file and bind it per catalog after the
     upgrade (see below). Keep only non-sensitive defaults in this file, because its values become
     catalog properties that can be returned by the REST API.

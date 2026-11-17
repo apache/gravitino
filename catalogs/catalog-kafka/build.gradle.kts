@@ -34,12 +34,10 @@ dependencies {
   implementation(libs.slf4j.api)
 
   // kafka-clients pulls at.yawk.lz4:lz4-java 1.10.1, which is affected by GHSA-mcr4-qmvw-px4g
-  // (CVE-2026-106451). 1.11.4 contains the fix and keeps the net.jpountz.lz4 API used by Kafka.
-  constraints {
-    implementation(libs.yawk.lz4.java) {
-      because("GHSA-mcr4-qmvw-px4g is fixed in 1.11.4")
-    }
-  }
+  // (CVE-2026-106451). Declare 1.11.4 as a direct dependency instead of a constraint, so it also
+  // wins in the published POM: a constraint only becomes dependencyManagement there, and Maven
+  // consumers of this artifact would still resolve 1.10.1 through kafka-clients.
+  runtimeOnly(libs.yawk.lz4.java)
 
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
