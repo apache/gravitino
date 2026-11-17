@@ -18,13 +18,28 @@
  */
 package org.apache.gravitino.maintenance;
 
+import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 
 /** Configuration for table maintenance scheduler pools (§7.2). */
 public final class TableMaintenanceConfig {
+
+  /**
+   * USER principal TMS uses when submitting jobs with authorization enabled. Required when {@link
+   * Configs#ENABLE_AUTHORIZATION} is {@code true}; ignored when authorization is disabled.
+   */
+  public static final ConfigEntry<Optional<String>> JOB_SUBMITTER =
+      new ConfigBuilder("gravitino.maintenance.jobSubmitter")
+          .doc(
+              "USER that TMS uses to submit maintenance jobs when authorization is enabled."
+                  + " Required when gravitino.authorization.enable=true.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .createWithOptional();
 
   public static final ConfigEntry<Integer> SCHEDULER_EXPAND_THREADS =
       new ConfigBuilder("gravitino.maintenance.scheduler.expandThreads")
