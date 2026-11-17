@@ -165,7 +165,7 @@ public final class DomainEventDispatcher implements DomainDispatcher {
     String user = PrincipalUtils.getCurrentUserName();
     DomainInfo requested =
         new DomainInfo(
-            name, comment, properties, Domain.Status.DRAFT, null, backingTag.name(), null);
+            name, comment, properties, Domain.Status.DRAFT, null, tagName(backingTag), null);
     eventBus.dispatchEvent(
         new CreateDomainPreEvent(user, metalake, name, requested, createBackingTag));
     try {
@@ -195,7 +195,7 @@ public final class DomainEventDispatcher implements DomainDispatcher {
     String user = PrincipalUtils.getCurrentUserName();
     DomainInfo requested =
         new DomainInfo(
-            name, comment, properties, Domain.Status.DRAFT, parent, backingTag.name(), null);
+            name, comment, properties, Domain.Status.DRAFT, parent, tagName(backingTag), null);
     eventBus.dispatchEvent(
         new CreateDomainPreEvent(user, metalake, name, requested, createBackingTag));
     try {

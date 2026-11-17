@@ -491,9 +491,10 @@ Membership depends only on the presence of the backing tag. An object that carri
 without values, matches; any value on an assignment is ignored.
 
 `domain.updateBackingTag("finance_data")` or Python `domain.update_backing_tag("finance_data")`
-replaces the binding with an existing tag. Pass `null` / `None` to remove it. Repeating a binding is a no-op. Removing a binding does not
-delete the tag, change assignments, or remove child membership roll-ups. Replacing it does not migrate
-members: only effective assignments matching the new binding contribute the domain's own members.
+replaces the binding with an existing tag. Pass `null` / `None` to remove it. Repeating a binding is
+a no-op. Removing a binding does not delete the tag, change assignments, or remove child membership
+roll-ups. Replacing it does not migrate members: only objects carrying the new tag contribute the
+domain's own members.
 
 Bindings use tag identity (ID), not its name. Renaming a tag preserves membership and exposes the new
 tag name on a freshly loaded domain. Deleting it leaves the domain without a backing tag. Recreating

@@ -91,7 +91,7 @@ public interface DomainOperations {
    * @throws BackingTagAlreadyBoundException If the existing tag already backs another domain.
    * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
    *     or may not create tags.
-   * @throws IllegalArgumentException If the backing tag is null.
+   * @throws IllegalArgumentException If the backing tag is null or blank.
    */
   Domain createDomain(
       String name,

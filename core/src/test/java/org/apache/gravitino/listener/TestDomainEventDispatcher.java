@@ -245,6 +245,28 @@ class TestDomainEventDispatcher {
   }
 
   @Test
+  void testNullBackingTagEmitsFailure() {
+    DomainDispatcher delegate = mock(DomainDispatcher.class);
+    when(delegate.createDomain(metalake, name, comment, properties, null, false))
+        .thenThrow(new IllegalArgumentException("null backing tag"));
+    when(delegate.createSubdomain(metalake, parent, name, comment, properties, null, false))
+        .thenThrow(new IllegalArgumentException("null backing tag"));
+    DomainEventDispatcher events = new DomainEventDispatcher(bus, delegate);
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> events.createDomain(metalake, name, comment, properties, null, false));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> events.createSubdomain(metalake, parent, name, comment, properties, null, false));
+    assertEquals(4, observed.size());
+    for (int i = 0; i < 4; i += 2) {
+      CreateDomainPreEvent pre = (CreateDomainPreEvent) observed.get(i);
+      assertFalse(pre.domainInfo().backingTag().isPresent());
+      assertInstanceOf(CreateDomainFailureEvent.class, observed.get(i + 1));
+    }
+  }
+
+  @Test
   void testCreateDomain() {
     verifyOperation(
         d -> d.createDomain(metalake, name, comment, properties, backingTag, createBackingTag),

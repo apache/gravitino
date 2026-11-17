@@ -199,10 +199,11 @@ public interface Domain extends Auditable {
    * @throws BackingTagAlreadyBoundException If the tag already backs another domain.
    * @throws ForbiddenException If a tag is set and the caller owns neither the tag nor the
    *     metalake. Removing the backing tag needs no privilege on the tag.
+   * @throws IllegalArgumentException If the tag name is blank.
    */
   Domain updateBackingTag(@Nullable String backingTag)
       throws NoSuchDomainException, NoSuchTagException, BackingTagAlreadyBoundException,
-          ForbiddenException;
+          ForbiddenException, IllegalArgumentException;
 
   /**
    * Creates a sub-domain under this domain. The new sub-domain is in {@link Status#DRAFT} status.
@@ -228,7 +229,7 @@ public interface Domain extends Auditable {
    * @throws BackingTagAlreadyBoundException If the existing tag already backs another domain.
    * @throws ForbiddenException If the caller does not own the existing backing tag or the metalake,
    *     or may not create tags.
-   * @throws IllegalArgumentException If the backing tag is null, this domain is itself a
+   * @throws IllegalArgumentException If the backing tag is null or blank, this domain is itself a
    *     sub-domain, or the sub-domain cannot be created under this domain.
    */
   Domain createSubdomain(

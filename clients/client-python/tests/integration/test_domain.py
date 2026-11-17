@@ -291,7 +291,7 @@ class TestDomain(DomainApiEdgesMixin, IntegrationTestEnv):
             [r.type() for r in direct["ice.schema.orders"].relations()],
         )
 
-    def test_members_relations_filters_and_nearest_assignment(self):
+    def test_members_relations_and_filters(self):
         catalog, table, hidden, view, semantic, fileset, model = self._catalogs()
         self.lake.create_tag("department", None, {}, ["finance", "risk"])
         self.lake.create_tag("risk", None, {})

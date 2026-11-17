@@ -41,8 +41,9 @@ class DomainBackingTagDTO:
         return self._name
 
     def validate(self) -> None:
-        Precondition.check_string_not_empty(
-            self._name, "backingTag.name must not be blank"
+        Precondition.check_argument(
+            isinstance(self._name, str) and self._name.strip() != "",
+            "backingTag.name must be a non-blank string",
         )
 
 
