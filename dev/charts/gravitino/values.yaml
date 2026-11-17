@@ -132,7 +132,8 @@ postgresql:
     ##
     port: ""
     ## @param init.sslMode libpq sslmode (PGSSLMODE), for example require. For external PostgreSQL, defaults to
-    ## sslmode from entity.jdbcUrl when set. In-chart Bitnami (postgresql.enabled=true) does not inherit entity.jdbcUrl sslmode.
+    ## sslmode from entity.jdbcUrl when set, or verify-full when the URL has ssl=true/ssl=1 and no sslmode (JDBC TLS default).
+    ## In-chart Bitnami (postgresql.enabled=true) does not inherit entity.jdbcUrl sslmode.
     ## sslmode=require does not need a CA. verify-ca and verify-full require init.ssl.existingSecret
     ## (JDBC sslrootcert is not copied into the init container).
     ##
