@@ -145,7 +145,7 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
 
 | Table                      | Unique key                                                                     | Other index                              |
 | -------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------- |
-| `glossary_term_meta`       | `(metalake_id, name_key, deleted_at)`, `(metalake_id, source_ref, deleted_at)` |                                          |
+| `glossary_term_meta`       | `(metalake_id, name_key)`, `(metalake_id, source_ref)` for live rows only      |                                          |
 | `glossary_term_synonym`    | `(term_id, synonym_key, deleted_at)`                                           | `(metalake_id, synonym_key, deleted_at)` |
 | `glossary_term_rel`        | `(from_term_id, to_term_id, rel_type, deleted_at)`                             | `(to_term_id, rel_type)`                 |
 | `glossary_term_domain_rel` | `(term_id, domain_id, deleted_at)`                                             | `(domain_id)`                            |
@@ -153,6 +153,11 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
 
 - The tables are added to the H2, MySQL and PostgreSQL schemas and to the `upgrade-1.3.0-to-2.0.0`
   scripts.
+- **Live definition uniqueness**: only rows with `deleted_at = 0` reserve a name or source
+  reference. PostgreSQL uses partial unique indexes. H2 and MySQL add a generated `live_row`
+  discriminator (`1` for live rows, `NULL` for deleted rows) to the unique keys. Keep the actual
+  deletion timestamp for GC; distinct deleted generations may share that timestamp without
+  colliding. MySQL indexes the binary source-reference key described below.
 - **Normalized key**: `key(s)` trims `s`, turns each run of spaces into one space, and lower-cases
   it (`Locale.ROOT`). Names, synonyms and lookups all use `key()`, so they compare the same way.
 - **Names** are unique in a metalake by `name_key = key(name)`. So `Churn` and `churn` are the same
@@ -178,9 +183,12 @@ TermVersion  { termId, version, state, snapshot, audit_info }   // Step 2 only; 
   synonyms. A definition has at most 16,384 UTF-8 bytes. A non-null `sourceRef` has at most 128
   Unicode code points. Reject over-limit values with 400 before writing; never truncate them.
   Apply the same bounds to create, alter and future imports. Store `source_ref` as nullable
-  `VARCHAR(128)` with exact, case-sensitive comparison. Under utf8mb4 its maximum key payload
-  is 512 bytes; with two BIGINT key columns the composite payload is 528 bytes, avoiding a
-  prefix index or a dependency on the 3072-byte MySQL index limit.
+  `VARCHAR(128)` on MySQL/PostgreSQL and `VARCHAR(256)` on H2 to accommodate UTF-16 storage,
+  while Java enforces the 128-code-point bound. Comparison is exact and case-sensitive, including
+  trailing spaces. MySQL uses a generated `VARBINARY(512)` source-reference key because its 5.7
+  string collation pads spaces. With the metalake BIGINT and nullable live-row INT, the explicit
+  composite key payload is at most 524 bytes, avoiding a prefix index or a dependency on the
+  3072-byte MySQL index limit.
 - `MetadataObject.Type.GLOSSARY_TERM` is added for owners, tags, events and audit. Privileges
   **cannot be granted on a single term**: the role APIs reject them.
 - Terms, relations and bindings are not cached. Owner-based glossary authorization resolves the
