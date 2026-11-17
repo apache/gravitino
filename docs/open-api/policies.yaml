@@ -317,7 +317,7 @@ components:
       nullable: true
       description: >
         When true, a successful Iceberg REST table update can enqueue commit-triggered
-        maintenance. Orphan file removal rejects `commitTrigger=true`.
+        maintenance.
     minIntervalMs:
       type: integer
       format: int64
@@ -328,15 +328,19 @@ components:
         When omitted, the server uses the per-type default.
     jobOptions:
       type: object
+      nullable: true
       additionalProperties:
         type: string
         minLength: 1
+        pattern: '[\s\S]*\S[\s\S]*'
       description: Optional Spark/job option bag. Keys and values must be non-blank.
     updaterOptions:
       type: object
+      nullable: true
       additionalProperties:
         type: string
         minLength: 1
+        pattern: '[\s\S]*\S[\s\S]*'
       description: >
         Optional updater option bag (for example `gravitino_uri`). Keys and values must be
         non-blank.
@@ -477,6 +481,13 @@ components:
       additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
+        # Explicit key wins over the YAML merge: orphan cleanup never accepts commitTrigger=true.
+        commitTrigger:
+          type: boolean
+          nullable: true
+          enum: [false]
+          description: >
+            Must be false or omitted. Orphan file removal rejects commit-triggered runs.
         olderThanDays:
           type: integer
           format: int64
