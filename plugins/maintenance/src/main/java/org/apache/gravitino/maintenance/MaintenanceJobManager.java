@@ -23,8 +23,8 @@ import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import javax.annotation.Nullable;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
@@ -60,7 +60,7 @@ public class MaintenanceJobManager {
   private static volatile MaintenanceJobManager instance;
 
   private final JobOperationDispatcher jobOperationDispatcher;
-  @Nullable private final OwnerDispatcher ownerDispatcher;
+  private final Supplier<OwnerDispatcher> ownerDispatcher;
 
   /**
    * Returns the shared TMS job manager for the server process.
@@ -73,19 +73,23 @@ public class MaintenanceJobManager {
         if (instance == null) {
           GravitinoEnv env = GravitinoEnv.getInstance();
           instance =
-              new MaintenanceJobManager(
-                  env.jobOperationDispatcher(), env.internalOwnerDispatcher());
+              new MaintenanceJobManager(env.jobOperationDispatcher(), env::internalOwnerDispatcher);
         }
       }
     }
     return instance;
   }
 
+  /**
+   * @param jobOperationDispatcher job submit/cancel dispatcher
+   * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
+   *     disabled (same shape as table/view hook dispatchers)
+   */
   @VisibleForTesting
   MaintenanceJobManager(
-      JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
+      JobOperationDispatcher jobOperationDispatcher, Supplier<OwnerDispatcher> ownerDispatcher) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
-    this.ownerDispatcher = ownerDispatcher;
+    this.ownerDispatcher = Preconditions.checkNotNull(ownerDispatcher);
   }
 
   /**
@@ -109,14 +113,15 @@ public class MaintenanceJobManager {
 
     Long jobId = null;
     try {
+      OwnerDispatcher owners = ownerDispatcher.get();
       JobEntity job;
-      if (ownerDispatcher == null) {
+      if (owners == null) {
         // Ownership disabled: JobManager skips setOwner.
         job =
             jobOperationDispatcher.runJob(
                 metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
       } else {
-        String ownerUser = requireMetalakeOwnerUser(ownerDispatcher, metalake);
+        String ownerUser = requireMetalakeOwnerUser(owners, metalake);
         try {
           job =
               PrincipalUtils.doAs(
