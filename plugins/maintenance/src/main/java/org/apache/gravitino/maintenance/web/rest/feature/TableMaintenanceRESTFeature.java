@@ -99,11 +99,9 @@ public class TableMaintenanceRESTFeature implements Feature {
           "Table maintenance requires gravitino.entity.store = relational");
     }
 
-    // Authorization on => jobSubmitter must be set so TMS can doAs a USER for runJob.
-    String jobSubmitter = null;
-    if (config.get(Configs.ENABLE_AUTHORIZATION)) {
-      jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).get();
-    }
+    boolean authorizationEnabled = config.get(Configs.ENABLE_AUTHORIZATION);
+    // When authorization is on, resolveJobSubmitter requires a non-blank jobSubmitter.
+    String jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).orElse(null);
 
     TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(config);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
@@ -124,7 +122,8 @@ public class TableMaintenanceRESTFeature implements Feature {
         dataSource,
         maintenanceConfig,
         config,
-        MaintenanceJobManager.getInstance(env.jobOperationDispatcher(), jobSubmitter),
+        MaintenanceJobManager.getInstance(
+            env.jobOperationDispatcher(), authorizationEnabled, jobSubmitter),
         MaintenanceActionManager.getInstance(),
         TableMaintenanceActionMetaService.getInstance(),
         tableEnumerator,

@@ -55,6 +55,7 @@ public class MaintenanceJobManager {
   private static volatile MaintenanceJobManager instance;
 
   private final JobOperationDispatcher jobOperationDispatcher;
+  private final boolean authorizationEnabled;
   @Nullable private final String jobSubmitter;
 
   /**
@@ -64,15 +65,20 @@ public class MaintenanceJobManager {
    * {@link org.apache.gravitino.GravitinoEnv} and pass them in.
    *
    * @param jobOperationDispatcher job submit/cancel dispatcher
+   * @param authorizationEnabled whether {@code gravitino.authorization.enable} is true
    * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
    * @return singleton manager
    */
   public static MaintenanceJobManager getInstance(
-      JobOperationDispatcher jobOperationDispatcher, @Nullable String jobSubmitter) {
+      JobOperationDispatcher jobOperationDispatcher,
+      boolean authorizationEnabled,
+      @Nullable String jobSubmitter) {
     if (instance == null) {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
-          instance = new MaintenanceJobManager(jobOperationDispatcher, jobSubmitter);
+          instance =
+              new MaintenanceJobManager(
+                  jobOperationDispatcher, authorizationEnabled, jobSubmitter);
         }
       }
     }
@@ -83,14 +89,19 @@ public class MaintenanceJobManager {
    * Test / override constructor. Production code should use {@link #getInstance}.
    *
    * @param jobOperationDispatcher job submit/cancel dispatcher
+   * @param authorizationEnabled whether authorization is enabled
    * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
    */
   MaintenanceJobManager(
-      JobOperationDispatcher jobOperationDispatcher, @Nullable String jobSubmitter) {
+      JobOperationDispatcher jobOperationDispatcher,
+      boolean authorizationEnabled,
+      @Nullable String jobSubmitter) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
-    if (jobSubmitter != null) {
+    this.authorizationEnabled = authorizationEnabled;
+    if (authorizationEnabled) {
       Preconditions.checkArgument(
-          !jobSubmitter.trim().isEmpty(), "jobSubmitter must be non-blank when set");
+          jobSubmitter != null && !jobSubmitter.trim().isEmpty(),
+          "jobSubmitter is required when authorization is enabled");
       this.jobSubmitter = jobSubmitter.trim();
     } else {
       this.jobSubmitter = null;
@@ -150,12 +161,12 @@ public class MaintenanceJobManager {
   /**
    * Runs the Iceberg maintenance template.
    *
-   * <p>Without a submitter (authorization off), calls {@code runJob} on the current thread.
-   * With a submitter, runs the same {@code runJob} under {@code doAs(jobSubmitter)} so {@link
-   * org.apache.gravitino.job.JobManager} records that USER as the job owner.
+   * <p>When authorization is disabled, calls {@code runJob} on the current thread. When
+   * authorization is enabled, runs the same {@code runJob} under {@code doAs(jobSubmitter)} so
+   * {@link org.apache.gravitino.job.JobManager} records that USER as the job owner.
    */
   JobEntity runIcebergMaintenanceJob(String metalake, Map<String, String> jobConf) {
-    if (jobSubmitter == null) {
+    if (!authorizationEnabled) {
       return runJob(metalake, jobConf);
     }
     try {

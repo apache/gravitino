@@ -40,14 +40,14 @@ class TestMaintenanceJobManager {
   private static final String SUBMITTER = "tms";
 
   @Test
-  void runJobWithoutDoAsWhenSubmitterUnset() {
+  void runJobWithoutDoAsWhenAuthorizationDisabled() {
     JobOperationDispatcher jobs = mock(JobOperationDispatcher.class);
     JobEntity job = mock(JobEntity.class);
     when(jobs.runJob(
             eq(METALAKE), eq(MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE), anyMap()))
         .thenReturn(job);
 
-    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, null);
+    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, false, null);
     Map<String, String> conf = new HashMap<>();
     Assertions.assertSame(job, manager.runIcebergMaintenanceJob(METALAKE, conf));
     verify(jobs)
@@ -68,7 +68,7 @@ class TestMaintenanceJobManager {
               return job;
             });
 
-    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, SUBMITTER);
+    MaintenanceJobManager manager = new MaintenanceJobManager(jobs, true, SUBMITTER);
     Map<String, String> conf = new HashMap<>();
     Assertions.assertSame(job, manager.runIcebergMaintenanceJob(METALAKE, conf));
     Assertions.assertEquals(SUBMITTER, principalDuringRun.get());
