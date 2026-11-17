@@ -18,14 +18,12 @@
  */
 package org.apache.gravitino.maintenance;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
@@ -65,28 +63,26 @@ public class MaintenanceJobManager {
   /**
    * Returns the shared TMS job manager for the server process.
    *
+   * <p>Composition roots (for example the table-maintenance REST feature) resolve dispatchers from
+   * {@link org.apache.gravitino.GravitinoEnv} and pass them in.
+   *
+   * @param jobOperationDispatcher job submit/cancel dispatcher
+   * @param ownerDispatcher owner dispatcher, or {@code null} when authorization is disabled
    * @return singleton manager
    */
-  public static MaintenanceJobManager getInstance() {
+  public static MaintenanceJobManager getInstance(
+      JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
     if (instance == null) {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
-          GravitinoEnv env = GravitinoEnv.getInstance();
-          instance =
-              new MaintenanceJobManager(
-                  env.jobOperationDispatcher(), env.internalOwnerDispatcher());
+          instance = new MaintenanceJobManager(jobOperationDispatcher, ownerDispatcher);
         }
       }
     }
     return instance;
   }
 
-  /**
-   * @param jobOperationDispatcher job submit/cancel dispatcher
-   * @param ownerDispatcher owner dispatcher, or {@code null} when authorization is disabled
-   */
-  @VisibleForTesting
-  MaintenanceJobManager(
+  private MaintenanceJobManager(
       JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
     this.ownerDispatcher = ownerDispatcher;
