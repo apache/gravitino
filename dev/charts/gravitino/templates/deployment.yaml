@@ -162,7 +162,7 @@ spec:
                   exit 1
                 fi
                 set +e
-                err=$(timeout "$remaining" env PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
+                err=$(PGPASSWORD="$POSTGRES_PASSWORD" timeout "$remaining" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
                 rc=$?
                 set -e
                 if [ "$rc" -eq 0 ]; then
@@ -178,9 +178,9 @@ spec:
                 sleep 2
               done
               if [ -n "${PG_CURRENT_SCHEMA:-}" ]; then
-                schema_exists=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_namespace WHERE nspname = '${PG_CURRENT_SCHEMA}'")
+                schema_exists=$(PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_namespace WHERE nspname = '${PG_CURRENT_SCHEMA}'")
                 if [ "$schema_exists" != "1" ]; then
-                  PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA \"${PG_CURRENT_SCHEMA}\""
+                  PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA \"${PG_CURRENT_SCHEMA}\""
                 fi
               fi
               VERSION=$(cat /scripts/version.txt)
@@ -201,20 +201,20 @@ spec:
               fi
               echo "Schema file: $schema_file"
               echo "Upgrade file: $upgrade_file"
-              if ! PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
+              if ! PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$upgrade_file"; then
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2 
               fi
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -f "$schema_file"
+              PGPASSWORD="$POSTGRES_PASSWORD" psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
           env:
             - name: POSTGRES_USER
-              value: {{ include "gravitino.postgresqlInitUsername" . }}
+              value: {{ include "gravitino.postgresqlInitUsername" . | quote }}
             - name: GRAVITINO_DB
-              value: {{ include "gravitino.postgresqlInitDatabase" . }}
+              value: {{ include "gravitino.postgresqlInitDatabase" . | quote }}
             - name: PGPORT
               value: {{ $pgInitPort | quote }}
             - name: PGCONNECT_TIMEOUT

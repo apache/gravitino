@@ -189,12 +189,17 @@ Supports a single host:port only (see entityJdbcAuthorityFromUrl).
 
 {{/*
 sslmode query parameter from entity.jdbcUrl.
+
+When sslmode is absent, JDBC ssl=true (or ssl=1) implies certificate and hostname
+verification, aligned with the PostgreSQL JDBC driver — mapped to verify-full for psql.
 */}}
 {{- define "gravitino.entityJdbcSslModeFromUrl" -}}
 {{- $url := .Values.entity.jdbcUrl | default "" -}}
 {{- $match := regexFind "sslmode=([^&]+)" $url -}}
 {{- if $match -}}
 {{- trimPrefix "sslmode=" $match -}}
+{{- else if or (regexFind "[?&]ssl=true(&|$)" $url) (regexFind "[?&]ssl=1(&|$)" $url) -}}
+verify-full
 {{- end -}}
 {{- end -}}
 
