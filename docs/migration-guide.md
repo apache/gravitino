@@ -97,9 +97,15 @@ and shutdown steps in [Upgrade Gravitino](./how-to-upgrade.md) before applying t
      Searching only for `${file:`, `${directory:`, or `${env:` misses custom aliases. See
      [Kafka configuration providers](https://kafka.apache.org/39/configuration/configuration-providers/).
   3. Record the value each reference resolves to, and whether it is a credential.
-- Before starting the 2.0 server, remove all provider properties from `kafka.conf`. Keep only
-  non-sensitive defaults in this file, because its values become catalog properties that can be
-  returned by the REST API.
+- Before starting the 2.0 server, update `catalogs/kafka/conf/kafka.conf`:
+  - Remove all provider properties.
+  - Replace every non-sensitive `${<alias>:...}` reference with the value it resolved to, for
+    example a numeric timeout. Removing only the provider properties leaves the reference
+    unresolved: a new catalog inherits it, is created, and then fails to connect, because the
+    Kafka client cannot parse the value.
+  - Remove every credential-bearing setting from the file and bind it per catalog after the
+    upgrade (see below). Keep only non-sensitive defaults in this file, because its values become
+    catalog properties that can be returned by the REST API.
 - After upgrading to 2.0, update each affected catalog with one `alterCatalog` call that removes
   all of its provider properties and replaces every reference. An `alterCatalog` call that leaves
   any provider property in place is rejected, including a comment-only change. Until this update,
