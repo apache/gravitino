@@ -726,27 +726,6 @@ vulnerabilities:
       - pkg:maven/org.apache.thrift/libthrift@0.14.1
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  # org.codehaus.jettison/jettison
-  - id: CVE-2022-40150
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2022-45685
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2022-45693
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
-  - id: CVE-2023-1436
-    purls:
-      - pkg:maven/org.codehaus.jettison/jettison@1.1
-    expired_at: 2027-02-07
-    statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.eclipse.jetty/jetty-http
   - id: CVE-2026-2332
     purls:
