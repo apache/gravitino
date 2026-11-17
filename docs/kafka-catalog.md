@@ -26,9 +26,11 @@ The Kafka catalog rejects the Kafka config provider properties `gravitino.bypass
 and `gravitino.bypass.config.providers.*` (for example `gravitino.bypass.config.providers.file.class`),
 because a provider can read the Gravitino server's own environment and files. Creating a catalog,
 testing a connection, or altering a catalog with these properties fails with an error naming them.
-This includes properties that come from `catalogs/kafka/conf/kafka.conf`, so a provider property in
-that file blocks the creation of every Kafka catalog. A catalog created before upgrading that still
-has them fails on schema and topic operations until they are removed.
+This includes properties that come from `kafka.conf` (`catalogs/kafka/conf/kafka.conf`, or
+`<package>/conf/kafka.conf` for a catalog with a custom `package` property), so a provider property
+in a `kafka.conf` file blocks the creation of every Kafka catalog that uses that file. A catalog
+created before upgrading that still has them fails on schema and topic operations until they are
+removed.
 
 :::caution Credentials in bypass properties
 Bypass properties can be returned in plaintext by the catalog REST API. Gravitino masks only keys
