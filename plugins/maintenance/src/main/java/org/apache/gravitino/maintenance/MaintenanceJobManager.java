@@ -113,27 +113,7 @@ public class MaintenanceJobManager {
 
     Long jobId = null;
     try {
-      JobEntity job;
-      if (ownerDispatcher == null) {
-        // Ownership disabled: JobManager skips setOwner.
-        job =
-            jobOperationDispatcher.runJob(
-                metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
-      } else {
-        String ownerUser = requireMetalakeOwnerUser(ownerDispatcher, metalake);
-        try {
-          job =
-              PrincipalUtils.doAs(
-                  new UserPrincipal(ownerUser),
-                  () ->
-                      jobOperationDispatcher.runJob(
-                          metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf));
-        } catch (RuntimeException e) {
-          throw e;
-        } catch (Exception e) {
-          throw new RuntimeException("Failed to submit TMS job as metalake owner " + ownerUser, e);
-        }
-      }
+      JobEntity job = runIcebergMaintenanceJob(metalake, jobConf);
       jobId = job.id();
       ACTION_SERVICE.bindJobIds(claims, jobId);
       return Optional.of(jobId);
@@ -160,6 +140,31 @@ public class MaintenanceJobManager {
           e.toString());
       return Optional.empty();
     }
+  }
+
+  /**
+   * Runs the Iceberg maintenance template. When ownership is enabled, submits as the metalake owner
+   * USER so {@link org.apache.gravitino.job.JobManager} does not attach {@code anonymous}.
+   */
+  private JobEntity runIcebergMaintenanceJob(String metalake, Map<String, String> jobConf) {
+    if (ownerDispatcher == null) {
+      // Ownership disabled: JobManager skips setOwner.
+      return submitIcebergMaintenance(metalake, jobConf);
+    }
+    String ownerUser = requireMetalakeOwnerUser(ownerDispatcher, metalake);
+    try {
+      return PrincipalUtils.doAs(
+          new UserPrincipal(ownerUser), () -> submitIcebergMaintenance(metalake, jobConf));
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException("Failed to submit TMS job as metalake owner " + ownerUser, e);
+    }
+  }
+
+  private JobEntity submitIcebergMaintenance(String metalake, Map<String, String> jobConf) {
+    return jobOperationDispatcher.runJob(
+        metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
   }
 
   /** Metalake owner USER name for {@code runJob} when ownership is enabled. */
