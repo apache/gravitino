@@ -233,6 +233,18 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     return gravitinoCatalogManager.getGravitinoCatalogInfo(identity, catalogName);
   }
 
+  /**
+   * Loads the current catalog metadata, bypassing the catalog metadata cache.
+   *
+   * <p>Source catalogs that retain connection settings after initialization use this before an IO
+   * operation to prevent an altered Gravitino catalog from silently accessing the old source.
+   *
+   * @return the current Gravitino catalog for this Spark catalog's name and identity
+   */
+  protected Catalog refreshGravitinoCatalog() {
+    return gravitinoCatalogManager.refreshGravitinoCatalogInfo(identity, catalogName);
+  }
+
   @Override
   public Identifier[] listTables(String[] namespace) throws NoSuchNamespaceException {
     String gravitinoNamespace = getDatabase(namespace);
@@ -809,7 +821,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     }
   }
 
-  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+  /**
+   * Returns catalog properties enriched with secrets and non-expiring credential information.
+   *
+   * @param catalog the Gravitino catalog to resolve properties for
+   * @return catalog properties enriched with available secrets and credentials
+   */
+  protected static Map<String, String> propsWithSecrets(Catalog catalog) {
     Map<String, String> props =
         new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
     try {

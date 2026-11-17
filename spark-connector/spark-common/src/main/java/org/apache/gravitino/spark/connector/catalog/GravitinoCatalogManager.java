@@ -248,6 +248,24 @@ public class GravitinoCatalogManager {
   }
 
   /**
+   * Loads the current catalog metadata from Gravitino and replaces the cached value.
+   *
+   * <p>Connectors whose source clients keep connection settings after initialization use this
+   * method to detect an unsafe catalog change before accessing the source.
+   *
+   * @param identity the identity used to load the catalog
+   * @param name the catalog name
+   * @return the freshly loaded catalog
+   */
+  Catalog refreshGravitinoCatalogInfo(GravitinoIdentity identity, String name) {
+    Preconditions.checkState(!isClosed, "GravitinoCatalogManager is already closed");
+    GravitinoClient client = getClient(identity);
+    Catalog catalog = loadCatalog(client, identity, name);
+    gravitinoCatalogs.put(cacheKey(identity, name), new CachedCatalog(client, catalog));
+    return catalog;
+  }
+
+  /**
    * Loads the relational catalogs visible to the application identity. This runs at driver init,
    * before any Spark session exists, so it never consults session state.
    */

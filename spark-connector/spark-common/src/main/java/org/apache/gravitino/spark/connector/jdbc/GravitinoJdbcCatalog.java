@@ -23,6 +23,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,10 +70,21 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
   // The Spark JDBC options the catalog was initialized with, used to read a table's schema again.
   private Map<String, String> jdbcOptions = Collections.emptyMap();
 
+  // The Spark catalog options supplied at initialization, retained when comparing refreshed
+  // Gravitino catalog properties because they take precedence over catalog properties.
+  private Map<String, String> sparkCatalogOptions = Collections.emptyMap();
+
+  // The connection settings that initialized Spark's JDBC catalog. Spark cannot safely change
+  // these settings on an already initialized JDBCTableCatalog.
+  private Map<String, String> jdbcConnectionOptions = Collections.emptyMap();
+
+  @Nullable private Instant catalogCreateTime;
+
   @Override
   protected TableCatalog createAndInitSparkCatalog(
       String name, CaseInsensitiveStringMap options, Map<String, String> properties) {
     JDBCTableCatalog jdbcTableCatalog = new JDBCTableCatalog();
+    sparkCatalogOptions = new HashMap<>(options.asCaseSensitiveMap());
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     applyJdbcCredential(gravitinoCatalog(), all);
@@ -95,6 +107,8 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     setPreferTimestampNtz(all, useTimestampNtz);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     jdbcOptions = new HashMap<>(all);
+    jdbcConnectionOptions = jdbcConnectionOptions(all);
+    catalogCreateTime = catalogCreateTime(gravitinoCatalog());
     return jdbcTableCatalog;
   }
 
@@ -108,6 +122,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
    */
   @Override
   protected Table loadSparkTable(Identifier ident) {
+    verifyJdbcConnectionUnchanged();
     try {
       return sparkCatalog.loadTable(ident);
     } catch (NoSuchTableException e) {
@@ -122,6 +137,48 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
       }
       throw new RuntimeException(String.format("Failed to load the real sparkTable: %s", table), e);
     }
+  }
+
+  private void verifyJdbcConnectionUnchanged() {
+    Catalog currentCatalog = refreshGravitinoCatalog();
+    Map<String, String> currentOptions =
+        getPropertiesConverter()
+            .toSparkCatalogProperties(
+                new CaseInsensitiveStringMap(sparkCatalogOptions),
+                propsWithSecrets(currentCatalog));
+    applyJdbcCredential(currentCatalog, currentOptions);
+    boolean connectionChanged =
+        !jdbcConnectionOptions.equals(jdbcConnectionOptions(currentOptions));
+    boolean catalogRecreated =
+        catalogCreateTime != null
+            && catalogCreateTime(currentCatalog) != null
+            && !catalogCreateTime.equals(catalogCreateTime(currentCatalog));
+    if (connectionChanged || catalogRecreated) {
+      throw new IllegalStateException(
+          String.format(
+              "JDBC catalog %s changed after this Spark session initialized it. "
+                  + "Restart the Spark session before accessing the catalog.",
+              name()));
+    }
+  }
+
+  private static Map<String, String> jdbcConnectionOptions(Map<String, String> options) {
+    Map<String, String> connectionOptions = new HashMap<>();
+    for (String key :
+        Arrays.asList(
+            JdbcPropertiesConstants.SPARK_JDBC_URL,
+            JdbcPropertiesConstants.SPARK_JDBC_USER,
+            JdbcPropertiesConstants.SPARK_JDBC_PASSWORD)) {
+      if (options.containsKey(key)) {
+        connectionOptions.put(key, options.get(key));
+      }
+    }
+    return connectionOptions;
+  }
+
+  @Nullable
+  private static Instant catalogCreateTime(Catalog catalog) {
+    return catalog.auditInfo() == null ? null : catalog.auditInfo().createTime();
   }
 
   /**
