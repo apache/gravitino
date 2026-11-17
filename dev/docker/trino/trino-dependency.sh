@@ -52,7 +52,7 @@ ${gravitino_home}/gradlew :trino-connector:${connector_module}:assembleTrinoConn
 cp -r "${gravitino_home}/distribution/gravitino-${connector_module}" "${trino_dir}/packages/gravitino-trino-connector"
 
 MYSQL_VERSION="8.0.27"
-PG_VERSION="42.7.11"
+PG_VERSION="42.7.14"
 MYSQL_JAVA_CONNECTOR_URL="https://repo1.maven.org/maven2/mysql/mysql-connector-java/${MYSQL_VERSION}/mysql-connector-java-${MYSQL_VERSION}.jar"
 PG_JAVA_CONNECTOR_URL="https://jdbc.postgresql.org/download/postgresql-${PG_VERSION}.jar"
 

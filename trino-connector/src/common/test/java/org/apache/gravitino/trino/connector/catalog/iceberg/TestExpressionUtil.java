@@ -313,4 +313,43 @@ public class TestExpressionUtil {
         },
         "Error parsing partition field");
   }
+
+  @Test
+  void testSortOrderFieldDirectionAndNullOrderingAreOptional() {
+    NamedReference id = NamedReference.field("id");
+    Assertions.assertArrayEquals(
+        new SortOrder[] {
+          SortOrders.of(id, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+          SortOrders.of(id, SortDirection.DESCENDING, NullOrdering.NULLS_LAST),
+          SortOrders.of(id, SortDirection.ASCENDING, NullOrdering.NULLS_LAST),
+          SortOrders.of(id, SortDirection.ASCENDING, NullOrdering.NULLS_FIRST),
+          SortOrders.of(id, SortDirection.DESCENDING, NullOrdering.NULLS_FIRST),
+        },
+        ExpressionUtil.sortOrderFiledToExpression(
+            List.of("id", "id desc", "id nulls last", "id NULLS  FIRST", " id DESC NULLS FIRST ")));
+  }
+
+  @Test
+  void testSortOrderFieldWithQuotedColumnRoundTrips() {
+    for (String column : List.of("order-id", "a b", "a\"b", "1st")) {
+      SortOrder[] sortOrders = {
+        SortOrders.of(
+            NamedReference.field(column), SortDirection.DESCENDING, NullOrdering.NULLS_FIRST)
+      };
+      List<String> fields = ExpressionUtil.expressionToSortOrderFiled(sortOrders);
+      Assertions.assertArrayEquals(sortOrders, ExpressionUtil.sortOrderFiledToExpression(fields));
+    }
+    Assertions.assertEquals(
+        List.of("\"a\"\"b\" DESC"),
+        ExpressionUtil.expressionToSortOrderFiled(
+            new SortOrder[] {SortOrders.descending(NamedReference.field("a\"b"))}));
+  }
+
+  @Test
+  void testSortOrderFieldWithInvalidGrammarIsRefused() {
+    for (String field : List.of("order-id", "id NULLS", "id DESC ASC", "\"id", "day(ts)")) {
+      Assertions.assertThrows(
+          TrinoException.class, () -> ExpressionUtil.sortOrderFiledToExpression(List.of(field)));
+    }
+  }
 }

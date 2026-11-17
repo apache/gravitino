@@ -22,14 +22,17 @@ package org.apache.gravitino.listener.api.event;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import java.util.Map;
+import java.util.OptionalLong;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.hook.TableHookDispatcher;
@@ -121,9 +124,13 @@ public class TestTableEvent {
     doThrow(new RuntimeException("Set owner failed"))
         .when(ownerDispatcher)
         .setOwner(any(), any(), any(), any());
+    TableDispatcher source = mockTableDispatcher();
+    EntityCombinedTable created = spy(EntityCombinedTable.of(table));
+    when(created.createdTableId()).thenReturn(OptionalLong.of(1L));
+    when(source.createTable(any(), any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(created);
     TableEventDispatcher dispatcherWithHook =
-        new TableEventDispatcher(
-            eventBus, new TableHookDispatcher(mockTableDispatcher(), () -> ownerDispatcher));
+        new TableEventDispatcher(eventBus, new TableHookDispatcher(source, () -> ownerDispatcher));
     NameIdentifier identifier = NameIdentifier.of("metalake", "catalog", "schema", table.name());
 
     RuntimeException thrown =

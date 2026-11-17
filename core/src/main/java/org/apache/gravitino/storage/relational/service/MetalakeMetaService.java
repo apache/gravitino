@@ -35,6 +35,8 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.DomainRelMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -56,6 +58,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetricMapper;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelSourceMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
@@ -284,6 +287,14 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    DomainMetaMapper.class,
+                    mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    DomainRelMapper.class,
+                    mapper -> mapper.softDeleteDomainRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
@@ -348,7 +359,11 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     SemanticModelMetricMapper.class,
-                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)));
+                    mapper -> mapper.softDeleteSemanticModelMetricsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    SemanticModelSourceMapper.class,
+                    mapper -> mapper.softDeleteByMetalakeId(metalakeId)));
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
@@ -394,6 +409,14 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     RoleMetaMapper.class,
                     mapper -> mapper.softDeleteRoleMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    DomainMetaMapper.class,
+                    mapper -> mapper.softDeleteDomainMetasByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    DomainRelMapper.class,
+                    mapper -> mapper.softDeleteDomainRelsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,

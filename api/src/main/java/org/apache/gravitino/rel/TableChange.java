@@ -838,6 +838,12 @@ public interface TableChange {
       result = 31 * result + Arrays.deepHashCode(fieldNames);
       return result;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "ADDINDEX " + getName();
+    }
   }
 
   /**
@@ -883,6 +889,12 @@ public interface TableChange {
     @Override
     public int hashCode() {
       return Objects.hash(name, ifExists);
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "DELETEINDEX " + getName();
     }
   }
 
@@ -1152,6 +1164,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "ADDCOLUMN " + String.join(".", fieldName()) + " " + dataType.simpleString();
+    }
   }
 
   /**
@@ -1221,6 +1239,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "RENAMECOLUMN " + String.join(".", fieldName()) + " TO " + newName;
+    }
   }
 
   /**
@@ -1285,6 +1309,13 @@ public interface TableChange {
       int result = Objects.hash(newDefaultValue);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      // Default expressions may be connector-defined and have no user-facing renderer.
+      return "UPDATECOLUMNDEFAULTVALUE " + String.join(".", fieldName());
     }
   }
 
@@ -1355,6 +1386,15 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNTYPE "
+          + String.join(".", fieldName())
+          + " TO "
+          + newDataType.simpleString();
+    }
   }
 
   /**
@@ -1423,6 +1463,12 @@ public interface TableChange {
     @Override
     public String[] fieldName() {
       return fieldName;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNCOMMENT " + String.join(".", fieldName()) + " TO " + newComment;
     }
   }
 
@@ -1494,6 +1540,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNPOSITION " + String.join(".", fieldName()) + " TO " + position;
+    }
   }
 
   /**
@@ -1560,6 +1612,12 @@ public interface TableChange {
     public String[] fieldName() {
       return fieldName;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "DELETECOLUMN " + String.join(".", fieldName());
+    }
   }
 
   /**
@@ -1616,6 +1674,12 @@ public interface TableChange {
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
     }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNNULLABILITY " + String.join(".", fieldName()) + " TO " + nullable;
+    }
   }
 
   /**
@@ -1670,6 +1734,12 @@ public interface TableChange {
       int result = Objects.hash(autoIncrement);
       result = 31 * result + Arrays.hashCode(fieldName);
       return result;
+    }
+
+    /** Returns a readable description of this change. */
+    @Override
+    public String toString() {
+      return "UPDATECOLUMNAUTOINCREMENT " + String.join(".", fieldName()) + " TO " + autoIncrement;
     }
   }
 }

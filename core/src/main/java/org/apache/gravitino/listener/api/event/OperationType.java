@@ -33,6 +33,39 @@ public enum OperationType {
   RENAME_TABLE,
   REGISTER_TABLE,
   TABLE_EXISTS,
+  REPORT_TABLE_METRICS,
+
+  // Domain operations
+  /** Domain operation: ListDomains. */
+  LIST_DOMAIN,
+  /** Domain operation: ListDomainsInfo. */
+  LIST_DOMAINS_INFO,
+  /** Domain operation: GetDomain. */
+  GET_DOMAIN,
+  /** Domain operation: CreateDomain. */
+  CREATE_DOMAIN,
+  /** Domain operation: AlterDomain. */
+  ALTER_DOMAIN,
+  /** Domain operation: DeleteDomain. */
+  DELETE_DOMAIN,
+  /** Domain operation: PublishDomain. */
+  PUBLISH_DOMAIN,
+  /** Domain operation: UnpublishDomain. */
+  UNPUBLISH_DOMAIN,
+  /** Domain operation: UpdateDomainBackingTag. */
+  UPDATE_DOMAIN_BACKING_TAG,
+  /** Domain operation: AttachDomain. */
+  ATTACH_DOMAIN,
+  /** Domain operation: DetachDomain. */
+  DETACH_DOMAIN,
+  /** Domain operation: ListSubdomains. */
+  LIST_SUBDOMAINS,
+  /** Domain operation: ListSubdomainsInfo. */
+  LIST_SUBDOMAINS_INFO,
+  /** Domain operation: ListDomainMembers. */
+  LIST_DOMAIN_MEMBERS,
+  /** Domain operation: ListDomainsForMetadataObject. */
+  LIST_DOMAINS_FOR_METADATA_OBJECT,
 
   // Tag operations
   CREATE_TAG,
@@ -218,6 +251,8 @@ public enum OperationType {
   LIST_SEMANTIC_MODEL,
   /** List identifiers of metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC,
+  /** Lists datasets associated with a source table or View. */
+  LIST_SEMANTIC_MODEL_DATASETS_BY_SOURCE,
   /** List complete metrics contained in Semantic Models. */
   LIST_SEMANTIC_MODEL_METRIC_INFOS,
   /** Import a Semantic Model from an Ossie document. */

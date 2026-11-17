@@ -218,19 +218,17 @@ class TestCoreCompatibilityMatrix(unittest.TestCase):
         with patch.dict(sys.modules, {spec.name: matrix}):
             spec.loader.exec_module(matrix)
             self.assertEqual(
-                matrix.dependency_specs("0.5.0", None, None),
-                ("ray==2.59.0", "lance-namespace==0.13.0"),
+                matrix.ray_dependency_spec("0.5.0", None),
+                "ray==2.59.0",
             )
-            for version in ("0.3.0", "0.4.2"):
+            for version in ("0.2.0", "0.3.0", "0.4.2"):
                 self.assertEqual(
-                    matrix.dependency_specs(version, None, None),
-                    ("ray==2.55.1", "lance-namespace==0.7.5"),
+                    matrix.ray_dependency_spec(version, None),
+                    "ray==2.55.1",
                 )
             self.assertEqual(
-                matrix.dependency_specs(
-                    "0.5.0", "ray==2.60.0", "lance-namespace==0.13.0"
-                ),
-                ("ray==2.60.0", "lance-namespace==0.13.0"),
+                matrix.ray_dependency_spec("0.5.0", "ray==2.60.0"),
+                "ray==2.60.0",
             )
             for output, expected in (
                 ("Ran 1 test in 0.1s\n\nOK\n", 0),

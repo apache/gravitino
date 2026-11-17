@@ -31,17 +31,17 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.maintenance.scheduler.job.cron.MaintenanceJobTemplates;
+import org.apache.gravitino.maintenance.scheduler.job.MaintenanceJobTemplates;
 
 /**
- * Enqueue-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and
+ * Schedule-time spec stored as JSON in db-scheduler {@code task_data} for {@code cron-job} and
  * {@code commit-job} rows.
  *
  * <p>Shape stays close to Iceberg update-stats {@code runJob} conf: each {@link Task} carries TMS
- * routing fields plus a flat {@code parameters} map (old template placeholders). Shared session
- * bags {@code updater_options} and {@code spark_conf} sit at the envelope top as JSON object
- * strings. Submit merges one task (cron) or all tasks (commit chain) into the flat {@code
- * Map<String,String>} passed to {@code runJob}.
+ * routing fields plus a flat {@code parameters} map (old template placeholders). Shared {@code
+ * updater_options} and {@code spark_conf} sit at the top as JSON object strings. Submit merges one
+ * task (cron) or all tasks (commit chain) into the flat {@code Map<String,String>} passed to {@code
+ * runJob}.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public final class MaintenanceJobSpec {
@@ -202,7 +202,7 @@ public final class MaintenanceJobSpec {
      * @param tableId table entity id
      * @param policyId policy entity id
      * @param maintenanceType Spark wire maintenance type
-     * @param actionId soft-slot action id when known; null at enqueue
+     * @param actionId soft-slot action id when known; null at schedule
      * @param parameters flat template placeholders (old builtin jobConf keys)
      */
     public Task(

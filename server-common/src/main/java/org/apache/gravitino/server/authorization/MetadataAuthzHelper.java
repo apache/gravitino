@@ -31,7 +31,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
@@ -90,9 +89,7 @@ public class MetadataAuthzHelper {
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
   private static final Set<Entity.EntityType> METADATA_OBJECT_ENTITY_TYPES =
-      Arrays.stream(MetadataObject.Type.values())
-          .map(MetadataObjectUtil::toEntityType)
-          .collect(Collectors.toUnmodifiableSet());
+      MetadataObjectUtil.metadataObjectEntityTypes();
 
   private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
   private static final String MODEL_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
@@ -250,11 +247,32 @@ public class MetadataAuthzHelper {
    */
   public static MetadataObject[] filterMetadataObject(
       String metalake, MetadataObject[] metadataObjects) {
+    return filterMetadataObject(
+        metalake,
+        metadataObjects,
+        PrincipalUtils.getCurrentPrincipal(),
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer());
+  }
+
+  /**
+   * Filters metadata objects using an explicitly supplied caller and authorizer.
+   *
+   * @param metalake The metalake name.
+   * @param metadataObjects The objects to filter.
+   * @param principal The caller.
+   * @param authorizer The authorizer evaluating the ordinary metadata access expression.
+   * @return The objects accessible to the caller.
+   */
+  public static MetadataObject[] filterMetadataObject(
+      String metalake,
+      MetadataObject[] metadataObjects,
+      Principal principal,
+      GravitinoAuthorizer authorizer) {
     return doFilter(
         AuthorizationExpressionConstants.CAN_ACCESS_METADATA,
         metadataObjects,
-        PrincipalUtils.getCurrentPrincipal(),
-        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer(),
+        principal,
+        authorizer,
         new AuthorizationRequestContext(),
         metadataObject ->
             NameIdentifierUtil.splitNameIdentifier(
@@ -417,7 +435,11 @@ public class MetadataAuthzHelper {
     if (!enableAuthorization() || nameIdentifiers.length == 0) {
       return entities;
     }
-    if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)) {
+    // Preserve legacy tag/policy names for normal authorization and cleanup. These are
+    // single-level metadata objects; their full names are never split into parent scopes.
+    if (METADATA_OBJECT_ENTITY_TYPES.contains(entityType)
+        && entityType != Entity.EntityType.TAG
+        && entityType != Entity.EntityType.POLICY) {
       Arrays.stream(nameIdentifiers)
           .forEach(
               identifier -> NameIdentifierUtil.checkMetadataObjectName(identifier, entityType));

@@ -27,6 +27,7 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.base.Preconditions;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
 import javax.ws.rs.Consumes;
@@ -132,6 +133,7 @@ public class LanceNamespaceOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       CreateNamespaceRequest request) {
     try {
+      Preconditions.checkArgument(request != null, "Request body must not be null");
       CreateNamespaceResponse response =
           lanceNamespace
               .asNamespaceOps()
@@ -156,6 +158,7 @@ public class LanceNamespaceOperations {
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       DropNamespaceRequest request) {
     try {
+      Preconditions.checkArgument(request != null, "Request body must not be null");
       DropNamespaceResponse response =
           lanceNamespace
               .asNamespaceOps()

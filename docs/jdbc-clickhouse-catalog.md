@@ -223,6 +223,15 @@ is not copied or materialized, and Gravitino does not manage projection `ALTER T
 Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
 `VarChar(n)` is rejected when creating or adding a column because ClickHouse cannot enforce its length limit.
 Use `String` for unlimited text or `FixedChar(n)` for fixed-length values.
+In the REST API and JSON payloads, `FixedChar(n)` is written as `char(n)`, for example `"type": "char(10)"`.
+By default, ClickHouse rejects `FixedString(n)` with `n` greater than 256 unless the server setting
+`allow_suspicious_fixed_string_types` is set to `1`.
+
+Literal column default values are checked against the column type before the DDL is sent, because
+ClickHouse does not validate them when creating or altering a table. Integer defaults must be in the
+range of the type, `Decimal(p,s)` defaults must fit the precision, `Date` defaults must be between
+`1970-01-01` and `2149-06-06`, `UUID` defaults must be valid UUID strings, and `Float`/`Double`
+defaults must be numbers. Default values of other types, such as `Timestamp`, are not checked.
 
 ### Table Properties
 
@@ -331,9 +340,11 @@ The `engine_parameters` property applies to `ReplacingMergeTree`, `SummingMergeT
 - `PARTITION BY`: single-column identity and some functions are supported only, and only for MergeTree-family engines. For example `PARTITION BY created_at`, `PARTITION BY toYYYYMM(created_at)`, `PARTITION BY toStartOfWeek(created_at)`, `PARTITION BY toStartOfMonth(created_at)`, `PARTITION BY toStartOfQuarter(created_at)`, and `PARTITION BY toStartOfYear(created_at)` are supported, but `PARTITION BY (created_at + 1)` is not supported.
    In all, the following partitioning expressions are supported:
    - Identity: `PARTITION BY column_name`
-   - Functions: `PARTITION BY toDate(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, `PARTITION BY toStartOfMonth(column_name)`, `PARTITION BY toStartOfQuarter(column_name)`, and `PARTITION BY toStartOfYear(column_name)`. Other function expressions are not supported as structured transforms.
+   - Functions: `PARTITION BY toYYYYMMDD(column_name)`, `PARTITION BY toYear(column_name)`, `PARTITION BY toYYYYMM(column_name)`, `PARTITION BY toStartOfWeek(column_name)`, `PARTITION BY toStartOfMonth(column_name)`, `PARTITION BY toStartOfQuarter(column_name)`, and `PARTITION BY toStartOfYear(column_name)`. Other function expressions are not supported as structured transforms.
    - `toStartOfWeek(column_name)` uses ClickHouse's default mode `0` (Sunday start) and the server timezone. Calls with an explicit mode or timezone are not structured.
    - Not support: `PARTITION BY (column_name + 1)`, `PARTITION BY (toYear(column_name) + 1)`, etc. (Note: ClickHouse itself does support arbitrary partitioning expressions, but Gravitino supports only the above patterns for partitioning). 
+
+   Day transforms generate `toYYYYMMDD(column_name)` (integer day keys). Legacy `toDate` keys on `Date` columns remain readable as day transforms, but recreating a table from them canonicalizes the key to `toYYYYMMDD`; this changes the native key type and partition IDs. It does not alter existing tables. Unary `toDate` wrappers inside year/month/day expressions are unwrapped on load only for columns whose native type is `Date`. Other input types (including `DateTime`, whose conversion can cross the epoch boundary in non-UTC timezones), `toDateTime`, explicit timezones, multi-argument conversions and arbitrary wrappers retain only the native expression, since removing a conversion can change values or make recreated SQL invalid.
 
    The patterns above apply when creating a table. When loading a table, Gravitino preserves ClickHouse's canonical native partition expression (as returned by `system.tables.partition_key`) in the read-only `partition-key` property. An arbitrary native expression is therefore retained on load even when it cannot be mapped to one of the supported `Transform`s; in that case `Table.partitioning()` is empty and the full expression is exposed through `partition-key`.
 

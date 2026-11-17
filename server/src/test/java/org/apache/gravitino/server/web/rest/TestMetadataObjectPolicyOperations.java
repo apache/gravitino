@@ -42,10 +42,13 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.responses.ErrorConstants;
+import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectPolicyListResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyNameListResponse;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.policy.Policy;
@@ -62,6 +65,8 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -115,6 +120,42 @@ public class TestMetadataObjectPolicyOperations extends BaseOperationsTest {
         });
 
     return resourceConfig;
+  }
+
+  /**
+   * Hidden tag path objects return the same error as missing tags in both response formats.
+   *
+   * @param verbose Whether to request detailed policy metadata.
+   */
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  public void testTagPathObjectVisibility(boolean verbose) {
+    MetadataObject hidden = MetadataObjects.parse("GRAVITINO_HIDDEN_123", MetadataObject.Type.TAG);
+    MetadataObject missing = MetadataObjects.parse("missing_tag", MetadataObject.Type.TAG);
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, hidden))
+        .thenReturn(new PolicyEntity[0]);
+    when(policyManager.listPolicyInfosForMetadataObject(metalake, missing))
+        .thenThrow(new NoSuchMetadataObjectException("Tag does not exist"));
+
+    for (MetadataObject object : new MetadataObject[] {hidden, missing}) {
+      try (Response response =
+          target(basePath(metalake))
+              .path("tag")
+              .path(object.fullName())
+              .path("policies")
+              .queryParam("details", verbose)
+              .request(MediaType.APPLICATION_JSON_TYPE)
+              .accept("application/vnd.gravitino.v1+json")
+              .get()) {
+        Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+        ErrorResponse error = response.readEntity(ErrorResponse.class);
+        Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, error.getCode());
+        Assertions.assertEquals(
+            NoSuchMetadataObjectException.class.getSimpleName(), error.getType());
+      }
+    }
+    Mockito.verify(policyManager, Mockito.never())
+        .listPolicyInfosForMetadataObject(metalake, hidden);
   }
 
   @Test

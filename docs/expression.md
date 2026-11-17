@@ -47,6 +47,37 @@ NamedReference field = NamedReference.field("student");
 
 Literal is a constant value.
 
+Binary literals created from a Java `byte[]` are encoded in REST literal values as `0x` followed by
+hexadecimal byte pairs, for example `"dataType": "binary", "value": "0x4142"` for the bytes `AB`.
+`"0x"` represents an empty binary value. JDBC default converters recognize this encoding and render
+the bytes using their dialect's binary syntax; provider restrictions on binary defaults still apply.
+Unprefixed binary string values retain their previous provider-specific interpretation. A binary
+string starting with `0x` must contain valid hexadecimal pairs; it is treated as encoded bytes.
+Sending encoded binary defaults requires the server-side JDBC default converters described here;
+older servers do not decode this representation.
+
+Spark timestamp defaults are converted to the target column type in the Spark session time zone.
+An LTZ literal assigned to an NTZ column keeps the local fields produced by Spark's timestamp cast;
+an NTZ literal assigned to an LTZ column is interpreted in the Spark session zone before it is sent
+as an instant. DATE defaults assigned to timestamp columns become midnight in the Spark session
+zone for LTZ targets, or local midnight for NTZ targets. String defaults for timestamp columns are
+explicitly rejected in both Spark 3.5 and 4.0; use a `TIMESTAMP_LTZ` or `TIMESTAMP_NTZ` literal instead
+of relying on implicit database conversion. Date and string defaults for non-timestamp columns
+retain their literal values and types.
+
+Timestamp, date, and string defaults load the current table schema once through Gravitino and
+require table load permission, including date/string defaults for non-timestamp columns. Other
+literal defaults do not add a schema read. Batches combining any of these schema-dependent defaults
+with column additions, deletions, renames, or type changes are rejected before writing because they
+require sequential schema evolution.
+
+JDBC timestamp defaults include seconds even for whole-minute and midnight values.
+Zoned timestamp defaults use numeric UTC offsets in JDBC SQL. MySQL requires 8.0.19 or later
+for [datetime literals with offsets](https://dev.mysql.com/doc/refman/8.0/en/datetime.html);
+MySQL 5.7 and older 8.0 releases cannot use these zoned defaults. Spark `DROP DEFAULT` is not
+supported by the current Gravitino update request and is rejected explicitly; `SET DEFAULT NULL`
+and `SET DEFAULT ''` remain distinct supported literal values.
+
 When writing table or function defaults, partition values, partitioning, distribution, or sort
 expressions, each literal must declare a recognized Gravitino type or an explicit
 [external type](./tables-and-views.md#external-type) with a nonblank `catalogString`.

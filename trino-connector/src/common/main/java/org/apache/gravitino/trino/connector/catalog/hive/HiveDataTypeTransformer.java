@@ -39,7 +39,7 @@ public class HiveDataTypeTransformer extends GeneralDataTypeTransformer {
         || Type.Name.TIME == type.name()) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_GRAVITINO_DATATYPE,
-          "Unsupported gravitino datatype: " + type);
+          "Unsupported gravitino datatype: " + type.simpleString());
     } else if (Type.Name.TIMESTAMP == type.name()) {
       return TimestampType.TIMESTAMP_MILLIS;
     }

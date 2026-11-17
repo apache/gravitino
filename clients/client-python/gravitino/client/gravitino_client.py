@@ -33,7 +33,15 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.policy.policy import Policy
+from gravitino.api.policy.policy_association_selector import PolicyAssociationSelector
+from gravitino.api.policy.policy_operations import PolicyOperations
+from gravitino.api.policy.policy_tag_association import PolicyTagAssociation
 from gravitino.api.secret import SecretBinding, SecretReference
+from gravitino.api.domain.domain import Domain
+from gravitino.api.domain.domain_change import DomainChangeVariant
+from gravitino.api.domain.domain_operations import DomainOperations
+from gravitino.api.tag.tag_value import TagValue
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -45,7 +53,9 @@ _EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
 _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
-class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
+class GravitinoClient(
+    GravitinoClientBase, SupportsJobs, TagOperations, DomainOperations, PolicyOperations
+):
     """Gravitino Client for a user to interact with the Gravitino API, allowing the client to list,
     load, create, and alter Catalog.
 
@@ -95,8 +105,22 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def list_catalogs(self) -> List[str]:
         return self.get_metalake().list_catalogs()
 
-    def list_catalogs_info(self) -> List[Catalog]:
-        return self.get_metalake().list_catalogs_info()
+    def list_catalogs_info(self, include_properties: bool = True) -> List[Catalog]:
+        """List catalogs, optionally omitting their properties.
+
+        Args:
+            include_properties: Whether to resolve catalog properties. Defaults to True.
+                False returns lightweight descriptors retaining only the in-use property and
+                name, type, provider, comment, and audit information. Use them for discovery
+                only. Call load_catalog before reading, comparing, or altering properties.
+
+        Returns:
+            A list of catalogs under the current metalake.
+
+        Raises:
+            NoSuchMetalakeException if the metalake does not exist.
+        """
+        return self.get_metalake().list_catalogs_info(include_properties)
 
     def load_catalog(self, name: str) -> Catalog:
         return self.get_metalake().load_catalog(name)
@@ -360,6 +384,186 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             NoSuchMetalakeException: If the metalake does not exist.
         """
         return self.get_metalake().delete_tag(tag_name)
+
+    def list_policy_associations_for_tag(self, tag_name) -> list[PolicyTagAssociation]:
+        """
+        List the policy associations of a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+
+        Returns:
+            list[PolicyTagAssociation]: The policy associations of the tag.
+        """
+        return self.get_metalake().list_policy_associations_for_tag(tag_name)
+
+    def add_policy_for_tag(
+        self, tag_name, policy_name, selector: PolicyAssociationSelector = None
+    ) -> PolicyTagAssociation:
+        """
+        Associate a policy with a tag under a metalake. When no selector is
+        given, the association applies to all values of the tag.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+            selector (PolicyAssociationSelector): The selector scoping the
+                association, or None for all tag values.
+
+        Returns:
+            PolicyTagAssociation: The created policy association.
+        """
+        return self.get_metalake().add_policy_for_tag(tag_name, policy_name, selector)
+
+    def remove_policy_from_tag(self, tag_name, policy_name) -> None:
+        """
+        Remove the association between a policy and a tag under a metalake.
+
+        Args:
+            tag_name (str): The name of the tag.
+            policy_name (str): The name of the policy.
+        """
+        return self.get_metalake().remove_policy_from_tag(tag_name, policy_name)
+
+    # Policy operations
+    def list_policies(self) -> list[str]:
+        """List all the policy names under a metalake.
+
+        Returns:
+            list[str]: The list of policy names.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_policies()
+
+    def list_policy_infos(self) -> list[Policy]:
+        """
+        List policies information under a metalake.
+
+        Returns:
+            list[Policy]: The list of policy information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().list_policy_infos()
+
+    def get_policy(self, policy_name) -> Policy:
+        """
+        Get a policy by its name under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            Policy: The policy information.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        return self.get_metalake().get_policy(policy_name)
+
+    def create_policy(
+        self, policy_name, policy_type, comment, enabled, content
+    ) -> Policy:
+        """
+        Create a new policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+            policy_type (str): The type of the policy.
+            comment (str): The comment of the policy.
+            enabled (bool): Whether the policy is enabled.
+            content (PolicyContent): The content of the policy.
+
+        Returns:
+            Policy: The policy information.
+
+        Raises:
+            NoSuchMetalakeException: If the metalake does not exist.
+            PolicyAlreadyExistsException: If the policy already exists.
+        """
+        return self.get_metalake().create_policy(
+            policy_name, policy_type, comment, enabled, content
+        )
+
+    def enable_policy(self, policy_name) -> None:
+        """
+        Enable a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        return self.get_metalake().enable_policy(policy_name)
+
+    def disable_policy(self, policy_name) -> None:
+        """
+        Disable a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        return self.get_metalake().disable_policy(policy_name)
+
+    def alter_policy(self, policy_name, *changes) -> Policy:
+        """
+        Alter a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+            changes (PolicyChange): The changes to apply to the policy.
+
+        Returns:
+            Policy: The altered policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+            IllegalArgumentException: If the changes cannot be applied to
+                the policy.
+            PolicyAlreadyExistsException: If a policy with the new name
+                already exists.
+        """
+        return self.get_metalake().alter_policy(policy_name, *changes)
+
+    def delete_policy(self, policy_name) -> bool:
+        """
+        Delete a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            bool: True if the policy was deleted, False otherwise.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+            NoSuchMetalakeException: If the metalake does not exist.
+        """
+        return self.get_metalake().delete_policy(policy_name)
+
+    def list_tag_associations_for_policy(
+        self, policy_name
+    ) -> list[PolicyTagAssociation]:
+        """
+        List the tag associations of a policy under a metalake.
+
+        Args:
+            policy_name (str): The name of the policy.
+
+        Returns:
+            list[PolicyTagAssociation]: The tag associations of the policy.
+
+        Raises:
+            NoSuchPolicyException: If the policy does not exist.
+        """
+        return self.get_metalake().list_tag_associations_for_policy(policy_name)
 
     # Owner operations
     def get_owner(self, metadata_object: MetadataObject) -> Optional[Owner]:
@@ -717,3 +921,36 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         return self.get_metalake().revoke_privileges_from_role(
             role_name, securable_object, privileges
         )
+
+    def list_domains(self) -> list[str]:
+        """List visible domains in the current metalake."""
+        return self.get_metalake().list_domains()
+
+    def list_domains_info(self) -> list[Domain]:
+        """List visible domain snapshots in the current metalake."""
+        return self.get_metalake().list_domains_info()
+
+    def get_domain(self, name: str) -> Domain:
+        """Load a domain; absent or hidden drafts raise NoSuchDomainException."""
+        return self.get_metalake().get_domain(name)
+
+    def create_domain(
+        self,
+        name: str,
+        comment: Optional[str],
+        properties: Optional[dict[str, str]],
+        backing_tag: TagValue,
+        create_backing_tag: bool,
+    ) -> Domain:
+        """Create a draft top-level domain with an explicit new or existing tag."""
+        return self.get_metalake().create_domain(
+            name, comment, properties, backing_tag, create_backing_tag
+        )
+
+    def alter_domain(self, name: str, *changes: DomainChangeVariant) -> Domain:
+        """Alter the named domain and return a new snapshot."""
+        return self.get_metalake().alter_domain(name, *changes)
+
+    def delete_domain(self, name: str) -> bool:
+        """Delete the named domain while preserving tags."""
+        return self.get_metalake().delete_domain(name)

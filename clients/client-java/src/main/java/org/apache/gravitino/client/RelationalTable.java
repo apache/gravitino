@@ -34,6 +34,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.SupportsRoles;
+import org.apache.gravitino.domain.Domain;
+import org.apache.gravitino.domain.SupportsDomains;
 import org.apache.gravitino.dto.rel.TableDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.requests.AddPartitionsRequest;
@@ -59,6 +61,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SupportsSemanticModels;
 import org.apache.gravitino.stats.PartitionRange;
 import org.apache.gravitino.stats.PartitionStatistics;
 import org.apache.gravitino.stats.PartitionStatisticsDrop;
@@ -77,6 +80,7 @@ class RelationalTable
     implements Table,
         SupportsPartitions,
         SupportsTags,
+        SupportsDomains,
         SupportsRoles,
         SupportsPolicies,
         SupportsStatistics,
@@ -89,7 +93,10 @@ class RelationalTable
 
   private final Namespace namespace;
 
+  private final MetadataObjectDomainOperations objectDomainOperations;
+
   private final MetadataObjectTagOperations objectTagOperations;
+  private final MetadataObjectSemanticModelOperations objectSemanticModelOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectStatisticsOperations objectStatisticsOperations;
@@ -123,8 +130,12 @@ class RelationalTable
         MetadataObjects.of(
             Arrays.asList(namespace.level(1), namespace.level(2), tableDTO.name()),
             MetadataObject.Type.TABLE);
+    this.objectSemanticModelOperations =
+        new MetadataObjectSemanticModelOperations(namespace.level(0), tableObject, restClient);
     this.objectTagOperations =
         new MetadataObjectTagOperations(namespace.level(0), tableObject, restClient);
+    this.objectDomainOperations =
+        new MetadataObjectDomainOperations(namespace.level(0), tableObject, restClient);
     this.objectRoleOperations =
         new MetadataObjectRoleOperations(namespace.level(0), tableObject, restClient);
     this.objectPolicyOperations =
@@ -351,6 +362,29 @@ class RelationalTable
   @SneakyThrows // Encode charset is fixed to UTF-8, so this is safe.
   protected static String formatPartitionRequestPath(String prefix, String partitionName) {
     return prefix + "/" + RESTUtils.encodeString(partitionName);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SupportsDomains supportsDomains() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public String[] listDomains() {
+    return objectDomainOperations.listDomains();
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Domain[] listDomainsInfo() {
+    return objectDomainOperations.listDomainsInfo();
+  }
+
+  @Override
+  public SupportsSemanticModels supportsSemanticModels() {
+    return objectSemanticModelOperations;
   }
 
   @Override

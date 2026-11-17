@@ -20,6 +20,7 @@ from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.policy.supports_policies import SupportsPolicies
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.exceptions.base import UnsupportedOperationException
 
@@ -49,6 +50,11 @@ class Schema(Auditable):
 
     def supports_tags(self) -> SupportsTags:
         raise UnsupportedOperationException("Schema does not support tag operations.")
+
+    def supports_policies(self) -> SupportsPolicies:
+        raise UnsupportedOperationException(
+            "Schema does not support policy operations."
+        )
 
     def supports_roles(self) -> SupportsRoles:
         """Return role operations supported by this schema.

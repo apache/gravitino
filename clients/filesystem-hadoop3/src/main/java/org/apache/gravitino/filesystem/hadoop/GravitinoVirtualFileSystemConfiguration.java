@@ -89,6 +89,15 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CLIENT_OAUTH2_SCOPE_KEY =
       "fs.gravitino.client.oauth2.scope";
 
+  /**
+   * The configuration key for the OAuth2 client authentication method.
+   *
+   * <p>Canonical values are the RFC 6749 style names {@code client_secret_post} (default) and
+   * {@code client_secret_basic} (case-insensitive).
+   */
+  public static final String FS_GRAVITINO_CLIENT_OAUTH2_AUTHENTICATION_METHOD_KEY =
+      "fs.gravitino.client.oauth2.authenticationMethod";
+
   /** The configuration key prefix for kerberos */
   public static final String FS_GRAVITINO_CLIENT_KERBEROS_PREFIX = "fs.gravitino.client.kerberos.";
 
@@ -228,6 +237,14 @@ public class GravitinoVirtualFileSystemConfiguration {
 
   /** The default value for whether to enable auto-creation of fileset location. */
   public static final boolean FS_GRAVITINO_AUTO_CREATE_LOCATION_DEFAULT = true;
+
+  /**
+   * The configuration key for the comma-separated fileset paths to collect delegation tokens for,
+   * e.g. {@code gvfs://fileset/catalog/schema/fileset}. Needed when a job reads filesets outside
+   * {@code fs.defaultFS}, because token requests carry no path for GVFS to resolve.
+   */
+  public static final String FS_GRAVITINO_KERBEROS_ACCESS_FILESETS =
+      "fs.gravitino.kerberos.access.filesets";
 
   /**
    * The prefix for user-defined location configs: {@code

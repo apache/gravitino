@@ -77,6 +77,10 @@ public final class EntityCombinedView implements View {
     return this;
   }
 
+  MaskAndOmitKeys hiddenProperties() {
+    return MaskAndOmitKeys.of(keysToMask, keysToOmit);
+  }
+
   @Override
   public Column[] columns() {
     return view.columns();

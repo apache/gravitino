@@ -21,6 +21,8 @@ package org.apache.gravitino.trino.connector.metadata;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_PRIMARY_KEY;
 import static org.apache.gravitino.trino.connector.catalog.jdbc.mysql.MySQLPropertyMeta.TABLE_UNIQUE_KEY;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -47,6 +49,24 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoTable {
+
+  /** Checks wide-table construction materializes the source columns once. */
+  @Test
+  public void testWideTableColumnsAreMaterializedOnce() {
+    Column[] columns = new Column[1000];
+    for (int i = 0; i < columns.length; i++) {
+      columns[i] = Column.of("c" + i, Types.IntegerType.get());
+    }
+    Table source = mockTable("wide", columns, "comment", Map.of("k", "v"));
+    GravitinoTable table = new GravitinoTable("s", "wide", source);
+    verify(source, times(1)).columns();
+    Assertions.assertEquals(1000, table.getColumns().size());
+    for (int i = 0; i < columns.length; i++) {
+      Assertions.assertEquals("c" + i, table.getColumns().get(i).getName());
+    }
+    Assertions.assertEquals("comment", table.getComment());
+    Assertions.assertEquals(Map.of("k", "v"), table.getProperties());
+  }
 
   @Test
   public void testGravitinoTable() {

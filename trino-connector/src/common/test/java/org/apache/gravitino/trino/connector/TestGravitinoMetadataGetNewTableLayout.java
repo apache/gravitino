@@ -22,6 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.trino.spi.connector.ConnectorMetadata;
@@ -105,6 +107,26 @@ public class TestGravitinoMetadataGetNewTableLayout {
     Optional<ConnectorTableLayout> result = metadata.getNewTableLayout(session, tableMetadata);
 
     assertTrue(result.isPresent());
+  }
+
+  @Test
+  public void testGetNewTableLayoutDoesNotAskInternalWhenAdapterSkipsIt() {
+    CatalogConnectorMetadata catalogConnectorMetadata = mock(CatalogConnectorMetadata.class);
+    CatalogConnectorMetadataAdapter metadataAdapter = mock(CatalogConnectorMetadataAdapter.class);
+    ConnectorMetadata internalMetadata = mock(ConnectorMetadata.class);
+    ConnectorSession session = mock(ConnectorSession.class);
+
+    ConnectorTableMetadata tableMetadata =
+        new ConnectorTableMetadata(
+            new SchemaTableName("test_schema", "test_table"), Collections.emptyList());
+
+    when(metadataAdapter.skipsInternalNewTableLayout()).thenReturn(true);
+
+    GravitinoMetadata metadata =
+        new StubGravitinoMetadata(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+
+    assertFalse(metadata.getNewTableLayout(session, tableMetadata).isPresent());
+    verify(internalMetadata, never()).getNewTableLayout(any(), any());
   }
 
   private static final class StubGravitinoMetadata extends GravitinoMetadata {

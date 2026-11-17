@@ -34,7 +34,11 @@ const orders = {
 
 const customers = {
   name: 'customers',
-  source: { namespace: ['sales', 'mart'], name: 'customers' }
+  source: { namespace: ['sales', 'mart'], name: 'customers' },
+  fields: [
+    { name: 'id', expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'id' }] } },
+    { name: 'tenant_id', expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'tenant_id' }] } }
+  ]
 }
 
 const definitionOf = overrides => ({ datasets: [orders], ...overrides })
@@ -109,6 +113,22 @@ describe('validateSemanticModelDefinition', () => {
     expect(errors).toEqual(['Field names must be unique within dataset "orders": order_id.'])
   })
 
+  test('rejects field names that differ only by case', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [
+        {
+          ...orders,
+          fields: [
+            ...orders.fields,
+            { name: 'Order_Id', expression: { dialects: [{ dialect: 'ANSI_SQL', expression: 'other_id' }] } }
+          ]
+        }
+      ]
+    })
+
+    expect(errors).toEqual(['Field names must be unique within dataset "orders": order_id.'])
+  })
+
   test('accepts the same field name in two different datasets', () => {
     const errors = validateSemanticModelDefinition({
       datasets: [orders, { ...customers, fields: orders.fields }]
@@ -121,7 +141,7 @@ describe('validateSemanticModelDefinition', () => {
     const errors = validateSemanticModelDefinition({
       datasets: [orders],
       relationships: [
-        { name: 'orders_customers', from: 'orders', to: 'customers', fromColumns: ['a'], toColumns: ['b'] }
+        { name: 'orders_customers', from: 'orders', to: 'customers', fromColumns: ['order_id'], toColumns: ['id'] }
       ]
     })
 
@@ -132,7 +152,13 @@ describe('validateSemanticModelDefinition', () => {
     const errors = validateSemanticModelDefinition({
       datasets: [orders, customers],
       relationships: [
-        { name: 'orders_customers', from: 'orders', to: 'customers', fromColumns: ['a'], toColumns: ['b', 'c'] }
+        {
+          name: 'orders_customers',
+          from: 'orders',
+          to: 'customers',
+          fromColumns: ['order_id'],
+          toColumns: ['id', 'tenant_id']
+        }
       ]
     })
 
@@ -153,7 +179,7 @@ describe('validateSemanticModelDefinition', () => {
       name: 'orders_customers',
       from: 'orders',
       to: 'customers',
-      fromColumns: ['customer_id'],
+      fromColumns: ['order_id'],
       toColumns: ['id']
     }
 
@@ -182,11 +208,60 @@ describe('validateSemanticModelDefinition', () => {
       'Dataset "customers" must have a source with a namespace and a name.'
     ])
   })
+
+  test('rejects key references that are not declared fields', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [{ ...orders, primaryKey: ['missing_key'], uniqueKeys: [['order_id'], ['missing_unique']] }]
+    })
+
+    expect(errors).toEqual([
+      `datasets[0].primaryKey[0] 'missing_key' is not a declared field of dataset "orders".`,
+      `datasets[0].uniqueKeys[1][0] 'missing_unique' is not a declared field of dataset "orders".`
+    ])
+  })
+
+  test('rejects relationship columns that are not declared fields of the endpoint datasets', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [orders, { ...customers, fields: [] }],
+      relationships: [
+        {
+          name: 'orders_customers',
+          from: 'orders',
+          to: 'customers',
+          fromColumns: ['missing_from'],
+          toColumns: ['id']
+        }
+      ]
+    })
+
+    expect(errors).toEqual([
+      `relationships[0].fromColumns[0] 'missing_from' is not a declared field of dataset "orders".`,
+      `relationships[0].toColumns[0] 'id' is not a declared field of dataset "customers".`
+    ])
+  })
+
+  test('matches declared field references case-insensitively', () => {
+    const errors = validateSemanticModelDefinition({
+      datasets: [{ ...orders, primaryKey: ['ORDER_ID'], uniqueKeys: [['Order_Id']] }],
+      relationships: [
+        { name: 'self', from: 'orders', to: 'orders', fromColumns: ['Order_ID'], toColumns: ['order_id'] }
+      ]
+    })
+
+    expect(errors).toEqual([])
+  })
 })
 
 describe('nested Semantic Model contract validation', () => {
   const expression = { dialects: [{ dialect: 'ANSI_SQL', expression: 'amount' }] }
-  const relationship = { name: 'self', from: 'orders', to: 'orders', fromColumns: ['id'], toColumns: ['id'] }
+
+  const relationship = {
+    name: 'self',
+    from: 'orders',
+    to: 'orders',
+    fromColumns: ['order_id'],
+    toColumns: ['order_id']
+  }
 
   test.each(['field', 'metric'])('accepts only the server-supported optional %s data types', kind => {
     const withType = datatype =>
@@ -317,7 +392,19 @@ describe('nested Semantic Model contract validation', () => {
     ).toEqual([])
     expect(
       validateSemanticModelDefinition({
-        datasets: [{ ...orders, primaryKey: ['order_id'], uniqueKeys: [['amount'], ['id', 'region']] }],
+        datasets: [
+          {
+            ...orders,
+            fields: [
+              ...orders.fields,
+              { name: 'amount', expression },
+              { name: 'id', expression },
+              { name: 'region', expression }
+            ],
+            primaryKey: ['order_id'],
+            uniqueKeys: [['amount'], ['id', 'region']]
+          }
+        ],
         relationships: [relationship],
         metrics: [
           {

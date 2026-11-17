@@ -22,7 +22,9 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -33,14 +35,21 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsDomainOperations.LockedDomainState;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
+import org.apache.gravitino.domain.Domain;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.DomainEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -48,6 +57,9 @@ import org.mockito.InOrder;
 import org.mockito.Mockito;
 
 public class TestRelationalEntityStore {
+
+  private static final AuditInfo AUDIT_INFO =
+      AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
   private RelationalEntityStore store;
   private RelationalBackend backend;
@@ -147,6 +159,54 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).delete(ident, Entity.EntityType.CATALOG, true);
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testInsertDomainWithNewBackingTagInvalidatesTagAfterBackendInsert()
+      throws IOException, IllegalAccessException {
+    DomainEntity domain =
+        DomainEntity.builder()
+            .withId(1L)
+            .withName("Finance")
+            .withNamespace(NamespaceUtil.ofDomain("metalake"))
+            .withStatus(Domain.Status.DRAFT)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(2L)
+            .withName("finance_tag")
+            .withNamespace(NamespaceUtil.ofTag("metalake"))
+            .withAllowedValues(new String[0])
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    NameIdentifier tagIdent = tag.nameIdentifier();
+    Consumer<LockedDomainState> check = state -> {};
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(tagIdent, Entity.EntityType.TAG);
+              return null;
+            })
+        .when(backend)
+        .insertDomainWithNewBackingTag(domain, tag, check);
+
+    store.insertDomainWithNewBackingTag(domain, tag, check);
+
+    InOrder inOrder = Mockito.inOrder(backend, cache);
+    inOrder.verify(backend).insertDomainWithNewBackingTag(domain, tag, check);
+    inOrder.verify(cache).invalidate(tagIdent, Entity.EntityType.TAG);
+
+    // A failed insert leaves no new tag, so nothing is invalidated.
+    Mockito.clearInvocations(cache);
+    Mockito.doThrow(new TagAlreadyExistsException("Tag finance_tag already exists"))
+        .when(backend)
+        .insertDomainWithNewBackingTag(domain, tag, check);
+    Assertions.assertThrows(
+        TagAlreadyExistsException.class,
+        () -> store.insertDomainWithNewBackingTag(domain, tag, check));
+    Mockito.verify(cache, Mockito.never()).invalidate(any(), any());
   }
 
   @Test

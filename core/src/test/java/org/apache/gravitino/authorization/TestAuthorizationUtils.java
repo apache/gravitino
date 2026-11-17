@@ -518,6 +518,61 @@ class TestAuthorizationUtils {
   }
 
   @Test
+  void testDomainPrivilegesDoNotUpdateMixedMetalakeConnectorGrants() {
+    CatalogManager catalogs = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    AuthorizationPlugin plugin = Mockito.mock(AuthorizationPlugin.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogs, catalog);
+    Mockito.when(catalog.name()).thenReturn("catalog");
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(plugin);
+    Mockito.when(catalogs.listCatalogs(Namespace.of(metalake)))
+        .thenReturn(new NameIdentifier[] {NameIdentifier.of(metalake, "catalog")});
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.catalogManager()).thenReturn(catalogs);
+    SecurableObject tableOnly =
+        SecurableObjects.parse(
+            metalake, MetadataObject.Type.METALAKE, List.of(Privileges.SelectTable.allow()));
+    try (MockedStatic<GravitinoEnv> mocked = Mockito.mockStatic(GravitinoEnv.class)) {
+      mocked.when(GravitinoEnv::getInstance).thenReturn(env);
+      for (Privilege privilege :
+          List.of(
+              Privileges.ManageDomain.allow(),
+              Privileges.UseDomain.allow(),
+              Privileges.ManageDomain.deny(),
+              Privileges.UseDomain.deny())) {
+        SecurableObject mixed =
+            SecurableObjects.parse(
+                metalake,
+                MetadataObject.Type.METALAKE,
+                List.of(Privileges.SelectTable.allow(), privilege));
+        RoleEntity role =
+            RoleEntity.builder()
+                .withId(1L)
+                .withName("mixed")
+                .withNamespace(AuthorizationUtils.ofRoleNamespace(metalake))
+                .withAuditInfo(
+                    AuditInfo.builder().withCreator("tester").withCreateTime(Instant.now()).build())
+                .withSecurableObjects(List.of(mixed))
+                .build();
+        AuthorizationUtils.notifyRolePrivilegesUpdated(metalake, role, tableOnly, mixed);
+        AuthorizationUtils.notifyRolePrivilegesUpdated(metalake, role, mixed, tableOnly);
+        Mockito.verifyNoInteractions(plugin);
+        AuthorizationUtils.callAuthorizationPluginForSecurableObjects(
+            metalake,
+            List.of(mixed),
+            (p, c) ->
+                p.onRoleCreated(AuthorizationUtils.filterSecurableObjects(role, metalake, c)));
+        ArgumentCaptor<Role> captured = ArgumentCaptor.forClass(Role.class);
+        Mockito.verify(plugin).onRoleCreated(captured.capture());
+        Assertions.assertEquals(
+            List.of(Privileges.SelectTable.allow()),
+            captured.getValue().securableObjects().get(0).privileges());
+        Mockito.clearInvocations(plugin);
+      }
+    }
+  }
+
+  @Test
   void testSemanticModelParentAndMixedPrivileges() {
     CatalogManager catalogs = Mockito.mock(CatalogManager.class);
     BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);

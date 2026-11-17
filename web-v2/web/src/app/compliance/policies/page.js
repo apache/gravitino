@@ -138,10 +138,6 @@ export default function PoliciesPage() {
     })
   }
 
-  const handleClick = name => () => {
-    router.push(`/metadataObjectsForPolicy?policy=${name}&metalake=${currentMetalake}`)
-  }
-
   const handleViewPolicy = async policy => {
     setDetailsLoading(true)
     const { payload: policyDetail } = await dispatch(getPolicyDetails({ metalake: currentMetalake, policy }))
@@ -172,10 +168,8 @@ export default function PoliciesPage() {
             key={record.name}
             icon={!record.enabled ? <StopOutlined style={{ color: 'white' }} /> : null}
             closable={false}
-            onClick={handleClick(record.name)}
             color={record.enabled ? token.colorPrimary : token.colorTextDisabled}
             style={{ userSelect: 'none' }}
-            className='cursor-pointer'
           >
             <span>{record.name.length > 20 ? `${record.name.slice(0, 20)}...` : record.name}</span>
           </Tag>

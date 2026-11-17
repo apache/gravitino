@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -412,6 +413,7 @@ class IcebergViewCatalogOperations {
             .defaultNamespace(defaultNamespace)
             .representations(newRepresentations)
             .putSummary("operation", "alter")
+            .putSummary("gravitino.view-replacement-id", UUID.randomUUID().toString())
             .defaultCatalog(replace.getDefaultCatalog())
             .build();
 

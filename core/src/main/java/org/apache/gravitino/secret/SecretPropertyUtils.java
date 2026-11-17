@@ -372,6 +372,49 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Returns the entity id that writing a write-through secret for {@code property} requires.
+   *
+   * <p>A write-through URN embeds the entity id, so an entity Gravitino has no id for yet, such as
+   * an external schema or fileset that was never imported, cannot bind one.
+   *
+   * @param entityId the entity id, or null if it cannot be resolved
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param property the property key
+   * @return {@code entityId}
+   * @throws IllegalArgumentException if {@code entityId} is null
+   */
+  static long requireEntityIdForWriteThrough(
+      @Nullable Long entityId, String entityType, String property) {
+    // Loading an external schema imports it, which gives it an id; filesets have no such path.
+    Preconditions.checkArgument(
+        entityId != null,
+        "Cannot alter the write-through secret of property %s: the %s has no Gravitino entity id"
+            + " yet%s",
+        property,
+        entityType,
+        "schema".equals(entityType) ? "; load the schema to import it first" : "");
+    return entityId;
+  }
+
+  /**
+   * Rejects changing {@code property} when it holds a write-through secret URN and the entity id
+   * cannot be resolved, because releasing that secret needs the id.
+   *
+   * @param entityId the entity id, or null if it cannot be resolved
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param property the property key
+   * @param currentValue the current value of {@code property} (may be null)
+   * @throws IllegalArgumentException if {@code entityId} is null and {@code currentValue} is a
+   *     write-through secret URN of this entity type and property
+   */
+  static void checkWriteThroughHasEntityId(
+      @Nullable Long entityId, String entityType, String property, @Nullable String currentValue) {
+    if (entityId == null && isWriteThroughUrn(property, currentValue, entityType)) {
+      requireEntityIdForWriteThrough(null, entityType, property);
+    }
+  }
+
+  /**
    * Omits cloud access-key pair properties from a plaintext secrets map for {@code USE_SECRETS}
    * callers. Delegates to {@link
    * CloudStorageCredentialPropertyKeys#omitCloudAccessKeyPairProperties}.
@@ -382,5 +425,26 @@ public final class SecretPropertyUtils {
   public static Map<String, String> omitCloudAccessKeyPairSecrets(
       @Nullable Map<String, String> secrets) {
     return CloudStorageCredentialPropertyKeys.omitCloudAccessKeyPairProperties(secrets);
+  }
+
+  /**
+   * Returns whether {@code value} is a write-through secret URN {@code
+   * entityType:entityId:propertyKey} for this entity type and property, whichever entity id it
+   * names.
+   */
+  private static boolean isWriteThroughUrn(
+      String propertyKey, @Nullable String value, String entityType) {
+    if (!isSecretProperty(propertyKey, value)) {
+      return false;
+    }
+    try {
+      List<String> segments = SecretUrn.parse(value).identifierSegments();
+      return segments.size() == 3
+          && entityType.equals(segments.get(0))
+          && StringUtils.isNumeric(segments.get(1))
+          && propertyKey.equals(segments.get(2));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
   }
 }
