@@ -92,16 +92,12 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   const obsoleteSummary = job => otherSummary(job) && required &&
     Number.isInteger(job.run_attempt) && job.run_attempt > 0 &&
     Number.isInteger(required.run_attempt) && required.run_attempt > job.run_attempt;
-  if (jobs.some(job => otherSummary(job) && !obsoleteSummary(job))) {
-    return requiredAction('A Required CI record from the same, newer or unknown attempt does not match ' +
-      'this head and base. Rerun Required CI for the current context before publishing success.');
-  }
   const isAuxiliary = job => job.name === FAIL_FAST || obsoleteSummary(job);
   const currentJobs = jobs.filter(job => !isAuxiliary(job));
   // A previous attempt's unsuccessful job may be awaiting its replacement in the jobs API.
   // It cannot become a settled failure for this rerun. Current failures remain authoritative.
   const fromCurrentAttempt = job => run.run_attempt === 1 || job.run_attempt === run.run_attempt;
-  const failed = currentJobs.filter(job => fromCurrentAttempt(job) &&
+  const failed = currentJobs.filter(job => !otherSummary(job) && fromCurrentAttempt(job) &&
     ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
   // Partial reruns can retain a cancelled watcher or an obsolete Required CI job, keeping
   // the whole run cancelled after its suites recover. Ignore only those auxiliary results,
@@ -114,6 +110,10 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   // not hide a failed prerequisite or suite observed in the jobs response.
   if (failed.length) return { status: 'completed', conclusion: 'failure',
     title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+  if (jobs.some(job => otherSummary(job) && !obsoleteSummary(job))) {
+    return requiredAction('A Required CI record from the same, newer or unknown attempt does not match ' +
+      'this head and base. Rerun Required CI for the current context before publishing success.');
+  }
   const stale = currentJobs.find(job => !fromCurrentAttempt(job) &&
     !['success', 'skipped'].includes(job.conclusion));
   if (stale) {
@@ -280,14 +280,19 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const sameDefinitions = await unchanged(pr);
     let trusted = await findRun(pr, true);
     let trustedJobs;
+    let trustedExact = false;
     if (trusted) {
       trustedJobs = await jobsFor(trusted.owner, trusted.repo, trusted.run);
-      const exact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha));
-      // The display title identifies only the PR number. A previous contributor head can
-      // have a trusted result too; do not let it obscure this head's running fork jobs.
-      if (!exact && (trusted.run.status === 'completed' ||
-          trustedJobs.some(job => job.name.startsWith('Required CI / ')) ||
-          (ordinary && trusted.run.created_at < ordinary.run.created_at))) trusted = undefined;
+      trustedExact = trustedJobs.some(job => job.name === requiredName(pr, trusted.run.head_sha));
+      // A missing or unexpanded gate is unknown context, not evidence of an older PR head.
+      // Only discard a run whose current summaries all explicitly identify another head.
+      const summaries = trustedJobs.filter(job => job.name.startsWith('Required CI / ') &&
+        (job.run_attempt || 1) === trusted.run.run_attempt);
+      const otherHead = summaries.length > 0 && summaries.every(job => {
+        const match = /^Required CI \/ (.+) \/ ([0-9a-f]{40}) \/ ([0-9a-f]{40})$/.exec(job.name);
+        return match && match[3] !== pr.head.sha;
+      });
+      if (!trustedExact && otherHead && !incompleteAttempt(trusted.run, trustedJobs)) trusted = undefined;
     }
     let selected = trusted && (!ordinary || (trusted.run.updated_at || trusted.run.created_at) >= (ordinary.run.updated_at || ordinary.run.created_at) || !sameDefinitions)
       ? trusted : ordinary;
@@ -303,7 +308,13 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const jobs = selected.trusted ? trustedJobs : await jobsFor(owner, repo, run);
     const incomplete = incompleteAttempt(run, jobs);
     if (incomplete) return { ...selected, fork: ordinary?.run, result: incomplete };
-    const base = selected.trusted ? run.head_sha : !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
+    if (selected.trusted && !trustedExact && run.status === 'completed') {
+      return { ...selected, fork: ordinary?.run, result: requiredAction(
+        'Trusted CI has not identified this PR head and base. The publisher will check again; ' +
+        'if the gate remains missing, dispatch a new trusted run for the current PR.') };
+    }
+    // CI edits change who may attest success, not which base the run actually tested.
+    const base = selected.trusted ? run.head_sha : await testedBase(pr, jobs);
     let result = evaluateExecution(pr, run, jobs, base);
     const needsSuiteChecks = !result;
     if (needsSuiteChecks) {

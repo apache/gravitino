@@ -343,8 +343,8 @@ test('immutable CI definition comparisons are cached by repository, head and bas
 
 const { update } = require('../update-fork-ci.cjs');
 // The status link records the fork run and attempt it mirrors.
-const url = (id = 1, attempt = 1, owner = 'fork', repo = 'repo') =>
-  `https://github.com/${owner}/${repo}/actions/runs/${id}/attempts/${attempt}`;
+const url = (id = 1, attempt = 1, owner = 'fork', repo = 'repo', fork) =>
+  require('../publish-ci-status.cjs').runUrl(owner, repo, { id, run_attempt: attempt }, fork, pr().base);
 const forkStatus = (state, description, target_url = url()) => ({ context: 'Fork CI', state, description, target_url });
 function publisherMock({ current = pr(), latest, rerun = run(), failTrees = false } = {}) {
   const github = serviceMock();
@@ -1279,7 +1279,7 @@ test('scheduled probes clear settled success when trusted CI is dispatched or re
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   const recent = { ...pr(), updated_at: new Date().toISOString() };
   for (const wasTrusted of [false, true]) {
-    const shown = wasTrusted ? `${url(2, 1, 'apache', 'gravitino')}#fork-run-1-1` : url();
+    const shown = wasTrusted ? url(2, 1, 'apache', 'gravitino', { id: 1, run_attempt: 1 }) : url();
     const { github, statuses } = publisherMock({ latest: forkStatus('success', 'All required suites passed', shown) });
     github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs: event !== 'workflow_dispatch' ? [run()]
       : [{ ...run(), id: 2, head_sha: B, head_branch: 'main', run_attempt: wasTrusted ? 2 : 1,
@@ -1290,7 +1290,7 @@ test('scheduled probes clear settled success when trusted CI is dispatched or re
     await update({ github, context: ctx, core, sleep: async () => {} });
     assert.equal(statuses[0].state, 'pending');
     // A trusted result also records the fork run it was chosen over.
-    assert.equal(statuses[0].target_url, `${url(2, wasTrusted ? 2 : 1, 'apache', 'gravitino')}#fork-run-1-1`);
+    assert.equal(statuses[0].target_url, url(2, wasTrusted ? 2 : 1, 'apache', 'gravitino', { id: 1, run_attempt: 1 }));
   }
 }));
 
@@ -1298,7 +1298,7 @@ test('a trusted result stays settled until its fork run changes', async () => wi
   ctx.eventName = 'schedule'; delete ctx.payload.inputs;
   const recent = { ...pr(), updated_at: new Date().toISOString() };
   for (const [forkAttempt, writes] of [[1, 0], [2, 1]]) {
-    const shown = `${url(2, 1, 'apache', 'gravitino')}#fork-run-1-1`;
+    const shown = url(2, 1, 'apache', 'gravitino', { id: 1, run_attempt: 1 });
     const { github, statuses } = publisherMock({ latest: forkStatus('success', 'All required suites passed', shown) });
     github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs: event !== 'workflow_dispatch'
       ? [{ ...run(), run_attempt: forkAttempt }]
@@ -1475,7 +1475,7 @@ test('the publisher settles cancelled previous-head statuses after publishing th
   github.rest.actions.getWorkflowRunAttempt = async () => ({ data: oldRun });
   await update({ github, context: ctx, core, sleep: async () => {} });
   assert.equal(failures.length, 0);
-  assert.deepEqual(statuses.map(s => [s.sha, s.state, s.target_url]), [[A, 'success', url()], [C, 'error', url(10, 1)]]);
+  assert.deepEqual(statuses.map(s => [s.sha, s.state, s.target_url]), [[A, 'success', url()], [C, 'error', url(10, 1).split('#')[0]]]);
   assert.equal(statuses[1].description, 'Fork CI cancelled for a previous commit');
 }));
 
@@ -1888,3 +1888,77 @@ test('unfinished current jobs remain retryable even when the aggregate is cancel
   current.at(-1).conclusion = 'success';
   assert.equal(evaluate(pr(), completed, current).conclusion, 'success');
 });
+
+test('changed CI uses the actual tested base while retaining the trust requirement', async () => {
+  for (const status of ['ahead', 'identical', 'diverged']) {
+    const forkJobs = jobs(pr()); forkJobs[0].name = requiredName(pr(), C);
+    const github = serviceMock({ changed: true, forkJobs });
+    github.rest.repos.compareCommitsWithBasehead = async args => {
+      assert.equal(args.basehead, `${C}...main`); return { data: { status } };
+    };
+    const mirrored = await createService(github).mirror(pr());
+    assert.equal(statusState(mirrored.result), status === 'diverged' ? 'error' : 'pending');
+    if (status !== 'diverged') assert.equal(mirrored.result.title, TRUSTED_REQUIRED);
+  }
+});
+
+test('current eligibility failure takes precedence over an unexpanded summary', () => {
+  for (const conclusion of ['failure', 'timed_out']) {
+    const snapshot = [{ name: 'Resolve fork CI eligibility', run_attempt: 2, conclusion },
+      { name: 'Required CI /  /  / ', run_attempt: 2, conclusion: 'skipped' }];
+    const result = evaluate(pr(), { ...run(), run_attempt: 2, conclusion: 'failure' }, snapshot);
+    assert.equal(statusState(result), 'failure');
+    assert.match(result.title, /Failed: Resolve fork CI eligibility/);
+    snapshot[0].run_attempt = 1;
+    assert.equal(statusState(evaluate(pr(), { ...run(), run_attempt: 2 }, snapshot)), 'error');
+  }
+});
+
+test('unknown trusted context cannot fall back to fork success and recovers when identified', async () => {
+  for (const shape of ['missing', 'unexpanded', 'future-unexpanded']) {
+    const attempt = shape === 'future-unexpanded' ? 2 : 1;
+    const trustedJobs = [{ name: 'Resolve fork CI eligibility', run_attempt: attempt, conclusion: 'failure' }];
+    if (shape !== 'missing') trustedJobs.push({ name: 'Required CI /  /  / ', run_attempt: attempt, conclusion: 'skipped' });
+    const github = serviceMock({ trusted: true, trustedJobs });
+    const service = createService(github);
+    const result = await service.mirror(pr());
+    assert.equal(result.trusted, true); assert.equal(result.run.id, 2);
+    assert.equal(statusState(result.result), 'error');
+    trustedJobs.splice(0, trustedJobs.length, ...jobs(pr()));
+    assert.equal(statusState((await service.mirror(pr())).result), 'success');
+  }
+});
+
+test('status URLs retain base context and accept legacy links', () => {
+  const { runUrl, parseRunUrl } = require('../publish-ci-status.cjs');
+  for (const ref of ['main', 'release/2.0', 'branch-%-中文']) {
+    for (const fork of [undefined, run()]) {
+      const link = runUrl('apache', 'gravitino', run(), fork, { sha: B, ref });
+      assert.equal(parseRunUrl(link).base_sha, B); assert.equal(parseRunUrl(link).base_ref, ref);
+      assert.equal(parseRunUrl(link).fork_run_id, fork?.id);
+    }
+  }
+  assert.equal(parseRunUrl(url().split('#')[0]).base_sha, undefined);
+  assert.equal(parseRunUrl(url().replace('-main', '-%zz')), undefined);
+});
+
+test('scheduled sweeps invalidate settled base context and upgrade legacy links once', async () => withPublisher(async ({ ctx, core }) => {
+  for (const kind of ['branch', 'sha', 'legacy']) {
+    const p = pr(); p.updated_at = new Date().toISOString();
+    const { github, statuses } = publisherMock({ latest: forkStatus('success', 'All required suites passed',
+      kind === 'legacy' ? url().split('#')[0] : url()) });
+    if (kind === 'branch') p.base.ref = 'release/2.0';
+    if (kind === 'sha') p.base.sha = C;
+    github.rest.pulls.get = async () => ({ data: p });
+    let reads = 0;
+    github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ??
+      (endpoint === github.rest.pulls.list ? [p] : (reads++, jobs(p)));
+    ctx.eventName = 'schedule'; ctx.payload = {};
+    await update({ github, context: ctx, core, sleep: async () => {} });
+    assert.equal(reads, 1); assert.equal(statuses.length, 1);
+    const parsed = require('../publish-ci-status.cjs').parseRunUrl(statuses[0].target_url);
+    assert.equal(parsed.base_ref, p.base.ref); assert.equal(parsed.base_sha, p.base.sha);
+    await update({ github, context: ctx, core, sleep: async () => {} });
+    assert.equal(reads, 1); assert.equal(statuses.length, 1);
+  }
+}));

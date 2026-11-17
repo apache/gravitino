@@ -23,20 +23,27 @@ const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
 // #fork-run-{id}-{attempt} for a trusted result, naming the fork run seen at that time.
 const RUN_URL = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/actions\/runs\/(\d+)(?:\/attempts\/(\d+))?(?:#fork-run-(\d+)-(\d+))?$/;
 
-function runUrl(owner, repo, run, fork) {
+function runUrl(owner, repo, run, fork, base) {
   return `https://github.com/${owner}/${repo}/actions/runs/${run.id}/attempts/${run.run_attempt || 1}` +
-    (fork ? `#fork-run-${fork.id}-${fork.run_attempt || 1}` : '');
+    (fork ? `#fork-run-${fork.id}-${fork.run_attempt || 1}` : '') +
+    (base ? `${fork ? '&' : '#'}base-${base.sha}-${encodeURIComponent(base.ref)}` : '');
 }
 
 // Returns the run a status links to, or undefined for a status without a run. Links written
 // before attempts were recorded have no run_attempt.
 function parseRunUrl(url) {
-  const match = RUN_URL.exec(url || '');
+  // Record the PR base separately from the tested base: retargeting must invalidate
+  // a settled status even if its head, run and attempt have not changed.
+  const context = /([#&])base-([0-9a-f]{40})-([^#&]+)$/.exec(url || '');
+  let baseRef;
+  try { baseRef = context && decodeURIComponent(context[3]); } catch { return undefined; }
+  const match = RUN_URL.exec(context ? url.slice(0, context.index) : url || '');
   if (!match) return undefined;
   const [, owner, repo, id, attempt, forkId, forkAttempt] = match;
   return { owner, repo, run_id: Number(id), run_attempt: attempt && Number(attempt),
     trusted: owner === UPSTREAM.owner && repo === UPSTREAM.repo,
-    fork_run_id: forkId && Number(forkId), fork_run_attempt: forkAttempt && Number(forkAttempt) };
+    fork_run_id: forkId && Number(forkId), fork_run_attempt: forkAttempt && Number(forkAttempt),
+    ...(context ? { base_sha: context[2], base_ref: baseRef } : {}) };
 }
 
 async function latestStatus({ github, repo, sha, context }) {

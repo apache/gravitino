@@ -108,7 +108,7 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     refreshed.add(pr.number);
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
-    const target = run ? runUrl(mirror.owner, mirror.repo, run, mirror.trusted && mirror.fork) : waitingUrl(pr);
+    const target = run ? runUrl(mirror.owner, mirror.repo, run, mirror.trusted && mirror.fork, pr.base) : waitingUrl(pr);
     // Re-read before publishing so a push or retarget during the API calls cannot get a stale success.
     const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
     if (current.head.sha !== pr.head.sha || current.base.sha !== pr.base.sha || current.base.ref !== pr.base.ref || current.state !== 'open') return;
@@ -189,7 +189,10 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
             : shown.trusted ? same(trusted, shown.run_id, shown.run_attempt) &&
               (fork ? same(fork, shown.fork_run_id, shown.fork_run_attempt) : !shown.fork_run_id)
               : same(fork, shown.run_id, shown.run_attempt) && !trusted;
-          if (settled) return;
+          // Legacy links have no context proof and are refreshed once. The rewritten
+          // link restores cheap probing, including after a missed retarget signal.
+          const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
+          if (settled && (!shown || sameBase)) return;
         }
         await refresh(pr);
       });
