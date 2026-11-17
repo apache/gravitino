@@ -18,14 +18,20 @@
  */
 package org.apache.gravitino.policy;
 
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +39,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
@@ -40,6 +47,13 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.ResolvedTagPolicy;
+import org.apache.gravitino.authorization.TagPolicyMatcher;
+import org.apache.gravitino.authorization.TagPolicyReader;
+import org.apache.gravitino.authorization.TagPolicyResolver;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -47,6 +61,7 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.EffectiveTagResolver;
 import org.apache.gravitino.tag.EffectiveTagResolver.ResolvedTag;
 import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -61,10 +76,16 @@ public class TestObjectPolicyResolver {
   private static final MetadataObject CATALOG =
       MetadataObjects.of(Collections.singletonList("catalog"), MetadataObject.Type.CATALOG);
 
+  private static final MetadataObject SCHEMA =
+      MetadataObjects.of("catalog", "schema", MetadataObject.Type.SCHEMA);
+
   private EntityStore entityStore;
   private SupportsRelationOperations relationOperations;
   private EffectiveTagResolver effectiveTagResolver;
   private ObjectPolicyResolver resolver;
+  private TagEntity gold;
+  private TagEntity bronze;
+  private PolicyEntity access;
 
   @BeforeEach
   public void setUp() {
@@ -73,6 +94,20 @@ public class TestObjectPolicyResolver {
     effectiveTagResolver = mock(EffectiveTagResolver.class);
     when(entityStore.relationOperations()).thenReturn(relationOperations);
     resolver = new ObjectPolicyResolver(entityStore, effectiveTagResolver);
+    gold = tag(1L, "certified", TagAssignment.ofValues("gold"));
+    bronze = tag(1L, "certified", TagAssignment.ofValues("bronze"));
+    access =
+        PolicyEntity.builder()
+            .withId(10L)
+            .withName("policy_10")
+            .withNamespace(NamespaceUtil.ofPolicy(METALAKE))
+            .withPolicyType(Policy.BuiltInType.ACCESS_CONTROL)
+            .withEnabled(true)
+            .withContent(
+                PolicyContents.accessControl(
+                    List.of(Privilege.Name.SELECT_TABLE), List.of("analyst")))
+            .withAuditInfo(audit())
+            .build();
   }
 
   @Test
@@ -313,6 +348,187 @@ public class TestObjectPolicyResolver {
     Assertions.assertFalse(result.get(OBJECT)[0].inherited().orElseThrow());
     Assertions.assertFalse(result.get(OBJECT)[1].inherited().orElseThrow());
     Assertions.assertArrayEquals(new PolicyEntity[] {second}, result.get(CATALOG));
+  }
+
+  @Test
+  void testReadsDirectTagsAndPreservesBindingSelectors() throws Exception {
+    stubTags(OBJECT, List.of(bronze));
+    stubBindings(
+        Arrays.asList(
+            relation(PolicyAssociationSelectorSerde.serialize(TagValueSelector.of("gold"))),
+            relation(null)));
+
+    Assertions.assertArrayEquals(
+        new String[] {"bronze"},
+        resolver.loadTags(METALAKE, OBJECT).get(0).assignment().orElseThrow().values());
+    List<ResolvedTagPolicy> bindings = resolver.loadPolicyBindings(METALAKE, List.of(bronze));
+    Assertions.assertEquals(2, bindings.size());
+    Assertions.assertEquals(TagValueSelector.of("gold"), bindings.get(0).selector());
+    Assertions.assertSame(AllValuesSelector.get(), bindings.get(1).selector());
+    Assertions.assertArrayEquals(
+        new String[] {"bronze"}, bindings.get(0).tag().assignment().orElseThrow().values());
+    Assertions.assertEquals(10L, bindings.get(0).policy().id());
+  }
+
+  @Test
+  void testPointAndPreloadedReadersUseTheSameOverrideSemantics() throws Exception {
+    stubTags(OBJECT, List.of(bronze));
+    stubTags(SCHEMA, Collections.emptyList());
+    stubTags(CATALOG, List.of(gold));
+    stubBindings(
+        List.of(relation(PolicyAssociationSelectorSerde.serialize(TagValueSelector.of("gold")))));
+    TagPolicyReader preloaded = mock(TagPolicyReader.class);
+    when(preloaded.loadTags(METALAKE, OBJECT)).thenReturn(List.of(bronze));
+    when(preloaded.loadTags(METALAKE, CATALOG)).thenReturn(List.of(gold));
+    when(preloaded.loadPolicyBindings(eq(METALAKE), anyList()))
+        .thenAnswer(
+            invocation -> {
+              List<TagEntity> tags = invocation.getArgument(1);
+              return List.of(
+                  new ResolvedTagPolicy(tags.get(0), access, TagValueSelector.of("gold")));
+            });
+
+    for (TagPolicyReader input : Arrays.asList(resolver, preloaded)) {
+      List<ResolvedTagPolicy> result =
+          new TagPolicyResolver(input).resolve(METALAKE, OBJECT, new AuthorizationRequestContext());
+      Assertions.assertArrayEquals(
+          new String[] {"bronze"}, result.get(0).tag().assignment().orElseThrow().values());
+      Assertions.assertFalse(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), result)
+              .isPresent());
+      Assertions.assertEquals(1L, result.get(0).tag().id());
+      Assertions.assertEquals(10L, result.get(0).policy().id());
+    }
+  }
+
+  @Test
+  void testTagStorageFailurePropagates() throws Exception {
+    IOException failure = new IOException("unavailable");
+    when(relationOperations.listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, OBJECT),
+            Entity.EntityType.TABLE))
+        .thenThrow(failure);
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+                UncheckedIOException.class, () -> resolver.loadTags(METALAKE, OBJECT))
+            .getCause());
+  }
+
+  @Test
+  void testPolicyStorageFailurePropagates() throws Exception {
+    IOException failure = new IOException("unavailable");
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(bronze.nameIdentifier()),
+            Entity.EntityType.TAG))
+        .thenThrow(failure);
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+                UncheckedIOException.class,
+                () -> resolver.loadPolicyBindings(METALAKE, List.of(bronze)))
+            .getCause());
+  }
+
+  @Test
+  void testMalformedSelectorDoesNotBecomePresenceMatch() throws Exception {
+    for (String invalid : Arrays.asList("{", "null", "{\"type\":\"UNKNOWN\"}")) {
+      stubBindings(List.of(relation(null), relation(invalid)));
+      IllegalStateException failure =
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () -> resolver.loadPolicyBindings(METALAKE, List.of(bronze)));
+      Assertions.assertInstanceOf(IllegalArgumentException.class, failure.getCause());
+      Assertions.assertTrue(failure.getMessage().contains(METALAKE));
+      Assertions.assertTrue(failure.getMessage().contains("tag ID 1"));
+      Assertions.assertTrue(failure.getMessage().contains("policy ID 10"));
+    }
+  }
+
+  @Test
+  void testMissingObjectHasNoDirectTags() throws Exception {
+    for (MetadataObject missing : Arrays.asList(OBJECT, SCHEMA, CATALOG)) {
+      when(relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(METALAKE, missing),
+              MetadataObjectUtil.toEntityType(missing)))
+          .thenThrow(new NoSuchEntityException("Missing object %s", missing));
+      Assertions.assertTrue(resolver.loadTags(METALAKE, missing).isEmpty());
+    }
+    Assertions.assertTrue(
+        new TagPolicyResolver(resolver)
+            .resolve(METALAKE, OBJECT, new AuthorizationRequestContext())
+            .isEmpty());
+  }
+
+  @Test
+  void testMissingObjectDoesNotPreventInheritedPolicyResolution() throws Exception {
+    stubTags(CATALOG, List.of(gold));
+    stubBindings(List.of(relation(null)));
+    for (MetadataObject missing : Arrays.asList(OBJECT, SCHEMA)) {
+      stubTags(OBJECT, Collections.emptyList());
+      stubTags(SCHEMA, Collections.emptyList());
+      when(relationOperations.listEntitiesByRelation(
+              SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+              MetadataObjectUtil.toEntityIdent(METALAKE, missing),
+              MetadataObjectUtil.toEntityType(missing)))
+          .thenThrow(new NoSuchEntityException("Missing object %s", missing));
+
+      List<ResolvedTagPolicy> bindings =
+          new TagPolicyResolver(resolver)
+              .resolve(METALAKE, OBJECT, new AuthorizationRequestContext());
+      Assertions.assertEquals(1, bindings.size());
+      Assertions.assertTrue(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("analyst"), bindings)
+              .isPresent());
+      Assertions.assertTrue(
+          TagPolicyMatcher.match(Privilege.Name.SELECT_TABLE, Set.of("unrelated"), bindings)
+              .isEmpty());
+    }
+  }
+
+  @Test
+  void testDuplicateTagNamesAreRejectedBeforeReadingPolicies() {
+    IllegalArgumentException failure =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> resolver.loadPolicyBindings(METALAKE, List.of(bronze, gold)));
+    Assertions.assertTrue(failure.getMessage().contains("certified"));
+    verifyNoInteractions(relationOperations);
+  }
+
+  @Test
+  void testNoTagsDoNotTriggerPolicyReads() {
+    Assertions.assertTrue(resolver.loadPolicyBindings(METALAKE, Collections.emptyList()).isEmpty());
+    verifyNoInteractions(relationOperations);
+  }
+
+  private void stubTags(MetadataObject object, List<TagEntity> tags) throws IOException {
+    doReturn(tags)
+        .when(relationOperations)
+        .listEntitiesByRelation(
+            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+            MetadataObjectUtil.toEntityIdent(METALAKE, object),
+            MetadataObjectUtil.toEntityType(object));
+  }
+
+  private void stubBindings(List<RelationalEntity<?>> bindings) throws IOException {
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            List.of(bronze.nameIdentifier()),
+            Entity.EntityType.TAG))
+        .thenReturn(bindings);
+  }
+
+  private RelationalEntity<PolicyEntity> relation(String selector) {
+    return new RelationalEntity<>(
+        SupportsRelationOperations.Type.POLICY_TAG_REL,
+        gold.nameIdentifier(),
+        Entity.EntityType.TAG,
+        access,
+        selector);
   }
 
   private static RelationalEntity<PolicyEntity> relation(
