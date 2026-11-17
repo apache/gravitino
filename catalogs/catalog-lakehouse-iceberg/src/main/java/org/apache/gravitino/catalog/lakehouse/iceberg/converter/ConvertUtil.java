@@ -215,5 +215,22 @@ public class ConvertUtil {
     return org.apache.gravitino.rel.types.Types.StructType.of(fields);
   }
 
+  /**
+   * Splits an Iceberg {@code schema.idToName()} value into Gravitino field-name components.
+   *
+   * <p>Iceberg joins nested levels with {@code '.'} (e.g. {@code event.user-id}). Callers must not
+   * pass the dotted string to {@code Transforms.*(String)} / {@code NamedReference.field(String)},
+   * which would keep a single component {@code ["event.user-id"]}.
+   *
+   * @param icebergIdToName dotted nested name from {@code Schema.idToName()}
+   * @return field path components (e.g. {@code ["event", "user-id"]})
+   */
+  public static String[] splitIcebergNameToFieldPath(String icebergIdToName) {
+    Preconditions.checkArgument(
+        icebergIdToName != null && !icebergIdToName.isEmpty(),
+        "Iceberg idToName value cannot be null or empty");
+    return icebergIdToName.split("\\.", -1);
+  }
+
   private ConvertUtil() {}
 }
