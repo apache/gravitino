@@ -332,6 +332,7 @@ public final class DomainAuthzHelper {
                 .withDomains(selected.toArray(new String[0]))
                 .withTypes(filter.types().toArray(new MetadataObject.Type[0]))
                 .withNameContains(filter.nameContains().orElse(null))
+                .withExpand(filter.expand())
                 .build();
       }
     }

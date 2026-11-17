@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -833,6 +834,23 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       Consumer<LockedDomainState> check)
       throws IOException {
     return DomainRelService.getInstance().updateDomainStatusAndGet(ident, status, auditInfo, check);
+  }
+
+  @Override
+  public Map<Long, List<GenericEntity>> listDomainAssignments(
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Map<Long, List<GenericEntity>> selectedAssignments)
+      throws IOException {
+    return TagMetaService.getInstance()
+        .listDomainAssignments(metalake, domains, types, selectedAssignments);
+  }
+
+  @Override
+  public Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) throws IOException {
+    return TagMetaService.getInstance().listDirectTagsByObjectIds(metalake, type, objectIds);
   }
 
   @Override

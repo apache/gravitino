@@ -75,7 +75,10 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " tm JOIN "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
         + " te ON tm.tag_id = te.tag_id"
-        + " WHERE te.metadata_object_id IN "
+        + " JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON tm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0 AND te.metadata_object_id IN "
         + "<foreach collection='metadataObjectIds' item='id' open='(' separator=',' close=')'>"
         + "#{id}</foreach>"
         + " AND te.metadata_object_type = #{metadataObjectType}"

@@ -28,10 +28,10 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * How a leaf metadata object relates to a domain, always relative to the listed domain. An object
- * can relate to a domain in several ways at once, and every relation that applies is reported, with
- * no precedence among them. For example, a table whose schema carries the backing tag of "Finance"
- * and which itself carries that of its sub-domain "Trading" relates to Finance as {@link
+ * How a metadata object relates to a domain, always relative to the listed domain. An object can
+ * relate to a domain in several ways at once, and every relation that applies is reported, with no
+ * precedence among them. For example, a table whose schema carries the backing tag of "Finance" and
+ * which itself carries that of its sub-domain "Trading" relates to Finance as {@link
  * Type#INHERITED} from the schema and as {@link Type#VIA_SUBDOMAIN} Trading.
  */
 @Evolving

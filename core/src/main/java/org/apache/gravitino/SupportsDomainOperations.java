@@ -22,7 +22,9 @@ import com.google.common.collect.ImmutableList;
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import javax.annotation.Nullable;
 import org.apache.gravitino.domain.Domain;
@@ -32,6 +34,7 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.DomainEntity;
+import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.tag.TagValue;
 
@@ -55,6 +58,12 @@ import org.apache.gravitino.tag.TagValue;
  * entity with its backing tag set.
  */
 public interface SupportsDomainOperations {
+
+  /** Number of domain or object IDs per direct membership lookup batch. */
+  int MEMBERSHIP_LOOKUP_BATCH_SIZE = 500;
+
+  /** Maximum visible domain IDs per candidate-restricted membership join. */
+  int JOINED_DOMAIN_BATCH_SIZE = 5_000;
 
   /**
    * Deletes a domain after checking its current state under the domain row lock.
@@ -240,6 +249,36 @@ public interface SupportsDomainOperations {
    */
   List<DomainEntity> listDomainsByBackingTagIds(String metalake, List<Long> backingTagIds)
       throws IOException;
+
+  /**
+   * Lists live directly assigned objects for the selected domain bindings and object types.
+   *
+   * @param metalake The metalake containing the domains.
+   * @param domains Selected domains with backing tags.
+   * @param types The candidate metadata object types.
+   * @param selectedAssignments Previously resolved objects by selected domain ID. An empty map
+   *     resolves names; otherwise only these objects can match, and their names are reused.
+   * @return Assigned objects keyed by domain ID.
+   * @throws IOException If the assignments cannot be read.
+   */
+  Map<Long, List<GenericEntity>> listDomainAssignments(
+      String metalake,
+      List<DomainEntity> domains,
+      Set<MetadataObject.Type> types,
+      Map<Long, List<GenericEntity>> selectedAssignments)
+      throws IOException;
+
+  /**
+   * Reads direct tag assignments for recorded domain member candidates of one type.
+   *
+   * @param metalake The metalake containing the objects.
+   * @param type The metadata object type.
+   * @param objectIds The stable IDs returned by the assignment lookup.
+   * @return Directly assigned tags and their values keyed by object ID.
+   * @throws IOException If the assignments cannot be read.
+   */
+  Map<Long, List<TagEntity>> listDirectTagsByObjectIds(
+      String metalake, MetadataObject.Type type, List<Long> objectIds) throws IOException;
 
   /** The domains involved in a change, as read under the change's row locks. */
   final class LockedDomainState {
