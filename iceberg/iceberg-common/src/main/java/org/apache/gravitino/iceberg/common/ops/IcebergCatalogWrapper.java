@@ -246,6 +246,19 @@ public class IcebergCatalogWrapper implements AutoCloseable {
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
     validateTableLocation(request.metadataLocation());
+    Catalog loadedCatalog = getCatalog();
+    // Subclasses can enforce additional registration invariants through the original API.
+    if (request instanceof RegisterTableRequestWithMetadata
+        && loadedCatalog.getClass() == JdbcCatalogWithMetadataLocationSupport.class) {
+      TableIdentifier identifier = TableIdentifier.of(namespace, request.name());
+      TableMetadata metadata = ((RegisterTableRequestWithMetadata) request).tableMetadata();
+      validateTableLocation(metadata.location());
+      validateStorageProperties(metadata.properties());
+      getMetadataCache().invalidate(identifier);
+      ((JdbcCatalogWithMetadataLocationSupport) loadedCatalog)
+          .registerTable(identifier, metadata, request.overwrite());
+      return LoadTableResponse.builder().withTableMetadata(metadata).build();
+    }
     try {
       return CatalogHandlers.registerTable(getCatalog(), namespace, request);
     } catch (NotFoundException e) {
@@ -428,6 +441,21 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     if (loadedCatalog instanceof SupportsMetadataLocation) {
       return Optional.ofNullable(
           ((SupportsMetadataLocation) loadedCatalog).metadataLocation(tableIdentifier));
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Returns potential overlapping standard-layout table pointers without reading table metadata.
+   *
+   * @param location requested table location
+   * @return candidate pointers, or empty when the backend has no bulk pointer lookup
+   */
+  public Optional<Map<TableIdentifier, String>> getTableMetadataLocationCandidates(
+      String location) {
+    Catalog loadedCatalog = getCatalog();
+    if (loadedCatalog instanceof SupportsMetadataLocation) {
+      return ((SupportsMetadataLocation) loadedCatalog).metadataLocationCandidates(location);
     }
     return Optional.empty();
   }

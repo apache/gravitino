@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.iceberg.common.cache;
 
+import java.util.Map;
+import java.util.Optional;
 import org.apache.iceberg.catalog.TableIdentifier;
 
 /** An interface that supports retrieving the metadata location for a table. */
@@ -33,4 +35,14 @@ public interface SupportsMetadataLocation {
    * @return the metadata location of the table as a String
    */
   String metadataLocation(TableIdentifier tableIdentifier);
+
+  /**
+   * Looks up current metadata pointers whose standard-layout table roots may overlap a location.
+   *
+   * @param location requested table location
+   * @return candidate pointers, or empty when bulk lookup is not supported
+   */
+  default Optional<Map<TableIdentifier, String>> metadataLocationCandidates(String location) {
+    return Optional.empty();
+  }
 }

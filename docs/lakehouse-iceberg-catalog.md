@@ -160,6 +160,23 @@ also rejected when a create request inherits it. ResolvingFileIO still permits l
 different remote storage systems, such as S3 and GCS, in the same catalog. Catalogs whose warehouse
 is a local path or `file:` URI retain local filesystem support for development and testing.
 
+With Iceberg REST authorization enabled, an explicit table location on create (including staged
+create), registration, or a `set-location` commit requires load access to every existing table
+whose location overlaps it. Equal, parent, and child directories overlap; names such as `table`
+and `table2` do not. Destination create and overwrite privileges are checked first, and denied
+source checks return 403 without disclosing the source table's name. A default-location create
+does not add a source scan.
+
+For JDBC backends, source discovery uses a single query of current metadata pointers and infers
+locations from the standard `<table-location>/metadata/<file>` layout. This lookup does not read
+other tables' metadata files and does not use a cross-request cache. Custom metadata layouts,
+including arbitrary `write.metadata.path` values, are outside this lookup's supported layout.
+Source discovery compares storage locations rather than table UUIDs; register-overwrite still
+preserves the destination table UUID. Backends without bulk pointer lookup retain namespace
+discovery; metadata read failures on that fallback path are logged and skipped. Database lookup
+failures are propagated. These availability and identity-check trade-offs apply to source
+discovery, while destination authorization remains required.
+
 Supports using static access-key-id and secret-access-key to access S3 data.
 
 | Configuration item     | Description                                                                                                                                                                                                         | Default value                           | Required |

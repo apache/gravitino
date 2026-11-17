@@ -20,13 +20,21 @@
 package org.apache.iceberg.jdbc;
 
 import com.google.common.base.Preconditions;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
+import org.apache.gravitino.iceberg.common.utils.IcebergTableLocationUtils;
 import org.apache.iceberg.MetastoreRegisterTableUtils;
 import org.apache.iceberg.Table;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
@@ -67,6 +75,52 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
     return table.get(METADATA_LOCATION_PROP);
   }
 
+  /** {@inheritDoc} */
+  @Override
+  public Optional<Map<TableIdentifier, String>> metadataLocationCandidates(String location) {
+    List<String> patterns = IcebergTableLocationUtils.metadataLocationPatterns(location);
+    String predicate =
+        String.join(
+            " OR ",
+            Collections.nCopies(patterns.size(), METADATA_LOCATION_PROP + " LIKE ? ESCAPE '!'"));
+    String query =
+        "SELECT table_namespace, table_name, metadata_location FROM iceberg_tables"
+            + " WHERE catalog_name = ?"
+            + (jdbcSchemaVersion == SchemaVersion.V0
+                ? ""
+                : " AND (iceberg_type = 'TABLE' OR iceberg_type IS NULL)")
+            + " AND ("
+            + predicate
+            + ")";
+    try {
+      return Optional.of(
+          jdbcConnections.run(
+              connection -> {
+                Map<TableIdentifier, String> rows = new LinkedHashMap<>();
+                try (PreparedStatement statement = connection.prepareStatement(query)) {
+                  statement.setString(1, jdbcCatalogName);
+                  for (int i = 0; i < patterns.size(); i++) {
+                    statement.setString(i + 2, patterns.get(i));
+                  }
+                  try (ResultSet result = statement.executeQuery()) {
+                    while (result.next()) {
+                      rows.put(
+                          TableIdentifier.of(
+                              JdbcUtil.stringToNamespace(result.getString(1)), result.getString(2)),
+                          result.getString(3));
+                    }
+                  }
+                }
+                return rows;
+              }));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new UncheckedInterruptedException(e, "Interrupted during metadata pointer lookup");
+    } catch (SQLException e) {
+      throw new UncheckedSQLException(e, "Failed to look up metadata pointers");
+    }
+  }
+
   /**
    * Check if the JDBC catalog schema version supports view operations. View operations are
    * supported from V1 schema version onwards.
@@ -92,6 +146,20 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
       TableIdentifier identifier, String metadataFileLocation, boolean overwrite) {
     return MetastoreRegisterTableUtils.registerTable(
         this, identifier, metadataFileLocation, overwrite, this::overwriteMetadataLocation);
+  }
+
+  /**
+   * Registers an already read metadata snapshot without opening the input file again.
+   *
+   * @param identifier destination table
+   * @param metadata metadata snapshot read and authorized for this request
+   * @param overwrite whether an existing registration can be replaced
+   * @return registered table
+   */
+  public Table registerTable(
+      TableIdentifier identifier, TableMetadata metadata, boolean overwrite) {
+    return MetastoreRegisterTableUtils.registerTable(
+        this, identifier, metadata, overwrite, this::overwriteMetadataLocation);
   }
 
   private void overwriteMetadataLocation(
