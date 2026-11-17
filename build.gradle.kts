@@ -27,11 +27,13 @@ import com.github.jk1.license.filter.LicenseBundleNormalizer
 import com.github.jk1.license.render.InventoryHtmlReportRenderer
 import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
+import groovy.json.JsonSlurper
 import net.ltgt.gradle.errorprone.errorprone
 import org.apache.tools.zip.ZipEntry
 import org.apache.tools.zip.ZipOutputStream
 import org.gradle.api.attributes.java.TargetJvmVersion
 import org.gradle.api.publish.maven.tasks.GenerateMavenPom
+import org.gradle.api.publish.tasks.GenerateModuleMetadata
 import org.gradle.api.services.BuildService
 import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
@@ -1016,6 +1018,17 @@ subprojects {
       if (configurations.findByName("shadedDependencies") == null) {
         return@afterEvaluate
       }
+      // The plain `jar` is an empty placeholder (classifier `empty`); the actual content lives in
+      // the shaded jar. Point the ordinary Java variants at the shaded jar so consumers resolving
+      // through Gradle module metadata get the implementation classes. Otherwise `runtimeElements`
+      // selects the empty jar and, with the bundled inputs no longer published as dependencies,
+      // consumers receive neither the classes nor the transitive dependencies.
+      listOf("apiElements", "runtimeElements").forEach { variantName ->
+        configurations.named(variantName) {
+          outgoing.artifacts.clear()
+          outgoing.artifact(tasks.named("shadowJar"))
+        }
+      }
       val generatePom = tasks.named<GenerateMavenPom>("generatePomFileForMavenJavaPublication")
       val verifyShadedRuntimePom = tasks.register("verifyShadedRuntimePom") {
         group = "verification"
@@ -1040,8 +1053,38 @@ subprojects {
           }
         }
       }
+      val generateMetadata =
+        tasks.named<GenerateModuleMetadata>("generateMetadataFileForMavenJavaPublication")
+      val shadedJarName = tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFileName }
+      val verifyShadedRuntimeModuleMetadata =
+        tasks.register("verifyShadedRuntimeModuleMetadata") {
+          group = "verification"
+          description =
+            "Fails when the ordinary Java variants do not expose the shaded jar, or republish bundled dependencies."
+          dependsOn(generateMetadata)
+          val metadataFile = generateMetadata.flatMap { it.outputFile }
+          doLast {
+            @Suppress("UNCHECKED_CAST")
+            val variants =
+              (JsonSlurper().parse(metadataFile.get().asFile) as Map<String, Any>)["variants"]
+                as List<Map<String, Any>>
+            listOf("apiElements", "runtimeElements").forEach { variantName ->
+              val variant = variants.first { it["name"] == variantName }
+
+              @Suppress("UNCHECKED_CAST")
+              val files = (variant["files"] as List<Map<String, String>>).map { it["name"] }
+              check(files == listOf(shadedJarName.get())) {
+                "${project.path} variant $variantName publishes $files instead of the shaded jar ${shadedJarName.get()}"
+              }
+              check((variant["dependencies"] as? List<*>).orEmpty().isEmpty()) {
+                "${project.path} variant $variantName republishes dependencies its jar already contains"
+              }
+            }
+          }
+        }
       tasks.named("check") {
         dependsOn(verifyShadedRuntimePom)
+        dependsOn(verifyShadedRuntimeModuleMetadata)
       }
     }
   }

@@ -45,6 +45,7 @@ dependencies {
   shadedDependencies(project(":clients:client-java"))
 
   testImplementation(libs.junit.jupiter.api)
+  testImplementation(gradleTestKit())
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
@@ -76,13 +77,47 @@ tasks.jar {
   archiveClassifier.set("empty")
 }
 
+// Stage the generated publication as a plain Maven-layout repository for
+// TestRuntimePublicationConsumer. This avoids publishToMavenLocal, whose signing tasks require a
+// signatory that local and CI test runs do not have.
+val consumerArtifactName = "${rootProject.name.lowercase()}-${project.name}"
+val consumerRepo = layout.buildDirectory.dir("consumer-test-repo")
+val stageRuntimePublication by tasks.registering(Sync::class) {
+  dependsOn(
+    "shadowJar",
+    "generatePomFileForMavenJavaPublication",
+    "generateMetadataFileForMavenJavaPublication"
+  )
+  into(
+    consumerRepo.map {
+      it.dir("${project.group.toString().replace('.', '/')}/$consumerArtifactName/${project.version}")
+    }
+  )
+  from(layout.buildDirectory.file("publications/mavenJava/pom-default.xml")) {
+    rename { "$consumerArtifactName-${project.version}.pom" }
+  }
+  from(layout.buildDirectory.file("publications/mavenJava/module.json")) {
+    rename { "$consumerArtifactName-${project.version}.module" }
+  }
+  from(tasks.named<ShadowJar>("shadowJar").flatMap { it.archiveFile })
+}
+
 tasks.test {
   useJUnitPlatform()
   val runtimeJar = tasks.named<ShadowJar>("shadowJar")
   dependsOn(runtimeJar)
+  // TestRuntimePublicationConsumer resolves the staged coordinate from consumerRepo.
+  dependsOn(stageRuntimePublication)
+  inputs.dir(consumerRepo)
   inputs.file(runtimeJar.flatMap { it.archiveFile })
   inputs.dir(rootProject.file("dev/release/maven"))
   inputs.files(shadedDependencies)
+  systemProperty(
+    "runtimeCoordinate",
+    "${project.group}:$consumerArtifactName:${project.version}"
+  )
+  systemProperty("expectedRuntimeJar", runtimeJar.get().archiveFileName.get())
+  systemProperty("consumerRepo", consumerRepo.get().asFile.absolutePath)
   doFirst {
     systemProperty("artifactPath", runtimeJar.get().archiveFile.get().asFile.absolutePath)
     systemProperty("legalTemplates", rootProject.file("dev/release/maven").absolutePath)
