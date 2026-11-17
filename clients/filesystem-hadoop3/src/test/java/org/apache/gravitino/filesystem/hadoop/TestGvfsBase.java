@@ -68,6 +68,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Version;
+import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
@@ -1779,7 +1780,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
 
     // Pin the metadata cache setting so the expected counts do not depend on a default defined
     // elsewhere.
-    Configuration opsConf = withoutLocationNameEnvVar(conf);
+    Configuration opsConf = isolatedConf(conf);
     opsConf.setBoolean(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE,
         metadataCache);
@@ -1934,7 +1935,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         String.format(
             "%s/schemas/%s/filesets/%s/location",
             catalogPath, schemaName, RESTUtils.encodeString(filesetName));
-    Configuration opsConf = withoutLocationNameEnvVar(conf);
+    Configuration opsConf = isolatedConf(conf);
     opsConf.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_OPERATIONS_CLASS,
         TestGvfsBase.class.getName() + "$" + operationsClass);
@@ -2001,7 +2002,7 @@ public class TestGvfsBase extends GravitinoMockServerBase {
         String.format(
             "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
             metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
-    Configuration opsConf = withoutLocationNameEnvVar(conf);
+    Configuration opsConf = isolatedConf(conf);
     opsConf.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_OPERATIONS_CLASS,
         CacheOverrideOperations.class.getName());
@@ -2041,10 +2042,13 @@ public class TestGvfsBase extends GravitinoMockServerBase {
     }
   }
 
-  // Copies the configuration and points the current location name env variable at a name that is
-  // never set, so a CURRENT_LOCATION_NAME in the build environment does not change the location.
-  private static Configuration withoutLocationNameEnvVar(Configuration configuration) {
-    Configuration copy = new Configuration(configuration);
+  // Copies the configuration into one that loads no default resources, leaves the current location
+  // name unset and points its env variable at a name that is never set. This way neither a
+  // core-site.xml on the test classpath nor CURRENT_LOCATION_NAME in the environment picks one.
+  private static Configuration isolatedConf(Configuration configuration) {
+    Configuration copy = new Configuration(false);
+    configuration.forEach(entry -> copy.set(entry.getKey(), entry.getValue()));
+    copy.unset(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME);
     copy.set(
         GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CURRENT_LOCATION_NAME_ENV_VAR,
         "GVFS_TEST_UNSET_LOCATION_NAME");
@@ -2244,7 +2248,12 @@ public class TestGvfsBase extends GravitinoMockServerBase {
                             .defaultAnswer(
                                 AdditionalAnswers.delegatesTo(
                                     super.getFilesetCatalog(catalogIdent))));
-                Mockito.doReturn(configuration.get(LocalHooks.LOCAL_DIR_KEY) + "/override.txt")
+                Mockito.doAnswer(
+                        invocation -> {
+                          // Like the real client, clear the caller context set for the lookup.
+                          CallerContext.CallerContextHolder.remove();
+                          return configuration.get(LocalHooks.LOCAL_DIR_KEY) + "/override.txt";
+                        })
                     .when(filesetCatalog)
                     .getFileLocation(any(), any(), any());
                 return filesetCatalog;
