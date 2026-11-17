@@ -24,11 +24,9 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
-import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.UserPrincipal;
-import org.apache.gravitino.authorization.Owner;
-import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.maintenance.model.OccupancyClaim;
@@ -43,10 +41,11 @@ import org.slf4j.LoggerFactory;
  * Submits TMS Spark jobs and binds the resulting job run id onto soft-slot claims.
  *
  * <p>{@link #submitAndBind} injects {@code action_ids}, calls {@code runJob}, then binds {@code
- * job_id}. When ownership is enabled, {@code runJob} runs as the metalake owner USER so the job is
- * not owned by {@code anonymous}. If {@code runJob} succeeds but bind fails, the orphaned Spark job
- * is cancelled and unbound claims are released. Callers that fail before {@code runJob} must
- * release claims themselves.
+ * job_id}. When authorization is enabled, {@code runJob} runs as the configured {@link
+ * TableMaintenanceConfig#JOB_SUBMITTER} USER so {@link org.apache.gravitino.job.JobManager} sets a
+ * stable job owner (including for GROUP-owned metalakes). If {@code runJob} succeeds but bind
+ * fails, the orphaned Spark job is cancelled and unbound claims are released. Callers that fail
+ * before {@code runJob} must release claims themselves.
  */
 public class MaintenanceJobManager {
 
@@ -58,7 +57,8 @@ public class MaintenanceJobManager {
   private static volatile MaintenanceJobManager instance;
 
   private final JobOperationDispatcher jobOperationDispatcher;
-  @Nullable private final OwnerDispatcher ownerDispatcher;
+  @Nullable private final AccessControlDispatcher accessControlDispatcher;
+  @Nullable private final String jobSubmitter;
 
   /**
    * Returns the shared TMS job manager for the server process.
@@ -67,25 +67,51 @@ public class MaintenanceJobManager {
    * {@link org.apache.gravitino.GravitinoEnv} and pass them in.
    *
    * @param jobOperationDispatcher job submit/cancel dispatcher
-   * @param ownerDispatcher owner dispatcher, or {@code null} when authorization is disabled
+   * @param accessControlDispatcher access-control dispatcher when authorization is enabled, else
+   *     {@code null}
+   * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
    * @return singleton manager
    */
   public static MaintenanceJobManager getInstance(
-      JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
+      JobOperationDispatcher jobOperationDispatcher,
+      @Nullable AccessControlDispatcher accessControlDispatcher,
+      @Nullable String jobSubmitter) {
     if (instance == null) {
       synchronized (MaintenanceJobManager.class) {
         if (instance == null) {
-          instance = new MaintenanceJobManager(jobOperationDispatcher, ownerDispatcher);
+          instance =
+              new MaintenanceJobManager(
+                  jobOperationDispatcher, accessControlDispatcher, jobSubmitter);
         }
       }
     }
     return instance;
   }
 
-  private MaintenanceJobManager(
-      JobOperationDispatcher jobOperationDispatcher, @Nullable OwnerDispatcher ownerDispatcher) {
+  /**
+   * Test / override constructor. Production code should use {@link #getInstance}.
+   *
+   * @param jobOperationDispatcher job submit/cancel dispatcher
+   * @param accessControlDispatcher access-control dispatcher when authorization is enabled, else
+   *     {@code null}
+   * @param jobSubmitter configured submitter USER when authorization is enabled, else {@code null}
+   */
+  MaintenanceJobManager(
+      JobOperationDispatcher jobOperationDispatcher,
+      @Nullable AccessControlDispatcher accessControlDispatcher,
+      @Nullable String jobSubmitter) {
     this.jobOperationDispatcher = Preconditions.checkNotNull(jobOperationDispatcher);
-    this.ownerDispatcher = ownerDispatcher;
+    if (jobSubmitter != null) {
+      Preconditions.checkArgument(
+          !jobSubmitter.trim().isEmpty(), "jobSubmitter must be non-blank when set");
+      Preconditions.checkNotNull(
+          accessControlDispatcher, "accessControlDispatcher is required when jobSubmitter is set");
+      this.jobSubmitter = jobSubmitter.trim();
+      this.accessControlDispatcher = accessControlDispatcher;
+    } else {
+      this.jobSubmitter = null;
+      this.accessControlDispatcher = null;
+    }
   }
 
   /**
@@ -139,39 +165,38 @@ public class MaintenanceJobManager {
   }
 
   /**
-   * Runs the Iceberg maintenance template. When ownership is enabled, submits as the metalake owner
-   * USER so {@link org.apache.gravitino.job.JobManager} does not attach {@code anonymous}.
+   * Runs the Iceberg maintenance template. When a job submitter is configured (authorization
+   * enabled), submits as that USER so {@link org.apache.gravitino.job.JobManager} does not attach
+   * {@code anonymous} and GROUP-owned metalakes still get a valid USER job owner.
    */
-  private JobEntity runIcebergMaintenanceJob(String metalake, Map<String, String> jobConf) {
-    if (ownerDispatcher == null) {
-      // Ownership disabled: JobManager skips setOwner.
+  JobEntity runIcebergMaintenanceJob(String metalake, Map<String, String> jobConf) {
+    if (jobSubmitter == null) {
+      // Authorization disabled: JobManager skips setOwner.
       return jobOperationDispatcher.runJob(
           metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf);
     }
-    Owner owner =
-        ownerDispatcher
-            .getOwner(metalake, MetadataObjects.of(null, metalake, MetadataObject.Type.METALAKE))
-            .orElseThrow(
-                () ->
-                    new IllegalStateException(
-                        "Metalake " + metalake + " has no owner for TMS job submit"));
-    Preconditions.checkState(
-        owner.type() == Owner.Type.USER && owner.name() != null && !owner.name().trim().isEmpty(),
-        "Metalake %s owner must be a non-blank USER for TMS job submit, got %s %s",
-        metalake,
-        owner.type(),
-        owner.name());
-    String ownerUser = owner.name();
+    try {
+      accessControlDispatcher.getUser(metalake, jobSubmitter);
+    } catch (NoSuchUserException e) {
+      throw new IllegalStateException(
+          "TMS job submitter '"
+              + jobSubmitter
+              + "' does not exist in metalake "
+              + metalake
+              + "; create the user or fix "
+              + TableMaintenanceConfig.JOB_SUBMITTER.getKey(),
+          e);
+    }
     try {
       return PrincipalUtils.doAs(
-          new UserPrincipal(ownerUser),
+          new UserPrincipal(jobSubmitter),
           () ->
               jobOperationDispatcher.runJob(
                   metalake, MaintenanceJobTemplates.ICEBERG_MAINTENANCE_TEMPLATE, jobConf));
     } catch (RuntimeException e) {
       throw e;
     } catch (Exception e) {
-      throw new RuntimeException("Failed to submit TMS job as metalake owner " + ownerUser, e);
+      throw new RuntimeException("Failed to submit TMS job as submitter " + jobSubmitter, e);
     }
   }
 }

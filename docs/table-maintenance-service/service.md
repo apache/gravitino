@@ -93,6 +93,12 @@ Scheduler pool sizes have these defaults:
 | `gravitino.maintenance.scheduler.cronThreads`   | `8`     |
 | `gravitino.maintenance.scheduler.commitThreads` | `4`     |
 
+When `gravitino.authorization.enable=true`, set a TMS submit identity. The user must exist in each metalake that runs maintenance jobs (checked at submit time):
+
+| Configuration item                     | Default | Description |
+|----------------------------------------|---------|-------------|
+| `gravitino.maintenance.jobSubmitter`   | (none)  | Required USER when authorization is enabled. TMS submits jobs as this principal. |
+
 ## Time Trigger
 
 `timeTrigger` stores the cron string on the policy. `0 */5 * * * ?` runs at second 0 of every fifth minute. A five-field Unix cron is not accepted.

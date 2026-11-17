@@ -112,6 +112,7 @@ public class TableMaintenanceRESTFeature implements Feature {
             env.internalSchemaDispatcher(),
             env.internalTableDispatcher());
 
+    String jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).orElse(null);
     DataSource dataSource = AutocommitDataSources.entityStore();
     MaintenanceSchedulerPools pools = new MaintenanceSchedulerPools();
     pools.start(
@@ -119,7 +120,7 @@ public class TableMaintenanceRESTFeature implements Feature {
         maintenanceConfig,
         config,
         MaintenanceJobManager.getInstance(
-            env.jobOperationDispatcher(), env.internalOwnerDispatcher()),
+            env.jobOperationDispatcher(), env.internalAccessControlDispatcher(), jobSubmitter),
         MaintenanceActionManager.getInstance(),
         TableMaintenanceActionMetaService.getInstance(),
         tableEnumerator,

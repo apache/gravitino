@@ -18,13 +18,29 @@
  */
 package org.apache.gravitino.maintenance;
 
+import java.util.Optional;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 
 /** Configuration for table maintenance scheduler pools (§7.2). */
 public final class TableMaintenanceConfig {
+
+  /**
+   * USER principal TMS uses when submitting jobs with authorization enabled. Required when {@link
+   * Configs#ENABLE_AUTHORIZATION} is {@code true}; ignored when authorization is disabled.
+   */
+  public static final ConfigEntry<Optional<String>> JOB_SUBMITTER =
+      new ConfigBuilder("gravitino.maintenance.jobSubmitter")
+          .doc(
+              "USER that TMS uses to submit maintenance jobs when authorization is enabled."
+                  + " Required when gravitino.authorization.enable=true; the user must exist in"
+                  + " each metalake that runs TMS jobs.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .createWithOptional();
 
   public static final ConfigEntry<Integer> SCHEDULER_EXPAND_THREADS =
       new ConfigBuilder("gravitino.maintenance.scheduler.expandThreads")
@@ -139,6 +155,32 @@ public final class TableMaintenanceConfig {
         config.get(SCHEDULER_MISSED_HEARTBEATS_LIMIT),
         config.get(EXPAND_SCHEDULE_BATCH_SIZE),
         config.get(OCCUPANCY_CLAIM_TIMEOUT_MS));
+  }
+
+  /**
+   * Resolves the TMS job-submit USER when authorization is enabled.
+   *
+   * <p>When {@link Configs#ENABLE_AUTHORIZATION} is {@code false}, returns empty (submitters do not
+   * {@code doAs}). When authorization is enabled, {@link #JOB_SUBMITTER} must be a non-blank name;
+   * existence in each metalake is checked at submit time.
+   *
+   * @param config gravitino server config
+   * @return submitter user name, or empty when authorization is disabled
+   * @throws IllegalArgumentException when authorization is enabled and the submitter is missing
+   */
+  public static Optional<String> resolveJobSubmitter(Config config) {
+    if (!config.get(Configs.ENABLE_AUTHORIZATION)) {
+      return Optional.empty();
+    }
+    String submitter = config.get(JOB_SUBMITTER).orElse("").trim();
+    if (submitter.isEmpty()) {
+      throw new IllegalArgumentException(
+          JOB_SUBMITTER.getKey()
+              + " is required when "
+              + Configs.ENABLE_AUTHORIZATION.getKey()
+              + "=true");
+    }
+    return Optional.of(submitter);
   }
 
   /**
