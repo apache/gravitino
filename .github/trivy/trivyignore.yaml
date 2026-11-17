@@ -748,20 +748,17 @@ vulnerabilities:
   # org.jline/jline-builtins
   - id: CVE-2026-77422
     purls:
-      - pkg:maven/org.jline/jline-builtins@3.22.0
       - pkg:maven/org.jline/jline-builtins@3.9.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   # org.jline/jline-remote-telnet
   - id: CVE-2026-56740
     purls:
-      - pkg:maven/org.jline/jline-remote-telnet@3.22.0
       - pkg:maven/org.jline/jline-remote-telnet@3.9.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
   - id: CVE-2026-56741
     purls:
-      - pkg:maven/org.jline/jline-remote-telnet@3.22.0
       - pkg:maven/org.jline/jline-remote-telnet@3.9.0
     expired_at: 2027-02-07
     statement: "Pre-existing finding, tracked in apache/gravitino#14777."
