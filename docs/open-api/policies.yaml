@@ -303,6 +303,44 @@ paths:
 
 
 components:
+  # YAML-only merge source for TMS execution peers. Not a public schema: each maintenance
+  # content object inlines these properties so additionalProperties: false still accepts them.
+  x-gravitino-policy-execution-peer-properties: &policy-execution-peer-properties
+    timeTrigger:
+      type: string
+      nullable: true
+      description: >
+        Optional six-field Quartz cron (`second minute hour day-of-month month day-of-week`).
+        When due, PolicyExpand schedules cron maintenance for matching tables.
+    commitTrigger:
+      type: boolean
+      nullable: true
+      description: >
+        When true, a successful Iceberg REST table update can enqueue commit-triggered
+        maintenance. Orphan file removal rejects `commitTrigger=true`.
+    minIntervalMs:
+      type: integer
+      format: int64
+      minimum: 0
+      nullable: true
+      description: >
+        Optional cooldown in milliseconds after a finished run of this policy on a table.
+        When omitted, the server uses the per-type default.
+    jobOptions:
+      type: object
+      additionalProperties:
+        type: string
+        minLength: 1
+      description: Optional Spark/job option bag. Keys and values must be non-blank.
+    updaterOptions:
+      type: object
+      additionalProperties:
+        type: string
+        minLength: 1
+      description: >
+        Optional updater option bag (for example `gravitino_uri`). Keys and values must be
+        non-blank.
+
   parameters:
     details:
       name: details
@@ -356,56 +394,13 @@ components:
           items:
             $ref: "#/components/schemas/TagForPolicyAssociation"
 
-    # Shared peer property map (YAML merge) for Iceberg maintenance content schemas.
-    # Keep peers in the same properties object as typed fields so additionalProperties: false
-    # still allows timeTrigger / jobOptions / etc.
-    PolicyExecutionPeers:
-      type: object
-      description: >
-        Optional TMS execution peers on Iceberg maintenance policy content. Product docs and the
-        server accept these peers on content; on updateContent, newContent fully replaces the
-        previous content, so omitting a peer clears it.
-      properties: &policy-execution-peer-properties
-        timeTrigger:
-          type: string
-          nullable: true
-          description: >
-            Optional six-field Quartz cron (`second minute hour day-of-month month day-of-week`).
-            When due, PolicyExpand schedules cron maintenance for matching tables.
-        commitTrigger:
-          type: boolean
-          nullable: true
-          description: >
-            When true, a successful Iceberg REST table update can enqueue commit-triggered
-            maintenance. Orphan file removal rejects `commitTrigger=true`.
-        minIntervalMs:
-          type: integer
-          format: int64
-          minimum: 0
-          nullable: true
-          description: >
-            Optional cooldown in milliseconds after a finished run of this policy on a table.
-            When omitted, the server uses the per-type default.
-        jobOptions:
-          type: object
-          additionalProperties:
-            type: string
-            minLength: 1
-          description: Optional Spark/job option bag. Keys and values must be non-blank.
-        updaterOptions:
-          type: object
-          additionalProperties:
-            type: string
-            minLength: 1
-          description: >
-            Optional updater option bag (for example `gravitino_uri`). Keys and values must be
-            non-blank.
-
     IcebergCompactionContent:
       type: object
       description: >
         Built-in Iceberg compaction thresholds, scoring weights, rewrite options, and TMS
-        execution peers such as `timeTrigger` and `jobOptions`.
+        execution peers such as `timeTrigger` and `jobOptions`. On updateContent, newContent
+        fully replaces the previous content; omitting a peer clears it.
+      additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
         minDataFileMse:
@@ -477,7 +472,9 @@ components:
       type: object
       description: >
         Table-level orphan cleanup options with TMS execution peers such as `timeTrigger`.
-        `commitTrigger=true` is rejected for this policy type.
+        `commitTrigger=true` is rejected for this policy type. On updateContent, newContent
+        fully replaces the previous content; omitting a peer clears it.
+      additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
         olderThanDays:
