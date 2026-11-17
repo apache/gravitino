@@ -19,8 +19,8 @@
 
 package org.apache.gravitino.meta;
 
+import com.google.common.base.Preconditions;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.regex.Pattern;
 
 /** Shared normalization for persisted glossary names and synonyms. */
@@ -30,7 +30,7 @@ public final class GlossaryTermNames {
   private GlossaryTermNames() {}
   /** Removes surrounding Unicode whitespace while preserving display spelling. */
   public static String display(String value) {
-    Objects.requireNonNull(value, "name");
+    Preconditions.checkArgument(value != null, "name cannot be null");
     int start = 0;
     int end = value.length();
     while (start < end && isWhitespace(value.codePointAt(start))) {

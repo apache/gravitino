@@ -19,11 +19,11 @@
 
 package org.apache.gravitino.meta;
 
+import com.google.common.base.Preconditions;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
@@ -183,6 +183,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     }
     /** Sets the synonyms. */
     public Builder withSynonyms(String[] v) {
+      Preconditions.checkArgument(v != null, "synonyms cannot be null");
       value.synonyms = v.clone();
       return this;
     }
@@ -193,6 +194,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     }
     /** Sets the links. */
     public Builder withLinks(TermLink[] v) {
+      Preconditions.checkArgument(v != null, "links cannot be null");
       value.links = v.clone();
       return this;
     }
@@ -203,6 +205,7 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     }
     /** Sets the properties. */
     public Builder withProperties(Map<String, String> v) {
+      Preconditions.checkArgument(v != null, "properties cannot be null");
       value.properties = Collections.unmodifiableMap(new LinkedHashMap<>(v));
       return this;
     }
@@ -218,10 +221,10 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
     }
     /** Returns the validated definition. */
     public GlossaryTermEntity build() {
-      Objects.requireNonNull(value.id, "id");
-      Objects.requireNonNull(value.namespace, "namespace");
-      Objects.requireNonNull(value.auditInfo, "auditInfo");
-      Objects.requireNonNull(value.status, "status");
+      Preconditions.checkArgument(value.id != null, "id cannot be null");
+      Preconditions.checkArgument(value.namespace != null, "namespace cannot be null");
+      Preconditions.checkArgument(value.auditInfo != null, "auditInfo cannot be null");
+      Preconditions.checkArgument(value.status != null, "status cannot be null");
       value.name = GlossaryTermNames.display(value.name);
       if (value.namespace.length() != 3
           || !value.namespace.level(1).equals(Entity.SYSTEM_CATALOG_RESERVED_NAME)

@@ -28,6 +28,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.glossary.TermLink;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 /** Tests storage definition bounds and snapshot isolation. */
 public class TestGlossaryTermEntity {
@@ -38,6 +39,23 @@ public class TestGlossaryTermEntity {
         .withNamespace(Namespace.of("lake", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term"))
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build());
+  }
+
+  @Test
+  public void testNullArguments() {
+    assertNullArgument("id", () -> builder().withId(null).build());
+    assertNullArgument("namespace", () -> builder().withNamespace(null).build());
+    assertNullArgument("auditInfo", () -> builder().withAuditInfo(null).build());
+    assertNullArgument("status", () -> builder().withStatus(null).build());
+    assertNullArgument("name", () -> builder().withName(null).build());
+    assertNullArgument("synonyms", () -> builder().withSynonyms(null));
+    assertNullArgument("links", () -> builder().withLinks(null));
+    assertNullArgument("properties", () -> builder().withProperties(null));
+    assertNullArgument("name", () -> builder().withSynonyms(new String[] {null}).build());
+    assertNullArgument("name", () -> GlossaryTermNames.display(null));
+    assertNullArgument("name", () -> GlossaryTermNames.key(null));
+    assertNullArgument("name", () -> GlossaryTermNames.validate(null));
+    Assertions.assertDoesNotThrow(() -> builder().withDefinition(null).withSourceRef(null).build());
   }
 
   @Test
@@ -82,7 +100,7 @@ public class TestGlossaryTermEntity {
       if (matches) Assertions.assertEquals("", GlossaryTermNames.display(boundary.repeat(3)));
     }
     Assertions.assertEquals("", GlossaryTermNames.display(""));
-    Assertions.assertThrows(NullPointerException.class, () -> GlossaryTermNames.display(null));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> GlossaryTermNames.display(null));
   }
 
   @Test
@@ -103,5 +121,11 @@ public class TestGlossaryTermEntity {
         UnsupportedOperationException.class, () -> first.properties().put("a", "b"));
     Assertions.assertEquals(Entity.EntityType.GLOSSARY_TERM, first.type());
     Assertions.assertEquals(1L, first.fields().get(GlossaryTermEntity.ID));
+  }
+
+  private void assertNullArgument(String field, Executable operation) {
+    IllegalArgumentException error =
+        Assertions.assertThrows(IllegalArgumentException.class, operation);
+    Assertions.assertEquals(field + " cannot be null", error.getMessage());
   }
 }
