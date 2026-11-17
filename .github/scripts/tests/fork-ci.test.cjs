@@ -1902,6 +1902,78 @@ test('changed CI uses the actual tested base while retaining the trust requireme
   }
 });
 
+test('unresolvable tested bases preserve current failures and never attest success', async () => {
+  for (const changed of [false, true]) {
+    for (const conclusion of ['failure', 'timed_out', 'success']) {
+      const forkJobs = jobs(pr()); forkJobs[0].name = requiredName(pr(), C);
+      forkJobs.push({ name: 'backend / test', conclusion });
+      const github = serviceMock({ changed, forkJobs });
+      github.rest.repos.compareCommitsWithBasehead = async args => {
+        assert.equal(args.basehead, `${C}...main`);
+        throw Object.assign(new Error('Not Found'), { status: 404 });
+      };
+      const { result, base } = await createService(github).mirror(pr());
+      assert.equal(base, B);
+      assert.equal(statusState(result), conclusion === 'success' ? 'error' : 'failure');
+      if (conclusion !== 'success') assert.equal(result.title, 'Failed: backend / test');
+      else assert.match(result.note, /does not match this head and base/);
+    }
+  }
+});
+
+test('unresolvable trusted bases cannot attest success', async () => {
+  const trustedJobs = jobs(pr()); trustedJobs[0].name = requiredName(pr(), C);
+  const github = serviceMock({ trusted: true, trustedSha: C, trustedJobs });
+  github.rest.repos.compareCommitsWithBasehead = async () => {
+    throw Object.assign(new Error('Not Found'), { status: 404 });
+  };
+  const { result } = await createService(github).mirror(pr());
+  assert.equal(statusState(result), 'error');
+  assert.match(result.note, /outside the current base branch/);
+});
+
+test('transient tested-base comparison errors propagate and recover on refresh', async () => {
+  for (const trusted of [false, true]) {
+    for (const status of [403, 429, 500, 502, 503, undefined]) {
+      const current = jobs(pr()); current[0].name = requiredName(pr(), C);
+      const github = serviceMock({ trusted, trustedSha: C, forkJobs: current, trustedJobs: current });
+      const error = Object.assign(new Error('Temporary API failure'), { status });
+      github.rest.repos.compareCommitsWithBasehead = async () => { throw error; };
+      const service = createService(github);
+      await assert.rejects(service.mirror(pr()), actual => actual === error);
+      github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead' } });
+      assert.equal(statusState((await service.mirror(pr())).result), 'success');
+    }
+  }
+});
+
+test('publisher replaces stale success after a tested-base 404 and retries API failures', async () => withPublisher(async ({ ctx, core, failures }) => {
+  const { github, statuses } = publisherMock({ latest: forkStatus('success', 'All required suites passed') });
+  const current = jobs(pr()); current[0].name = requiredName(pr(), C);
+  current.push({ name: 'backend / test', conclusion: 'failure' });
+  github.rest.git = serviceMock({ changed: true }).rest.git;
+  github.paginate = async (endpoint, args) => runsOf(github, endpoint, args) ?? current;
+  let status = 404;
+  github.rest.repos.compareCommitsWithBasehead = async () => {
+    if (status) throw Object.assign(new Error('Comparison unavailable'), { status });
+    return { data: { status: 'ahead' } };
+  };
+  await update({ github, context: ctx, core });
+  assert.equal(failures.length, 0);
+  assert.equal(statuses.length, 1);
+  assert.equal(statuses[0].state, 'failure');
+  assert.match(statuses[0].description, /Failed: backend \/ test/);
+  current.at(-1).conclusion = 'success'; status = 503;
+  await update({ github, context: ctx, core });
+  assert.equal(failures.length, 1);
+  assert.equal(statuses.length, 1);
+  status = undefined;
+  await update({ github, context: ctx, core });
+  assert.equal(statuses.length, 2);
+  assert.equal(statuses[1].state, 'pending');
+  assert.equal(statuses[1].description, TRUSTED_REQUIRED);
+}));
+
 test('current eligibility failure takes precedence over an unexpanded summary', () => {
   for (const conclusion of ['failure', 'timed_out']) {
     const snapshot = [{ name: 'Resolve fork CI eligibility', run_attempt: 2, conclusion },

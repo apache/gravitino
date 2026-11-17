@@ -232,9 +232,16 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
   }
   async function acceptedBase(pr, sha) {
     if (!sha || sha === pr.base.sha || !/^[0-9a-f]{40}$/.test(sha)) return pr.base.sha;
-    const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...UPSTREAM,
-      basehead: `${sha}...${pr.base.ref}`, per_page: 1 });
-    return ['ahead', 'identical'].includes(data.status) ? sha : pr.base.sha;
+    try {
+      const { data } = await github.rest.repos.compareCommitsWithBasehead({ ...UPSTREAM,
+        basehead: `${sha}...${pr.base.ref}`, per_page: 1 });
+      return ['ahead', 'identical'].includes(data.status) ? sha : pr.base.sha;
+    } catch (error) {
+      // A workflow can name a nonexistent SHA. Reject that context without hiding
+      // authoritative job failures; transient API errors must still retry the refresh.
+      if (error.status !== 404) throw error;
+      return pr.base.sha;
+    }
   }
   async function testedBase(pr, jobs) {
     // pr.base.sha is not refreshed by later pushes, so runs usually test a newer base commit.
