@@ -20,7 +20,7 @@ package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
-import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
+import static org.apache.gravitino.catalog.CapabilityHelpers.withCapability;
 
 import java.io.IOException;
 import java.util.Map;
@@ -101,11 +101,12 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    Capability capability = getCapability(ident, catalogManager);
+    FilesetChange[] normalizedChanges =
+        withCapability(ident, catalogManager, capability -> applyCapabilities(capability, changes));
     return dispatcher.alterFileset(
         // The constraints of the name spec may be more strict than underlying catalog,
         // and for compatibility reasons, we only apply case-sensitive capabilities here.
-        normalizeCaseSensitive(ident), applyCapabilities(capability, changes));
+        normalizeCaseSensitive(ident), normalizedChanges);
   }
 
   @Override
@@ -124,17 +125,23 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier ident) {
-    Capability capabilities = getCapability(ident, catalogManager);
-    return applyCapabilities(ident, Capability.Scope.FILESET, capabilities);
+    return withCapability(
+        ident,
+        catalogManager,
+        capabilities -> applyCapabilities(ident, Capability.Scope.FILESET, capabilities));
   }
 
   private Namespace normalizeCaseSensitive(Namespace namespace) {
-    Capability capabilities = getCapability(NameIdentifier.of(namespace.levels()), catalogManager);
-    return applyCaseSensitive(namespace, Capability.Scope.FILESET, capabilities);
+    return withCapability(
+        NameIdentifier.of(namespace.levels()),
+        catalogManager,
+        capabilities -> applyCaseSensitive(namespace, Capability.Scope.FILESET, capabilities));
   }
 
   private NameIdentifier normalizeCaseSensitive(NameIdentifier filesetIdent) {
-    Capability capabilities = getCapability(filesetIdent, catalogManager);
-    return applyCaseSensitive(filesetIdent, Capability.Scope.FILESET, capabilities);
+    return withCapability(
+        filesetIdent,
+        catalogManager,
+        capabilities -> applyCaseSensitive(filesetIdent, Capability.Scope.FILESET, capabilities));
   }
 }

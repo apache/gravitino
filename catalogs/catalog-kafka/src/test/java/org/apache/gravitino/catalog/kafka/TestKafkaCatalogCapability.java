@@ -25,6 +25,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TopicDispatcher;
 import org.apache.gravitino.catalog.TopicNormalizeDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.Capability.Scope;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -32,6 +33,7 @@ import org.apache.gravitino.dto.requests.TopicCreateRequest;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.server.web.rest.TopicOperations;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -100,7 +102,15 @@ public class TestKafkaCatalogCapability {
   @Test
   void testCreateTopicRejectsIllegalNamesBeforeDispatch() throws IllegalAccessException {
     CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    Mockito.when(catalogManager.doWithCatalog(Mockito.any(), Mockito.any())).thenReturn(capability);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.capability()).thenReturn(capability);
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogManager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
     TopicDispatcher dispatcher = Mockito.mock(TopicDispatcher.class);
     TopicOperations operations =
         new TopicOperations(new TopicNormalizeDispatcher(dispatcher, catalogManager));
