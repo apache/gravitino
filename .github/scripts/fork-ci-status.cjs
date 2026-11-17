@@ -98,8 +98,11 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   }
   const isAuxiliary = job => job.name === FAIL_FAST || obsoleteSummary(job);
   const currentJobs = jobs.filter(job => !isAuxiliary(job));
-  const failed = currentJobs.filter(job => ['failure', 'timed_out'].includes(job.conclusion))
-    .map(job => job.name);
+  // A previous attempt's unsuccessful job may be awaiting its replacement in the jobs API.
+  // It cannot become a settled failure for this rerun. Current failures remain authoritative.
+  const fromCurrentAttempt = job => run.run_attempt === 1 || job.run_attempt === run.run_attempt;
+  const failed = currentJobs.filter(job => fromCurrentAttempt(job) &&
+    ['failure', 'timed_out'].includes(job.conclusion)).map(job => job.name);
   // Partial reruns can retain a cancelled watcher or an obsolete Required CI job, keeping
   // the whole run cancelled after its suites recover. Ignore only those auxiliary results,
   // then verify the exact Required CI and all required suites below. Any other unfinished
@@ -111,6 +114,30 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   // not hide a failed prerequisite or suite observed in the jobs response.
   if (failed.length) return { status: 'completed', conclusion: 'failure',
     title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
+  const stale = currentJobs.find(job => !fromCurrentAttempt(job) &&
+    !['success', 'skipped'].includes(job.conclusion));
+  if (stale) {
+    return requiredAction(`The result for ${stale.name} is not from the current attempt. ` +
+      'Waiting for consistent results; the publisher will automatically check again.');
+  }
+  // Seeing one current job does not establish that downstream results are complete.
+  // Overriding an unsuccessful aggregate requires a successful gate in THIS attempt.
+  // A watcher-only rerun with an older gate must rerun Required CI too: the API snapshot
+  // alone cannot distinguish it from a rerun whose downstream records have not arrived.
+  const gateBehind = required?.conclusion === 'success' &&
+    currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion)) && currentJobs.some(job =>
+    Number.isInteger(job.run_attempt) && job.run_attempt > 0 &&
+    (!Number.isInteger(required.run_attempt) || job.run_attempt > required.run_attempt));
+  if (run.run_attempt > 1 && (gateBehind || (run.conclusion !== 'success' &&
+      required?.run_attempt !== run.run_attempt &&
+      currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion))))) {
+    return requiredAction('Required CI has not confirmed the current attempt. The publisher will ' +
+      'check again automatically; if only the watcher was rerun, rerun Required CI as well.');
+  }
+  if (currentJobs.some(job => !job.conclusion)) {
+    return requiredAction('The completed run still has unfinished job results. ' +
+      'The publisher will check the results again automatically.');
+  }
   if (run.conclusion !== 'success' && !auxiliaryOnly) {
     return { status: 'completed',
       conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
@@ -295,9 +322,9 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
         'After reviewing these changes, a committer must dispatch Fork CI from the current upstream default branch with this PR number.';
       // Approval of CI edits is separate from execution progress. Never turn a running fork
       // into a completed error, or hide an actual failure behind the trust requirement.
-      result = run.status === 'completed' && (run.conclusion === 'success' || needsSuiteChecks)
+      result = needsSuiteChecks
         ? { ...requiredAction(note), title: TRUSTED_REQUIRED }
-        : { ...result, note: `${result.title}. ${note}` };
+        : { ...result, note: `${result.note || result.title}. ${note}` };
     }
     return { ...selected, fork: ordinary?.run, base, result };
   }

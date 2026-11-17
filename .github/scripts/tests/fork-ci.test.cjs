@@ -631,13 +631,13 @@ test('nonmatching Required CI summaries must be provably older than the exact su
         for (const conclusion of ['success', 'failure', 'timed_out', 'cancelled', 'skipped', null]) {
           const current = jobs(p).map((job, i) => ({ ...job, id: 100 + i, run_attempt: 2 }));
           current.push({ name, id: 999, run_attempt: attempt, conclusion });
-          current.push({ name: FAIL_FAST, id: 1000, run_attempt: 3, conclusion: 'cancelled' });
+          current.push({ name: FAIL_FAST, id: 1000, run_attempt: 2, conclusion: 'cancelled' });
           const github = serviceMock({ trusted, forkJobs: current, trustedJobs: current });
           const list = github.rest.actions.listWorkflowRuns;
           github.rest.actions.listWorkflowRuns = async args => {
             const response = await list(args);
             for (const run of response.data.workflow_runs) Object.assign(run,
-              { run_attempt: 3, conclusion: 'cancelled' });
+              { run_attempt: attempt === 3 ? 3 : 2, conclusion: 'cancelled' });
             return response;
           };
           // A fully expanded newer base is selected by testedBase, not an obsolete summary.
@@ -1654,7 +1654,7 @@ test('scheduled publication clears stale success and recovers once the run listi
   github.rest.pulls.get = async () => ({ data: recent });
   const paginate = github.paginate;
   github.paginate = async (endpoint, args) => args.run_id === 1
-    ? [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+    ? [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: rerun.run_attempt })),
       { name: 'backend / changes', id: 200, run_attempt: 2, conclusion: 'success' }]
     : endpoint === github.rest.pulls.list ? [recent] : paginate(endpoint, args);
   // A signal refresh observes the jobs from attempt 2 before its run listing catches up.
@@ -1744,3 +1744,147 @@ test('scheduled sweeps recover from an entirely stale jobs snapshot without cach
   assert.match(statuses.at(-1).description, /cancelled/);
   assert.equal(statuses.at(-1).target_url, url(1, 2));
 }));
+
+test('overriding an unsuccessful aggregate requires a current successful gate', async () => {
+  for (const trusted of [false, true]) {
+    for (const changed of [false, true]) {
+      for (const aggregate of ['success', 'failure', 'timed_out', 'cancelled']) {
+        for (const visible of ['eligibility', 'watcher', 'suite', 'gate']) {
+          const current = jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 }));
+          current.push({ name: FAIL_FAST, id: 100, run_attempt: visible === 'watcher' ? 2 : 1, conclusion: aggregate });
+          const name = { eligibility: 'Resolve fork CI eligibility', watcher: FAIL_FAST,
+            suite: 'backend / changes', gate: requiredName(pr()) }[visible];
+          if (visible !== 'watcher') current.push({ name, id: 200, run_attempt: 2, conclusion: 'success' });
+          const github = serviceMock({ trusted, changed, forkJobs: current, trustedJobs: current });
+          const list = github.rest.actions.listWorkflowRuns;
+          github.rest.actions.listWorkflowRuns = async args => {
+            const response = await list(args);
+            for (const run of response.data.workflow_runs) Object.assign(run, { run_attempt: 2, conclusion: aggregate });
+            return response;
+          };
+          const { result } = await createService(github).mirror(pr());
+          if (visible === 'gate' || (aggregate === 'success' && visible === 'watcher')) {
+            assert.equal(statusState(result), changed && !trusted ? 'pending' : 'success');
+          } else {
+            assert.equal(statusState(result), 'error', JSON.stringify({ trusted, changed, aggregate, visible }));
+            assert.match(result.note, /Required CI has not confirmed/);
+          }
+        }
+      }
+    }
+  }
+});
+
+test('a successful watcher-only rerun may retain its successful gate and suites', () => {
+  const current = [...jobs(pr()).map(job => ({ ...job, run_attempt: 1 })),
+    { name: FAIL_FAST, run_attempt: 2, conclusion: 'success' }];
+  assert.equal(evaluate(pr(), { ...run(), run_attempt: 2 }, current).conclusion, 'success');
+});
+
+test('partial current snapshots stay retryable until downstream cancellation or recovery arrives', async () => {
+  for (const recovered of [false, true]) {
+    await withPublisher(async ({ ctx, core }) => {
+      const recent = { ...pr(), updated_at: new Date().toISOString() };
+      const { github, statuses } = publisherMock({ current: recent,
+        rerun: { ...run(), run_attempt: 2, conclusion: 'cancelled' } });
+      ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+      github.rest.pulls.get = async () => ({ data: recent });
+      let ready = false, reads = 0;
+      const paginate = github.paginate;
+      github.paginate = async (endpoint, args) => {
+        if (endpoint === github.rest.pulls.list) return [recent];
+        if (args.run_id !== 1) return paginate(endpoint, args);
+        reads++;
+        const current = [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+          { name: FAIL_FAST, id: 100, run_attempt: 1, conclusion: 'cancelled' },
+          { name: 'Resolve fork CI eligibility', id: 200, run_attempt: 2, conclusion: 'success' }];
+        if (ready) {
+          current.push({ name: 'backend / changes', id: 201, run_attempt: 2, conclusion: recovered ? 'success' : 'cancelled' });
+          if (recovered) current.push({ name: requiredName(pr()), id: 202, run_attempt: 2, conclusion: 'success' });
+        }
+        return current;
+      };
+      await update({ github, context: ctx, core, sleep: async () => {} });
+      assert.equal(statuses.at(-1).state, 'error');
+      assert.match(statuses.at(-1).description, /needs attention/);
+      const initialReads = reads, writes = statuses.length;
+      await update({ github, context: ctx, core, sleep: async () => {} });
+      assert.ok(reads > initialReads); assert.equal(statuses.length, writes);
+      ready = true;
+      await update({ github, context: ctx, core, sleep: async () => {} });
+      assert.equal(statuses.at(-1).state, recovered ? 'success' : 'error');
+      assert.match(statuses.at(-1).description, recovered ? /All required suites passed/ : /cancelled/);
+      assert.equal(statuses.at(-1).target_url, url(1, 2));
+    });
+  }
+});
+
+test('stale unsuccessful jobs recover automatically instead of becoming settled failures', async () => {
+  for (const aggregate of ['success', 'cancelled']) {
+    for (const conclusion of ['failure', 'timed_out', 'cancelled', null]) {
+      for (const changed of [false, true]) {
+        await withPublisher(async ({ ctx, core }) => {
+          const recent = { ...pr(), updated_at: new Date().toISOString() };
+          const { github, statuses } = publisherMock({ current: recent,
+            rerun: { ...run(), run_attempt: 2, conclusion: aggregate } });
+          ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+          github.rest.pulls.get = async () => ({ data: recent });
+          if (changed) github.rest.git.getTree = serviceMock({ changed: true }).rest.git.getTree;
+          let ready = false, reads = 0;
+          const paginate = github.paginate;
+          github.paginate = async (endpoint, args) => {
+            if (endpoint === github.rest.pulls.list) return [recent];
+            if (args.run_id !== 1) return paginate(endpoint, args);
+            reads++;
+            return [...jobs(pr()).map((job, i) => job.name === 'backend / changes'
+              ? { ...job, id: i + 1, run_attempt: ready ? 2 : 1, conclusion: ready ? 'success' : conclusion }
+              : { ...job, id: i + 1, run_attempt: 2 }),
+              { name: FAIL_FAST, id: 100, run_attempt: 1, conclusion: 'cancelled' }];
+          };
+          await update({ github, context: ctx, core, sleep: async () => {} });
+          assert.equal(statuses.at(-1).state, 'error');
+          assert.match(statuses.at(-1).description, /needs attention/);
+          const previous = reads;
+          ready = true;
+          await update({ github, context: ctx, core, sleep: async () => {} });
+          assert.ok(reads > previous);
+          assert.equal(statuses.at(-1).state, changed ? 'pending' : 'success');
+          if (changed) assert.equal(statuses.at(-1).description, TRUSTED_REQUIRED);
+          const settledReads = reads;
+          await update({ github, context: ctx, core, sleep: async () => {} });
+          assert.equal(reads, settledReads);
+        });
+      }
+    }
+  }
+});
+
+test('trust requirements preserve current failures and incomplete execution results', async () => {
+  for (const trusted of [false, true]) {
+    for (const conclusion of ['failure', 'timed_out', 'cancelled', null]) {
+      const current = [...jobs(pr()).map(job => ({ ...job, run_attempt: 1 })),
+        { name: 'Resolve fork CI eligibility', run_attempt: 1, conclusion }];
+      const github = serviceMock({ changed: true, trusted, forkJobs: current, trustedJobs: current });
+      const { result } = await createService(github).mirror(pr());
+      assert.notEqual(result.title, TRUSTED_REQUIRED);
+      if (['failure', 'timed_out'].includes(conclusion)) {
+        assert.equal(result.conclusion, 'failure');
+        assert.equal(result.title, 'Failed: Resolve fork CI eligibility');
+      } else {
+        assert.equal(statusState(result), 'error');
+      }
+    }
+  }
+});
+
+test('unfinished current jobs remain retryable even when the aggregate is cancelled', () => {
+  const current = [...jobs(pr()).map(job => ({ ...job, run_attempt: 2 })),
+    { name: FAIL_FAST, run_attempt: 1, conclusion: 'cancelled' },
+    { name: 'backend / test', run_attempt: 2, conclusion: null }];
+  const completed = { ...run(), run_attempt: 2, conclusion: 'cancelled' };
+  const incomplete = evaluate(pr(), completed, current);
+  assert.equal(statusState(incomplete), 'error');
+  assert.match(incomplete.note, /unfinished job results/);
+  current.at(-1).conclusion = 'success';
+  assert.equal(evaluate(pr(), completed, current).conclusion, 'success');
+});
