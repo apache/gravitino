@@ -26,9 +26,11 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.exceptions.BadRequestException;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.ParameterUtil;
+import org.apache.gravitino.server.web.filter.RequestValidation;
 
 /**
  * Authorization executor for load table operations.
@@ -107,7 +109,12 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
     return Arrays.stream(privileges.split(","))
         .map(String::trim)
         .filter(StringUtils::isNotBlank)
-        .map(Privilege.Name::valueOf)
-        .anyMatch(Privilege.Name.MODIFY_TABLE::equals);
+        .map(
+            privilege ->
+                RequestValidation.parse(
+                    () -> Privilege.Name.valueOf(privilege),
+                    e -> new BadRequestException(e, "Invalid privilege: %s", privilege)))
+        .toList()
+        .contains(Privilege.Name.MODIFY_TABLE);
   }
 }

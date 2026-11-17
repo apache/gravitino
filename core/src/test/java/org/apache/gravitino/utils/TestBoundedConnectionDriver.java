@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.utils;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -29,9 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTimeout;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,6 +43,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.IOException;
+import java.nio.channels.spi.AbstractInterruptibleChannel;
 import java.security.AccessController;
 import java.security.PrivilegedExceptionAction;
 import java.sql.Connection;
@@ -48,20 +53,31 @@ import java.sql.SQLException;
 import java.sql.SQLTimeoutException;
 import java.sql.SQLTransientConnectionException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.security.auth.Subject;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 class TestBoundedConnectionDriver {
   private final ExecutorService workers = Executors.newSingleThreadExecutor();
@@ -70,6 +86,532 @@ class TestBoundedConnectionDriver {
   void close() throws Exception {
     workers.shutdownNow();
     assertTrue(workers.awaitTermination(10, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void testDeadlineDoesNotRunBlockingInterruptCallbackOnCaller() throws Exception {
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch releaseDriver = new CountDownLatch(1);
+    CountDownLatch callbackEntered = new CountDownLatch(1);
+    CountDownLatch releaseCallback = new CountDownLatch(1);
+    AtomicReference<Thread> callbackThread = new AtomicReference<>();
+    class BlockingInterruptChannel extends AbstractInterruptibleChannel {
+      void register() {
+        begin();
+      }
+
+      void finish() throws IOException {
+        end(false);
+      }
+      /** {@inheritDoc} */
+      @Override
+      protected void implCloseChannel() {
+        callbackThread.set(Thread.currentThread());
+        callbackEntered.countDown();
+        awaitIgnoringInterrupts(releaseCallback);
+      }
+    }
+    BlockingInterruptChannel channel = new BlockingInterruptChannel();
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              channel.register();
+              entered.countDown();
+              try {
+                awaitIgnoringInterrupts(releaseDriver);
+              } finally {
+                channel.finish();
+              }
+              return late;
+            });
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 500, workers);
+    ExecutorService callers = Executors.newSingleThreadExecutor();
+    AtomicReference<Thread> callerThread = new AtomicReference<>();
+    try {
+      Future<SQLTimeoutException> result =
+          callers.submit(
+              () -> {
+                callerThread.set(Thread.currentThread());
+                return assertThrows(
+                    SQLTimeoutException.class,
+                    () -> bounded.connect("jdbc:test", new Properties()));
+              });
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+      // The caller returns at its deadline while the interrupt callback is still blocked.
+      assertNotNull(result.get(2, TimeUnit.SECONDS));
+      assertTrue(callbackEntered.await(10, TimeUnit.SECONDS), "The worker must be interrupted");
+      assertNotSame(callerThread.get(), callbackThread.get());
+      assertTrue(callbackThread.get().getName().startsWith("jdbc-connect-cancel"));
+      assertThrows(
+          SQLTransientConnectionException.class,
+          () -> bounded.connect("jdbc:test", new Properties()));
+      verify(late, never()).close();
+    } finally {
+      releaseCallback.countDown();
+      releaseDriver.countDown();
+      callers.shutdownNow();
+      assertTrue(callers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+    // The interrupt closed the driver's channel, so its connect fails instead of returning late.
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    verify(late, never()).close();
+    doReturn(late).when(driver).connect(anyString(), any());
+    assertSame(late, bounded.connect("jdbc:test", new Properties()));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  @SuppressWarnings("removal")
+  void testInterruptCallbackPreservesCallerContext(boolean rejectFirst) throws Exception {
+    ExecutorService cancellers = Executors.newSingleThreadExecutor();
+    ClassLoader originalLoader =
+        cancellers.submit(() -> Thread.currentThread().getContextClassLoader()).get();
+    ClassLoader callerLoader = new ClassLoader(originalLoader) {};
+    Subject subject = new Subject();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch callback = new CountDownLatch(1);
+    AtomicReference<Subject> observedSubject = new AtomicReference<>();
+    AtomicReference<ClassLoader> observedLoader = new AtomicReference<>();
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+    class ContextCheckingChannel extends AbstractInterruptibleChannel {
+      void register() {
+        begin();
+      }
+
+      void finish() throws IOException {
+        end(false);
+      }
+
+      /** {@inheritDoc} */
+      @Override
+      protected void implCloseChannel() {
+        observedSubject.set(Subject.getSubject(AccessController.getContext()));
+        observedLoader.set(Thread.currentThread().getContextClassLoader());
+        callback.countDown();
+      }
+    }
+    ContextCheckingChannel channel = new ContextCheckingChannel();
+    Driver driver = mock(Driver.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              channel.register();
+              entered.countDown();
+              try {
+                release.await();
+              } finally {
+                channel.finish();
+              }
+              return null;
+            });
+    ExecutorService submissions = mock(ExecutorService.class);
+    AtomicBoolean reject = new AtomicBoolean(rejectFirst);
+    doAnswer(
+            invocation -> {
+              if (reject.getAndSet(false)) {
+                throw new RejectedExecutionException("temporary handoff rejection");
+              }
+              cancellers.execute(invocation.getArgument(0));
+              return null;
+            })
+        .when(submissions)
+        .execute(any());
+    BoundedConnectionDriver bounded =
+        new BoundedConnectionDriver(driver, 30000, workers, submissions);
+    Thread caller =
+        new Thread(
+            () -> {
+              ClassLoader previous = Thread.currentThread().getContextClassLoader();
+              try {
+                Thread.currentThread().setContextClassLoader(callerLoader);
+                Subject.doAs(
+                    subject,
+                    (PrivilegedExceptionAction<Void>)
+                        () -> {
+                          assertThrows(
+                              SQLTimeoutException.class,
+                              () -> bounded.connect("jdbc:test", new Properties()));
+                          assertTrue(Thread.currentThread().isInterrupted());
+                          return null;
+                        });
+              } catch (Throwable error) {
+                failure.set(error);
+              } finally {
+                Thread.currentThread().setContextClassLoader(previous);
+              }
+            });
+    try {
+      caller.start();
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+      caller.interrupt();
+      caller.join(10000);
+      assertFalse(caller.isAlive());
+      assertNull(failure.get());
+      assertTrue(callback.await(10, TimeUnit.SECONDS));
+      workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+      verify(submissions, times(rejectFirst ? 2 : 1)).execute(any());
+      assertAll(
+          () -> assertSame(subject, observedSubject.get()),
+          () -> assertSame(callerLoader, observedLoader.get()));
+      assertNull(cancellers.submit(() -> Subject.getSubject(AccessController.getContext())).get());
+      assertSame(
+          originalLoader,
+          cancellers.submit(() -> Thread.currentThread().getContextClassLoader()).get());
+    } finally {
+      release.countDown();
+      caller.interrupt();
+      caller.join(10000);
+      cancellers.shutdownNow();
+      assertTrue(cancellers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testTimeoutInterruptsWorkerSoItIsReleased() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection connection = mock(Connection.class);
+    CountDownLatch never = new CountDownLatch(1);
+    CountDownLatch interrupted = new CountDownLatch(1);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              try {
+                never.await(30, TimeUnit.SECONDS);
+                throw new AssertionError("The hung connect was not interrupted");
+              } catch (InterruptedException e) {
+                interrupted.countDown();
+                throw new SQLException("Interrupted", "08001", e);
+              }
+            })
+        .thenReturn(connection);
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers);
+    assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+    assertTrue(interrupted.await(10, TimeUnit.SECONDS));
+    // The single worker is free again and the quarantine is lifted.
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertSame(connection, bounded.connect("jdbc:test", new Properties()));
+  }
+
+  @Test
+  void testLateCancellationDoesNotInterruptNextAttemptOnSameWorker() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection first = mock(Connection.class);
+    Connection second = mock(Connection.class);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    CountDownLatch secondEntered = new CountDownLatch(1);
+    CountDownLatch releaseSecond = new CountDownLatch(1);
+    AtomicReference<Boolean> secondInterrupted = new AtomicReference<>(false);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              awaitIgnoringInterrupts(releaseFirst);
+              return first;
+            })
+        .thenAnswer(
+            call -> {
+              secondEntered.countDown();
+              try {
+                releaseSecond.await(10, TimeUnit.SECONDS);
+              } catch (InterruptedException e) {
+                secondInterrupted.set(true);
+              }
+              return second;
+            });
+    // Hold the cancellation until the abandoned attempt has finished and the worker moved on.
+    AtomicReference<Runnable> cancellation = new AtomicReference<>();
+    ExecutorService manual = mock(ExecutorService.class);
+    doAnswer(
+            call -> {
+              cancellation.set(call.getArgument(0));
+              return null;
+            })
+        .when(manual)
+        .execute(any());
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers, manual);
+    assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+    releaseFirst.countDown();
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    verify(first).close();
+
+    ExecutorService callers = Executors.newSingleThreadExecutor();
+    try {
+      Future<Connection> next =
+          callers.submit(() -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(secondEntered.await(10, TimeUnit.SECONDS));
+      assertNotNull(cancellation.get());
+      cancellation.get().run();
+      releaseSecond.countDown();
+      assertSame(second, next.get(10, TimeUnit.SECONDS));
+      assertFalse(secondInterrupted.get(), "A stale cancellation must not reach a later attempt");
+    } finally {
+      releaseSecond.countDown();
+      callers.shutdownNow();
+      assertTrue(callers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  /**
+   * The canceller has decided to interrupt and is inside {@link Thread#interrupt} when the connect
+   * returns. The worker must wait for that interrupt instead of moving on, otherwise it would land
+   * on the next attempt that the same worker runs.
+   */
+  @Test
+  void testInFlightCancellationIsDeliveredBeforeWorkerMovesOn() throws Exception {
+    CountDownLatch interruptEntered = new CountDownLatch(1);
+    CountDownLatch releaseInterrupt = new CountDownLatch(1);
+    ExecutorService worker =
+        Executors.newSingleThreadExecutor(
+            task ->
+                new Thread(task) {
+                  /** {@inheritDoc} */
+                  @Override
+                  public void interrupt() {
+                    if (Thread.currentThread() != this) {
+                      interruptEntered.countDown();
+                      awaitIgnoringInterrupts(releaseInterrupt);
+                    }
+                    super.interrupt();
+                  }
+                });
+    Driver driver = mock(Driver.class);
+    Connection first = mock(Connection.class);
+    Connection second = mock(Connection.class);
+    CountDownLatch releaseFirst = new CountDownLatch(1);
+    CountDownLatch secondEntered = new CountDownLatch(1);
+    CountDownLatch releaseSecond = new CountDownLatch(1);
+    AtomicReference<Boolean> secondInterrupted = new AtomicReference<>(false);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              awaitIgnoringInterrupts(releaseFirst);
+              return first;
+            })
+        .thenAnswer(
+            call -> {
+              secondEntered.countDown();
+              try {
+                releaseSecond.await(10, TimeUnit.SECONDS);
+              } catch (InterruptedException e) {
+                secondInterrupted.set(true);
+              }
+              return second;
+            });
+    AtomicReference<Runnable> cancellation = new AtomicReference<>();
+    ExecutorService manual = mock(ExecutorService.class);
+    doAnswer(
+            call -> {
+              cancellation.set(call.getArgument(0));
+              return null;
+            })
+        .when(manual)
+        .execute(any());
+    // A second datasource on the same shared workers, so its attempt is not quarantined.
+    BoundedConnectionDriver timedOut = new BoundedConnectionDriver(driver, 100, worker, manual);
+    BoundedConnectionDriver healthy = new BoundedConnectionDriver(driver, 10000, worker, manual);
+    ExecutorService callers = Executors.newSingleThreadExecutor();
+    Thread canceller = null;
+    try {
+      assertThrows(
+          SQLTimeoutException.class, () -> timedOut.connect("jdbc:test", new Properties()));
+      canceller = new Thread(cancellation.get());
+      canceller.start();
+      assertTrue(interruptEntered.await(10, TimeUnit.SECONDS));
+      releaseFirst.countDown();
+      Future<Connection> next =
+          callers.submit(() -> healthy.connect("jdbc:test", new Properties()));
+      assertFalse(
+          secondEntered.await(300, TimeUnit.MILLISECONDS),
+          "The worker must not start another attempt while an interrupt is being delivered");
+      releaseInterrupt.countDown();
+      canceller.join(10000);
+      assertTrue(secondEntered.await(10, TimeUnit.SECONDS));
+      releaseSecond.countDown();
+      assertSame(second, next.get(10, TimeUnit.SECONDS));
+      assertFalse(secondInterrupted.get(), "The cancellation must not reach the next attempt");
+      verify(first).close();
+    } finally {
+      releaseFirst.countDown();
+      releaseInterrupt.countDown();
+      releaseSecond.countDown();
+      if (canceller != null) {
+        canceller.join(10000);
+      }
+      callers.shutdownNow();
+      worker.shutdownNow();
+      assertTrue(callers.awaitTermination(10, TimeUnit.SECONDS));
+      assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testBarrierRestoresInterruptionAfterCleanup() throws Exception {
+    CountDownLatch interruptEntered = new CountDownLatch(1);
+    CountDownLatch releaseInterrupt = new CountDownLatch(1);
+    AtomicBoolean firstInterrupt = new AtomicBoolean(true);
+    AtomicReference<Thread> workerThread = new AtomicReference<>();
+    ExecutorService worker =
+        Executors.newSingleThreadExecutor(
+            task -> {
+              Thread thread =
+                  new Thread(task) {
+                    /** {@inheritDoc} */
+                    @Override
+                    public void interrupt() {
+                      if (Thread.currentThread() != this
+                          && firstInterrupt.compareAndSet(true, false)) {
+                        super.interrupt();
+                        interruptEntered.countDown();
+                        awaitIgnoringInterrupts(releaseInterrupt);
+                        return;
+                      }
+                      super.interrupt();
+                    }
+                  };
+              workerThread.set(thread);
+              return thread;
+            });
+    worker.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    CountDownLatch finished = new CountDownLatch(1);
+    AtomicReference<Boolean> interruptedAfterCleanup = new AtomicReference<>();
+    ExecutorService recording = mock(ExecutorService.class);
+    doAnswer(
+            invocation -> {
+              Runnable task = invocation.getArgument(0);
+              worker.execute(
+                  () -> {
+                    try {
+                      task.run();
+                    } finally {
+                      interruptedAfterCleanup.set(Thread.currentThread().isInterrupted());
+                      finished.countDown();
+                    }
+                  });
+              return null;
+            })
+        .when(recording)
+        .execute(any());
+    AtomicReference<Runnable> cancellation = new AtomicReference<>();
+    ExecutorService manual = mock(ExecutorService.class);
+    doAnswer(
+            invocation -> {
+              cancellation.set(invocation.getArgument(0));
+              return null;
+            })
+        .when(manual)
+        .execute(any());
+    CountDownLatch releaseConnect = new CountDownLatch(1);
+    CountDownLatch connectReturned = new CountDownLatch(1);
+    CountDownLatch connectConsumedInterrupt = new CountDownLatch(1);
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              while (true) {
+                try {
+                  releaseConnect.await();
+                  break;
+                } catch (InterruptedException ignored) {
+                  // The driver consumes cancellation before returning, while its interrupt
+                  // callback is still running on the canceller.
+                  connectConsumedInterrupt.countDown();
+                }
+              }
+              connectReturned.countDown();
+              return late;
+            });
+    doAnswer(
+            invocation -> {
+              assertFalse(Thread.currentThread().isInterrupted());
+              return null;
+            })
+        .when(late)
+        .close();
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 500, recording, manual);
+    Thread canceller = null;
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      canceller = new Thread(cancellation.get());
+      canceller.start();
+      assertTrue(interruptEntered.await(10, TimeUnit.SECONDS));
+      assertTrue(connectConsumedInterrupt.await(10, TimeUnit.SECONDS));
+      releaseConnect.countDown();
+      assertTrue(connectReturned.await(10, TimeUnit.SECONDS));
+      Awaitility.await()
+          .atMost(Duration.ofSeconds(10))
+          .until(() -> workerThread.get().getState() == Thread.State.WAITING);
+      // Deliver an independent interrupt while the cancellation callback is still running.
+      workerThread.get().interrupt();
+      Awaitility.await()
+          .atMost(Duration.ofSeconds(10))
+          .until(
+              () ->
+                  workerThread.get().getState() == Thread.State.WAITING
+                      && !workerThread.get().isInterrupted());
+      releaseInterrupt.countDown();
+      canceller.join(10000);
+      assertTrue(finished.await(10, TimeUnit.SECONDS));
+      assertEquals(true, interruptedAfterCleanup.get());
+      verify(late).close();
+    } finally {
+      releaseConnect.countDown();
+      releaseInterrupt.countDown();
+      if (canceller != null) {
+        canceller.join(10000);
+      }
+      worker.shutdownNow();
+      assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testCancellationAfterConnectReturnsDoesNotInterruptCleanup() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch closeEntered = new CountDownLatch(1);
+    CountDownLatch releaseClose = new CountDownLatch(1);
+    AtomicReference<Boolean> closeInterrupted = new AtomicReference<>();
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            call -> {
+              awaitIgnoringInterrupts(release);
+              return late;
+            });
+    doAnswer(
+            call -> {
+              closeEntered.countDown();
+              awaitIgnoringInterrupts(releaseClose);
+              closeInterrupted.set(Thread.currentThread().isInterrupted());
+              return null;
+            })
+        .when(late)
+        .close();
+    AtomicReference<Runnable> cancellation = new AtomicReference<>();
+    ExecutorService manual = mock(ExecutorService.class);
+    doAnswer(
+            call -> {
+              cancellation.set(call.getArgument(0));
+              return null;
+            })
+        .when(manual)
+        .execute(any());
+    BoundedConnectionDriver bounded = new BoundedConnectionDriver(driver, 100, workers, manual);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      release.countDown();
+      assertTrue(closeEntered.await(10, TimeUnit.SECONDS));
+      // The connect has returned; cancelling now must not interrupt closing the late connection.
+      cancellation.get().run();
+    } finally {
+      release.countDown();
+      releaseClose.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertEquals(false, closeInterrupted.get());
   }
 
   @Test
@@ -500,6 +1042,246 @@ class TestBoundedConnectionDriver {
   }
 
   @Test
+  void testTransientCancellationRejectionRecoversWorker() throws Exception {
+    ExecutorService cancellers = Executors.newSingleThreadExecutor();
+    ScheduledExecutorService retries = Executors.newSingleThreadScheduledExecutor();
+    Semaphore slots = new Semaphore(1);
+    ExecutorService flaky = mock(ExecutorService.class);
+    AtomicBoolean first = new AtomicBoolean(true);
+    doAnswer(
+            invocation -> {
+              if (first.getAndSet(false)) {
+                throw new RejectedExecutionException("temporary handoff rejection");
+              }
+              cancellers.execute(invocation.getArgument(0));
+              return null;
+            })
+        .when(flaky)
+        .execute(any());
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    CountDownLatch interrupted = new CountDownLatch(1);
+    Driver driver = mock(Driver.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              entered.countDown();
+              try {
+                release.await();
+              } catch (InterruptedException e) {
+                interrupted.countDown();
+                throw new SQLException("interrupted connect", e);
+              }
+              return null;
+            });
+    BoundedConnectionDriver bounded =
+        new BoundedConnectionDriver(driver, 500, workers, flaky, retries, slots);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+      assertTrue(interrupted.await(5, TimeUnit.SECONDS), "A transient rejection must be retried");
+      workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+      verify(flaky, times(2)).execute(any());
+      Awaitility.await().atMost(Duration.ofSeconds(10)).until(() -> slots.availablePermits() == 1);
+      doReturn(null).when(driver).connect(anyString(), any());
+      assertNull(bounded.connect("jdbc:test", new Properties()));
+    } finally {
+      release.countDown();
+      retries.shutdownNow();
+      assertTrue(retries.awaitTermination(10, TimeUnit.SECONDS));
+      cancellers.shutdownNow();
+      assertTrue(cancellers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testRejectedCancellationStillClosesLateConnection() throws Exception {
+    Driver driver = mock(Driver.class);
+    Connection late = mock(Connection.class);
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    AtomicReference<Boolean> interrupted = new AtomicReference<>(false);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              entered.countDown();
+              try {
+                release.await();
+              } catch (InterruptedException e) {
+                interrupted.set(true);
+                throw new SQLException("Unexpected caller-thread cancellation", e);
+              }
+              return late;
+            });
+    ExecutorService rejected = mock(ExecutorService.class);
+    doThrow(new RejectedExecutionException("cancellation pool full")).when(rejected).execute(any());
+    BlockingQueue<Runnable> pending = new LinkedBlockingQueue<>();
+    List<Long> delays = new ArrayList<>();
+    ScheduledExecutorService retries = manualRetries(pending, delays);
+    Semaphore slots = new Semaphore(1);
+    BoundedConnectionDriver bounded =
+        new BoundedConnectionDriver(driver, 500, workers, rejected, retries, slots);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(entered.await(10, TimeUnit.SECONDS));
+      assertEquals(0, slots.availablePermits());
+      for (int i = 0; i < 3; i++) {
+        takeRetry(pending).run();
+      }
+      assertEquals(List.of(10L, 20L, 40L), delays);
+      assertEquals(1, slots.availablePermits());
+      assertTrue(pending.isEmpty());
+      verify(rejected, times(4)).execute(any());
+      assertThrows(
+          SQLTransientConnectionException.class,
+          () -> bounded.connect("jdbc:test", new Properties()));
+    } finally {
+      release.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    assertFalse(interrupted.get(), "Rejected cancellation must not fall back to the caller");
+    verify(late).close();
+    doReturn(null).when(driver).connect(anyString(), any());
+    assertNull(bounded.connect("jdbc:test", new Properties()));
+  }
+
+  @Test
+  void testRetryCapacityIsBoundedAndReleasedWhenAttemptFinishes() throws Exception {
+    ExecutorService rejected = mock(ExecutorService.class);
+    doThrow(new RejectedExecutionException("cancellation pool full")).when(rejected).execute(any());
+    BlockingQueue<Runnable> pending = new LinkedBlockingQueue<>();
+    ScheduledExecutorService retries = manualRetries(pending, new ArrayList<>());
+    Semaphore slots = new Semaphore(1);
+    ExecutorService otherWorkers = Executors.newSingleThreadExecutor();
+    CountDownLatch release = new CountDownLatch(1);
+    Driver driver = mock(Driver.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              release.await();
+              return null;
+            });
+    BoundedConnectionDriver first =
+        new BoundedConnectionDriver(driver, 500, workers, rejected, retries, slots);
+    BoundedConnectionDriver second =
+        new BoundedConnectionDriver(driver, 500, otherWorkers, rejected, retries, slots);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> first.connect("jdbc:test", new Properties()));
+      assertThrows(SQLTimeoutException.class, () -> second.connect("jdbc:test", new Properties()));
+      assertEquals(0, slots.availablePermits());
+      assertEquals(1, pending.size(), "Retry admission must bound retained attempts");
+      verify(rejected, times(2)).execute(any());
+      assertThrows(
+          SQLTransientConnectionException.class,
+          () -> second.connect("jdbc:test", new Properties()));
+      release.countDown();
+      workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+      otherWorkers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+      takeRetry(pending).run();
+      assertEquals(1, slots.availablePermits());
+      assertTrue(pending.isEmpty());
+      verify(rejected, times(2)).execute(any());
+    } finally {
+      release.countDown();
+      otherWorkers.shutdownNow();
+      assertTrue(otherWorkers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void testObsoleteRetryDoesNotInterruptNextAttempt() throws Exception {
+    BlockingQueue<Runnable> pending = new LinkedBlockingQueue<>();
+    ScheduledExecutorService retries = manualRetries(pending, new ArrayList<>());
+    Semaphore slots = new Semaphore(1);
+    ExecutorService rejected = mock(ExecutorService.class);
+    doThrow(new RejectedExecutionException("temporary rejection")).when(rejected).execute(any());
+    CountDownLatch firstRelease = new CountDownLatch(1);
+    CountDownLatch secondEntered = new CountDownLatch(1);
+    CountDownLatch secondRelease = new CountDownLatch(1);
+    Connection late = mock(Connection.class);
+    Connection healthy = mock(Connection.class);
+    Driver driver = mock(Driver.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              firstRelease.await();
+              return late;
+            })
+        .thenAnswer(
+            invocation -> {
+              secondEntered.countDown();
+              secondRelease.await();
+              return healthy;
+            });
+    BoundedConnectionDriver bounded =
+        new BoundedConnectionDriver(driver, 500, workers, rejected, retries, slots);
+    ExecutorService callers = Executors.newSingleThreadExecutor();
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      firstRelease.countDown();
+      workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+      verify(late).close();
+      Future<Connection> next =
+          callers.submit(() -> bounded.connect("jdbc:test", new Properties()));
+      assertTrue(secondEntered.await(10, TimeUnit.SECONDS));
+      takeRetry(pending).run();
+      verify(rejected, times(1)).execute(any());
+      assertEquals(1, slots.availablePermits());
+      secondRelease.countDown();
+      assertSame(healthy, next.get(10, TimeUnit.SECONDS));
+    } finally {
+      firstRelease.countDown();
+      secondRelease.countDown();
+      callers.shutdownNow();
+      assertTrue(callers.awaitTermination(10, TimeUnit.SECONDS));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRejectedRetryScheduleReleasesCapacity(boolean rejectReschedule) throws Exception {
+    BlockingQueue<Runnable> pending = new LinkedBlockingQueue<>();
+    ScheduledExecutorService retries = manualRetries(pending, new ArrayList<>());
+    if (!rejectReschedule) {
+      doThrow(new RejectedExecutionException("retry dispatcher stopped"))
+          .when(retries)
+          .schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS));
+    }
+    ExecutorService rejected = mock(ExecutorService.class);
+    doThrow(new RejectedExecutionException("cancellation pool full")).when(rejected).execute(any());
+    Semaphore slots = new Semaphore(1);
+    CountDownLatch release = new CountDownLatch(1);
+    Driver driver = mock(Driver.class);
+    when(driver.connect(anyString(), any()))
+        .thenAnswer(
+            invocation -> {
+              release.await();
+              return null;
+            });
+    BoundedConnectionDriver bounded =
+        new BoundedConnectionDriver(driver, 500, workers, rejected, retries, slots);
+    try {
+      assertThrows(SQLTimeoutException.class, () -> bounded.connect("jdbc:test", new Properties()));
+      if (rejectReschedule) {
+        doThrow(new RejectedExecutionException("retry dispatcher stopped"))
+            .when(retries)
+            .schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS));
+        takeRetry(pending).run();
+      }
+      assertEquals(1, slots.availablePermits());
+      assertTrue(pending.isEmpty());
+      assertThrows(
+          SQLTransientConnectionException.class,
+          () -> bounded.connect("jdbc:test", new Properties()));
+    } finally {
+      release.countDown();
+    }
+    workers.submit(() -> {}).get(10, TimeUnit.SECONDS);
+    doReturn(null).when(driver).connect(anyString(), any());
+    assertNull(bounded.connect("jdbc:test", new Properties()));
+  }
+
+  @Test
   void testLateCloseFailureDoesNotPinContextOrQuarantine() throws Exception {
     Driver driver = mock(Driver.class);
     Connection late = mock(Connection.class);
@@ -526,6 +1308,25 @@ class TestBoundedConnectionDriver {
             .get(10, TimeUnit.SECONDS));
     assertNull(bounded.connect("jdbc:test", new Properties()));
     verify(late).close();
+  }
+
+  private static ScheduledExecutorService manualRetries(
+      BlockingQueue<Runnable> pending, List<Long> delays) {
+    ScheduledExecutorService retries = mock(ScheduledExecutorService.class);
+    when(retries.schedule(any(Runnable.class), anyLong(), eq(TimeUnit.MILLISECONDS)))
+        .thenAnswer(
+            invocation -> {
+              delays.add(invocation.getArgument(1));
+              pending.add(invocation.getArgument(0));
+              return mock(ScheduledFuture.class);
+            });
+    return retries;
+  }
+
+  private static Runnable takeRetry(BlockingQueue<Runnable> pending) throws InterruptedException {
+    Runnable retry = pending.poll(10, TimeUnit.SECONDS);
+    assertNotNull(retry, "A rejected cancellation must have a pending retry");
+    return retry;
   }
 
   private static void awaitIgnoringInterrupts(CountDownLatch latch) {

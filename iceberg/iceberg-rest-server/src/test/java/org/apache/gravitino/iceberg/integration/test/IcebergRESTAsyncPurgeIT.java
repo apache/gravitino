@@ -32,6 +32,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.service.cleanup.FileCleanupAssertions;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.TestDatabaseName;
@@ -55,6 +56,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +73,7 @@ import org.slf4j.LoggerFactory;
  * {@code file://} warehouse, since cleanup jobs are keyed by catalog id and the files must be
  * visible on disk.
  */
+@Tag("gravitino-docker-test")
 public class IcebergRESTAsyncPurgeIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTAsyncPurgeIT.class);
@@ -181,12 +184,7 @@ public class IcebergRESTAsyncPurgeIT extends BaseIT {
     Awaitility.await()
         .atMost(60, TimeUnit.SECONDS)
         .pollInterval(500, TimeUnit.MILLISECONDS)
-        .untilAsserted(
-            () ->
-                Assertions.assertEquals(
-                    0L,
-                    countRegularFiles(tableDir),
-                    "Background cleanup worker should have deleted all table files"));
+        .untilAsserted(() -> FileCleanupAssertions.assertNoRegularFiles(tableDir));
   }
 
   private void initMetalakeAndCatalog() {

@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -52,6 +53,8 @@ import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.Database;
+import software.amazon.awssdk.services.glue.model.DatabaseIdentifier;
+import software.amazon.awssdk.services.glue.model.DatabaseInput;
 import software.amazon.awssdk.services.glue.model.DeleteDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.EntityNotFoundException;
 import software.amazon.awssdk.services.glue.model.GetDatabaseRequest;
@@ -358,10 +361,7 @@ class TestGlueCatalogSchemaOperations {
             .parameters(Map.of("existing", "val"))
             .createTime(Instant.now())
             .build();
-    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
-        .thenReturn(GetDatabaseResponse.builder().database(db).build());
-    when(mockClient.updateDatabase(any(UpdateDatabaseRequest.class)))
-        .thenReturn(UpdateDatabaseResponse.builder().build());
+    useFakeGlueDatabase(db);
 
     ArgumentCaptor<UpdateDatabaseRequest> captor =
         ArgumentCaptor.forClass(UpdateDatabaseRequest.class);
@@ -495,6 +495,112 @@ class TestGlueCatalogSchemaOperations {
 
     verify(mockClient).deleteDatabase(captor.capture());
     assertEquals("123456789012", captor.getValue().catalogId());
+  }
+
+  @Test
+  void testLoadSchemaReportsLocationUri() {
+    useFakeGlueDatabase(
+        Database.builder()
+            .name("mydb")
+            .locationUri("s3://bucket/native_db")
+            .parameters(Map.of("location", "s3://bucket/stale"))
+            .build());
+
+    GlueSchema schema = ops.loadSchema(NameIdentifier.of("metalake", "catalog", "mydb"));
+
+    assertEquals("s3://bucket/native_db", schema.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testCreateSchemaStoresLocationOnlyAsLocationUri() {
+    ArgumentCaptor<CreateDatabaseRequest> captor =
+        ArgumentCaptor.forClass(CreateDatabaseRequest.class);
+
+    GlueSchema created =
+        ops.createSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"),
+            null,
+            Map.of(GlueConstants.LOCATION, "s3://bucket/mydb", "k", "v"));
+    assertEquals("s3://bucket/mydb", created.properties().get(GlueConstants.LOCATION));
+
+    verify(mockClient).createDatabase(captor.capture());
+    DatabaseInput input = captor.getValue().databaseInput();
+    assertEquals("s3://bucket/mydb", input.locationUri());
+    assertFalse(input.parameters().containsKey(GlueConstants.LOCATION));
+    assertEquals("v", input.parameters().get("k"));
+  }
+
+  @Test
+  void testAlterSchemaKeepsLocationUriAndUnmodeledFields() {
+    useFakeGlueDatabase(
+        Database.builder()
+            .name("mydb")
+            .description("native")
+            .locationUri("s3://bucket/native_db")
+            .parameters(Map.of("k", "v"))
+            .targetDatabase(DatabaseIdentifier.builder().databaseName("shared").build())
+            .build());
+    ArgumentCaptor<UpdateDatabaseRequest> captor =
+        ArgumentCaptor.forClass(UpdateDatabaseRequest.class);
+
+    GlueSchema result =
+        ops.alterSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"), SchemaChange.setProperty("k2", "v2"));
+
+    verify(mockClient).updateDatabase(captor.capture());
+    DatabaseInput input = captor.getValue().databaseInput();
+    assertEquals("s3://bucket/native_db", input.locationUri());
+    assertEquals("native", input.description());
+    assertEquals("shared", input.targetDatabase().databaseName());
+    assertEquals("s3://bucket/native_db", result.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAlterSchemaReturnsSubmittedDefinitionWhenReadBackFails() {
+    Database database =
+        Database.builder().name("mydb").locationUri("s3://bucket/native_db").build();
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenReturn(GetDatabaseResponse.builder().database(database).build())
+        .thenThrow(ThrottlingException.builder().message("slow down").build());
+
+    GlueSchema result =
+        ops.alterSchema(
+            NameIdentifier.of("metalake", "catalog", "mydb"), SchemaChange.setProperty("k", "v"));
+
+    verify(mockClient).updateDatabase(any(UpdateDatabaseRequest.class));
+    assertEquals("v", result.properties().get("k"));
+    assertEquals("s3://bucket/native_db", result.properties().get(GlueConstants.LOCATION));
+  }
+
+  @Test
+  void testAlterSchemaLocationChangesLocationUri() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "mydb");
+    useFakeGlueDatabase(Database.builder().name("mydb").locationUri("s3://bucket/old").build());
+
+    ops.alterSchema(ident, SchemaChange.setProperty(GlueConstants.LOCATION, "s3://bucket/new"));
+    assertEquals("s3://bucket/new", ops.loadSchema(ident).properties().get(GlueConstants.LOCATION));
+
+    ops.alterSchema(ident, SchemaChange.removeProperty(GlueConstants.LOCATION));
+    assertFalse(ops.loadSchema(ident).properties().containsKey(GlueConstants.LOCATION));
+  }
+
+  /** Makes the mock behave like Glue for one database: updates are visible to later reads. */
+  private void useFakeGlueDatabase(Database initial) {
+    AtomicReference<Database> stored = new AtomicReference<>(initial);
+    when(mockClient.getDatabase(any(GetDatabaseRequest.class)))
+        .thenAnswer(inv -> GetDatabaseResponse.builder().database(stored.get()).build());
+    when(mockClient.updateDatabase(any(UpdateDatabaseRequest.class)))
+        .thenAnswer(
+            inv -> {
+              DatabaseInput in = ((UpdateDatabaseRequest) inv.getArgument(0)).databaseInput();
+              stored.set(
+                  stored.get().toBuilder()
+                      .description(in.description())
+                      .locationUri(in.locationUri())
+                      .parameters(in.parameters())
+                      .build());
+              return UpdateDatabaseResponse.builder().build();
+            });
   }
 
   private static GlueException glueException(String code, String message) {

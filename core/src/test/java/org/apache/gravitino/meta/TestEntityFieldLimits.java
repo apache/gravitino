@@ -76,6 +76,38 @@ public class TestEntityFieldLimits {
     assertLengthLimit(builder, "alias", "model version", EntityFieldLimits.MAX_NAME_LENGTH);
   }
 
+  @Test
+  public void testFilesetStorageLocationNameLength() {
+    Function<String, Entity> builder =
+        locationName ->
+            FilesetEntity.builder()
+                .withId(1L)
+                .withName("fileset")
+                .withFilesetType(Fileset.Type.MANAGED)
+                .withStorageLocations(ImmutableMap.of(locationName, "location"))
+                .withAuditInfo(AuditInfo.EMPTY)
+                .build();
+    assertLengthLimit(
+        builder,
+        "storage location name",
+        "fileset",
+        EntityFieldLimits.MAX_STORAGE_LOCATION_NAME_LENGTH);
+  }
+
+  @Test
+  public void testModelVersionUriNameLength() {
+    Function<String, Entity> builder =
+        uriName ->
+            ModelVersionEntity.builder()
+                .withModelIdentifier(NameIdentifier.of("m1", "c1", "s1", "model1"))
+                .withVersion(1)
+                .withUris(ImmutableMap.of(uriName, "test_uri"))
+                .withAuditInfo(AuditInfo.EMPTY)
+                .build();
+    assertLengthLimit(
+        builder, "uri name", "model version", EntityFieldLimits.MAX_MODEL_VERSION_URI_NAME_LENGTH);
+  }
+
   /** Verifies column names use their own limit while other entity names keep the existing limit. */
   @Test
   public void testColumnNameLength() {
@@ -150,6 +182,16 @@ public class TestEntityFieldLimits {
                         .withAuditInfo(AuditInfo.EMPTY)
                         .build()),
         Arguments.of("tag", (Function<String, Entity>) name -> tagBuilder(name, null)),
+        Arguments.of(
+            "topic",
+            (Function<String, Entity>)
+                name ->
+                    TopicEntity.builder()
+                        .withId(1L)
+                        .withName(name)
+                        .withNamespace(NAMESPACE)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build()),
         Arguments.of(
             "policy",
             (Function<String, Entity>)

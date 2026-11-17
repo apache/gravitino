@@ -66,6 +66,17 @@ public final class GlueClientProvider {
    *     credentials
    */
   public static GlueClient buildClient(Map<String, String> config) {
+    return buildClient(config, true);
+  }
+
+  /**
+   * Builds a {@link GlueClient} from the given catalog configuration map.
+   *
+   * @param config Catalog configuration properties.
+   * @param checkCredentials whether to check up front that credentials can be resolved
+   * @return A configured and ready-to-use {@link GlueClient}.
+   */
+  static GlueClient buildClient(Map<String, String> config, boolean checkCredentials) {
     validateConfig(config);
     String region = config.get(GlueConstants.AWS_REGION);
     GlueClientBuilder builder = GlueClient.builder().region(Region.of(region));
@@ -84,7 +95,9 @@ public final class GlueClientProvider {
         hasAwsStaticCredentials(accessKey, secretKey)
             ? StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey))
             : DefaultCredentialsProvider.builder().build();
-    validateCredentials(credentialsProvider);
+    if (checkCredentials) {
+      validateCredentials(credentialsProvider);
+    }
     builder.credentialsProvider(credentialsProvider);
 
     // Bound every call so an endpoint that does not answer cannot hold a request thread for the

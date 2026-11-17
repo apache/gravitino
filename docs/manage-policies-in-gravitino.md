@@ -15,7 +15,7 @@ model and how object policy lookup works, see
 [Policies](./policies.md). To move from direct object policy associations, follow
 [Migration Guide](./migration-guide.md).
 
-The Python client does not cover policies, so the examples below are REST and Java only.
+The examples below cover REST, Java, and the Python client.
 
 ## Policy Operations
 
@@ -67,6 +67,28 @@ Policy policy = client.createPolicy(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_contents import PolicyContents
+from gravitino.api.metadata_object import MetadataObject
+
+content = PolicyContents.CustomContent(
+    {"retentionDays": 30},
+    {
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+    },
+    {"owner": "platform"},
+)
+
+policy = client.create_policy(
+    "retention_30d", "custom", "Thirty day retention", True, content
+)
+```
+
+</TabItem>
 </Tabs>
 
 The built-in compaction policy has a fixed content shape, documented in
@@ -106,6 +128,14 @@ Policy[] policies = client.listPolicyInfos();
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policy_names = client.list_policies()
+policies = client.list_policy_infos()
+```
+
+</TabItem>
 </Tabs>
 
 ### Get a Policy
@@ -123,6 +153,13 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 Policy policy = client.getPolicy("retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policy = client.get_policy("retention_30d")
 ```
 
 </TabItem>
@@ -175,6 +212,29 @@ Policy policy = client.alterPolicy(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_change import PolicyChange
+from gravitino.api.policy.policy_contents import PolicyContents
+from gravitino.api.metadata_object import MetadataObject
+
+new_content = PolicyContents.CustomContent(
+    {"retentionDays": 90},
+    {
+        MetadataObject.Type.CATALOG,
+        MetadataObject.Type.SCHEMA,
+        MetadataObject.Type.TABLE,
+    },
+    {"owner": "platform"},
+)
+
+policy = client.alter_policy(
+    "retention_30d", PolicyChange.update_content("custom", new_content)
+)
+```
+
+</TabItem>
 </Tabs>
 
 ### Enable or Disable a Policy
@@ -200,6 +260,14 @@ client.enablePolicy("retention_30d");
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.disable_policy("retention_30d")
+client.enable_policy("retention_30d")
+```
+
+</TabItem>
 </Tabs>
 
 ### Delete a Policy
@@ -219,6 +287,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 client.deletePolicy("retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.delete_policy("retention_30d")
 ```
 
 </TabItem>
@@ -267,6 +342,20 @@ PolicyTagAssociation association = client.addPolicyForTag(
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino.api.policy.policy_association_selector import TagValueSelector
+
+association = client.add_policy_for_tag(
+    "data_domain", "retention_30d", TagValueSelector.of("finance")
+)
+
+# Match any assignment of data_domain instead:
+# client.add_policy_for_tag("data_domain", "retention_30d")
+```
+
+</TabItem>
 </Tabs>
 
 The request fails with a conflict if the policy is already associated with the tag.
@@ -297,6 +386,19 @@ PolicyTagAssociation[] tags = client.listTagAssociationsForPolicy("retention_30d
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+policies = client.list_policy_associations_for_tag("data_domain")
+tags = client.list_tag_associations_for_policy("retention_30d")
+
+for association in policies:
+    policy = association.policy()
+    tag = association.tag()
+    selector = association.selector()
+```
+
+</TabItem>
 </Tabs>
 
 ### Remove an Association
@@ -317,6 +419,13 @@ curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 client.removePolicyFromTag("data_domain", "retention_30d");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.remove_policy_from_tag("data_domain", "retention_30d")
 ```
 
 </TabItem>
@@ -390,6 +499,35 @@ boolean omittedPolicyDetails = detailList.hasInaccessiblePolicies();
 
 The existing `listPolicies()` and `listPolicyInfos()` methods continue to return only the visible
 arrays.
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+from gravitino import NameIdentifier
+
+customers = (
+    client.load_catalog("catalog1")
+    .as_table_catalog()
+    .load_table(NameIdentifier.of("schema1", "customers"))
+)
+
+name_list = customers.supports_policies().list_policies_with_visibility()
+policy_names = name_list.policies()
+omitted_policies = name_list.has_inaccessible_policies()
+
+detail_list = customers.supports_policies().list_policy_infos_with_visibility()
+policies = detail_list.policies()
+omitted_policy_details = detail_list.has_inaccessible_policies()
+
+# The existing list_policies() and list_policy_infos() methods continue to
+# return only the visible lists.
+```
+
+The `inherited` flag on a listed `Policy` is `True` when the policy matches only through a tag
+assigned to an ancestor of the object, and `False` when the tag is assigned to the object itself.
+It is `None` when the policy is returned outside object lookup, for example from
+`client.get_policy(...)`.
 
 </TabItem>
 </Tabs>

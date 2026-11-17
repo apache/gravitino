@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -29,7 +30,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.catalog.hive.HiveStorageConstants;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
@@ -50,7 +53,12 @@ import software.amazon.awssdk.services.glue.model.GetPartitionRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionResponse;
 import software.amazon.awssdk.services.glue.model.GetPartitionsRequest;
 import software.amazon.awssdk.services.glue.model.GetPartitionsResponse;
+import software.amazon.awssdk.services.glue.model.GetTableRequest;
+import software.amazon.awssdk.services.glue.model.GetTableResponse;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
+import software.amazon.awssdk.services.glue.model.PartitionInput;
+import software.amazon.awssdk.services.glue.model.SerDeInfo;
+import software.amazon.awssdk.services.glue.model.StorageDescriptor;
 
 class TestGluePartitionOperations {
 
@@ -62,6 +70,36 @@ class TestGluePartitionOperations {
     mockClient = mock(GlueClient.class);
     ops =
         new GlueTableOperations(mockClient, null, "mydb", "mytable", new String[] {"dt", "region"});
+    // The table a new partition copies its storage descriptor from.
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(
+            GetTableResponse.builder()
+                .table(
+                    software.amazon.awssdk.services.glue.model.Table.builder()
+                        .name("mytable")
+                        .storageDescriptor(
+                            StorageDescriptor.builder()
+                                .location("s3://bucket/mydb/mytable/")
+                                .inputFormat(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS)
+                                .outputFormat(HiveStorageConstants.IGNORE_KEY_OUTPUT_FORMAT_CLASS)
+                                .serdeInfo(
+                                    SerDeInfo.builder()
+                                        .serializationLibrary(
+                                            HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS)
+                                        .build())
+                                .build())
+                        .build())
+                .build());
+    // Glue returns the partition that was added.
+    when(mockClient.getPartition(any(GetPartitionRequest.class)))
+        .thenAnswer(
+            inv ->
+                GetPartitionResponse.builder()
+                    .partition(
+                        software.amazon.awssdk.services.glue.model.Partition.builder()
+                            .values(((GetPartitionRequest) inv.getArgument(0)).partitionValues())
+                            .build())
+                    .build());
   }
 
   // -------------------------------------------------------------------------
@@ -141,6 +179,42 @@ class TestGluePartitionOperations {
     verify(mockClient).getPartition(captor.capture());
     assertEquals(List.of("2024-01-01", "us"), captor.getValue().partitionValues());
     assertEquals("dt=2024-01-01/region=us", result.name());
+  }
+
+  @Test
+  void testPartitionWithEmptyValueIsAddressableByItsListedName() {
+    software.amazon.awssdk.services.glue.model.Partition gluePartition =
+        software.amazon.awssdk.services.glue.model.Partition.builder()
+            .values("2024-01-01", "")
+            .build();
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(GetPartitionsResponse.builder().partitions(gluePartition).build());
+    when(mockClient.getPartition(any(GetPartitionRequest.class)))
+        .thenReturn(GetPartitionResponse.builder().partition(gluePartition).build());
+
+    String name = ops.listPartitionNames()[0];
+    assertEquals("dt=2024-01-01/region=", name);
+
+    ops.getPartition(name);
+    ArgumentCaptor<GetPartitionRequest> captor = ArgumentCaptor.forClass(GetPartitionRequest.class);
+    verify(mockClient).getPartition(captor.capture());
+    assertEquals(List.of("2024-01-01", ""), captor.getValue().partitionValues());
+  }
+
+  @Test
+  void testPartitionNameUsesLowerCaseKeys() {
+    GlueTableOperations upperCaseOps =
+        new GlueTableOperations(mockClient, null, "mydb", "mytable", new String[] {"DT"});
+    when(mockClient.getPartitions(any(GetPartitionsRequest.class)))
+        .thenReturn(
+            GetPartitionsResponse.builder()
+                .partitions(
+                    software.amazon.awssdk.services.glue.model.Partition.builder()
+                        .values("2024-01-01")
+                        .build())
+                .build());
+
+    assertEquals("dt=2024-01-01", upperCaseOps.listPartitionNames()[0]);
   }
 
   @Test
@@ -230,7 +304,7 @@ class TestGluePartitionOperations {
 
   private static IdentityPartition partitionWithRegion(String region) {
     return Partitions.identity(
-        "p",
+        null,
         new String[][] {{"dt"}, {"region"}},
         new org.apache.gravitino.rel.expressions.literals.Literal[] {
           Literals.stringLiteral("2024-01-01"), Literals.stringLiteral(region)
@@ -314,5 +388,154 @@ class TestGluePartitionOperations {
 
     verify(mockClient).deletePartition(captor.capture());
     assertEquals("123456789012", captor.getValue().catalogId());
+  }
+
+  private static IdentityPartition partition(String name, String[][] fieldNames, String... values) {
+    org.apache.gravitino.rel.expressions.literals.Literal<?>[] literals =
+        new org.apache.gravitino.rel.expressions.literals.Literal<?>[values.length];
+    for (int i = 0; i < values.length; i++) {
+      literals[i] = Literals.stringLiteral(values[i]);
+    }
+    return Partitions.identity(name, fieldNames, literals, java.util.Collections.emptyMap());
+  }
+
+  private PartitionInput addAndCapture(IdentityPartition partition) {
+    ops.addPartition(partition);
+    ArgumentCaptor<CreatePartitionRequest> captor =
+        ArgumentCaptor.forClass(CreatePartitionRequest.class);
+    verify(mockClient).createPartition(captor.capture());
+    return captor.getValue().partitionInput();
+  }
+
+  @Test
+  void testPartitionValueWithSlashIsEscapedAndAddressable() {
+    PartitionInput input =
+        addAndCapture(partition(null, new String[][] {{"dt"}, {"region"}}, "2025/12/31", "us"));
+    assertEquals(List.of("2025/12/31", "us"), input.values());
+
+    Partition added = ops.getPartition("dt=2025%2F12%2F31/region=us");
+    assertEquals("dt=2025%2F12%2F31/region=us", added.name());
+
+    ArgumentCaptor<GetPartitionRequest> getCaptor =
+        ArgumentCaptor.forClass(GetPartitionRequest.class);
+    verify(mockClient, org.mockito.Mockito.atLeastOnce()).getPartition(getCaptor.capture());
+    assertEquals(List.of("2025/12/31", "us"), getCaptor.getValue().partitionValues());
+  }
+
+  @Test
+  void testAddPartitionAcceptsUnescapedName() {
+    PartitionInput input =
+        addAndCapture(
+            partition(
+                "dt=2025/12/31/region=us",
+                new String[][] {{"dt"}, {"region"}},
+                "2025/12/31",
+                "us"));
+    assertEquals(List.of("2025/12/31", "us"), input.values());
+  }
+
+  @Test
+  void testEscapeRoundTrip() {
+    String value = "a/b=c%d:e#f";
+    assertEquals(
+        value, GlueTableOperations.unescapePathName(GlueTableOperations.escapePathName(value)));
+    assertEquals("100%", GlueTableOperations.unescapePathName("100%"));
+    assertEquals("%+1", GlueTableOperations.unescapePathName("%+1"));
+  }
+
+  @Test
+  void testAddPartitionPlacesValuesByFieldName() {
+    PartitionInput input =
+        addAndCapture(partition(null, new String[][] {{"region"}, {"dt"}}, "us", "2024-01-01"));
+    assertEquals(List.of("2024-01-01", "us"), input.values());
+  }
+
+  @Test
+  void testAddPartitionRefusesUnknownFieldOrMismatchedName() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ops.addPartition(partition(null, new String[][] {{"zz"}, {"yy"}}, "a", "b")));
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.addPartition(
+                    partition(
+                        "dt=q/region=9", new String[][] {{"dt"}, {"region"}}, "2024-01-01", "us")));
+    assertTrue(e.getMessage().contains("does not match"), e.getMessage());
+    verify(mockClient, never()).createPartition(any(CreatePartitionRequest.class));
+  }
+
+  @Test
+  void testAddPartitionCopiesTableStorageDescriptor() {
+    PartitionInput input =
+        addAndCapture(partition(null, new String[][] {{"dt"}, {"region"}}, "2024-01-01", "us"));
+    StorageDescriptor sd = input.storageDescriptor();
+    assertEquals("s3://bucket/mydb/mytable/dt=2024-01-01/region=us", sd.location());
+    assertEquals(HiveStorageConstants.TEXT_INPUT_FORMAT_CLASS, sd.inputFormat());
+    assertEquals(
+        HiveStorageConstants.LAZY_SIMPLE_SERDE_CLASS, sd.serdeInfo().serializationLibrary());
+  }
+
+  @Test
+  void testAddPartitionRefusesTableWithoutLocation() {
+    when(mockClient.getTable(any(GetTableRequest.class)))
+        .thenReturn(
+            GetTableResponse.builder()
+                .table(
+                    software.amazon.awssdk.services.glue.model.Table.builder()
+                        .name("mytable")
+                        .build())
+                .build());
+
+    IllegalArgumentException e =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                ops.addPartition(
+                    partition(null, new String[][] {{"dt"}, {"region"}}, "2024-01-01", "us")));
+    assertTrue(e.getMessage().contains("no storage location"), e.getMessage());
+  }
+
+  @Test
+  void testAddPartitionNameIgnoresCaseOfColumnNames() {
+    PartitionInput input =
+        addAndCapture(
+            partition(
+                "DT=2024-01-01/Region=us",
+                new String[][] {{"dt"}, {"region"}},
+                "2024-01-01",
+                "us"));
+    assertEquals(List.of("2024-01-01", "us"), input.values());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.addPartition(
+                partition(
+                    "dt=2024-01-01/region=US",
+                    new String[][] {{"dt"}, {"region"}},
+                    "2024-01-01",
+                    "us")));
+  }
+
+  @Test
+  void testAddPartitionReturnsTheRequestedValuesWithoutReadingBack() {
+    IdentityPartition partition =
+        Partitions.identity(
+            null,
+            new String[][] {{"region"}, {"dt"}},
+            new org.apache.gravitino.rel.expressions.literals.Literal<?>[] {
+              Literals.stringLiteral("us"), Literals.dateLiteral(java.time.LocalDate.of(2024, 1, 1))
+            },
+            Map.of("k", "v"));
+
+    IdentityPartition result = (IdentityPartition) ops.addPartition(partition);
+
+    assertEquals("dt=2024-01-01/region=us", result.name());
+    assertArrayEquals(new String[][] {{"dt"}, {"region"}}, result.fieldNames());
+    assertEquals(Literals.dateLiteral(java.time.LocalDate.of(2024, 1, 1)), result.values()[0]);
+    assertEquals(Map.of("k", "v"), result.properties());
+    verify(mockClient, never()).getPartition(any(GetPartitionRequest.class));
   }
 }

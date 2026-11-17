@@ -39,8 +39,17 @@ public final class EntityFieldLimits {
   /** The maximum number of characters of an entity comment stored in a 256-character column. */
   public static final int MAX_COMMENT_LENGTH = 256;
 
+  /** The maximum number of characters of a tag value, as stored in a tag relation. */
+  public static final int MAX_TAG_VALUE_LENGTH = 256;
+
   /** The maximum number of characters of a column comment. */
   public static final int MAX_COLUMN_COMMENT_LENGTH = 4096;
+
+  /** The maximum number of characters of a fileset storage location name. */
+  public static final int MAX_STORAGE_LOCATION_NAME_LENGTH = 256;
+
+  /** The maximum number of characters of a model version URI name. */
+  public static final int MAX_MODEL_VERSION_URI_NAME_LENGTH = 256;
 
   private EntityFieldLimits() {}
 

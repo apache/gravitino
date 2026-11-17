@@ -35,6 +35,7 @@ import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotInUseException;
 import org.apache.gravitino.exceptions.RESTException;
 
@@ -126,12 +127,12 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
    * Converts an exception into a Trino exception. A {@link TrinoException} is returned as is, so a
    * caller may route every failure of a guarded block through this method, including a {@link
    * TrinoException} it throws inside that block. An {@link ExecutionException} is classified by its
-   * cause. {@link ForbiddenException}, {@link NotInUseException}, {@link IllegalArgumentException}
-   * and {@link UnsupportedOperationException} map to {@code PERMISSION_DENIED}, {@code
-   * CATALOG_UNAVAILABLE}, {@link #GRAVITINO_ILLEGAL_ARGUMENT} and {@link
-   * #GRAVITINO_UNSUPPORTED_OPERATION}. A {@link ConnectionFailedException}, or a {@link
-   * RESTException} caused by a network failure, maps to {@link #GRAVITINO_CONNECTION_FAILED}.
-   * Anything else maps to {@code GENERIC_INTERNAL_ERROR}.
+   * cause. {@link ForbiddenException}, {@link NotInUseException}, {@link NonEmptySchemaException},
+   * {@link IllegalArgumentException} and {@link UnsupportedOperationException} map to {@code
+   * PERMISSION_DENIED}, {@code CATALOG_UNAVAILABLE}, {@link #GRAVITINO_SCHEMA_NOT_EMPTY}, {@link
+   * #GRAVITINO_ILLEGAL_ARGUMENT} and {@link #GRAVITINO_UNSUPPORTED_OPERATION}. A {@link
+   * ConnectionFailedException}, or a {@link RESTException} caused by a network failure, maps to
+   * {@link #GRAVITINO_CONNECTION_FAILED}. Anything else maps to {@code GENERIC_INTERNAL_ERROR}.
    *
    * @param exception the exception to convert
    * @param context describes the failed operation; it prefixes the message of an exception that
@@ -155,6 +156,9 @@ public enum GravitinoErrorCode implements ErrorCodeSupplier {
     if (e instanceof ConnectionFailedException
         || (e instanceof RESTException && isNetworkFailure(e.getCause()))) {
       return new TrinoException(GRAVITINO_CONNECTION_FAILED, firstLineMessage(e), e);
+    }
+    if (e instanceof NonEmptySchemaException) {
+      return new TrinoException(GRAVITINO_SCHEMA_NOT_EMPTY, firstLineMessage(e), e);
     }
     if (e instanceof IllegalArgumentException) {
       return new TrinoException(GRAVITINO_ILLEGAL_ARGUMENT, firstLineMessage(e), e);

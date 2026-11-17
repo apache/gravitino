@@ -36,6 +36,7 @@ import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.exceptions.CommitStateUnknownException;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
 import software.amazon.awssdk.awscore.exception.AwsErrorDetails;
+import software.amazon.awssdk.awscore.exception.AwsServiceException;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
@@ -50,6 +51,7 @@ import software.amazon.awssdk.services.glue.model.GlueException;
 import software.amazon.awssdk.services.glue.model.InvalidInputException;
 import software.amazon.awssdk.services.glue.model.ThrottlingException;
 import software.amazon.awssdk.services.glue.model.ValidationException;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 /** Converts AWS Glue SDK exceptions to Gravitino exceptions. */
 final class GlueExceptionConverter {
@@ -261,6 +263,13 @@ final class GlueExceptionConverter {
           context,
           awsErrorDetail(glueException));
     }
+    if (e instanceof ConcurrentModificationException) {
+      return new OptimisticLockException(
+          e,
+          "%s was changed concurrently; the request can be retried. AWS error: %s",
+          context,
+          awsErrorDetail(glueException));
+    }
     if (e instanceof InvalidInputException || e instanceof ValidationException) {
       return new IllegalArgumentException(
           String.format(
@@ -334,10 +343,11 @@ final class GlueExceptionConverter {
    * and S3 errors either as its own exception types or wrapped around the AWS SDK exception, so the
    * cause chain is walked from the outside in and the first recognized type decides the result:
    * Iceberg not-found, already-exists, validation and forbidden errors map to the matching
-   * Gravitino types, a commit conflict maps to {@link OptimisticLockException}, and AWS SDK causes
-   * go through {@link #toGenericException}. A commit whose state is unknown is reported as such,
-   * because the change may have been applied. {@link GravitinoRuntimeException}, {@link
-   * IllegalArgumentException} and {@link UnsupportedOperationException} are returned as is.
+   * Gravitino types, a commit conflict maps to {@link OptimisticLockException}, S3 failures map by
+   * their HTTP status, and other AWS SDK causes go through {@link #toGenericException}. A commit
+   * whose state is unknown is reported as such, because the change may have been applied. {@link
+   * GravitinoRuntimeException}, {@link IllegalArgumentException} and {@link
+   * UnsupportedOperationException} are returned as is.
    *
    * @param e the failure raised by an Iceberg catalog call
    * @param context description of the operation context for error messages
@@ -406,11 +416,61 @@ final class GlueExceptionConverter {
         // Not wrapped by Iceberg; it may be the table or its database.
         return new NotFoundException(e, "%s: %s", context, describe(t));
       }
+      if (t instanceof S3Exception) {
+        return toS3Exception((S3Exception) t, context, e);
+      }
+      if (t instanceof SdkClientException) {
+        // The failing client may be the Glue or the S3 client of the Iceberg catalog.
+        SdkClientException clientException = (SdkClientException) t;
+        if (isCredentialFailure(clientException)) {
+          return toCredentialException(clientException, context);
+        }
+        return new ConnectionFailedException(
+            e,
+            "Failed to reach AWS (Glue or S3) for %s: %s",
+            context,
+            StringUtils.defaultIfBlank(
+                ExceptionMessages.usefulMessage(clientException),
+                clientException.getClass().getSimpleName()));
+      }
       if (t instanceof SdkException) {
         return toGenericException((SdkException) t, context, null);
       }
     }
     return new RuntimeException(context + ": " + describe(e), e);
+  }
+
+  /**
+   * Converts an S3 failure met while reading or writing Iceberg metadata or data files. The status
+   * decides the result, since S3 reports most failures under a few generic error codes.
+   */
+  private static RuntimeException toS3Exception(
+      S3Exception s3Exception, String context, RuntimeException e) {
+    String detail = awsErrorDetail(s3Exception);
+    int status = s3Exception.statusCode();
+    if (status == 403) {
+      return new ForbiddenException(e, "S3 denied access for %s: %s", context, detail);
+    }
+    if (status == 404) {
+      return new NotFoundException(e, "S3 object or bucket not found for %s: %s", context, detail);
+    }
+    if (status == 503 || s3Exception.isThrottlingException()) {
+      return new ServiceUnavailableException(
+          e, "S3 throttled the request for %s; the request can be retried: %s", context, detail);
+    }
+    if (status == 301) {
+      return new IllegalArgumentException(
+          String.format(
+              "S3 redirected the request for %s; the bucket is likely in a different region than"
+                  + " '%s': %s",
+              context, GlueConstants.AWS_REGION, detail),
+          e);
+    }
+    if (status >= 400 && status < 500) {
+      return new IllegalArgumentException(
+          String.format("S3 rejected the request for %s: %s", context, detail), e);
+    }
+    return new RuntimeException(String.format("S3 error: %s: %s", context, detail), e);
   }
 
   private static String regionMismatchMessage(GlueException e, @Nullable GlueClient client) {
@@ -451,19 +511,19 @@ final class GlueExceptionConverter {
   }
 
   /**
-   * Renders the AWS-side detail of a Glue exception. AWS names the failing action and the resource
-   * there, which is what the caller needs to act on; the error code is prefixed so the failure can
-   * be classified at a glance. Long messages, which quote the offending request value, are
-   * shortened in the middle so the violated constraint at the end stays visible.
+   * Renders the AWS-side detail of a Glue or S3 exception. AWS names the failing action and the
+   * resource there, which is what the caller needs to act on; the error code is prefixed so the
+   * failure can be classified at a glance. Long messages, which quote the offending request value,
+   * are shortened in the middle so the violated constraint at the end stays visible.
    *
-   * @param e the Glue exception to describe
+   * @param e the AWS service exception to describe
    * @return the AWS error code and message, or a best-effort description when they are unavailable
    */
-  private static String awsErrorDetail(GlueException e) {
+  private static String awsErrorDetail(AwsServiceException e) {
     return StringUtils.abbreviateMiddle(rawAwsErrorDetail(e), " ... ", MAX_AWS_MESSAGE_LENGTH);
   }
 
-  private static String rawAwsErrorDetail(GlueException e) {
+  private static String rawAwsErrorDetail(AwsServiceException e) {
     AwsErrorDetails details = e.awsErrorDetails();
     if (details != null) {
       String code = details.errorCode();

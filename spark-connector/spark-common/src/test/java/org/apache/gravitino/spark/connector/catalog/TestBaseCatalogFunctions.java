@@ -80,8 +80,7 @@ public class TestBaseCatalogFunctions {
     Catalog gravitinoCatalog = mock(Catalog.class);
     functionCatalog = mock(FunctionCatalog.class);
     when(gravitinoCatalog.asFunctionCatalog()).thenReturn(functionCatalog);
-    catalog = new FunctionTestCatalog();
-    catalog.gravitinoCatalogClient = gravitinoCatalog;
+    catalog = new FunctionTestCatalog(gravitinoCatalog);
   }
 
   @Test
@@ -135,6 +134,18 @@ public class TestBaseCatalogFunctions {
   }
 
   private static class FunctionTestCatalog extends BaseCatalog {
+
+    private final Catalog gravitinoCatalog;
+
+    private FunctionTestCatalog(Catalog gravitinoCatalog) {
+      this.gravitinoCatalog = gravitinoCatalog;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
+    }
+
     @Override
     protected TableCatalog createAndInitSparkCatalog(
         String name, CaseInsensitiveStringMap options, Map<String, String> properties) {

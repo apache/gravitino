@@ -204,6 +204,16 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
   }
 
   /**
+   * Identifies authorization denials, including a protocol's own forbidden exception.
+   *
+   * @param exception exception raised while authorizing the request
+   * @return whether the exception represents a denied request
+   */
+  protected boolean isAuthorizationDenial(Exception exception) {
+    return exception instanceof ForbiddenException;
+  }
+
+  /**
    * Returns whether the complete local authorization pipeline should be skipped. This is intended
    * for a protocol proxy whose downstream Gravitino server authorizes the same request.
    *
@@ -387,10 +397,10 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor {
         }
       }
     } catch (Exception ex) {
-      if (ex instanceof ForbiddenException) {
+      if (isAuthorizationDenial(ex)) {
         dispatchAuthorizationDenial(deniedObject, method.getName(), deniedExpression);
       }
-      if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {
+      if (isAuthorizationDenial(ex) || isExceptionPropagate(ex)) {
         return toErrorResponse(method, args, ex);
       }
       String currentUser = PrincipalUtils.getCurrentUserName();

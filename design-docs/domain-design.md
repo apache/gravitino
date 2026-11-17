@@ -137,8 +137,8 @@ Domain operations use the store's existing locking primitives, in one global ord
 - **Rule**: an object's effective tags are its own plus its schema's and catalog's; for the same tag the nearest level wins, and different tags accumulate. A leaf object (see Member types) is a member of domain D when its effective tags match D's backing (tag, value). Membership reuses core's `EffectiveTagResolver`, which applies no tag-privilege filtering: domain visibility and object access are applied afterwards, so a caller needs no tag privilege.
 - **Different tags accumulate**: with schema `finance` and table `sales`, the table is in both Finance and Sales, and a child cannot leave a domain it inherits.
 - **Values of one tag** backing different domains override each other: with schema `dept=finance` and table `dept=hr`, the table is only in the `dept=hr` domain, unless it uses `dept=[finance, hr]`. This is the one case where a child can leave an inherited domain, and only for bindings with a value; a binding without a value matches every value.
-- **Member types**: leaf objects only: tables, views, filesets, topics, models and semantic models (`DomainMember.SUPPORTED_TYPES`). Catalogs and schemas are never members: one that carries a backing tag passes membership to the leaf objects under it through tag inheritance. Columns and functions are not members either: a column or function carrying a backing tag is not listed. A type that becomes taggable later joins only when it is added to this list. Metrics belong through their semantic model.
-- **Relations**: a leaf object relates to a domain in one of three ways, reported with its source by member listing and by domains of an object:
+- **Member types**: the default listing returns directly tagged catalogs, schemas and leaves. The leaf types are tables, views, filesets, topics, models and semantic models. Expanded listing and object-to-domain lookup support these leaf types. Columns and functions are excluded.
+- **Relations**: expanded listing and object-to-domain lookup report the following relations for a leaf. Direct listing reports Direct and Via subdomain for assignments on the object itself:
 
   | Relation      | Meaning                                                        | Source                                    |
   | :------------ | :------------------------------------------------------------- | :---------------------------------------- |
@@ -146,22 +146,21 @@ Domain operations use the store's existing locking primitives, in one global ord
   | Inherited     | the object inherits the backing tag from its catalog or schema | the nearest catalog or schema carrying it |
   | Via subdomain | a visible subdomain of the domain has the object in its scope  | that subdomain                            |
 
-  Every relation that applies is reported, as a list of (relation, source) pairs, with no precedence: a table whose schema carries `finance` and which itself carries `trading` gets `[Inherited from cat.db, Via subdomain Trading]` under Finance, and an object in two subdomains gets one Via subdomain pair for each. Clients decide how to display them. Relations are always relative to the listed domain. An object is a member of the domain itself when its relations include Direct or Inherited. The relation is an enum; the exact field shape is an implementation choice.
-- **Domains of an object**: for a leaf object, every domain the caller can see whose scope contains the object, each with its relations. An object tagged only `trading` gets Trading (Direct) and Finance (Via subdomain Trading). Catalogs and schemas do not support this lookup, since they are never members; the domain a catalog or schema passes down is visible from its tags.
+  In an expanded listing, every relation that applies is reported, as a list of (relation, source) pairs, with no precedence: a table whose schema carries `finance` and which itself carries `trading` gets `[Inherited from cat.db, Via subdomain Trading]` under Finance, and an object in two subdomains gets one Via subdomain pair for each. Clients decide how to display them. Relations are always relative to the listed domain. An object is a member of the domain itself when its relations include Direct or Inherited. The relation is an enum; the exact field shape is an implementation choice.
+- **Domains of an object**: for a leaf object, every domain the caller can see whose scope contains the object, each with its relations. An object tagged only `trading` gets Trading (Direct) and Finance (Via subdomain Trading). This reverse lookup remains limited to leaves even though forward listing can return catalogs and schemas.
 - **Removing a member**: membership ends when the object no longer carries the backing tag, by the tag rules. To take an object out of a domain backed by a tag without a value, remove the tag by name (v1 association request), which removes all its values on the object; a v2 request removes one (tag, value) pair. An inherited membership can only be removed on the catalog or schema.
 - **Domain filters**: Phase 1 adds no domain filter to other list APIs. When one is added, it matches scope, consistent with member listing.
 
 ### Member listing
 
-`GET /domains/{domain}/objects` lists leaf objects, expanding catalogs and schemas:
+`GET /domains/{domain}/objects` defaults to direct assignments. Look up the selected domains' backing tags by stable ID and optional assignment value. A recreated tag with the same name has a different ID and cannot take over the binding.
 
-1. Resolve the backing tags of the domains in the selected scopes (by default the listed domain's whole scope: itself and its visible subdomains).
-2. List the objects carrying them by the bound tag ID and value. The existing lookup by tag name (`listMetadataObjectsForTag`) is not reused, since a tag deleted and recreated with the same name between steps would contribute its objects; this applies to bindings without a value too. Leaf objects are candidates as they are; a tagged catalog or schema is replaced by the leaf objects under it, from Gravitino's store.
-3. Keep the candidates whose effective tags match a selected backing tag by tag ID (the matching rules above, nearest level wins), so a leaf object that overrides an inherited value drops out. Only bindings with a value need this check.
-4. Drop objects the caller cannot access (`filterMetadataObject`), de-duplicate, and record each member's relations and sources.
+Return each accessible matching object once with its relations to the queried domain and its visible subdomains. If a schema and a table under it both carry matching assignments, both appear. A leaf that matches solely through inheritance appears only with `expand=true`.
+
+With `expand=true`, enumerate recorded leaves under each tagged container and check each leaf's effective tags against the selected bindings. A nearer assignment can override an inherited value.
 
 - **A view of recorded objects**: membership is defined by the rule above; the listing shows the objects recorded in Gravitino's store. Objects in an external catalog that Gravitino has not recorded yet are not listed, so an empty listing does not mean an object is not a member.
-- **Cost**: a domain backed by a tag on a large catalog lists every recorded leaf object under it (see Open Questions).
+- **Cost**: expanding a domain backed by a tag on a large catalog visits every recorded leaf object under it (see Open Questions).
 - **Per caller**: the listing depends on the subdomains and objects the caller can see, so its length is not a property of the domain. Paging and counts come in Phase 2; counts follow the listing and depend on the caller too, so they never reveal assets the caller cannot see.
 
 ### Access control
@@ -241,7 +240,8 @@ DomainMemberDTO { object: MetadataObjectDTO, relations: [{relation, source?}] }
 - **Concurrency**: changes apply to the current state on the server and the last write wins, as for other Gravitino metadata operations; there is no version check. Detach removes the current parent edge and removing the backing tag removes the current one, whatever the caller's snapshot shows; detaching a top-level domain is a no-op, not an error. Domains are addressed by name, so if a domain is renamed and a new one takes its old name, later calls with that name act on the new domain.
 - **Member listing parameters**:
   - `domains` (repeatable, `?domains=Tax&domains=Trading`; not comma-separated, since domain names may contain `,`): each name, the listed domain itself or one of its visible subdomains, selects that domain's scope, and the result is the union. On Finance with subdomains Tax and Trading, not setting it or `domains=Finance` lists the whole scope (Finance, Tax and Trading), `domains=Tax` lists only Tax's members, and `domains=Tax&domains=Trading` lists Tax's and Trading's. Names that are neither the domain nor a subdomain visible to the caller are ignored; if all given names are ignored, the result is empty rather than everything, so a typo cannot widen it.
-  - `types` (comma-separated, each a leaf member type) and `nameContains` (case-insensitive, on the full name). Filters apply to the expanded leaf list, so `types=TABLE` finds the tables under a tagged catalog.
+  - `expand` defaults to false. Set it to true to enumerate recorded leaves through inheritance.
+  - `types` accepts comma-separated leaf types and, for direct listing, CATALOG and SCHEMA. With `types=TABLE`, direct listing returns directly tagged tables. Add `expand=true` to include tables that inherit a matching tag. `nameContains` matches the full name case-insensitively.
   - The listed domain's own members are those whose relations include Direct or Inherited.
   - No paging in Phase 1, like the other core list APIs; paging and counts come in Phase 2.
 - **Errors**:
@@ -265,7 +265,7 @@ A new read-only `domain` tool category in `mcp-server/`, added to `SUPPORTED_TOO
 | :-------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `list_domains`              | `GET /domains?details=true`; returns name, comment, parent, status and backing tag, so an agent can pick a domain                                                                                                          |
 | `get_domain_by_name`        | `GET /domains/{domain}`                                                                                                                                                                                                    |
-| `list_metadata_by_domain`   | `GET /domains/{domain}/objects`, with `domains` (a list of scopes to include, the domain itself or its subdomains; default the whole scope), `types`, `name_contains`; lets an agent look within a domain by type and name |
+| `list_domain_members`   | `GET /domains/{domain}/objects`, with `domains` (a list of scopes to include, the domain itself or its subdomains; default the whole scope), `types`, `name_contains`, and `expand`; lets an agent look within a domain by type and name |
 | `list_domains_for_metadata` | `GET /objects/{type}/{fullName}/domains`, for leaf objects                                                                                                                                                                 |
 
 Adding members uses the existing `associate_tag_with_metadata` tool. It keeps removing tags by name (v1, all values) and is extended to accept (name, value) pairs and send the v2 request, so value-backed domains work. The MCP server forwards the caller's `Authorization` header, so the server's visibility rules apply; with OAuth client-credentials, the agent sees what that service identity sees.
@@ -293,7 +293,7 @@ Unity Catalog domains ([Domains and subdomains](https://docs.databricks.com/aws/
 
 ## Open Questions
 
-1. **Cost of expanding large catalogs**: member listing expands a tagged catalog or schema to every recorded leaf object under it. Paging (Phase 2) bounds the response, not the work; is a cheaper strategy needed for very large catalogs?
+1. **Cost of expanding large catalogs**: with `expand=true`, member listing expands a tagged catalog or schema to every recorded leaf object under it. Paging (Phase 2) bounds the response, not the work; is a cheaper strategy needed for very large catalogs?
 2. **Data-access grants on domains**, if wanted later: deny-only grants (tagging can only tighten access), or allow grants that also require grant authority on the asset when tagging. Either works only where Gravitino enforces authorization itself and adds a membership lookup to every check.
 
 ## Task Breakdown
@@ -316,7 +316,7 @@ Unity Catalog domains ([Domains and subdomains](https://docs.databricks.com/aws/
 
 - [ ] Membership resolution in `core/` on `EffectiveTagResolver`, returning the inherited source and matching by tag ID
 - [ ] Lookup of tag relations by tag ID and value (the existing lookup is by tag name)
-- [ ] Member listing: expansion to leaf objects, relation lists, filters; domains of a leaf object
+- [ ] Member listing: direct objects and opt-in expansion to leaves, relation lists, filters; domains of a leaf object
 - [ ] REST endpoints and tests
 
 ### Phase 1c: Clients, MCP and documentation

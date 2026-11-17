@@ -110,11 +110,40 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 public class TestPOConverters {
   private static final LocalDateTime FIX_DATE_TIME = LocalDateTime.of(2024, 2, 6, 0, 0, 0);
 
   private static final Instant FIX_INSTANT = FIX_DATE_TIME.toInstant(ZoneOffset.UTC);
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testRoleAssignmentAuditUsesGrant(boolean group) throws JsonProcessingException {
+    AuditInfo created =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    AuditInfo initial = roleAssignmentAudit(group, created);
+    assertEquals(created, initial);
+
+    for (int grant = 1; grant <= 2; grant++) {
+      Instant grantedAt = FIX_INSTANT.plusSeconds(grant);
+      AuditInfo principalAudit =
+          AuditInfo.builder()
+              .withCreator(created.creator())
+              .withCreateTime(created.createTime())
+              .withLastModifier("granter" + grant)
+              .withLastModifiedTime(grantedAt)
+              .build();
+      AuditInfo assignment = roleAssignmentAudit(group, principalAudit);
+      assertEquals("granter" + grant, assignment.creator());
+      assertEquals(grantedAt, assignment.createTime());
+      assertNotEquals(principalAudit.creator(), assignment.creator());
+      assertNotEquals(principalAudit.createTime(), assignment.createTime());
+      assertEquals("creator", principalAudit.creator());
+      assertEquals(FIX_INSTANT, principalAudit.createTime());
+    }
+  }
 
   @Test
   public void testFromMetalakePO() throws JsonProcessingException {
@@ -1739,6 +1768,38 @@ public class TestPOConverters {
     Assertions.assertEquals("test", entity.name());
     Assertions.assertEquals("test", entity.value().value());
     Assertions.assertEquals(Namespace.fromString(parentTableIdent.toString()), entity.namespace());
+  }
+
+  private AuditInfo roleAssignmentAudit(boolean group, AuditInfo audit)
+      throws JsonProcessingException {
+    Namespace namespace = Namespace.of("metalake", "system", group ? "groups" : "users");
+    String serialized;
+    if (group) {
+      GroupEntity principal =
+          GroupEntity.builder()
+              .withId(1L)
+              .withName("group")
+              .withNamespace(namespace)
+              .withAuditInfo(audit)
+              .build();
+      serialized =
+          POConverters.initializeGroupRoleRelsPOWithVersion(principal, List.of(2L))
+              .get(0)
+              .getAuditInfo();
+    } else {
+      UserEntity principal =
+          UserEntity.builder()
+              .withId(1L)
+              .withName("user")
+              .withNamespace(namespace)
+              .withAuditInfo(audit)
+              .build();
+      serialized =
+          POConverters.initializeUserRoleRelsPOWithVersion(principal, List.of(2L))
+              .get(0)
+              .getAuditInfo();
+    }
+    return JsonUtils.anyFieldMapper().readValue(serialized, AuditInfo.class);
   }
 
   private static BaseMetalake createMetalake(Long id, String name, String comment) {

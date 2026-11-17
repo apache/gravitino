@@ -146,6 +146,14 @@ public class ModelVersionEntity implements Entity, Auditable, HasIdentifier {
               EntityFieldLimits.checkMaxLength(
                   alias, EntityFieldLimits.MAX_NAME_LENGTH, "alias", type()));
     }
+    uris.keySet()
+        .forEach(
+            uriName ->
+                EntityFieldLimits.checkMaxLength(
+                    uriName,
+                    EntityFieldLimits.MAX_MODEL_VERSION_URI_NAME_LENGTH,
+                    "uri name",
+                    type()));
   }
 
   @Override

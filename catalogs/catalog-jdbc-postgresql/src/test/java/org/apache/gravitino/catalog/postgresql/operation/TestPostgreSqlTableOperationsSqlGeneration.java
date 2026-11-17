@@ -18,7 +18,16 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.Collections;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConverter;
@@ -42,10 +51,22 @@ import org.junit.jupiter.params.provider.ValueSource;
 public class TestPostgreSqlTableOperationsSqlGeneration {
 
   private static class TestablePostgreSqlTableOperations extends PostgreSqlTableOperations {
+    private final ResultSet indexMetadata = mock(ResultSet.class);
+
     public TestablePostgreSqlTableOperations() {
       super.exceptionMapper = new JdbcExceptionConverter();
       super.typeConverter = new PostgreSqlTypeConverter();
       super.columnDefaultValueConverter = new JdbcColumnDefaultValueConverter();
+      super.dataSource = mock(DataSource.class);
+      try {
+        Connection connection = mock(Connection.class);
+        PreparedStatement statement = mock(PreparedStatement.class);
+        when(dataSource.getConnection()).thenReturn(connection);
+        when(connection.prepareStatement(anyString())).thenReturn(statement);
+        when(statement.executeQuery()).thenReturn(indexMetadata);
+      } catch (SQLException e) {
+        throw new AssertionError(e);
+      }
     }
 
     private TestablePostgreSqlTableOperations(PostgreSqlColumnDefaultValueConverter converter) {
@@ -87,6 +108,18 @@ public class TestPostgreSqlTableOperationsSqlGeneration {
               })
           .build();
     }
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void testStandaloneUniqueIndexCannotBeSilentlyIgnored(boolean ifExists) throws SQLException {
+    TestablePostgreSqlTableOperations ops = new TestablePostgreSqlTableOperations();
+    when(ops.indexMetadata.next()).thenReturn(true);
+    IllegalArgumentException error =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> ops.alterTableSql("table", TableChange.deleteIndex("native_unique", ifExists)));
+    Assertions.assertTrue(error.getMessage().contains("standalone unique index"));
   }
 
   @Test

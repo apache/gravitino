@@ -184,7 +184,7 @@ public class TestDataSourceUrlValidation {
     // instead of throwing), so the H2 guard still fires on the untouched "jdbc:h2" prefix.
     HashMap<String, String> properties = Maps.newHashMap();
     properties.put(JdbcConfig.JDBC_DRIVER.getKey(), "org.postgresql.Driver");
-    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:h2:mem:test?password=100%");
+    properties.put(JdbcConfig.JDBC_URL.getKey(), "jdbc:h2:mem:test?applicationName=100%");
     properties.put(JdbcConfig.USERNAME.getKey(), "test");
     properties.put(JdbcConfig.PASSWORD.getKey(), "test");
 

@@ -20,6 +20,7 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
+import com.sun.jersey.api.client.ClientHandlerException;
 import com.sun.jersey.api.client.UniformInterfaceException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -31,9 +32,11 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroup;
 import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.ranger.RangerClient;
 import org.apache.ranger.RangerServiceException;
 import org.apache.ranger.plugin.model.RangerPolicy;
+import org.apache.ranger.plugin.model.RangerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,6 +91,27 @@ public class RangerClientExtension extends RangerClient {
       callAPIMethodClassResponseType.setAccessible(true);
     } catch (NoSuchMethodException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  /**
+   * Looks up a service and reports invalid Ranger Admin responses with configuration context.
+   *
+   * @param serviceName the Ranger service name
+   * @return the Ranger service
+   * @throws RangerServiceException if Ranger returns a valid API error
+   * @throws AuthorizationPluginException if the response cannot be read
+   */
+  @Override
+  public RangerService getService(String serviceName) throws RangerServiceException {
+    try {
+      return super.getService(serviceName);
+    } catch (ClientHandlerException e) {
+      throw new AuthorizationPluginException(
+          e,
+          "Failed to read Ranger Admin response for service '%s'. Check the configured Ranger "
+              + "Admin URL, connectivity, and proxy settings; the service lookup must return JSON.",
+          serviceName);
     }
   }
 

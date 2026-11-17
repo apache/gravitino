@@ -54,6 +54,13 @@ extras.
 1. [Manage metalake using Gravitino Python API](./manage-metalake-using-gravitino.md?language=python)
 2. [Manage fileset metadata using Gravitino Python API](./manage-fileset-metadata-using-gravitino.md?language=python)
 3. [Manage Semantic Model metadata using Gravitino Python API](./manage-semantic-model-metadata-using-gravitino.md?language=python)
+4. [Manage view metadata using Gravitino Python API](./manage-view-metadata-using-gravitino.md?language=python)
+
+### View Operations
+
+Use `as_view_catalog()` on a loaded relational catalog to manage views. The
+[View guide](./manage-view-metadata-using-gravitino.md?language=python) includes Python examples for view
+creation, list/load, alteration (rename, set/remove property, and replace), and drop operations.
 
 ### HTTP Error Handling
 
@@ -240,7 +247,11 @@ Process finished with exit code 0
 + User documentation: https://gravitino.apache.org/docs/
 + Slack Community: [https://the-asf.slack.com#gravitino](https://the-asf.slack.com/archives/C078RESTT19)
 
+## Domains
+
+See [Manage domains](./manage-domains-in-gravitino.md) for a complete executable example
+covering creation, publication, tag membership, reverse lookup and cleanup.
+
 ## License
 
 Gravitino is under the Apache License Version 2.0, See the [LICENSE](https://github.com/apache/gravitino/blob/main/LICENSE) for the details.
-

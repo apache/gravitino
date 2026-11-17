@@ -50,7 +50,7 @@ import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.lock.TreeLock;
-import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
@@ -262,7 +262,7 @@ public class TestIcebergNamespaceHookDispatcher {
         .thenReturn(mock(CreateNamespaceResponse.class));
     RuntimeException importFailure =
         new RuntimeException("Failed to import schema entity to the store");
-    when(mockInternalSchemaDispatcher.loadSchema(any())).thenThrow(importFailure);
+    when(mockInternalSchemaDispatcher.importSchema(any(), any())).thenThrow(importFailure);
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -311,11 +311,21 @@ public class TestIcebergNamespaceHookDispatcher {
         NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
     when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
 
+    when(mockInternalViewDispatcher.importView(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit = invocation.getArgument(1);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadViewResponse response = hookDispatcher.registerView(mockContext, namespace, request);
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
 
     verify(mockDispatcher).registerView(mockContext, namespace, request);
-    verify(mockInternalViewDispatcher).loadView(eq(expectedIdent));
-    verify(mockViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher).importView(eq(expectedIdent), any());
+    verify(mockViewDispatcher, never()).importView(any(), any());
     verify(mockInternalOwnerDispatcher).setOwner(any(), any(), eq(TEST_USER), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     Assertions.assertEquals(mockResponse, response);
@@ -341,7 +351,7 @@ public class TestIcebergNamespaceHookDispatcher {
 
     verify(mockDispatcher).registerView(mockContext, namespace, request);
     // Import and setOwner are both skipped since the entity already exists
-    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, never()).importView(any(), any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     Assertions.assertEquals(mockResponse, response);
   }
@@ -362,9 +372,11 @@ public class TestIcebergNamespaceHookDispatcher {
         NameIdentifier.of(TEST_METALAKE, TEST_CATALOG, "test_schema", "test_view");
     when(mockEntityStore.exists(eq(expectedIdent), eq(Entity.EntityType.VIEW))).thenReturn(false);
 
-    // View import (loadView) throwing must propagate so the caller learns the view exists in
+    // View import (importView) throwing must propagate so the caller learns the view exists in
     // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
-    doThrow(new RuntimeException("Import failed")).when(mockInternalViewDispatcher).loadView(any());
+    doThrow(new RuntimeException("Import failed"))
+        .when(mockInternalViewDispatcher)
+        .importView(any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -399,7 +411,7 @@ public class TestIcebergNamespaceHookDispatcher {
             () -> hookDispatcher.registerView(mockContext, namespace, request));
     Assertions.assertEquals(IOException.class, thrown.getCause().getClass());
     verify(mockDispatcher).registerView(mockContext, namespace, request);
-    verify(mockInternalViewDispatcher, never()).loadView(any());
+    verify(mockInternalViewDispatcher, never()).importView(any(), any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
 
@@ -412,11 +424,11 @@ public class TestIcebergNamespaceHookDispatcher {
     CreateNamespaceResponse mockResponse = mock(CreateNamespaceResponse.class);
     when(mockDispatcher.createNamespace(mockContext, mockRequest)).thenReturn(mockResponse);
 
-    // Schema import (loadSchema) throwing must propagate so the caller learns the namespace
+    // Schema import (importSchema) throwing must propagate so the caller learns the namespace
     // exists in Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
     doThrow(new RuntimeException("Import failed"))
         .when(mockInternalSchemaDispatcher)
-        .loadSchema(any());
+        .importSchema(any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -425,7 +437,7 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertEquals("Import failed", thrown.getMessage());
     verify(mockInternalOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwners(any(), any(), any(), any());
-    verify(mockSchemaDispatcher, never()).loadSchema(any());
+    verify(mockSchemaDispatcher, never()).importSchema(any(), any());
   }
 
   @Test
@@ -442,7 +454,7 @@ public class TestIcebergNamespaceHookDispatcher {
     LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
 
     Assertions.assertSame(mockResponse, response);
-    verify(mockInternalTableDispatcher, never()).loadTable(any());
+    verify(mockInternalTableDispatcher, never()).importTable(any(), any());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
@@ -458,11 +470,21 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
         .thenReturn(mockResponse);
 
+    when(mockInternalTableDispatcher.importTable(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              AuditInfo audit = invocation.getArgument(1);
+              Assertions.assertEquals(TEST_USER, audit.creator());
+              Assertions.assertNotNull(audit.createTime());
+              return null;
+            });
+
     LoadTableResponse response = hookDispatcher.registerTable(mockContext, namespace, mockRequest);
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
 
     Assertions.assertSame(mockResponse, response);
     verify(mockDispatcher).registerTable(mockContext, namespace, mockRequest);
-    verify(mockInternalTableDispatcher).loadTable(any());
+    verify(mockInternalTableDispatcher).importTable(any(), any());
     verify(mockInternalOwnerDispatcher).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
   }
@@ -477,11 +499,11 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.registerTable(mockContext, namespace, mockRequest))
         .thenReturn(mockResponse);
 
-    // Table import (loadTable) throwing must propagate so the caller learns the table exists in
+    // Table import (importTable) throwing must propagate so the caller learns the table exists in
     // Iceberg but is not registered in Gravitino. setOwner is therefore unreachable.
     doThrow(new RuntimeException("Import failed"))
         .when(mockInternalTableDispatcher)
-        .loadTable(any());
+        .importTable(any(), any());
 
     RuntimeException thrown =
         Assertions.assertThrows(
@@ -491,7 +513,7 @@ public class TestIcebergNamespaceHookDispatcher {
     Assertions.assertEquals("Import failed", thrown.getMessage());
     verify(mockInternalOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
     verify(mockOwnerDispatcher, never()).setOwner(any(), any(), any(), any());
-    verify(mockTableDispatcher, never()).loadTable(any());
+    verify(mockTableDispatcher, never()).importTable(any(), any());
   }
 
   @Test
@@ -531,6 +553,21 @@ public class TestIcebergNamespaceHookDispatcher {
     when(mockDispatcher.createNamespace(mockContext, request))
         .thenReturn(mock(CreateNamespaceResponse.class));
 
+    when(mockInternalSchemaDispatcher.importSchema(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              NameIdentifier identifier = invocation.getArgument(0);
+              AuditInfo audit = invocation.getArgument(1);
+              if (identifier.name().equals("A")) {
+                Assertions.assertNull(audit.creator());
+                Assertions.assertNull(audit.createTime());
+              } else {
+                Assertions.assertEquals(TEST_USER, audit.creator());
+                Assertions.assertNotNull(audit.createTime());
+              }
+              return null;
+            });
+
     hookDispatcher.createNamespace(mockContext, request);
 
     @SuppressWarnings("unchecked")
@@ -544,13 +581,7 @@ public class TestIcebergNamespaceHookDispatcher {
         Arrays.asList(TEST_CATALOG + ".A:B", TEST_CATALOG + ".A:B:C", TEST_CATALOG + ".A:B:C:D"),
         names);
 
-    // Each namespace the request created gets its creator recorded; the existing A does not.
-    ArgumentCaptor<NameIdentifier> recorded = ArgumentCaptor.forClass(NameIdentifier.class);
-    verify(mockEntityStore, times(3))
-        .update(recorded.capture(), eq(SchemaEntity.class), eq(Entity.EntityType.SCHEMA), any());
-    Assertions.assertEquals(
-        Arrays.asList("A:B", "A:B:C", "A:B:C:D"),
-        recorded.getAllValues().stream().map(NameIdentifier::name).collect(Collectors.toList()));
+    verify(mockEntityStore, never()).update(any(), any(), any(), any());
   }
 
   @Test

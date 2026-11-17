@@ -59,6 +59,10 @@ public class IcebergOrphanFileRemovalContent extends AbstractExecutablePolicyCon
   public static final long DEFAULT_OLDER_THAN_DAYS = 3;
   /** Default execution mode. */
   public static final boolean DEFAULT_DRY_RUN = false;
+  /** TMS S1 metric: orphan files removed (or found in dry-run). */
+  public static final String REMOVED_FILE_NUMBER_METRIC = "custom-removed-file-number";
+  /** TMS S1 metric: bytes of orphan files removed. */
+  public static final String REMOVED_FILE_SIZE_METRIC = "custom-removed-file-size";
 
   private final long olderThanDays;
   @Nullable private final String location;

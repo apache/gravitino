@@ -54,6 +54,7 @@ import org.apache.gravitino.storage.relational.session.SqlSessions;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
 
@@ -250,6 +251,40 @@ class TestOwnerAssignmentWrites extends TestJDBCBackend {
       }
       assertEquals(2, liveOwnerRows(principalId(group, principal)));
     }
+  }
+
+  @TestTemplate
+  void testRetiredOwnerRowsAlwaysGetANewerDeletedAt() throws Exception {
+    // PostgreSQL's transaction-start clock is what lets retired rows repeat a deleted_at.
+    Assumptions.assumeTrue("postgresql".equalsIgnoreCase(backendType));
+    createAndInsertMakeLake(METALAKE);
+    CatalogEntity owned = createAndInsertCatalog(METALAKE, "owned");
+    NameIdentifier first = insertPrincipal(false, "first");
+    NameIdentifier second = insertPrincipal(false, "second");
+    setOwner(owned, first, Entity.EntityType.USER);
+    setOwner(owned, second, Entity.EntityType.USER);
+    long future = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(1);
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Statement statement = session.getConnection().createStatement()) {
+      statement.executeUpdate(
+          "UPDATE owner_meta SET deleted_at = "
+              + future
+              + " WHERE metadata_object_id = "
+              + owned.id()
+              + " AND deleted_at > 0");
+    }
+
+    setOwner(owned, first, Entity.EntityType.USER);
+    assertEquals(future + 1, latestRetiredAt(owned));
+
+    batchSetOwners(List.of(owned), second, Entity.EntityType.USER);
+    assertEquals(future + 2, latestRetiredAt(owned));
+  }
+
+  private long latestRetiredAt(CatalogEntity owned) throws Exception {
+    return queryLong(
+        "SELECT MAX(deleted_at) FROM owner_meta WHERE metadata_object_id = " + owned.id());
   }
 
   private void setOwner(CatalogEntity owned, NameIdentifier owner, Entity.EntityType ownerType) {

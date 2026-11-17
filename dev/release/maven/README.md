@@ -86,19 +86,21 @@ inventory. A dependency's POM license declaration may omit embedded third-party 
   and [1.0.90 MIT text](https://github.com/wrandelshofer/FastDoubleParser/blob/v1.0.90/LICENSE)
   respectively. Jackson 2.18.3 also needs the Boost text identified by its parser
   NOTICE. Existing fast_float and bigint texts are preserved.
-  Versions 2.9.2/2.13.5 contain neither parser; 2.21.3 already includes their full
-  license texts. These audited versions require no supplements.
+  Versions 2.9.2/2.13.5 contain neither parser; 2.18.12, 2.21.3 and 2.21.8 already
+  include their full license texts (identical in all three). These audited versions
+  require no supplements.
 - Reactive Streams 1.0.4: [MIT-0 LICENSE](https://github.com/reactive-streams/reactive-streams-jvm/blob/v1.0.4/LICENSE).
 - JaCoCo runtime 0.8.8: its binary `about.html` identifies EPL-2.0 and the
   embedded ASM 9.2 BSD code; retain that file (which already contains the ASM BSD
   text) and supplement only the missing full EPL-2.0 text.
-- Snappy Java 1.1.10.8: [NOTICE](https://github.com/xerial/snappy-java/blob/v1.1.10.8/NOTICE).
+- Snappy Java 1.1.10.12: [NOTICE](https://github.com/xerial/snappy-java/blob/v1.1.10.12/NOTICE).
   Its native libraries include [Snappy 1.1.10](https://github.com/google/snappy/blob/1.1.10/COPYING)
   and [Bitshuffle 0.3.4](https://github.com/kiyo-masui/bitshuffle/blob/0.3.4/LICENSE),
   as recorded by the tagged Makefile and VERSION file.
-- Netty 4.1.109/110/118: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
+- Netty 4.1.109/110/118/140: [NOTICE](https://github.com/netty/netty/blob/netty-4.1.118.Final/NOTICE.txt)
   and [companion license texts](https://github.com/netty/netty/tree/netty-4.1.118.Final/license).
-  The selected companions match across these versions. They cover embedded
+  The NOTICE and companion texts are identical in 4.1.118 and 4.1.140 (compared file by file),
+  and the selected companions match across these versions. They cover embedded
   SLF4J/Harmony/JCTools in common, Webbit and Hoehrmann UTF-8 validation in HTTP,
   Bzip2/FastLZ/libdivsufsort/Protobuf in codec, HPACK implementations in HTTP/2,
   and Apple's dnsinfo header in the macOS native resolver.

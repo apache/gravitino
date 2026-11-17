@@ -60,6 +60,7 @@ import org.apache.spark.sql.SparkSession;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,7 @@ import org.slf4j.LoggerFactory;
  * user for Spark SQL, doesn't have privileges by default. You could use Spark SQL to try to do the
  * operation and use Gravitino client to grant privilege or check the test result.
  */
+@Tag("gravitino-docker-test")
 public class IcebergAuthorizationIT extends BaseIT {
 
   private static final Logger LOG = LoggerFactory.getLogger(IcebergAuthorizationIT.class);
@@ -178,7 +180,7 @@ public class IcebergAuthorizationIT extends BaseIT {
             "gravitino.authorization.serviceAdmins",
             SUPER_USER,
             "gravitino.authenticators",
-            "simple",
+            authenticator(),
             // BaseIT will use SimpleAuthUserName to create Gravitino client
             "SimpleAuthUserName",
             SUPER_USER,
@@ -205,6 +207,11 @@ public class IcebergAuthorizationIT extends BaseIT {
 
   protected Map<String, String> getCustomProperties() {
     return Maps.newHashMap();
+  }
+
+  /** Returns the authenticator used by the Gravitino server in this test suite. */
+  protected String authenticator() {
+    return "simple";
   }
 
   protected boolean supportsCredentialVending() {
