@@ -70,6 +70,7 @@ import static org.mockito.Mockito.when;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.Uninterruptibles;
@@ -100,6 +101,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -2653,6 +2655,78 @@ public class TestFilesetCatalogOperations {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(booleans = {true, false})
+  void testFailedInitializeClosesTheFileSystemsItCreated(boolean locationIsAFile)
+      throws IOException {
+    Path checked = new Path("s3a://bucket-a/checked");
+    Path failing = new Path("s3a://bucket-b/failing");
+    FileSystem checkedFs = Mockito.mock(FileSystem.class);
+    FileSystem failingFs = Mockito.mock(FileSystem.class);
+    if (locationIsAFile) {
+      FileStatus file = Mockito.mock(FileStatus.class);
+      when(file.isFile()).thenReturn(true);
+      when(failingFs.exists(failing)).thenReturn(true);
+      when(failingFs.getFileStatus(failing)).thenReturn(file);
+    } else {
+      when(failingFs.exists(failing)).thenThrow(new IOException("Connection refused"));
+    }
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(checkedFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(checked), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      doReturn(failingFs)
+          .when(ops)
+          .getFileSystem(Mockito.eq(failing), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      RuntimeException failure =
+          Assertions.assertThrows(
+              RuntimeException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "checked",
+                          checked.toString(),
+                          PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "failing",
+                          failing.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Class<? extends RuntimeException> expected =
+          locationIsAFile ? IllegalArgumentException.class : ConnectionFailedException.class;
+      Assertions.assertInstanceOf(expected, failure);
+      // Checked before the try closes ops: no catalog keeps an ops whose initialization failed.
+      Mockito.verify(checkedFs, Mockito.atLeastOnce()).close();
+      Mockito.verify(failingFs, Mockito.atLeastOnce()).close();
+    }
+  }
+
+  @Test
+  public void testFailedInitializeKeepsItsFailureWhenClosingFails() throws IOException {
+    Path path = new Path("s3a://test-bucket/unreachable");
+    FileSystem fileSystem = Mockito.mock(FileSystem.class);
+    when(fileSystem.exists(path)).thenThrow(new IOException("Connection refused"));
+    IllegalStateException closeFailure = new IllegalStateException("close failed");
+    // Only the close of the failed initialization fails, not the one of the try below.
+    Mockito.doThrow(closeFailure).doNothing().when(fileSystem).close();
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      doReturn(fileSystem)
+          .when(ops)
+          .getFileSystem(Mockito.eq(path), Mockito.anyMap(), Mockito.anyString(), Mockito.any());
+      ConnectionFailedException failure =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () ->
+                  ops.initialize(
+                      ImmutableMap.of(PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "s3", path.toString()),
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Assertions.assertArrayEquals(new Throwable[] {closeFailure}, failure.getSuppressed());
+    }
+  }
+
   @Test
   public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
@@ -2881,11 +2955,19 @@ public class TestFilesetCatalogOperations {
             "kerberos",
             HADOOP_SECURITY_PRINCIPAL,
             "svc-simple@EXAMPLE.COM");
+    // What the first principal expands to.
+    Map<String, String> expanded =
+        ImmutableMap.of(
+            AuthenticationConfig.AUTH_TYPE_KEY,
+            "kerberos",
+            HADOOP_SECURITY_PRINCIPAL,
+            "svc-kerberos@EXAMPLE.COM");
 
     try (FilesetCatalogOperations ops = newOpsWithStubbedHdfs(defaultProvider)) {
       for (Path path : hdfsCacheKeyPaths(defaultProvider)) {
-        Assertions.assertNotSame(
-            ops.getFileSystemWithCache(path, first), ops.getFileSystemWithCache(path, second));
+        FileSystem fs = ops.getFileSystemWithCache(path, first);
+        Assertions.assertNotSame(fs, ops.getFileSystemWithCache(path, second));
+        Assertions.assertSame(fs, ops.getFileSystemWithCache(path, expanded));
       }
     }
   }
@@ -3077,6 +3159,57 @@ public class TestFilesetCatalogOperations {
       } finally {
         timedOut.countDown();
       }
+      Mockito.verify(late, Mockito.timeout(10_000)).close();
+    }
+  }
+
+  @Test
+  public void testFileSystemCreatedAfterInterruptIsClosed() throws Exception {
+    FileSystem late = Mockito.mock(FileSystem.class);
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch interrupted = new CountDownLatch(1);
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(ImmutableMap.of(), randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+      // Like a Kerberos login that ignores the interrupt.
+      Mockito.doAnswer(
+              invocation -> {
+                started.countDown();
+                Uninterruptibles.awaitUninterruptibly(interrupted);
+                return late;
+              })
+          .when(ops)
+          .createFileSystem(any(), any(), any(), any(), any(), any());
+
+      AtomicReference<Throwable> failure = new AtomicReference<>();
+      AtomicBoolean stillInterrupted = new AtomicBoolean();
+      Thread caller =
+          new Thread(
+              () -> {
+                try {
+                  ops.getFileSystemWithCache(
+                      new Path(TEST_ROOT_PATH, "interrupted"),
+                      ImmutableMap.of(FILESYSTEM_CONNECTION_TIMEOUT_SECONDS, "60"));
+                } catch (Throwable t) {
+                  failure.set(t);
+                  stillInterrupted.set(Thread.currentThread().isInterrupted());
+                }
+              });
+      caller.start();
+      boolean callerStillWaiting;
+      try {
+        Assertions.assertTrue(started.await(10, TimeUnit.SECONDS));
+        caller.interrupt();
+        caller.join(10_000);
+        callerStillWaiting = caller.isAlive();
+      } finally {
+        interrupted.countDown();
+      }
+      Assertions.assertFalse(callerStillWaiting, "the caller kept waiting after the interrupt");
+      Assertions.assertNotNull(failure.get(), "the caller returned without an exception");
+      Assertions.assertInstanceOf(
+          InterruptedException.class, Throwables.getRootCause(failure.get()));
+      Assertions.assertTrue(stillInterrupted.get());
       Mockito.verify(late, Mockito.timeout(10_000)).close();
     }
   }

@@ -30,10 +30,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -42,12 +44,14 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosAuthUtils;
 import org.apache.gravitino.catalog.hadoop.auth.KerberosClient;
 import org.apache.gravitino.catalog.hadoop.fs.kerberos.AuthenticationConfig;
@@ -58,6 +62,7 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.fs.RawLocalFileSystem;
 import org.apache.hadoop.security.UserGroupInformation;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
@@ -72,6 +77,12 @@ public class TestHDFSFileSystemProxy {
           AuthenticationConfig.AUTH_TYPE_KEY, "kerberos",
           KerberosConfig.PRINCIPAL_KEY, "test@EXAMPLE.COM",
           KerberosConfig.KEY_TAB_URI_KEY, "file:///tmp/test.keytab");
+
+  // Running the shutdown hook hands over every later keytab file. No other test may see that.
+  @AfterEach
+  void resetKeytabHandOver() {
+    HDFSFileSystemProxy.resetKeytabFilesHandedOver();
+  }
 
   @Test
   public void testClosingFileSystemStopsKerberosTicketRefresh(@TempDir File keytabDir)
@@ -105,6 +116,28 @@ public class TestHDFSFileSystemProxy {
       assertThrows(
           GravitinoRuntimeException.class,
           () -> new HDFSFileSystemProxy(new Path("nosuchfs:///"), KERBEROS_CONFIG));
+      verify(client, times(1)).close();
+      assertFalse(keytabs.get(0).exists());
+    }
+  }
+
+  @Test
+  public void testFileSystemCreationErrorAfterLoginStopsKerberosTicketRefresh(
+      @TempDir File keytabDir) throws Exception {
+    Map<String, String> config =
+        ImmutableMap.<String, String>builder()
+            .putAll(KERBEROS_CONFIG)
+            .put("fs.errorfs.impl", ErrorOnInitializeFileSystem.class.getName())
+            .build();
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+
+      assertThrows(
+          NoClassDefFoundError.class,
+          () -> new HDFSFileSystemProxy(new Path("errorfs:///"), config));
       verify(client, times(1)).close();
       assertFalse(keytabs.get(0).exists());
     }
@@ -211,6 +244,68 @@ public class TestHDFSFileSystemProxy {
         assertFalse(isDeletedOnExit(keytabs.get(0)));
       } finally {
         open.close();
+      }
+    }
+  }
+
+  @Test
+  public void testKeytabFileRecordedAfterTheCleanerRanIsDeletedOnExit(@TempDir File keytabDir)
+      throws Exception {
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      FileSystem first = new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+      try {
+        HDFSFileSystemProxy.keytabCleaner().run();
+        // As if another shutdown hook opened a Kerberos fileset after the cleaner ran.
+        try (FileSystem second =
+            new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy()) {
+          assertTrue(isDeletedOnExit(keytabs.get(1)));
+        }
+      } finally {
+        first.close();
+      }
+    }
+  }
+
+  @Test
+  public void testKeytabFilesAreDeletedOnExitWhenTheCleanerCannotBeAdded(@TempDir File keytabDir)
+      throws Exception {
+    // As if the JVM began to shut down before the first Kerberos login of this class loader could
+    // add the cleaner.
+    Runtime runtime = spy(Runtime.getRuntime());
+    Mockito.doThrow(new IllegalStateException("Shutdown in progress"))
+        .when(runtime)
+        .addShutdownHook(
+            argThat(hook -> hook != null && "gravitino-keytab-cleaner".equals(hook.getName())));
+    AtomicReference<Thread> cleaner = keytabCleanerReference();
+    KerberosClient client = mockLoggedInClient();
+    try (MockedStatic<KerberosClient> clients = mockStatic(KerberosClient.class);
+        MockedStatic<KerberosAuthUtils> authUtils = mockStatic(KerberosAuthUtils.class)) {
+      stubKerberosLogin(clients, client);
+      List<File> keytabs = stubKeytabFetch(authUtils, keytabDir);
+      // Its keytab is in the set when adding the cleaner fails, like that of a concurrent login
+      // that lost the race to add it, so only a hand-over of the set registers it.
+      try (FileSystem open =
+          new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy()) {
+        assertFalse(isDeletedOnExit(keytabs.get(0)));
+        Thread registered = cleaner.getAndSet(null);
+        try (MockedStatic<Runtime> runtimes =
+            mockStatic(Runtime.class, Mockito.CALLS_REAL_METHODS)) {
+          runtimes.when(Runtime::getRuntime).thenReturn(runtime);
+          try (FileSystem first =
+                  new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy();
+              FileSystem second =
+                  new HDFSFileSystemProxy(new Path("file:///"), KERBEROS_CONFIG).getProxy()) {
+            assertTrue(isDeletedOnExit(keytabs.get(0)));
+            assertTrue(isDeletedOnExit(keytabs.get(1)));
+            assertTrue(isDeletedOnExit(keytabs.get(2)));
+          }
+        } finally {
+          cleaner.set(registered);
+        }
       }
     }
   }
@@ -351,6 +446,13 @@ public class TestHDFSFileSystemProxy {
     return builder;
   }
 
+  @SuppressWarnings("unchecked")
+  private static AtomicReference<Thread> keytabCleanerReference() throws Exception {
+    Field field = HDFSFileSystemProxy.class.getDeclaredField("KEYTAB_CLEANER");
+    field.setAccessible(true);
+    return (AtomicReference<Thread>) field.get(null);
+  }
+
   // Whether java.io.DeleteOnExitHook deletes the file at JVM exit. Needs --add-opens
   // java.base/java.io, which the Gradle test task passes.
   private static boolean isDeletedOnExit(File file) throws Exception {
@@ -398,6 +500,17 @@ public class TestHDFSFileSystemProxy {
     public void close() throws IOException {
       CLOSED.incrementAndGet();
       super.close();
+    }
+  }
+
+  /**
+   * A file system whose initialization fails with an error, for example from a class that a
+   * released catalog class loader can no longer load.
+   */
+  public static final class ErrorOnInitializeFileSystem extends RawLocalFileSystem {
+    @Override
+    public void initialize(URI uri, Configuration conf) throws IOException {
+      throw new NoClassDefFoundError("org/example/Missing");
     }
   }
 }

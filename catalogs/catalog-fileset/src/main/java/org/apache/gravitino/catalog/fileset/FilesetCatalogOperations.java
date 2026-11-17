@@ -367,7 +367,18 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       this.fileSystemCache = cacheBuilder.build();
     }
 
-    this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    try {
+      this.catalogStorageLocations = getAndCheckCatalogStorageLocations(config);
+    } catch (RuntimeException | Error e) {
+      // A catalog keeps no operations whose initialization failed, so nothing else closes the file
+      // systems created to check the locations.
+      try {
+        close();
+      } catch (IOException | RuntimeException closeFailure) {
+        e.addSuppressed(closeFailure);
+      }
+      throw e;
+    }
 
     // Metrics System could be null in UT.
     if (metricsSystem != null) {

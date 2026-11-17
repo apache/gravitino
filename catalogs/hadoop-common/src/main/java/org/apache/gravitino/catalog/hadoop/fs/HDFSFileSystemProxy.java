@@ -69,6 +69,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   // would keep the path of every proxy ever created.
   private static final Set<File> LIVE_KEYTAB_FILES = ConcurrentHashMap.newKeySet();
   private static final AtomicReference<Thread> KEYTAB_CLEANER = new AtomicReference<>();
+  // Set once the shutdown hook has handed LIVE_KEYTAB_FILES over, or when the JVM is shutting
+  // down and the hook cannot be added. Files recorded after that go to File.deleteOnExit directly.
+  private static volatile boolean keytabFilesHandedOver;
 
   @Nullable private KerberosClient kerberosClient;
   @Nullable private File keytabFile;
@@ -130,6 +133,9 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
     } catch (Exception e) {
       close();
       throw new GravitinoRuntimeException(e, "Failed to create HDFS FileSystem with UGI: %s", path);
+    } catch (Error e) {
+      close();
+      throw e;
     }
   }
 
@@ -254,20 +260,14 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         LOG.warn("Failed to delete the keytab file {}", keytabFile, e);
         // Deleted at exit instead. The shutdown hook would hand it over too, but a catalog class
         // loader removes that hook when it is closed. Only failed deletes get here.
-        try {
-          keytabFile.deleteOnExit();
-        } catch (RuntimeException ex) {
-          LOG.warn("Failed to delete the keytab file {} on exit", keytabFile, ex);
-        }
+        deleteOnExit(keytabFile);
       }
       keytabFile = null;
     }
   }
 
   private synchronized void recordKeytabFile(File file) {
-    if (keytabFile != null) {
-      LIVE_KEYTAB_FILES.remove(keytabFile);
-    }
+    File previous = keytabFile;
     keytabFile = file;
     if (KEYTAB_CLEANER.get() == null) {
       Thread cleaner =
@@ -279,17 +279,41 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
         try {
           Runtime.getRuntime().addShutdownHook(cleaner);
         } catch (IllegalStateException e) {
-          LOG.warn("The JVM is shutting down, {} is not deleted on exit", file);
+          // The JVM is shutting down, so no hook will hand the files over.
+          deleteLiveKeytabFilesOnExit();
         }
       }
     }
-    LIVE_KEYTAB_FILES.add(file);
+    // The hook sets the flag and goes through the set under the same LIVE_KEYTAB_FILES lock, so
+    // either the hook sees the file or this method sees the flag.
+    synchronized (LIVE_KEYTAB_FILES) {
+      if (previous != null) {
+        LIVE_KEYTAB_FILES.remove(previous);
+      }
+      LIVE_KEYTAB_FILES.add(file);
+      if (keytabFilesHandedOver) {
+        deleteOnExit(file);
+      }
+    }
+  }
+
+  private static void deleteOnExit(File file) {
+    try {
+      file.deleteOnExit();
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to delete the keytab file {} on exit", file, e);
+    }
   }
 
   @VisibleForTesting
   @Nullable
   static Thread keytabCleaner() {
     return KEYTAB_CLEANER.get();
+  }
+
+  @VisibleForTesting
+  static void resetKeytabFilesHandedOver() {
+    keytabFilesHandedOver = false;
   }
 
   @VisibleForTesting
@@ -300,7 +324,10 @@ public class HDFSFileSystemProxy implements MethodInterceptor {
   // Shutdown hooks run concurrently, and the server's own hook still closes file systems that may
   // log in again. File.deleteOnExit deletes the files after all shutdown hooks finish.
   private static void deleteLiveKeytabFilesOnExit() {
-    LIVE_KEYTAB_FILES.forEach(File::deleteOnExit);
+    synchronized (LIVE_KEYTAB_FILES) {
+      keytabFilesHandedOver = true;
+      LIVE_KEYTAB_FILES.forEach(HDFSFileSystemProxy::deleteOnExit);
+    }
   }
 
   /**
