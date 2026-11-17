@@ -34,7 +34,12 @@ Apache Iceberg
 Copyright 2017-2026 The Apache Software Foundation
 
 Apache Kafka
-Copyright 2026 The Apache Software Foundation
+Copyright 2011-2023 The Apache Software Foundation
+Apache Kafka (kafka-clients)
+Copyright 2026 The Apache Software Foundation.
+This project contains the following code copied from Apache Hadoop:
+clients/src/main/java/org/apache/kafka/common/utils/PureJavaCrc32C.java
+Some portions of this file Copyright (c) 2004-2006 Intel Corporation and licensed under the BSD license.
 
 Objenesis
 Copyright 2006-2022 Joe Walnes, Henri Tremblay, Leonardo Mesquita

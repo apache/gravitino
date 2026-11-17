@@ -389,6 +389,7 @@
    Jetty SSLEngine
    JJWT
    LZ4 and XxHash
+   LZ4 Java (at.yawk.lz4 fork)
    Prometheus Java Simpleclient
    Snappy Java
    XNIO API
@@ -443,6 +444,8 @@
    ParaNamer
    RE2/J
    ZSTD JNI
+   LZ4 native library and xxHash (bundled in LZ4 Java, see licenses/lz4.txt)
+   Zstandard native library (bundled in ZSTD JNI, see licenses/zstd-native.txt)
    fsspec
    Google auth HTTP
    Google auth Credentials
@@ -553,6 +556,11 @@
    For the Schubfach license text, see licenses/Schubfach.txt.
 
 For the BSD license of OGNL shaded in MyBatis, see licenses/mybatis-ognl.txt.
+
+For the BSD licenses of the native LZ4 and xxHash code bundled in LZ4 Java, see licenses/lz4.txt.
+
+For the BSD license of the ZSTD JNI wrapper, see licenses/zstd.txt. For the BSD license of the
+   native Zstandard code it bundles, see licenses/zstd-native.txt.
 
 For the license texts of code included in Apache Commons Math 3.1.1,
    see licenses/commons-math3.txt.
