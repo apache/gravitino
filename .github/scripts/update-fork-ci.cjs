@@ -14,7 +14,7 @@
  */
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
-const { latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
+const { NEEDS_ATTENTION, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
 const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
@@ -108,20 +108,25 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
     refreshed.add(pr.number);
     const mirror = await service.mirror(pr);
     const { result, run } = mirror;
-    const target = run ? runUrl(mirror.owner, mirror.repo, run, mirror.trusted && mirror.fork) : waitingUrl(pr);
+    const target = run ? runUrl(mirror.owner, mirror.repo, run, mirror.trusted && mirror.fork, pr.base) : waitingUrl(pr);
     // Re-read before publishing so a push or retarget during the API calls cannot get a stale success.
     const { data: current } = await github.rest.pulls.get({ ...context.repo, pull_number: pr.number });
     if (current.head.sha !== pr.head.sha || current.base.sha !== pr.base.sha || current.base.ref !== pr.base.ref || current.state !== 'open') return;
     // Signals and sweeps can publish concurrently. Read the status last and never replace a newer
-    // attempt of a run from the same repository, or a completed result with a running one. Any
+    // attempt of a run from the same repository and base context, or a completed result with a running one. Any
     // remaining interleaving is repaired by the next pass, which compares the status with the runs.
     const latest = await forkStatus(pr);
     const shown = parseRunUrl(latest?.target_url);
-    // A run already shown for this commit still exists; a listing that missed it is incomplete.
-    if (!run && shown) return;
-    if (run && shown && shown.owner === mirror.owner && shown.repo === mirror.repo && (shown.run_id > run.id ||
+    // Ordering applies within the same base context. A retarget may select an older
+    // trusted run (or none), so a result for the previous base cannot suppress it.
+    const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
+    // A run already shown for this context still exists; a listing that missed it is incomplete.
+    if (!run && shown && sameBase) return;
+    if (run && shown && sameBase && shown.owner === mirror.owner && shown.repo === mirror.repo && (shown.run_id > run.id ||
         (shown.run_id === run.id && (shown.run_attempt > run.run_attempt ||
           (shown.run_attempt === run.run_attempt && statusCompleted(latest) && result.status !== 'completed'))))) return;
+    // Commit-status descriptions are short; retain the detailed recovery instructions in the publisher log.
+    if (result.note) core.info(`Fork CI #${pr.number}: ${result.note}`);
     await publishStatus({ github, repo: context.repo, sha: pr.head.sha, context: 'Fork CI',
       state: statusState(result), description: describe(result, mirror), targetUrl: target, previous: latest ?? null });
   }
@@ -171,7 +176,11 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       probed++;
       await visit(pr, async () => {
         const latest = await forkStatus(pr);
-        if (latest && statusCompleted(latest) && pr.head.repo) {
+        // Incomplete/mismatched jobs may become consistent without another run or attempt.
+        // Retry these attention results within the normal sweep budget, while authoritative
+        // failures/cancellations and successes retain the cheap settled-run probe.
+        const retry = latest?.state === 'error' && latest.description?.startsWith(NEEDS_ATTENTION);
+        if (latest && !retry && statusCompleted(latest) && pr.head.repo) {
           const shown = parseRunUrl(latest.target_url);
           // A fork without fork-ci.yml (404) has no run to watch; its status already says so.
           const fork = (await service.findRun(pr, false).catch(error => {
@@ -185,7 +194,10 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
             : shown.trusted ? same(trusted, shown.run_id, shown.run_attempt) &&
               (fork ? same(fork, shown.fork_run_id, shown.fork_run_attempt) : !shown.fork_run_id)
               : same(fork, shown.run_id, shown.run_attempt) && !trusted;
-          if (settled) return;
+          // Legacy links have no context proof and are refreshed once. The rewritten
+          // link restores cheap probing, including after a missed retarget signal.
+          const sameBase = shown?.base_sha === pr.base.sha && shown?.base_ref === pr.base.ref;
+          if (settled && (!shown || sameBase)) return;
         }
         await refresh(pr);
       });
