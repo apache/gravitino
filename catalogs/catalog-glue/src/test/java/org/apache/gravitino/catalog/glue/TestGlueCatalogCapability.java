@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.glue;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.gravitino.connector.capability.Capability;
@@ -69,5 +71,24 @@ class TestGlueCatalogCapability {
     // Iceberg keeps the case of column names; Hive-format names are folded by the catalog itself.
     CapabilityResult result = capability.caseSensitiveOnName(Capability.Scope.COLUMN);
     assertTrue(result.supported());
+  }
+
+  @Test
+  void testCaseSensitiveOnNameRejectsNullScope() {
+    assertThrows(IllegalArgumentException.class, () -> capability.caseSensitiveOnName(null));
+  }
+
+  @Test
+  void testNoSwitchOnEnumSyntheticClass() {
+    // Verifies that the if/else rewrite eliminated the compiler-generated $1 switch-map class.
+    // If switch-on-enum were still present, javac would produce GlueCatalogCapability$1.class,
+    // which is loaded lazily on the first switch execution by the defining IsolatedClassLoader.
+    // Closing that classloader before the first switch call would then cause a permanent
+    // NoClassDefFoundError. The absence of $1 confirms this trigger is eliminated.
+    String syntheticClassResource =
+        GlueCatalogCapability.class.getName().replace('.', '/') + "$1.class";
+    assertNull(
+        GlueCatalogCapability.class.getClassLoader().getResource(syntheticClassResource),
+        "GlueCatalogCapability$1 switch-map class must not exist after if/else rewrite");
   }
 }

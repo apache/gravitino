@@ -220,7 +220,9 @@ public class DomainAuthorizationIT extends DomainIT {
     try (GravitinoAdminClient readerClient = userClient("object_reader")) {
       GravitinoMetalake reader = readerClient.loadMetalake(metalake.name());
       DomainMember[] visible =
-          reader.getDomain(parent.name()).listMembers(DomainMemberFilter.builder().build());
+          reader
+              .getDomain(parent.name())
+              .listMembers(DomainMemberFilter.builder().withExpand(true).build());
       assertEquals(1, visible.length);
       assertEquals("ice.schema.orders", visible[0].object().fullName());
       assertEquals(DomainRelation.Type.INHERITED, visible[0].relations()[0].type());
@@ -233,12 +235,16 @@ public class DomainAuthorizationIT extends DomainIT {
           0,
           reader
               .getDomain(parent.name())
-              .listMembers(DomainMemberFilter.builder().withDomains(child.name()).build())
+              .listMembers(
+                  DomainMemberFilter.builder().withExpand(true).withDomains(child.name()).build())
               .length);
 
       // The draft child must not contribute a roll-up relation before publication.
       child.publish();
-      visible = reader.getDomain(parent.name()).listMembers(DomainMemberFilter.builder().build());
+      visible =
+          reader
+              .getDomain(parent.name())
+              .listMembers(DomainMemberFilter.builder().withExpand(true).build());
       assertEquals(
           Set.of(DomainRelation.Type.INHERITED, DomainRelation.Type.VIA_SUBDOMAIN),
           Arrays.stream(visible[0].relations())
@@ -255,7 +261,9 @@ public class DomainAuthorizationIT extends DomainIT {
       // A visible object's hidden child relation must disappear without hiding parent membership.
       grant("object_reader", List.of(scope(child.name(), Privileges.UseDomain.deny())));
       DomainMember[] parentOnly =
-          reader.getDomain(parent.name()).listMembers(DomainMemberFilter.builder().build());
+          reader
+              .getDomain(parent.name())
+              .listMembers(DomainMemberFilter.builder().withExpand(true).build());
       assertEquals(1, parentOnly.length);
       assertEquals(1, parentOnly[0].relations().length);
       assertEquals(DomainRelation.Type.INHERITED, parentOnly[0].relations()[0].type());
@@ -270,7 +278,10 @@ public class DomainAuthorizationIT extends DomainIT {
                   schemaScope, "orders", List.of(Privileges.SelectTable.deny()))));
       assertEquals(
           0,
-          reader.getDomain(parent.name()).listMembers(DomainMemberFilter.builder().build()).length);
+          reader
+              .getDomain(parent.name())
+              .listMembers(DomainMemberFilter.builder().withExpand(true).build())
+              .length);
       assertThrows(ForbiddenException.class, () -> readerTable.supportsDomains().listDomains());
     }
   }
@@ -365,7 +376,8 @@ public class DomainAuthorizationIT extends DomainIT {
         Domain snapshot = reader.getDomain(child.name());
         // USE_DOMAIN keeps reads available even when management is explicitly denied.
         assertEquals(child.name(), snapshot.name());
-        assertEquals(0, snapshot.listMembers(DomainMemberFilter.builder().build()).length);
+        assertEquals(
+            0, snapshot.listMembers(DomainMemberFilter.builder().withExpand(true).build()).length);
         assertEquals(0, snapshot.listSubdomains().length);
         assertEquals(0, snapshot.listSubdomainsInfo().length);
         assertThrows(

@@ -61,11 +61,12 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
-import org.apache.gravitino.storage.relational.po.TablePO;
+import org.apache.gravitino.storage.relational.po.TableNamePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -107,7 +108,6 @@ public class MetadataObjectService {
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =
       ImmutableMap.<MetadataObject.Type, BasePOStorageOps<?, ?>>builder()
           .put(MetadataObject.Type.SCHEMA, SchemaMetaService.getInstance().ops())
-          .put(MetadataObject.Type.TABLE, TableMetaService.getInstance().ops())
           .put(MetadataObject.Type.VIEW, ViewMetaService.getInstance().ops())
           .put(MetadataObject.Type.FUNCTION, FunctionMetaService.getInstance().ops())
           .build();
@@ -432,40 +432,19 @@ public class MetadataObjectService {
       return Maps.newHashMap();
     }
 
-    @SuppressWarnings("unchecked")
-    BasePOStorageOps<TablePO, TableMetaMapper> ops =
-        (BasePOStorageOps<TablePO, TableMetaMapper>)
-            TYPE_TO_STORAGE_OPS_MAP.get(MetadataObject.Type.TABLE);
-    List<TablePO> tablePOs =
+    List<TableNamePO> tables =
         SessionUtils.getWithoutCommit(
-            TableMetaMapper.class, mapper -> ops.listPOs(mapper, tableIds));
-
-    if (tablePOs == null || tablePOs.isEmpty()) {
-      return Maps.newHashMap();
+            TableMetaMapper.class, mapper -> mapper.listTableNamesByIds(tableIds));
+    Map<Long, String> tableIdAndNameMap = new HashMap<>();
+    String separator = HierarchicalSchemaUtil.schemaSeparator();
+    for (TableNamePO table : tables) {
+      String fullName = null;
+      if (table.getCatalogName() != null && table.getSchemaName() != null) {
+        String schema = HierarchicalSchemaUtil.physicalToLogical(table.getSchemaName(), separator);
+        fullName = DOT_JOINER.join(table.getCatalogName(), schema, table.getTableName());
+      }
+      tableIdAndNameMap.put(table.getTableId(), fullName);
     }
-
-    List<Long> schemaIds = tablePOs.stream().map(TablePO::getSchemaId).collect(Collectors.toList());
-
-    Map<Long, String> schemaIdAndNameMap = getSchemaObjectsFullName(schemaIds);
-
-    HashMap<Long, String> tableIdAndNameMap = new HashMap<>();
-
-    tablePOs.forEach(
-        tablePO -> {
-          // since the schema can be deleted, we need to check the null value,
-          // and when schema is deleted, we will set fullName of tablePO to
-          // null
-          String schemaName = schemaIdAndNameMap.getOrDefault(tablePO.getSchemaId(), null);
-          if (schemaName == null) {
-            LOG.warn("The schema of table {} may be deleted", tablePO.getTableId());
-            tableIdAndNameMap.put(tablePO.getTableId(), null);
-            return;
-          }
-
-          String fullName = DOT_JOINER.join(schemaName, tablePO.getTableName());
-          tableIdAndNameMap.put(tablePO.getTableId(), fullName);
-        });
-
     return tableIdAndNameMap;
   }
 

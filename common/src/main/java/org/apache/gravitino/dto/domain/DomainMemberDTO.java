@@ -27,7 +27,7 @@ import org.apache.gravitino.domain.DomainMember;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 
-/** A recorded leaf member and all its relations to the queried domain. */
+/** A recorded member and all its relations to the queried domain. */
 @Getter
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class DomainMemberDTO {

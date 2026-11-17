@@ -123,6 +123,7 @@ dependencies {
   testImplementation(libs.metrics.core)
   testImplementation(libs.minikdc)
   testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
   testImplementation(libs.mysql.driver)
   testImplementation(libs.postgresql.driver)
   testImplementation(libs.sqlite.jdbc)
