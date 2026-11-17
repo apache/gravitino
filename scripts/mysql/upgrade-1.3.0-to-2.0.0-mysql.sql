@@ -925,32 +925,32 @@ CREATE TABLE IF NOT EXISTS `domain_rel` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'domain parent relation';
 
 CREATE TABLE IF NOT EXISTS glossary_term_meta (
-    term_id BIGINT NOT NULL PRIMARY KEY,
-    metalake_id BIGINT NOT NULL,
-    name VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
-    name_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL,
-    definition MEDIUMTEXT,
-    status VARCHAR(16) NOT NULL,
-    links MEDIUMTEXT NOT NULL,
-    source_ref VARCHAR(128) COLLATE utf8mb4_bin,
+    term_id BIGINT NOT NULL PRIMARY KEY COMMENT 'globally unique glossary term id',
+    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
+    name VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT 'glossary term display name, preserving case and internal whitespace',
+    name_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'lookup and uniqueness key: trimmed, whitespace-collapsed and lowercased name',
+    definition MEDIUMTEXT COMMENT 'optional glossary term definition',
+    status VARCHAR(16) NOT NULL COMMENT 'glossary term status: DRAFT, APPROVED or DEPRECATED',
+    links MEDIUMTEXT NOT NULL COMMENT 'documentation links as a JSON array of label and URL pairs',
+    source_ref VARCHAR(128) COLLATE utf8mb4_bin COMMENT 'optional external source identifier, case and trailing spaces are significant',
     -- MySQL 5.7 collations pad spaces. The binary key preserves exact source references.
-    source_ref_key VARBINARY(512) GENERATED ALWAYS AS (CAST(source_ref AS BINARY)) STORED,
-    properties MEDIUMTEXT NOT NULL,
-    audit_info MEDIUMTEXT NOT NULL,
-    current_version BIGINT NOT NULL DEFAULT 1,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
+    source_ref_key VARBINARY(512) GENERATED ALWAYS AS (CAST(source_ref AS BINARY)) STORED COMMENT 'generated binary source reference key for exact uniqueness, including trailing spaces',
+    properties MEDIUMTEXT NOT NULL COMMENT 'glossary term properties as a JSON object',
+    audit_info MEDIUMTEXT NOT NULL COMMENT 'glossary term audit info as a JSON object',
+    current_version BIGINT NOT NULL DEFAULT 1 COMMENT 'glossary term revision, starting at 1 and incremented on update or overwrite',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'soft deletion time in epoch milliseconds, 0 means live',
     -- NULL exempts deleted generations from uniqueness, even at the same deletion time.
-    live_row INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED,
+    live_row INT GENERATED ALWAYS AS (CASE WHEN deleted_at = 0 THEN 1 ELSE NULL END) STORED COMMENT 'generated live-row discriminator: 1 for live, NULL for deleted, only live rows reserve unique keys',
     CONSTRAINT uk_glossary_name UNIQUE (metalake_id, name_key, live_row),
     CONSTRAINT uk_glossary_source UNIQUE (metalake_id, source_ref_key, live_row)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term definitions';
 
 CREATE TABLE IF NOT EXISTS glossary_term_synonym (
-    term_id BIGINT NOT NULL,
-    metalake_id BIGINT NOT NULL,
-    synonym VARCHAR(128) COLLATE utf8mb4_bin NOT NULL,
-    synonym_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL,
-    deleted_at BIGINT NOT NULL DEFAULT 0,
+    term_id BIGINT NOT NULL COMMENT 'globally unique glossary term id',
+    metalake_id BIGINT NOT NULL COMMENT 'owning metalake id',
+    synonym VARCHAR(128) COLLATE utf8mb4_bin NOT NULL COMMENT 'glossary term synonym display name',
+    synonym_key VARCHAR(384) COLLATE utf8mb4_bin NOT NULL COMMENT 'synonym lookup key: trimmed, whitespace-collapsed and lowercased synonym',
+    deleted_at BIGINT NOT NULL DEFAULT 0 COMMENT 'soft deletion time in epoch milliseconds, 0 means live',
     PRIMARY KEY (term_id, synonym_key, deleted_at),
     KEY idx_glossary_synonym (metalake_id, synonym_key, deleted_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'glossary term synonyms, different terms may share the same synonym';

@@ -1443,3 +1443,24 @@ CREATE TABLE IF NOT EXISTS glossary_term_synonym (
     PRIMARY KEY (term_id, synonym_key, deleted_at)
 );
 CREATE INDEX IF NOT EXISTS idx_glossary_synonym ON glossary_term_synonym (metalake_id, synonym_key, deleted_at);
+
+COMMENT ON TABLE glossary_term_meta IS 'glossary term definitions';
+COMMENT ON COLUMN glossary_term_meta.term_id IS 'globally unique glossary term id';
+COMMENT ON COLUMN glossary_term_meta.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_meta.name IS 'glossary term display name, preserving case and internal whitespace';
+COMMENT ON COLUMN glossary_term_meta.name_key IS 'lookup and uniqueness key: trimmed, whitespace-collapsed and lowercased name';
+COMMENT ON COLUMN glossary_term_meta.definition IS 'optional glossary term definition';
+COMMENT ON COLUMN glossary_term_meta.status IS 'glossary term status: DRAFT, APPROVED or DEPRECATED';
+COMMENT ON COLUMN glossary_term_meta.links IS 'documentation links as a JSON array of label and URL pairs';
+COMMENT ON COLUMN glossary_term_meta.source_ref IS 'optional external source identifier, case and trailing spaces are significant';
+COMMENT ON COLUMN glossary_term_meta.properties IS 'glossary term properties as a JSON object';
+COMMENT ON COLUMN glossary_term_meta.audit_info IS 'glossary term audit info as a JSON object';
+COMMENT ON COLUMN glossary_term_meta.current_version IS 'glossary term revision, starting at 1 and incremented on update or overwrite';
+COMMENT ON COLUMN glossary_term_meta.deleted_at IS 'soft deletion time in epoch milliseconds, 0 means live';
+
+COMMENT ON TABLE glossary_term_synonym IS 'glossary term synonyms, different terms may share the same synonym';
+COMMENT ON COLUMN glossary_term_synonym.term_id IS 'globally unique glossary term id';
+COMMENT ON COLUMN glossary_term_synonym.metalake_id IS 'owning metalake id';
+COMMENT ON COLUMN glossary_term_synonym.synonym IS 'glossary term synonym display name';
+COMMENT ON COLUMN glossary_term_synonym.synonym_key IS 'synonym lookup key: trimmed, whitespace-collapsed and lowercased synonym';
+COMMENT ON COLUMN glossary_term_synonym.deleted_at IS 'soft deletion time in epoch milliseconds, 0 means live';
