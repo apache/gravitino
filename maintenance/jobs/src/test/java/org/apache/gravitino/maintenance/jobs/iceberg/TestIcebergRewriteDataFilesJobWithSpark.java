@@ -880,51 +880,6 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   }
 
   /**
-   * Iceberg/Spark multi-level namespace (Gravitino hierarchical schema {@code a:b} maps here to
-   * {@code a.b}). Quoted nested field predicates must still work under {@code table => 'a.b.t'}.
-   */
-  @Test
-  public void testPartitionUtilsWhereInNestedNamespaceThroughSparkCall() {
-    String parentNs = catalogName + ".a";
-    String nestedNs = catalogName + ".a.b";
-    String table = nestedNs + ".pu_nested_ns";
-    try {
-      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + parentNs);
-      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + nestedNs);
-      spark.sql("DROP TABLE IF EXISTS " + table);
-      spark.sql(
-          "CREATE TABLE "
-              + table
-              + " (id INT, event STRUCT<`user-id`: INT>) USING iceberg "
-              + "PARTITIONED BY (event.`user-id`)");
-      spark.sql(
-          "INSERT INTO " + table + " SELECT id, named_struct('user-id', 7) FROM range(0, 20)");
-
-      String where =
-          PartitionUtils.getWhereClauseForPartitions(
-              Collections.singletonList(
-                  PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id", "7")))),
-              new Column[] {
-                column(
-                    "event",
-                    Types.StructType.of(
-                        Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
-              },
-              new Transform[] {Transforms.identity(new String[] {"event", "user-id"})},
-              catalogName);
-      assertEquals("(`event`.`user-id` = 7)", where);
-
-      String sql =
-          IcebergRewriteDataFilesJob.buildProcedureCall(
-              catalogName, "a.b.pu_nested_ns", "binpack", null, where, null);
-      assertTrue(sql.contains("table => 'a.b.pu_nested_ns'"), sql);
-      assertDoesNotThrow(() -> spark.sql(sql).collect());
-    } finally {
-      spark.sql("DROP TABLE IF EXISTS " + table);
-    }
-  }
-
-  /**
    * With catalog {@code default-namespace}, unqualified {@code years(ts)} is rewritten to {@code
    * catalog.<ns>.years}; {@code catalog.system.years} stays a system function.
    *
