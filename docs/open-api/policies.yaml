@@ -482,12 +482,13 @@ components:
       properties:
         <<: *policy-execution-peer-properties
         # Explicit key wins over the YAML merge: orphan cleanup never accepts commitTrigger=true.
+        # Put null in enum (same as domains.yaml parent): OAS 3.0 nullable does not extend enum.
         commitTrigger:
           type: boolean
           nullable: true
-          enum: [false]
+          enum: [false, null]
           description: >
-            Must be false or omitted. Orphan file removal rejects commit-triggered runs.
+            Must be false, null, or omitted. Orphan file removal rejects commit-triggered runs.
         olderThanDays:
           type: integer
           format: int64
