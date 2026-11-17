@@ -157,31 +157,6 @@ public final class TableMaintenanceConfig {
   }
 
   /**
-   * Resolves the TMS job-submit USER when authorization is enabled.
-   *
-   * <p>When {@link Configs#ENABLE_AUTHORIZATION} is {@code false}, returns empty (submitters do not
-   * {@code doAs}). When authorization is enabled, {@link #JOB_SUBMITTER} must be a non-blank name.
-   *
-   * @param config gravitino server config
-   * @return submitter user name, or empty when authorization is disabled
-   * @throws IllegalArgumentException when authorization is enabled and the submitter is missing
-   */
-  public static Optional<String> resolveJobSubmitter(Config config) {
-    if (!config.get(Configs.ENABLE_AUTHORIZATION)) {
-      return Optional.empty();
-    }
-    String submitter = config.get(JOB_SUBMITTER).orElse("").trim();
-    if (submitter.isEmpty()) {
-      throw new IllegalArgumentException(
-          JOB_SUBMITTER.getKey()
-              + " is required when "
-              + Configs.ENABLE_AUTHORIZATION.getKey()
-              + "=true");
-    }
-    return Optional.of(submitter);
-  }
-
-  /**
    * @return expand pool thread count
    */
   public int expandThreads() {

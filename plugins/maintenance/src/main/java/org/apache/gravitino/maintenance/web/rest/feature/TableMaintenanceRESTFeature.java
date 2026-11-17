@@ -100,8 +100,17 @@ public class TableMaintenanceRESTFeature implements Feature {
     }
 
     boolean authorizationEnabled = config.get(Configs.ENABLE_AUTHORIZATION);
-    // When authorization is on, resolveJobSubmitter requires a non-blank jobSubmitter.
-    String jobSubmitter = TableMaintenanceConfig.resolveJobSubmitter(config).orElse(null);
+    String jobSubmitter = null;
+    if (authorizationEnabled) {
+      jobSubmitter = config.get(TableMaintenanceConfig.JOB_SUBMITTER).orElse("").trim();
+      if (jobSubmitter.isEmpty()) {
+        throw new IllegalArgumentException(
+            TableMaintenanceConfig.JOB_SUBMITTER.getKey()
+                + " is required when "
+                + Configs.ENABLE_AUTHORIZATION.getKey()
+                + "=true");
+      }
+    }
 
     TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(config);
     PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
