@@ -135,6 +135,7 @@ spec:
         {{- $pgInitCurrentSchema := include "gravitino.postgresqlInitCurrentSchema" . | trim }}
         {{- $pgInitSslCaSecret := include "gravitino.postgresqlInitSslCaSecretName" . | trim }}
         {{- $pgInitWaitTimeout := .Values.postgresql.init.waitTimeoutSeconds | default 300 }}
+        {{- $pgInitConnectTimeout := .Values.postgresql.init.connectTimeoutSeconds | default 5 }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -152,15 +153,23 @@ spec:
                 exit 1
               fi
               deadline=$((SECONDS + timeout))
+              last_err=""
               while true; do
+                remaining=$((deadline - SECONDS))
+                if [ "$remaining" -lt 1 ]; then
+                  echo "ERROR: timed out after ${timeout}s waiting for PostgreSQL at {{ $pgInitHost }}:$PGPORT/$GRAVITINO_DB" >&2
+                  echo "$last_err" >&2
+                  exit 1
+                fi
                 set +e
-                err=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
+                err=$(timeout "$remaining" env PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -c "SELECT 1" 2>&1)
                 rc=$?
                 set -e
                 if [ "$rc" -eq 0 ]; then
                   break
                 fi
-                if [ "$SECONDS" -ge "$deadline" ]; then
+                last_err="$err"
+                if [ "$rc" -eq 124 ]; then
                   echo "ERROR: timed out after ${timeout}s waiting for PostgreSQL at {{ $pgInitHost }}:$PGPORT/$GRAVITINO_DB" >&2
                   echo "$err" >&2
                   exit 1
@@ -169,7 +178,10 @@ spec:
                 sleep 2
               done
               if [ -n "${PG_CURRENT_SCHEMA:-}" ]; then
-                PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA IF NOT EXISTS \"${PG_CURRENT_SCHEMA}\""
+                schema_exists=$(PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_namespace WHERE nspname = '${PG_CURRENT_SCHEMA}'")
+                if [ "$schema_exists" != "1" ]; then
+                  PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -c "CREATE SCHEMA \"${PG_CURRENT_SCHEMA}\""
+                fi
               fi
               VERSION=$(cat /scripts/version.txt)
               if [ -z "$VERSION" ]; then
@@ -193,7 +205,7 @@ spec:
                 echo "WARNING: Upgrade script failed: $upgrade_file" >&2
                 echo "Continuing with schema script..." >&2 
               fi
-              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -f "$schema_file"
+              PGPASSWORD=$POSTGRES_PASSWORD psql -h {{ $pgInitHost }} -U $POSTGRES_USER -d $GRAVITINO_DB -v ON_ERROR_STOP=1 -f "$schema_file"
           resources:
             {{- toYaml .Values.initResources | nindent 12 }}
           securityContext:
@@ -205,6 +217,8 @@ spec:
               value: {{ include "gravitino.postgresqlInitDatabase" . }}
             - name: PGPORT
               value: {{ $pgInitPort | quote }}
+            - name: PGCONNECT_TIMEOUT
+              value: {{ $pgInitConnectTimeout | quote }}
             {{- if $pgInitSslMode }}
             - name: PGSSLMODE
               value: {{ $pgInitSslMode | quote }}

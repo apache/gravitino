@@ -246,7 +246,7 @@ sslmode for init-postgresql (PGSSLMODE).
 {{- define "gravitino.postgresqlInitSslMode" -}}
 {{- if .Values.postgresql.init.sslMode -}}
 {{- .Values.postgresql.init.sslMode -}}
-{{- else -}}
+{{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
 {{- include "gravitino.entityJdbcSslModeFromUrl" . | trim -}}
 {{- end -}}
 {{- end -}}
@@ -261,7 +261,7 @@ Empty means libpq default (typically public).
 {{- $schema := "" -}}
 {{- if .Values.postgresql.init.currentSchema -}}
 {{- $schema = .Values.postgresql.init.currentSchema | toString | trim -}}
-{{- else -}}
+{{- else if eq (include "gravitino.entityUsesExternalPostgresql" . | trim) "true" -}}
 {{- $schema = include "gravitino.entityJdbcCurrentSchemaFromUrl" . | trim -}}
 {{- end -}}
 {{- if $schema -}}
