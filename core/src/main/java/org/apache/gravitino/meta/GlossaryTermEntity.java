@@ -192,10 +192,18 @@ public final class GlossaryTermEntity implements Entity, HasIdentifier, Auditabl
       value.status = v;
       return this;
     }
-    /** Sets the links. */
+    /**
+     * Sets the links.
+     *
+     * @throws IllegalArgumentException if the array or any link is null
+     */
     public Builder withLinks(TermLink[] v) {
       Preconditions.checkArgument(v != null, "links cannot be null");
-      value.links = v.clone();
+      TermLink[] links = v.clone();
+      for (int i = 0; i < links.length; i++) {
+        Preconditions.checkArgument(links[i] != null, "links[%s] cannot be null", i);
+      }
+      value.links = links;
       return this;
     }
     /** Sets the sourceRef. */

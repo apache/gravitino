@@ -50,6 +50,7 @@ public class TestGlossaryTermEntity {
     assertNullArgument("name", () -> builder().withName(null).build());
     assertNullArgument("synonyms", () -> builder().withSynonyms(null));
     assertNullArgument("links", () -> builder().withLinks(null));
+    assertNullArgument("links[0]", () -> builder().withLinks(new TermLink[] {null}));
     assertNullArgument("properties", () -> builder().withProperties(null));
     assertNullArgument("name", () -> builder().withSynonyms(new String[] {null}).build());
     assertNullArgument("name", () -> GlossaryTermNames.display(null));
