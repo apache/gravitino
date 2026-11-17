@@ -33,6 +33,17 @@ dependencies {
   implementation(libs.kafka.clients)
   implementation(libs.slf4j.api)
 
+  // kafka-clients pulls at.yawk.lz4:lz4-java 1.10.1, which is affected by GHSA-mcr4-qmvw-px4g
+  // (CVE-2026-106451). Declare 1.11.4 as a direct dependency instead of a constraint, so it also
+  // wins in the published POM: a constraint only becomes dependencyManagement there, and Maven
+  // consumers of this artifact would still resolve 1.10.1 through kafka-clients.
+  runtimeOnly(libs.yawk.lz4.java)
+
+  // kafka-clients pulls snappy-java 1.1.10.5, which has known HIGH CVEs. The root build forces the
+  // patched version for the binary distribution, but a force does not reach the published POM, so
+  // declare it directly for Maven consumers as well.
+  runtimeOnly(libs.snappy.java)
+
   testImplementation(project(":api"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
