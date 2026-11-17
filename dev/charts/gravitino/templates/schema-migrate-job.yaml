@@ -1,0 +1,189 @@
+{{- /*
+    Licensed to the Apache Software Foundation (ASF) under one
+    or more contributor license agreements.  See the NOTICE file
+    distributed with this work for additional information
+    regarding copyright ownership.  The ASF licenses this file
+    to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+  */}}
+
+{{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" }}
+{{- $_ := include "gravitino.schemaMigrateSslValidate" . }}
+{{- $engine := include "gravitino.schemaMigrateEngine" . | trim }}
+{{- $dbHost := include "gravitino.schemaMigrateHost" . | trim }}
+{{- $dbPort := include "gravitino.schemaMigratePort" . | trim }}
+{{- $dbName := include "gravitino.schemaMigrateDatabase" . | trim }}
+{{- $pgSchema := include "gravitino.schemaMigrateCurrentSchema" . | trim }}
+{{- $pgSslMode := include "gravitino.schemaMigrateSslMode" . | trim }}
+{{- $sslCaSecret := include "gravitino.schemaMigrateSslCaSecretName" . | trim }}
+{{- $hookWeight := .Values.schema.migrate.hookWeight | default "1" | toString }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ printf "%s-schema-migrate-r%d" .Release.Name .Release.Revision | trunc 63 | trimSuffix "-" }}
+  namespace: {{ include "gravitino.namespace" . }}
+  labels:
+    {{- include "gravitino.labels" . | nindent 4 }}
+    app.kubernetes.io/component: schema-migrate
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: {{ $hookWeight | quote }}
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.schema.migrate.backoffLimit }}
+  activeDeadlineSeconds: {{ .Values.schema.migrate.activeDeadlineSeconds }}
+  ttlSecondsAfterFinished: 600
+  completions: 1
+  parallelism: 1
+  template:
+    metadata:
+      labels:
+        {{- include "gravitino.labels" . | nindent 8 }}
+        app.kubernetes.io/component: schema-migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: sqlfile
+          image: {{ include "gravitino.image" . }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              cp -r /opt/gravitino/scripts/* /tmp/scripts/
+              VERSION=$(ls /opt/gravitino/libs/gravitino-server-* | grep -oP '[0-9]+\.[0-9]+\.[0-9]+'|head -1)
+              echo $VERSION > /tmp/scripts/version.txt
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - mountPath: /tmp/scripts/
+              name: scripts-emptydir
+      containers:
+        - name: schema-migrate
+          {{- if eq $engine "mysql" }}
+          image: {{ include "init-mysql.image" . }}
+          {{- else }}
+          image: {{ include "init-postgresql.image" . }}
+          {{- end }}
+          imagePullPolicy: "{{ .Values.image.pullPolicy }}"
+          command:
+            - /bin/bash
+            - /schema-migrate.sh
+          resources:
+            {{- toYaml .Values.initResources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.initContainerSecurityContext | nindent 12 }}
+          env:
+            - name: DB_ENGINE
+              value: {{ $engine | quote }}
+            - name: DB_HOST
+              value: {{ $dbHost | quote }}
+            - name: DB_PORT
+              value: {{ $dbPort | quote }}
+            - name: GRAVITINO_DB
+              value: {{ $dbName | quote }}
+            - name: SCRIPTS_DIR
+              value: /scripts
+            {{- if eq $engine "mysql" }}
+            {{- if .Values.mysql.enabled }}
+            - name: MYSQL_USER
+              value: root
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-mysql
+                  key: mysql-root-password
+            {{- else }}
+            - name: MYSQL_USER
+              value: {{ .Values.entity.jdbcUser | quote }}
+            - name: MYSQL_PWD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gravitino.schemaMigrateSecretName" . | trim }}
+                  key: {{ .Values.schema.migrate.existingSecretPasswordKey | default "password" }}
+            {{- end }}
+            {{- else }}
+            - name: POSTGRES_USER
+              {{- if .Values.postgresql.enabled }}
+              value: {{ .Values.postgresql.auth.username | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.postgresql.auth.existingSecret }}
+                  name: {{ tpl (.Values.postgresql.auth.existingSecret | toString) . }}
+                  {{- else }}
+                  name: {{ .Release.Name }}-postgresql
+                  {{- end }}
+                  key: password
+              {{- else }}
+              value: {{ .Values.entity.jdbcUser | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "gravitino.schemaMigrateSecretName" . | trim }}
+                  key: {{ .Values.schema.migrate.existingSecretPasswordKey | default "password" }}
+              {{- end }}
+            - name: PGPORT
+              value: {{ $dbPort | quote }}
+            {{- if $pgSslMode }}
+            - name: PGSSLMODE
+              value: {{ $pgSslMode | quote }}
+            {{- end }}
+            {{- if $pgSchema }}
+            - name: PG_CURRENT_SCHEMA
+              value: {{ $pgSchema | quote }}
+            - name: PGOPTIONS
+              value: {{ printf "-c search_path=%s" $pgSchema | quote }}
+            {{- end }}
+            {{- if $sslCaSecret }}
+            - name: PGSSLROOTCERT
+              value: /db-ssl/ca.crt
+            {{- end }}
+            {{- end }}
+          volumeMounts:
+            - mountPath: /scripts
+              name: scripts-emptydir
+            - mountPath: /schema-migrate.sh
+              name: gravitino-conf
+              subPath: schema-migrate.sh
+              readOnly: true
+            {{- if $sslCaSecret }}
+            - name: schema-migrate-ssl
+              mountPath: /db-ssl
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: scripts-emptydir
+          emptyDir: {}
+        - name: gravitino-conf
+          configMap:
+            name: {{ include "gravitino.fullname" . }}
+        {{- if $sslCaSecret }}
+        - name: schema-migrate-ssl
+          secret:
+            secretName: {{ $sslCaSecret }}
+            items:
+              - key: {{ include "gravitino.schemaMigrateSslCaKey" . | trim }}
+                path: ca.crt
+        {{- end }}
+{{- end }}

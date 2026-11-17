@@ -74,7 +74,7 @@ spec:
           volumeMounts:
             - mountPath: /tmp/scripts/
               name: scripts-emptydir
-      {{- if .Values.mysql.enabled }}
+      {{- if eq (include "gravitino.mysqlSchemaInitEnabled" . | trim) "true" }}
         - name: init-mysql
           image: {{ include "init-mysql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"
@@ -125,7 +125,7 @@ spec:
             - mountPath: /scripts
               name: scripts-emptydir
       {{- end }}
-      {{- if .Values.postgresql.enabled }}
+      {{- if eq (include "gravitino.postgresqlSchemaInitEnabled" . | trim) "true" }}
         - name: init-postgresql
           image: {{ include "init-postgresql.image" . }}
           imagePullPolicy: "{{ .Values.image.pullPolicy }}"

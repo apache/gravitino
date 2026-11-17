@@ -69,6 +69,17 @@ Override postgresql.auth.password (or set postgresql.auth.existingSecret)
 before any non-trial deployment.
 {{- end }}
 
+{{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" }}
+
+NOTE: Entity schema migration runs in a pre-install/pre-upgrade Helm hook Job
+(schema.migrate.enabled). Use helm install/upgrade --wait so the Job completes
+before application Pods start. Per-pod init-mysql/init-postgresql schema apply
+is disabled while the hook is enabled.
+{{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
+Set schema.migrate.existingSecret for external database credentials.
+{{- end }}
+{{- end }}
+
 To check pod status:
 
   kubectl get pods --namespace {{ include "gravitino.namespace" . }}

@@ -142,6 +142,19 @@ Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
 Change admin and admin123 to your actual MySQL username and password. \
 Ensure the target MySQL database (gravitino) exists before deployment._
 
+### Schema migration Helm hook (MySQL / PostgreSQL)
+
+For install and upgrade, you can run entity-store schema SQL once per revision in a
+`pre-install` / `pre-upgrade` hook Job instead of per-pod init containers (avoids
+rolling-update races). Enable it with `schema.migrate.enabled=true` and use
+`helm upgrade --install ... --wait` so Helm waits for the Job before rolling Pods.
+
+For external MySQL or PostgreSQL, set `schema.migrate.existingSecret` to a Secret
+that holds the `entity.jdbcUser` password. Optional `schema.dbHost`, `schema.dbPort`,
+and `schema.dbName` override JDBC URL parsing. For PostgreSQL `currentSchema` and
+TLS, use `schema.currentSchema`, `schema.sslMode`, and `schema.ssl.existingSecret`
+as needed.
+
 ### Deploy Gravitino with GCS as Object Store
 
 If your catalog uses Google Cloud Storage (GCS) as the object store, you need to set the `GOOGLE_APPLICATION_CREDENTIALS` environment variable in the container and mount the service account key file.

@@ -115,6 +115,37 @@ postgresql:
     ##
     existingSecret: ""
 
+## Schema migration (Helm hook Job)
+## Runs once per install/upgrade before Pods roll (#11099, #9013).
+## When enabled, per-pod init-mysql / init-postgresql schema apply is skipped.
+##
+schema:
+  migrate:
+    ## @param schema.migrate.enabled Run pre-install/pre-upgrade hook Job for entity DB schema.
+    enabled: false
+    ## @param schema.migrate.backoffLimit Job retries before Helm marks the hook failed.
+    backoffLimit: 3
+    ## @param schema.migrate.activeDeadlineSeconds Hard limit for the migrate Job.
+    activeDeadlineSeconds: 600
+    ## @param schema.migrate.hookWeight helm.sh/hook-weight (lower runs earlier with other hooks).
+    hookWeight: "1"
+    ## @param schema.migrate.existingSecret Password Secret for external MySQL/PostgreSQL (required when no in-chart DB).
+    existingSecret: ""
+    ## @param schema.migrate.existingSecretPasswordKey Key in existingSecret for entity.jdbcUser password.
+    existingSecretPasswordKey: password
+  ## Optional overrides when entity.jdbcUrl is not enough (IPv6, multi-host, and so on).
+  dbHost: ""
+  dbPort: ""
+  dbName: ""
+  ## PostgreSQL libpq sslmode for the migrate Job when using external PostgreSQL.
+  sslMode: ""
+  ## PostgreSQL search_path for the migrate Job (external PostgreSQL).
+  currentSchema: ""
+  ssl:
+    ## @param schema.ssl.existingSecret CA Secret for verify-ca / verify-full (PGSSLROOTCERT).
+    existingSecret: ""
+    caCert: ca.crt
+
 ## THE CONFIGURATION FOR Gravitino ENTITY STORE
 ##
 entity:

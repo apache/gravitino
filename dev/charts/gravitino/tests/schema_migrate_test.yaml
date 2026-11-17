@@ -1,0 +1,158 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+suite: test schema migrate hook job
+templates:
+  - schema-migrate-job.yaml
+  - configmap.yaml
+  - deployment.yaml
+tests:
+  - it: ships schema-migrate.sh in the ConfigMap
+    template: configmap.yaml
+    release:
+      name: gravitino
+    asserts:
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "apply_migrations"
+
+  - it: renders pre-install pre-upgrade hook Job for in-chart PostgreSQL
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - isKind:
+          of: Job
+      - equal:
+          path: metadata.annotations["helm.sh/hook"]
+          value: pre-install,pre-upgrade
+      - equal:
+          path: metadata.annotations["helm.sh/hook-weight"]
+          value: "1"
+      - equal:
+          path: spec.parallelism
+          value: 1
+      - equal:
+          path: spec.template.spec.containers[0].command[1]
+          value: /schema-migrate.sh
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_ENGINE
+            value: postgresql
+
+  - it: skips init-postgresql on Deployment when schema migrate is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-postgresql
+          any: true
+
+  - it: skips init-mysql on Deployment when schema migrate is enabled
+    template: deployment.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      mysql:
+        enabled: true
+    asserts:
+      - notContains:
+          path: spec.template.spec.initContainers
+          content:
+            name: init-mysql
+          any: true
+
+  - it: renders external PostgreSQL migrate Job with operator Secret
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+          existingSecret: gravitino-pg-secret
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino_meta?currentSchema=gravitino&sslmode=require
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DB_HOST
+            value: pg.example.ci.local
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: gravitino-pg-secret
+                key: password
+
+  - it: fails when schema migrate enabled without relational target
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+    asserts:
+      - failedTemplate:
+          errorPattern: "schema.migrate.enabled is true but no relational target"
+
+  - it: fails external PostgreSQL migrate without existingSecret
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+      postgresql:
+        enabled: false
+      entity:
+        jdbcUrl: jdbc:postgresql://pg.example.ci.local:5432/gravitino
+        jdbcDriver: org.postgresql.Driver
+        jdbcUser: gravitino_app
+    asserts:
+      - failedTemplate:
+          errorPattern: "schema.migrate.existingSecret is required"
