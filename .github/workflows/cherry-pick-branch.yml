@@ -17,152 +17,96 @@
 # under the License.
 #
 
-name: Cherry-pick to branch
+name: Cherry-pick to fork
 
 on:
   workflow_call:
     inputs:
       target-branch:
-        description: 'Target branch to cherry-pick to'
         required: true
         type: string
-      commit-sha:
-        description: 'Commit SHA to cherry-pick'
+      task:
+        description: 'Verified source PR, merger, fork and immutable source commit'
         required: true
         type: string
-      commit-message:
-        description: 'Original commit message'
+    secrets:
+      CHERRY_PICK_TOKEN:
+        required: false
+      BACKPORT_APP_PRIVATE_KEY:
         required: true
-        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 jobs:
   cherry-pick:
     runs-on: ubuntu-latest
-    name: Cherry-pick to ${{ inputs.target-branch }}
-    permissions:
-      contents: write
-      pull-requests: write
-      issues: write
+    timeout-minutes: 15
+    name: Cherry-pick to ${{ inputs.target-branch }} in merger fork
+    env:
+      BACKPORT_TASK: ${{ inputs.task }}
+      BACKPORT_TARGET: ${{ inputs.target-branch }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
-          # A PAT (or GitHub App token) is required so that the created PR
-          # triggers downstream CI workflows.  GITHUB_TOKEN-created events
-          # are intentionally ignored by GitHub to prevent recursive runs.
-          token: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
-
-      - name: Set up Git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Cherry-pick commit
-        id: cherry-pick
-        run: |
-          # Fetch all branches
-          git fetch origin
-          
-          # Checkout target branch
-          git checkout ${{ inputs.target-branch }}
-          
-          # Create a new branch for the cherry-pick (use short SHA)
-          SHORT_SHA=$(echo "${{ inputs.commit-sha }}" | cut -c1-8)
-          BRANCH_NAME="cherry-pick-${SHORT_SHA}-to-${{ inputs.target-branch }}"
-          git checkout -b $BRANCH_NAME
-          
-          # Cherry-pick the commit
-          if git cherry-pick ${{ inputs.commit-sha }}; then
-            echo "Cherry-pick successful"
-            echo "success=true" >> $GITHUB_OUTPUT
-            echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-          else
-            echo "Cherry-pick failed, creating conflict PR"
-            echo "success=false" >> $GITHUB_OUTPUT
-            echo "branch-name=$BRANCH_NAME" >> $GITHUB_OUTPUT
-            
-            # Add all files (including conflicts)
-            git add .
-            git commit --no-edit || git commit -m "Cherry-pick ${{ inputs.commit-sha }} to ${{ inputs.target-branch }} (with conflicts)"
-          fi
-
-      - name: Push branch
-        if: steps.cherry-pick.outputs.branch-name != ''
-        run: |
-          git push origin ${{ steps.cherry-pick.outputs.branch-name }}
-
-      - name: Create Pull Request
-        if: steps.cherry-pick.outputs.branch-name != ''
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - name: Authorize only the merger's fork
+        id: token
+        uses: actions/github-script@v7
         env:
-          GH_TOKEN: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
-          COMMIT_MESSAGE: ${{ inputs.commit-message }}
-          TARGET_BRANCH: ${{ inputs.target-branch }}
-          COMMIT_SHA: ${{ inputs.commit-sha }}
-          SUCCESS: ${{ steps.cherry-pick.outputs.success }}
-        run: |
-          # Use original commit message with branch prefix
-          TITLE="[Cherry-pick to ${TARGET_BRANCH}] ${COMMIT_MESSAGE}"
-          LABELS=(cherry-pick)
-
-          # Prepare body with cherry-pick info
-          if [ "${SUCCESS}" = "true" ]; then
-            BODY=$(cat <<'EOF'
-          **Cherry-pick Information:**
-          - Original commit: ${COMMIT_SHA}
-          - Target branch: `${TARGET_BRANCH}`
-          - Status: ✅ Clean cherry-pick (no conflicts)
-          EOF
-          )
-          else
-            # Make conflicts visible in the PR list (title + label), not only in the body.
-            TITLE="[DO NOT MERGE] ${TITLE}"
-            LABELS+=(cherry-pick-conflict)
-
-            BODY=$(cat <<'EOF'
-          **Cherry-pick Information:**
-          - Original commit: ${COMMIT_SHA}
-          - Target branch: `${TARGET_BRANCH}`
-          - Status: ⚠️ **Has conflicts - manual resolution required**
-
-          **Do not merge** until conflict markers are resolved and the
-          `cherry-pick-conflict` label is removed.
-
-          Please review and resolve the conflicts before merging.
-          EOF
-          )
-          fi
-
-          # Replace placeholders with actual values
-          BODY="${BODY//\$\{COMMIT_SHA\}/${COMMIT_SHA}}"
-          BODY="${BODY//\$\{TARGET_BRANCH\}/${TARGET_BRANCH}}"
-
-          # Ensure labels exist (forks may not have them yet).
-          gh label create cherry-pick \
-            --description "Automatically opened cherry-pick PR" \
-            --color 1D76DB \
-            --force >/dev/null 2>&1 || true
-          if [ "${SUCCESS}" != "true" ]; then
-            gh label create cherry-pick-conflict \
-              --description "Cherry-pick has conflicts; needs human resolution before merge" \
-              --color B60205 \
-              --force >/dev/null 2>&1 || true
-          fi
-
-          LABEL_ARGS=()
-          for label in "${LABELS[@]}"; do
-            LABEL_ARGS+=(--label "$label")
-          done
-
-          CREATE_ARGS=(
-            --title "$TITLE"
-            --body "$BODY"
-            --base "${{ inputs.target-branch }}"
-            --head "${{ steps.cherry-pick.outputs.branch-name }}"
-            "${LABEL_ARGS[@]}"
-          )
-          # Reviewer is only valid on apache/gravitino.
-          if [ "${{ github.repository }}" = "apache/gravitino" ]; then
-            CREATE_ARGS+=(--reviewer jerryshao)
-          fi
-          gh pr create "${CREATE_ARGS[@]}" || echo "Failed to create PR, may already exist"
+          APP_ID: ${{ vars.BACKPORT_APP_ID }}
+          APP_PRIVATE_KEY: ${{ secrets.BACKPORT_APP_PRIVATE_KEY }}
+        with:
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').installationToken({
+              appRequest: new github.constructor().request, core, task: JSON.parse(process.env.BACKPORT_TASK),
+              appId: process.env.APP_ID, privateKey: process.env.APP_PRIVATE_KEY });
+      - name: Prepare or reuse the backport branch
+        id: prepare
+        uses: actions/github-script@v7
+        env:
+          FORK_TOKEN: ${{ steps.token.outputs.token }}
+        with:
+          github-token: ${{ steps.token.outputs.token }}
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').prepare({ github, core,
+              task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
+              token: process.env.FORK_TOKEN });
+      - name: Open or reuse the Apache pull request
+        id: pr
+        uses: actions/github-script@v7
+        env:
+          BACKPORT_BRANCH: ${{ steps.prepare.outputs.branch }}
+          BACKPORT_MARKERS: ${{ steps.prepare.outputs.markers }}
+          BACKPORT_CONFLICT: ${{ steps.prepare.outputs.conflict }}
+        with:
+          github-token: ${{ secrets.CHERRY_PICK_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').openPullRequest({ github, core,
+              task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
+              branch: process.env.BACKPORT_BRANCH, conflict: process.env.BACKPORT_CONFLICT === 'true',
+              markers: process.env.BACKPORT_MARKERS === 'true' });
+      - name: Start CI in the fork after the PR exists
+        if: steps.pr.outputs.ready == 'true'
+        uses: actions/github-script@v7
+        env:
+          BACKPORT_BRANCH: ${{ steps.prepare.outputs.branch }}
+          BACKPORT_SHA: ${{ steps.prepare.outputs.sha }}
+          BACKPORT_NUMBER: ${{ steps.pr.outputs.number }}
+        with:
+          github-token: ${{ steps.token.outputs.token }}
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').dispatch({ github, core,
+              task: JSON.parse(process.env.BACKPORT_TASK), target: process.env.BACKPORT_TARGET,
+              branch: process.env.BACKPORT_BRANCH, sha: process.env.BACKPORT_SHA,
+              number: process.env.BACKPORT_NUMBER });
+      - name: Revoke fork credentials
+        if: always() && steps.token.outputs.token != ''
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ steps.token.outputs.token }}
+          script: |
+            await github.request('DELETE /installation/token');

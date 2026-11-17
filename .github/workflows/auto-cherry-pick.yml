@@ -1,100 +1,74 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
 name: Automatically cherry-pick merged PR to different branches
 
 on:
-  push:
-    branches:
-      - main
+  pull_request_target:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: 'Merged main PR to backport or retry using its current release labels'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: backport-${{ github.event.pull_request.number || inputs.pull-request }}
+  cancel-in-progress: false
 
 jobs:
-  detect-cherry-pick-labels:
-    # Contributor forks run workflows for Fork CI; cherry-picks only apply to the
-    # repository the pull requests were merged into.
-    if: ${{ !github.event.repository.fork }}
-    runs-on: ubuntu-latest
-    name: Detect cherry-pick labels from merged PR
+  resolve:
+    if: >-
+      github.repository == 'apache/gravitino' &&
+      (github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true)
+    runs-on: ubuntu-slim
     outputs:
-      branch-1-3: ${{ steps.check-labels.outputs.branch-1-3 }}
-      branch-2-0: ${{ steps.check-labels.outputs.branch-2-0 }}
-      commit-sha: ${{ steps.get-commit.outputs.commit-sha }}
-      commit-message: ${{ steps.get-commit.outputs.commit-message }}
+      targets: ${{ steps.resolve.outputs.targets }}
+      task: ${{ steps.resolve.outputs.task }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          # The privileged coordinator never checks out PR or release-branch code.
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+      - id: resolve
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await require('./.github/scripts/backport-to-fork.cjs').resolve({ github, context, core });
 
-      - name: Get commit info
-        id: get-commit
-        run: |
-          # Get the commit message and extract PR number if available
-          COMMIT_MESSAGE=$(git log -1 --pretty=%B ${{ github.sha }})
-          COMMIT_SUBJECT=$(git log -1 --pretty=%s ${{ github.sha }})
-          echo "Commit: $COMMIT_SUBJECT"
-          
-          PR_NUMBER=$(echo "$COMMIT_SUBJECT" | grep -oE '\(#[0-9]+\)' | tail -1 | grep -oE '[0-9]+')
-          
-          # If not found, try to match any #xxx pattern
-          if [ -z "$PR_NUMBER" ]; then
-            PR_NUMBER=$(echo "$COMMIT_MESSAGE" | grep -oE '#[0-9]+' | tail -1 | sed 's/#//')
-          fi
-          
-          if [ -z "$PR_NUMBER" ]; then
-            echo "No PR number found, will skip label check"
-            echo "pr-number=" >> $GITHUB_OUTPUT
-          else
-            echo "Found PR number: $PR_NUMBER"
-            echo "pr-number=$PR_NUMBER" >> $GITHUB_OUTPUT
-          fi
-          
-          # Save commit info
-          echo "commit-sha=${{ github.sha }}" >> $GITHUB_OUTPUT
-          {
-            echo "commit-message<<EOF"
-            echo "$COMMIT_SUBJECT"
-            echo "EOF"
-          } >> $GITHUB_OUTPUT
-
-      - name: Check PR labels
-        id: check-labels
-        if: steps.get-commit.outputs.pr-number != ''
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          PR_NUMBER=${{ steps.get-commit.outputs.pr-number }}
-          
-          # Get PR labels using GitHub CLI
-          LABELS=$(gh pr view $PR_NUMBER --json labels --jq '.labels[].name' || echo "")
-          echo "PR #$PR_NUMBER labels: $LABELS"
-          
-          # Check for each branch label
-          if echo "$LABELS" | grep -q "branch-1.3"; then
-            echo "branch-1-3=true" >> $GITHUB_OUTPUT
-          else
-            echo "branch-1-3=false" >> $GITHUB_OUTPUT
-          fi
-
-          if echo "$LABELS" | grep -Fxq "branch-2.0"; then
-            echo "branch-2-0=true" >> $GITHUB_OUTPUT
-          else
-            echo "branch-2-0=false" >> $GITHUB_OUTPUT
-          fi
-
-  cherry-pick-branch-1-3:
-    needs: detect-cherry-pick-labels
-    if: needs.detect-cherry-pick-labels.outputs.branch-1-3 == 'true'
+  backport:
+    needs: resolve
+    if: needs.resolve.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.resolve.outputs.targets) }}
     uses: ./.github/workflows/cherry-pick-branch.yml
     with:
-      target-branch: branch-1.3
-      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
-      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
-    secrets: inherit
-
-  cherry-pick-branch-2-0:
-    needs: detect-cherry-pick-labels
-    if: needs.detect-cherry-pick-labels.outputs.branch-2-0 == 'true'
-    uses: ./.github/workflows/cherry-pick-branch.yml
-    with:
-      target-branch: branch-2.0
-      commit-sha: ${{ needs.detect-cherry-pick-labels.outputs.commit-sha }}
-      commit-message: ${{ needs.detect-cherry-pick-labels.outputs.commit-message }}
+      target-branch: ${{ matrix.target }}
+      task: ${{ needs.resolve.outputs.task }}
     secrets: inherit

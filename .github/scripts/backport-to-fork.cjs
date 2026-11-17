@@ -1,0 +1,222 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements. See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License. You may obtain a copy of the License at
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+'use strict';
+const { createPrivateKey, sign } = require('node:crypto');
+const { mkdtempSync, rmSync } = require('node:fs');
+const { tmpdir } = require('node:os');
+const path = require('node:path');
+const { spawnSync } = require('node:child_process');
+const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
+const ROUTING_MARKER = 'Backport fork routing v1';
+const TARGETS = ['branch-1.3', 'branch-2.0'];
+
+// For a rebase merge, merge_commit_sha names only the last rebased commit.
+// GitHub's commit/PR association identifies the merged PR that introduced each
+// default-branch commit. Walk its contiguous first-parent range, not commit text.
+async function mergedChangeBase(github, pr) {
+  let sha = pr.merge_commit_sha;
+  const introducedBySource = async commitSha => {
+    const prs = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
+      { ...UPSTREAM, commit_sha: commitSha, per_page: 100 });
+    return prs.some(candidate => candidate.number === pr.number && candidate.merged_at && candidate.base.ref === 'main');
+  };
+  if (!await introducedBySource(sha)) throw new Error('Source merge attribution is not available yet; retry the coordinator.');
+  for (let count = 0; count < 250; count++) {
+    const { data: commit } = await github.rest.repos.getCommit({ ...UPSTREAM, ref: sha });
+    const parent = commit.parents[0]?.sha;
+    if (!/^[0-9a-f]{40}$/.test(parent || '')) throw new Error('Cannot identify the parent of the merged change.');
+    if (commit.parents.length > 1 || !await introducedBySource(parent)) return parent;
+    sha = parent;
+  }
+  throw new Error('Merged change exceeds 250 commits; prepare this backport manually.');
+}
+
+async function resolve({ github, context, core }) {
+  if (`${context.repo.owner}/${context.repo.repo}` !== 'apache/gravitino') throw new Error('Run backports in apache/gravitino.');
+  const defaultBranch = context.payload.repository.default_branch;
+  if (context.ref !== `refs/heads/${defaultBranch}`) throw new Error('Run the coordinator from the default branch.');
+  const number = context.payload.inputs?.['pull-request'] || context.payload.pull_request?.number;
+  if (!/^[1-9][0-9]*$/.test(String(number))) throw new Error('A source PR number is required.');
+  const { data: pr } = await github.rest.pulls.get({ ...UPSTREAM, pull_number: Number(number) });
+  if (!pr.merged || pr.base.ref !== 'main' || pr.base.repo.full_name !== 'apache/gravitino' ||
+      !/^[0-9a-f]{40}$/.test(pr.merge_commit_sha || '')) throw new Error('The source PR must be merged into apache/gravitino main.');
+  const targets = TARGETS.filter(target => pr.labels.some(label => label.name === target));
+  core.setOutput('targets', JSON.stringify(targets));
+  if (!targets.length) return;
+  const owner = pr.merged_by?.login;
+  if (pr.merged_by?.type !== 'User' || !/^[A-Za-z0-9-]+$/.test(owner || '')) throw new Error('The original merger must be a human account.');
+  let fork;
+  try { fork = (await github.rest.repos.get({ owner, repo: 'gravitino' })).data; }
+  catch (error) {
+    if (error.status !== 404) throw error;
+    throw new Error(`${owner} must create a public gravitino fork and enable Actions before retrying this workflow.`);
+  }
+  if (!fork.fork || fork.source?.full_name !== 'apache/gravitino' || fork.private || fork.archived ||
+      fork.owner.login.toLowerCase() !== owner.toLowerCase()) throw new Error(`${owner}/gravitino must be an active public fork of apache/gravitino.`);
+  const task = { owner, repo: 'gravitino', repositoryId: fork.id, number: pr.number,
+    sha: pr.merge_commit_sha, sourceBaseSha: await mergedChangeBase(github, pr), title: pr.title };
+  core.setOutput('task', JSON.stringify(task));
+}
+
+async function installationToken({ appRequest, core, task, appId, privateKey, now = Date.now() }) {
+  if (!/^[0-9]+$/.test(appId || '') || !privateKey) throw new Error('Configure BACKPORT_APP_ID and BACKPORT_APP_PRIVATE_KEY, and install the App on the merger’s fork.');
+  const encode = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+  const data = `${encode({ alg: 'RS256', typ: 'JWT' })}.${encode({ iat: Math.floor(now / 1000) - 60,
+    exp: Math.floor(now / 1000) + 540, iss: appId })}`;
+  const jwt = `${data}.${sign('RSA-SHA256', Buffer.from(data), createPrivateKey(privateKey)).toString('base64url')}`;
+  core.setSecret(jwt);
+  const headers = { authorization: `Bearer ${jwt}` };
+  let installation;
+  try { installation = (await appRequest('GET /repos/{owner}/{repo}/installation', { owner: task.owner, repo: task.repo, headers })).data; }
+  catch (error) {
+    if (error.status !== 404) throw error;
+    throw new Error(`Install the Backport App on ${task.owner}/${task.repo}, then retry.`);
+  }
+  const { data: token } = await appRequest('POST /app/installations/{installation_id}/access_tokens', {
+    installation_id: installation.id, repository_ids: [task.repositoryId],
+    permissions: { contents: 'write', actions: 'write', workflows: 'write' }, headers
+  });
+  core.setSecret(token.token);
+  core.setOutput('token', token.token);
+}
+
+function git(directory, args, env = {}, allowFailure = false) {
+  const result = spawnSync('git', args, { cwd: directory, env: { ...process.env, ...env }, encoding: 'utf8' });
+  if (result.error) throw result.error;
+  if (result.status !== 0 && !allowFailure) throw new Error(`git ${args[0]} failed: ${result.stderr}`);
+  return result;
+}
+
+// Only Git reads the fetched trees. Never execute code from the release or backport branch.
+function buildCommit({ directory, upstream, baseSha, sourceSha, sourceBaseSha }) {
+  git(directory, ['init', '--quiet']);
+  git(directory, ['config', 'user.name', 'Apache Gravitino Backport']);
+  git(directory, ['config', 'user.email', 'dev@gravitino.apache.org']);
+  git(directory, ['fetch', '--no-tags', upstream, baseSha, sourceSha, ...(sourceBaseSha ? [sourceBaseSha] : [])]);
+  git(directory, ['checkout', '--detach', baseSha]);
+  const parent = sourceBaseSha || git(directory, ['rev-parse', `${sourceSha}^1`]).stdout.trim();
+  const tree = git(directory, ['rev-parse', `${sourceSha}^{tree}`]).stdout.trim();
+  // One synthetic commit represents the complete integrated change for squash,
+  // merge-commit and rebase merges alike; it is never pushed as a source ref.
+  const change = git(directory, ['commit-tree', tree, '-p', parent, '-m', `Integrated change ${sourceSha}`]).stdout.trim();
+  const picked = git(directory, ['cherry-pick', '--no-commit', change], {}, true);
+  const conflicts = git(directory, ['diff', '--name-only', '--diff-filter=U']).stdout.trim();
+  if (picked.status !== 0 && !conflicts) throw new Error(`Cherry-pick failed without merge conflicts: ${picked.stderr}`);
+  git(directory, ['add', '-A']);
+  if (!conflicts && !git(directory, ['diff', '--cached', '--name-only']).stdout.trim()) throw new Error('Cherry-pick is empty; verify whether the change is already backported.');
+  git(directory, ['commit', '--allow-empty', '-m', `Backport ${sourceSha}\n\nBackport-of: ${sourceSha}\nBackport-conflicts: ${!!conflicts}`]);
+  return { conflict: !!conflicts, sha: git(directory, ['rev-parse', 'HEAD']).stdout.trim() };
+}
+
+async function prepare({ github, core, task, target, token }) {
+  if (!TARGETS.includes(target) || !/^[0-9a-f]{40}$/.test(task.sha) || !/^[0-9a-f]{40}$/.test(task.sourceBaseSha)) throw new Error('Invalid backport target or source SHA.');
+  const branch = `backport/pr-${task.number}/${target}`;
+  const { data: base } = await github.rest.repos.getBranch({ ...UPSTREAM, branch: target });
+  // Roll out routing to the release branch before enabling automated fork pushes.
+  for (const file of ['.github/scripts/resolve-fork-ci.cjs', '.github/workflows/fork-ci.yml']) {
+    let contents;
+    try { contents = (await github.rest.repos.getContent({ ...UPSTREAM, ref: base.commit.sha, path: file })).data; }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      throw new Error(`Backport the fork routing support to ${target} first; missing ${file}.`, { cause: error });
+    }
+    if (contents.encoding !== 'base64' || !Buffer.from(contents.content, 'base64').toString().includes(ROUTING_MARKER)) {
+      throw new Error(`Backport the fork routing support to ${target} first; ${file} is not ready. No branch was pushed.`);
+    }
+  }
+  const fork = { owner: task.owner, repo: task.repo };
+  let workflow;
+  try { workflow = (await github.rest.actions.getWorkflow({ ...fork, workflow_id: 'fork-ci.yml' })).data; }
+  catch (error) {
+    if (error.status !== 404) throw error;
+    throw new Error(`Sync the fork's default branch and enable Fork CI in ${task.owner}/${task.repo}, then retry.`, { cause: error });
+  }
+  if (workflow.state !== 'active') throw new Error(`Enable Fork CI in ${task.owner}/${task.repo} before retrying.`);
+  let existing;
+  try { existing = (await github.rest.git.getRef({ ...fork, ref: `heads/${branch}` })).data; }
+  catch (error) { if (error.status !== 404) throw error; }
+  const directory = mkdtempSync(path.join(tmpdir(), 'gravitino-backport-'));
+  try {
+    let result;
+    if (existing) {
+      git(directory, ['init', '--quiet']);
+      git(directory, ['fetch', '--no-tags', 'https://github.com/apache/gravitino.git', base.commit.sha]);
+      git(directory, ['fetch', '--no-tags', `https://github.com/${task.owner}/${task.repo}.git`, existing.object.sha]);
+      const messages = git(directory, ['log', '-n', '100', '--format=%B%x00', existing.object.sha]).stdout;
+      const provenance = messages.split('\0').filter(message => message.split('\n').includes(`Backport-of: ${task.sha}`));
+      if (!provenance.length) throw new Error(`Existing ${branch} lacks this source commit's provenance; refusing to overwrite it.`);
+      // Reuse the branch, including any human conflict-resolution commits.
+      const diff = git(directory, ['diff', '--unified=0', `${base.commit.sha}...${existing.object.sha}`]).stdout;
+      const markers = /^\+(<<<<<<< |>>>>>>> |=======\r?$)/m.test(diff);
+      // Absence of text markers cannot prove binary or modify/delete conflicts resolved.
+      const conflict = provenance.some(message => !message.split('\n').includes('Backport-conflicts: false'));
+      result = { sha: existing.object.sha, conflict: conflict || markers, markers };
+    } else {
+      result = buildCommit({ directory, upstream: 'https://github.com/apache/gravitino.git', baseSha: base.commit.sha, sourceSha: task.sha, sourceBaseSha: task.sourceBaseSha });
+      const header = `AUTHORIZATION: basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`;
+      core.setSecret(header);
+      git(directory, ['push', '--force-with-lease=refs/heads/' + branch + ':',
+        `https://github.com/${task.owner}/${task.repo}.git`, `HEAD:refs/heads/${branch}`],
+        { GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'http.https://github.com/.extraheader', GIT_CONFIG_VALUE_0: header });
+    }
+    for (const [key, value] of Object.entries({ branch, sha: result.sha, conflict: String(result.conflict), markers: String(!!result.markers) })) core.setOutput(key, value);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+}
+
+async function openPullRequest({ github, core, task, target, branch, conflict, markers = false }) {
+  const prs = await github.paginate(github.rest.pulls.list, { ...UPSTREAM, state: 'all',
+    head: `${task.owner}:${branch}`, base: target, per_page: 100 });
+  let pr = prs.find(pr => pr.head.repo?.full_name.toLowerCase() === `${task.owner}/${task.repo}`.toLowerCase());
+  if (pr && pr.state !== 'open') throw new Error(`Backport PR #${pr.number} is already closed; no CI was dispatched.`);
+  // A ready existing PR with its conflict label removed is explicit human acknowledgement.
+  const blocked = markers || (conflict && (!pr || pr.draft || pr.labels?.some(label => label.name === 'cherry-pick-conflict')));
+  if (!pr) {
+    pr = (await github.rest.pulls.create({ ...UPSTREAM, base: target, head: `${task.owner}:${branch}`,
+      title: `${conflict ? '[DO NOT MERGE] ' : ''}[Cherry-pick to ${target}] ${task.title}`.slice(0, 256),
+      draft: conflict, maintainer_can_modify: true,
+      body: `Backport of #${task.number}.\n\n- Original commit: ${task.sha}\n- Target branch: ${target}\n- Original merger: @${task.owner}\n\n${conflict ? 'Resolve conflicts in the fork, remove the cherry-pick-conflict label, mark ready for review, and run Fork CI on this branch.' : 'CI runs in the original merger’s fork.'}` })).data;
+  }
+  const labels = ['cherry-pick', ...(blocked ? ['cherry-pick-conflict'] : [])];
+  for (const name of labels) {
+    try { await github.rest.issues.getLabel({ ...UPSTREAM, name }); }
+    catch (error) {
+      if (error.status !== 404) throw error;
+      await github.rest.issues.createLabel({ ...UPSTREAM, name, color: name === 'cherry-pick' ? '1D76DB' : 'B60205' });
+    }
+  }
+  await github.rest.issues.addLabels({ ...UPSTREAM, issue_number: pr.number, labels });
+  const ready = !blocked && !pr.draft && !pr.labels?.some(label => label.name === 'cherry-pick-conflict');
+  core.setOutput('ready', String(ready));
+  core.setOutput('number', String(pr.number));
+  try { await core.summary.addLink(`Backport #${pr.number}`, pr.html_url).write(); }
+  catch (error) { core.warning(`Backport #${pr.number} is ready but its job summary could not be written: ${error.message}`); }
+}
+
+async function dispatch({ github, core, task, target, branch, sha, number }) {
+  const { data: pr } = await github.rest.pulls.get({ ...UPSTREAM, pull_number: Number(number) });
+  if (pr.state !== 'open' || pr.draft || pr.base.ref !== target || pr.head.sha !== sha ||
+      pr.head.repo?.full_name.toLowerCase() !== `${task.owner}/${task.repo}`.toLowerCase() ||
+      pr.labels.some(label => label.name === 'cherry-pick-conflict')) throw new Error('The backport changed or is not ready; retry after resolving it.');
+  const runs = await github.paginate(github.rest.actions.listWorkflowRuns, {
+    owner: task.owner, repo: task.repo, workflow_id: 'fork-ci.yml', head_sha: sha, event: 'workflow_dispatch', per_page: 100 });
+  if (runs.some(run => run.head_branch === branch && run.status !== 'completed')) {
+    core.notice('Fork CI is already queued or running for this backport.');
+    return;
+  }
+  await github.rest.actions.createWorkflowDispatch({ owner: task.owner, repo: task.repo,
+    workflow_id: 'fork-ci.yml', ref: branch });
+  core.notice(`Started Fork CI in ${task.owner}/${task.repo} for #${number}.`);
+}
+module.exports = { resolve, mergedChangeBase, installationToken, buildCommit, prepare, openPullRequest, dispatch, ROUTING_MARKER };

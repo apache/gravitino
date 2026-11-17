@@ -14,6 +14,7 @@
  */
 'use strict';
 const { latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted } = require('./publish-ci-status.cjs');
+const { isBackportPreparation } = require('./resolve-fork-ci.cjs');
 const { FORK_EVENTS } = require('./fork-ci-status.cjs');
 
 // A push cancels the fork run of the previous head, whose status would otherwise stay pending.
@@ -31,7 +32,8 @@ async function retireCancelled({ github, repo, pr }) {
     throw error;
   }
   for (const run of data.workflow_runs) {
-    if (run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
+    if (isBackportPreparation(run.event, `refs/heads/${run.head_branch}`, run.actor?.type) ||
+        run.head_sha === pr.head.sha || run.head_branch !== pr.head.ref ||
         run.path !== '.github/workflows/fork-ci.yml' || !FORK_EVENTS.includes(run.event) ||
         run.status !== 'completed' || run.conclusion !== 'cancelled') continue;
     const latest = await latestStatus({ github, repo, sha: run.head_sha, context: 'Fork CI' });

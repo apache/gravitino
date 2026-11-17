@@ -15,8 +15,18 @@
 'use strict';
 const UPSTREAM = 'apache/gravitino';
 
+function isBackportPreparation(event, ref, actorType) {
+  return event === 'push' && ref?.startsWith('refs/heads/backport/') && actorType === 'Bot';
+}
+
 async function resolve({ github, context, core }) {
   const repository = `${context.repo.owner}/${context.repo.repo}`;
+  // Backport fork routing v1: the coordinator dispatches only after opening the PR.
+  // App pushes must not race that dispatch or run suites for unresolved conflicts.
+  if (isBackportPreparation(context.eventName, context.ref, context.payload.sender?.type)) {
+    core.setOutput('valid', 'false');
+    return;
+  }
   let headRepository = repository;
   let headSha = context.sha;
   let baseRef = context.ref.replace(/^refs\/heads\//, '');
@@ -56,6 +66,11 @@ async function resolve({ github, context, core }) {
       const matches = prs.filter(pr => pr.head.sha === headSha && pr.head.repo?.full_name === repository);
       if (matches.length > 1) throw new Error('More than one open PR matches this pushed commit.');
       if (matches.length === 1) {
+        if (matches[0].labels?.some(label => label.name === 'cherry-pick-conflict')) {
+          core.notice('Resolve the cherry-pick conflicts and remove cherry-pick-conflict before running CI.');
+          core.setOutput('valid', 'false');
+          return;
+        }
         baseRef = matches[0].base.ref;
       } else {
         const { data: upstream } = await github.rest.repos.get({ owner: 'apache', repo: 'gravitino' });
@@ -100,4 +115,4 @@ async function resolve({ github, context, core }) {
     'head-repository': headRepository, sync: String(sync), valid: 'true'
   })) core.setOutput(name, value);
 }
-module.exports = { resolve };
+module.exports = { resolve, isBackportPreparation };

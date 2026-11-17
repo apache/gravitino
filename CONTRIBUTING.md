@@ -144,6 +144,83 @@ Known limitations of Fork CI:
 
 The trusted publishers use `workflow_run` and `schedule`, rather than `pull_request_target`. `actions/*`, `github/*` and `apache/*` actions are exempt from ASF's external-action SHA requirement; external third-party actions still require an approved SHA.
 
+### Automatic release backports in committer forks
+
+For merged `main` PRs labeled `branch-1.3` or `branch-2.0`, the backport coordinator
+uses GitHub's `merged_by` identity and the exact integrated change. For rebase
+merges, GitHub's commit-to-PR attribution identifies the complete contiguous
+commit range, so earlier commits are included too. Missing attribution or API
+errors stop the coordinator and require retry; changes spanning over 250 commits
+require a manual backport. It pushes
+`backport/pr-<source PR>/<target branch>` to that person's public `gravitino` fork,
+then opens a PR against the Apache release branch. Heavy CI runs in the fork;
+Apache runs only the coordinator and existing status publishers. This does not
+change post-merge CI on Apache's `main` or release branches.
+
+Before enabling this coordinator:
+
+1. Install the Fork CI routing change in each supported release branch. The
+   coordinator checks for that support before pushing anything. Bootstrap this
+   change with a manually prepared PR; the old backport workflow cannot install
+   its own prerequisite automatically.
+2. Create a GitHub App with repository **Contents: read/write**, **Actions:
+   read/write**, and **Workflows: read/write** permissions. The workflow permission
+   permits backports that include workflow files; it does not bypass trusted CI
+   verification. Each participating committer installs the App only on their
+   public `gravitino` fork, enables Actions, and makes sure **Fork CI** is active
+   and available for manual dispatch. Forks must belong to Apache's fork network.
+3. Configure the Apache repository variable `BACKPORT_APP_ID` and secret
+   `BACKPORT_APP_PRIVATE_KEY`. The coordinator requests a short-lived token for
+   exactly the merger's fork and revokes it when the job finishes. The App token
+   never enters the tested checkout or a CI job. The existing
+   `CHERRY_PICK_TOKEN`, when configured, creates the PR and labels; otherwise the
+   coordinator uses Apache's `GITHUB_TOKEN` and repository policy must allow
+   Actions to create PRs. With `GITHUB_TOKEN`, GitHub can require a committer to
+   approve PR workflows before **Conflict Marker Check**, **Fork CI PR Signal**,
+   and the subsequent **Trusted ASF Allowlist** run. Approve those workflows in
+   the PR before merging; the explicit fork CI dispatch does not approve them.
+   To keep those checks automatic, configure `CHERRY_PICK_TOKEN` with an App or
+   bot credential authorized to create Apache PRs and labels. That credential
+   is used only by the PR step, never to push to the fork or run tests.
+
+The coordinator checks out only default-branch automation. Fetched source and
+release trees are processed with Git in a separate temporary directory and never
+executed with the App token. App pushes to `backport/` branches intentionally skip
+full CI; the coordinator explicitly dispatches **Fork CI** on the new branch
+only after the upstream PR exists, so CI resolves the intended release base.
+Preparation pushes have a separate concurrency group and are excluded from status
+selection and cancellation retirement. They cannot cancel or replace a dispatched
+test result. Ordinary human pushes still trigger CI.
+
+If the backport conflicts, the coordinator retains the conflicted files in a draft
+PR with the `cherry-pick-conflict` label and does not dispatch full CI. Resolve the
+conflicts in the fork, push the fix, remove the label, mark the PR ready, and use
+**Fork CI → Run workflow** on the backport branch. A run started while the label
+is present skips suites. The independent conflict-marker check remains in place.
+The generated commit records conflict provenance, including binary and
+modify/delete conflicts that have no text markers, so a push-before-PR failure
+cannot become a clean backport on retry. An existing PR marked ready with the
+conflict label removed acknowledges human resolution; current text markers still
+block coordinator dispatch.
+
+To recover a failed coordinator, dispatch **Automatically cherry-pick merged PR
+to different branches** on Apache's default branch and supply the original PR
+number. This uses its current release labels. An existing branch with matching
+`Backport-of` provenance (within its latest 100 commits) is reused without force
+updates, including human fixes. An existing open PR is reused; a closed PR is
+reported rather than reopened. A branch push that succeeded before PR creation
+failed is recoverable on retry. An active fork CI run for the same head is not
+dispatched twice. Failed runs can be retried from the fork or by retrying the
+coordinator; disabled Actions, missing App installations, absent forks, and API
+failures are reported, never redirected to heavy Apache CI.
+
+Existing Apache-hosted cherry-pick PRs are not migrated automatically. A committer
+must deliberately replace them with fork-backed PRs and close the old ones after
+checking the replacement. CI-definition changes still require the existing
+trusted verification process; ordinary fork success does not override that
+policy. GitHub App dispatch and upstream PR creation must be validated in a
+configured sandbox before production rollout.
+
 ## 🆘 Need Help?
 
 If you're stuck, ask on the `dev@` mailing list or open a GitHub Discussion. We're here to help.
