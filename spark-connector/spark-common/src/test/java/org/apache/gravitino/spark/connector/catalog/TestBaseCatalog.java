@@ -9,36 +9,40 @@
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
  */
 package org.apache.gravitino.spark.connector.catalog;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anySet;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoClient;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
@@ -48,24 +52,50 @@ import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestBaseCatalog {
 
   private static final String FORMAT_NAMESPACE = "parquet";
-  private static final String TABLE_SCHEMA = "db";
+  private static final String TEST_CATALOG = "datasource_test";
+
+  @TempDir private static File tempDir;
+
+  private static SparkSession spark;
+  private static FileSystem localFileSystem;
+  private static Path originalWorkingDirectory;
 
   private SupportsSchemas schemas;
   private org.apache.gravitino.rel.TableCatalog gravitinoTableCatalog;
   private BaseCatalog catalog;
 
   @BeforeAll
-  static void initCatalogManager() {
+  static void initCatalogManagerAndSpark() throws IOException {
     GravitinoClient gravitinoClient = mock(GravitinoClient.class);
     GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
+
+    spark =
+        SparkSession.builder()
+            .master("local[1]")
+            .appName("test-datasource-resolution")
+            .config("spark.ui.enabled", "false")
+            .config("spark.sql.catalog." + TEST_CATALOG, AnalyzerCatalog.class.getName())
+            .getOrCreate();
+    spark.catalog().setCurrentCatalog(TEST_CATALOG);
+    localFileSystem = FileSystem.get(spark.sparkContext().hadoopConfiguration());
+    originalWorkingDirectory = localFileSystem.getWorkingDirectory();
+    localFileSystem.setWorkingDirectory(new Path(tempDir.toURI()));
+    spark.range(1).write().parquet("data.parquet");
   }
 
   @AfterAll
-  static void cleanupCatalogManager() {
+  static void cleanupCatalogManagerAndSpark() {
+    if (localFileSystem != null && originalWorkingDirectory != null) {
+      localFileSystem.setWorkingDirectory(originalWorkingDirectory);
+    }
+    if (spark != null) {
+      spark.stop();
+    }
     GravitinoCatalogManager.get().close();
   }
 
@@ -76,16 +106,20 @@ public class TestBaseCatalog {
     gravitinoTableCatalog = mock(org.apache.gravitino.rel.TableCatalog.class);
     when(gravitinoCatalog.asSchemas()).thenReturn(schemas);
     when(gravitinoCatalog.asTableCatalog()).thenReturn(gravitinoTableCatalog);
-    when(schemas.loadSchema(TABLE_SCHEMA)).thenReturn(mock(Schema.class));
     when(schemas.loadSchema(FORMAT_NAMESPACE))
         .thenThrow(new NoSuchSchemaException("Schema parquet does not exist"));
+    when(gravitinoTableCatalog.loadTable(any(NameIdentifier.class), anySet()))
+        .thenThrow(new IllegalArgumentException("Invalid table name"));
     catalog = new DataSourceTestCatalog(gravitinoCatalog);
+    AnalyzerCatalog.gravitinoCatalog = gravitinoCatalog;
+    localFileSystem.setWorkingDirectory(new Path(tempDir.toURI()));
   }
 
   @Test
-  void pathLikeNamesWithPathSeparatorsMatchThePrefilter() {
+  void pathLikeNamesMatchThePrefilter() {
     Identifier[] pathIdents = {
       Identifier.of(new String[] {"parquet"}, "/tmp/data"),
+      Identifier.of(new String[] {"parquet"}, "data.parquet"),
       Identifier.of(new String[] {"csv"}, "s3a://bucket/file.csv"),
       Identifier.of(new String[] {"json"}, "relative/path/to/file"),
       Identifier.of(new String[] {"PARQUET"}, "hdfs://namenode/path"),
@@ -113,60 +147,43 @@ public class TestBaseCatalog {
   }
 
   @Test
-  void missingSchemaAndPathLikeNameIsADataSourceReference() {
-    assertTrue(
-        catalog.isDataSourceReference(
-            Identifier.of(new String[] {FORMAT_NAMESPACE}, "s3a://bucket/file.parquet")));
-    assertTrue(
-        catalog.isDataSourceReference(
-            Identifier.of(new String[] {FORMAT_NAMESPACE}, "C:\\data\\file.parquet")));
+  void existingTableWithDataSourceSyntaxTakesPrecedence() {
+    Identifier ident = Identifier.of(new String[] {FORMAT_NAMESPACE}, "table/with/slash");
+    when(gravitinoTableCatalog.loadTable(any(NameIdentifier.class), anySet()))
+        .thenReturn(mock(org.apache.gravitino.rel.Table.class));
+
+    assertTrue(catalog.tableExists(ident));
   }
 
   @Test
-  void existingSchemaWithSlashInTableNameStaysATableReference() {
-    // PostgreSQL and other backends allow '/' in quoted table names; the namespace is a real
-    // Gravitino schema, so the identifier must not be hijacked as a DataSource shortcut.
-    assertFalse(
-        catalog.isDataSourceReference(
-            Identifier.of(new String[] {TABLE_SCHEMA}, "table/with/slash")));
-  }
-
-  @Test
-  void nonPathLikeNameIsDecidedWithoutASchemaLookup() {
-    assertFalse(catalog.isDataSourceReference(Identifier.of(new String[] {TABLE_SCHEMA}, "users")));
-    verify(schemas, never()).loadSchema(anyString());
-  }
-
-  @Test
-  void nonNoSuchSchemaErrorFromSchemaLookupPropagates() {
-    when(schemas.loadSchema("restricted")).thenThrow(new ForbiddenException("Permission denied"));
-    assertThrows(
-        ForbiddenException.class,
-        () ->
-            catalog.isDataSourceReference(Identifier.of(new String[] {"restricted"}, "data/file")));
-  }
-
-  @Test
-  void loadTableYieldsForDataSourceReferenceWithoutTouchingTableCatalog()
-      throws NoSuchTableException {
+  void loadTableYieldsForInvalidDataSourceName() {
     Identifier ident = Identifier.of(new String[] {FORMAT_NAMESPACE}, "s3a://bucket/file.parquet");
     assertThrows(NoSuchTableException.class, () -> catalog.loadTable(ident));
-    verifyNoInteractions(gravitinoTableCatalog);
   }
 
   @Test
-  void loadTableForWritingYieldsForDataSourceReferenceWithoutTouchingTableCatalog()
-      throws NoSuchTableException {
+  void loadTableForWritingYieldsForInvalidDataSourceName() {
     Identifier ident = Identifier.of(new String[] {FORMAT_NAMESPACE}, "s3a://bucket/file.parquet");
     assertThrows(NoSuchTableException.class, () -> catalog.loadTable(ident, java.util.Set.of()));
-    verifyNoInteractions(gravitinoTableCatalog);
   }
 
   @Test
-  void tableExistsReturnsFalseForDataSourceReferenceWithoutTouchingTableCatalog() {
+  void tableExistsReturnsFalseForInvalidDataSourceName() {
     Identifier ident = Identifier.of(new String[] {FORMAT_NAMESPACE}, "s3a://bucket/file.parquet");
     assertFalse(catalog.tableExists(ident));
-    verifyNoInteractions(gravitinoTableCatalog);
+  }
+
+  @Test
+  void sparkAnalyzerResolvesRelativeFilename() {
+    assertEquals(1L, spark.sql("SELECT * FROM parquet.`data.parquet`").count());
+  }
+
+  @Test
+  void sparkAnalyzerResolvesPathWhenSchemaExists() {
+    doReturn(mock(Schema.class)).when(schemas).loadSchema(FORMAT_NAMESPACE);
+
+    String path = tempDir.toPath().resolve("data.parquet").toString();
+    assertEquals(1L, spark.sql("SELECT * FROM parquet.`" + path + "`").count());
   }
 
   private static class DataSourceTestCatalog extends BaseCatalog {
@@ -207,6 +224,28 @@ public class TestBaseCatalog {
     @Override
     protected SparkTransformConverter getSparkTransformConverter() {
       return null;
+    }
+  }
+
+  /** Catalog instantiated by Spark to exercise DataSource fallback through the real analyzer. */
+  public static class AnalyzerCatalog extends DataSourceTestCatalog {
+    private static Catalog gravitinoCatalog;
+
+    public AnalyzerCatalog() {
+      super(null);
+    }
+
+    @Override
+    public void initialize(String name, CaseInsensitiveStringMap options) {}
+
+    @Override
+    public String name() {
+      return TEST_CATALOG;
+    }
+
+    @Override
+    protected Catalog gravitinoCatalog() {
+      return gravitinoCatalog;
     }
   }
 }

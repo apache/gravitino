@@ -319,15 +319,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public Table loadTable(Identifier ident) throws NoSuchTableException {
-    if (isDataSourceReference(ident)) {
-      // This is Spark's DataSource shortcut syntax, e.g. SELECT * FROM parquet.`path`; yield to
-      // the analyzer's SQL-on-file resolver instead of forwarding the path to the server.
-      throw new NoSuchTableException(ident);
-    }
     org.apache.gravitino.rel.Table gravitinoTable;
     try {
       gravitinoTable = loadGravitinoTable(ident);
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        // Let Spark's analyzer resolve the path as a DataSource relation.
+        throw e;
+      }
       // Not a table in Gravitino; try as a view.
       return loadViewAsTable(ident);
     } catch (ForbiddenException e) {
@@ -354,53 +353,26 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   @Override
   public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
       throws NoSuchTableException {
-    if (isDataSourceReference(ident)) {
-      throw new NoSuchTableException(ident);
-    }
     return loadTableForWriting(ident);
   }
 
   /**
-   * Detects Spark's DataSource shortcut syntax after the analyzer expands the identifier against
-   * this catalog as the current catalog, for example {@code SELECT * FROM parquet.`path`} or {@code
-   * SELECT * FROM csv.`s3a://bucket/file.csv`}. The expanded identifier has a single-part namespace
-   * (the format name) and the table name itself is a file path.
+   * Returns whether an identifier has DataSource path syntax that the Gravitino table API may
+   * reject. A real table lookup is always attempted first; this check is used only after that
+   * lookup fails, so a table named {@code db."a/b"} keeps precedence over file resolution.
    *
-   * <p>Such a lookup must not reach the Gravitino table APIs: the path may contain dots, so the
-   * server splits the full name into more than three parts and {@code MetadataObjects.of(TABLE,
-   * names)} throws {@code IllegalArgumentException}, which the Spark analyzer does not treat as
-   * non-existence. Reporting "not found" lets the analyzer fall back to its SQL-on-file resolver,
-   * the same path vanilla Spark takes.
-   *
-   * <p>The path characters ({@code /} or {@code \}) are only a cheap structural prefilter: some
-   * Gravitino backends (for example PostgreSQL quoted identifiers) allow them in table names. The
-   * decisive check is that the single-part namespace names no Gravitino schema, so a real table
-   * reference such as {@code db."a/b"} keeps resolving when the schema exists. Only the prefiltered
-   * identifiers pay the extra schema lookup.
+   * <p>Dots are included because relative filenames such as {@code data.parquet} have no path
+   * separator. The Gravitino server splits the full name on dots and rejects the resulting name;
+   * translating that failure to {@link NoSuchTableException} lets Spark's analyzer fall back to its
+   * SQL-on-file resolver.
    */
-  @VisibleForTesting
-  protected boolean isDataSourceReference(Identifier ident) {
-    if (!looksLikeDataSourceReference(ident)) {
-      return false;
-    }
-    try {
-      gravitinoCatalog().asSchemas().loadSchema(ident.namespace()[0]);
-      // The namespace is a real Gravitino schema, so this is a table reference even though the
-      // table name contains a path separator.
-      return false;
-    } catch (NoSuchSchemaException e) {
-      return true;
-    }
-  }
-
-  /** Cheap structural prefilter for {@link #isDataSourceReference} without a server call. */
   @VisibleForTesting
   static boolean looksLikeDataSourceReference(Identifier ident) {
     if (ident.namespace().length != 1) {
       return false;
     }
     String name = ident.name();
-    return name.indexOf('/') >= 0 || name.indexOf('\\') >= 0;
+    return name.indexOf('.') >= 0 || name.indexOf('/') >= 0 || name.indexOf('\\') >= 0;
   }
 
   @Override
@@ -474,11 +446,6 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
 
   @Override
   public boolean tableExists(Identifier ident) {
-    if (isDataSourceReference(ident)) {
-      // DataSource shortcut such as parquet.`path`; answer "no" so the analyzer falls back to its
-      // SQL-on-file resolver instead of forwarding the path identifier to the Gravitino server.
-      return false;
-    }
     // Gravitino uses loadTable() to verify table existence, which requires LOAD_TABLE privilege.
     // For CREATE TABLE IF NOT EXISTS operations, users may only have CREATE_TABLE privilege.
     // When ForbiddenException is thrown (lacking LOAD_TABLE privilege), we return false to allow
@@ -488,6 +455,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
       loadGravitinoTable(ident);
       return true;
     } catch (NoSuchTableException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        return false;
+      }
       // fall through to view check
     } catch (ForbiddenException e) {
       // User lacks LOAD_TABLE privilege, return false to allow CREATE TABLE IF NOT EXISTS
@@ -665,6 +635,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.SELECT_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
@@ -679,6 +654,11 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               Sets.newHashSet(Privilege.Name.MODIFY_TABLE));
     } catch (org.apache.gravitino.exceptions.NoSuchTableException e) {
       throw new NoSuchTableException(ident);
+    } catch (IllegalArgumentException e) {
+      if (looksLikeDataSourceReference(ident)) {
+        throw new NoSuchTableException(ident);
+      }
+      throw e;
     }
   }
 
