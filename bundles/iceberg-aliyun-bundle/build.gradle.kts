@@ -25,6 +25,11 @@ plugins {
 }
 
 dependencies {
+  // aliyun-sdk-oss 3.10.2 pulls in jettison 1.1. Raise it to the version in the catalog, which is
+  // also the version the aliyun-bundle resolves through hadoop-aliyun.
+  constraints {
+    implementation(libs.jettison)
+  }
   implementation(libs.aliyun.credentials.sdk)
   implementation(libs.aliyun.sdk.oss)
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
