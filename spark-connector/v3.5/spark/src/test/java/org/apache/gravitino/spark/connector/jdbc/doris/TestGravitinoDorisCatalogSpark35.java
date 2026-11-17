@@ -78,7 +78,6 @@ public class TestGravitinoDorisCatalogSpark35 {
 
   @AfterEach
   void tearDown() {
-    AuthorizationTable.clear();
     DorisTestDriver.clearDelegate();
     manager.close();
   }
