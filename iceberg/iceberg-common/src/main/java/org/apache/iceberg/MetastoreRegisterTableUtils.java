@@ -107,9 +107,8 @@ public class MetastoreRegisterTableUtils {
    * @param metadata snapshot read from the requested metadata file
    * @param overwrite whether the destination can be replaced
    * @param metadataLocationOverwrite atomic pointer replacement
-   * @return registered table
    */
-  public static Table registerTable(
+  public static void registerTableWithMetadata(
       BaseMetastoreCatalog catalog,
       TableIdentifier identifier,
       TableMetadata metadata,
@@ -136,10 +135,6 @@ public class MetastoreRegisterTableUtils {
       metadataLocationOverwrite.overwrite(
           identifier, base.metadataFileLocation(), metadata.metadataFileLocation());
     }
-    return new BaseTable(
-        ops,
-        BaseMetastoreCatalog.fullTableName(catalog.name(), identifier),
-        catalog.metricsReporter());
   }
 
   private MetastoreRegisterTableUtils() {}

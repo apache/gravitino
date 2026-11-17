@@ -91,6 +91,7 @@ import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 import org.apache.iceberg.view.BaseView;
 import org.apache.iceberg.view.View;
 import org.apache.iceberg.view.ViewMetadata;
+import org.apache.iceberg.view.ViewMetadataParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -245,18 +246,21 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   }
 
   public LoadTableResponse registerTable(Namespace namespace, RegisterTableRequest request) {
+    request.validate();
     validateTableLocation(request.metadataLocation());
+    TableMetadata metadata =
+        request instanceof RegisterTableRequestWithMetadata
+            ? ((RegisterTableRequestWithMetadata) request).tableMetadata()
+            : loadTableMetadataFromLocation(request.metadataLocation());
+    validateTableLocation(metadata.location());
+    validateStorageProperties(metadata.properties());
     Catalog loadedCatalog = getCatalog();
     // Subclasses can enforce additional registration invariants through the original API.
-    if (request instanceof RegisterTableRequestWithMetadata
-        && loadedCatalog.getClass() == JdbcCatalogWithMetadataLocationSupport.class) {
+    if (loadedCatalog.getClass() == JdbcCatalogWithMetadataLocationSupport.class) {
       TableIdentifier identifier = TableIdentifier.of(namespace, request.name());
-      TableMetadata metadata = ((RegisterTableRequestWithMetadata) request).tableMetadata();
-      validateTableLocation(metadata.location());
-      validateStorageProperties(metadata.properties());
       getMetadataCache().invalidate(identifier);
       ((JdbcCatalogWithMetadataLocationSupport) loadedCatalog)
-          .registerTable(identifier, metadata, request.overwrite());
+          .registerTableWithMetadata(identifier, metadata, request.overwrite());
       return LoadTableResponse.builder().withTableMetadata(metadata).build();
     }
     try {
@@ -453,9 +457,22 @@ public class IcebergCatalogWrapper implements AutoCloseable {
    */
   public Optional<Map<TableIdentifier, String>> getTableMetadataLocationCandidates(
       String location) {
+    return getTableMetadataLocationCandidates(location, null);
+  }
+
+  /**
+   * Returns overlapping standard-layout pointers and an exact registration source pointer.
+   *
+   * @param location requested table location
+   * @param metadataLocation requested metadata pointer, or null outside registration
+   * @return candidate pointers, or empty when bulk lookup is unsupported
+   */
+  public Optional<Map<TableIdentifier, String>> getTableMetadataLocationCandidates(
+      String location, @Nullable String metadataLocation) {
     Catalog loadedCatalog = getCatalog();
     if (loadedCatalog instanceof SupportsMetadataLocation) {
-      return ((SupportsMetadataLocation) loadedCatalog).metadataLocationCandidates(location);
+      return ((SupportsMetadataLocation) loadedCatalog)
+          .metadataLocationCandidates(location, metadataLocation);
     }
     return Optional.empty();
   }
@@ -560,6 +577,11 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     request.validate();
     validateTableLocation(request.metadataLocation());
     try {
+      if (hasRemoteWarehouse() || S3FileIO.class.getName().equals(fileIOImpl())) {
+        ViewMetadata metadata = loadViewMetadataFromLocation(request.metadataLocation());
+        validateTableLocation(metadata.location());
+        validateStorageProperties(metadata.properties());
+      }
       return CatalogHandlers.registerView(getViewCatalog(), namespace, request);
     } catch (NotFoundException e) {
       // As in registerTable: the metadata location comes from the request.
@@ -668,6 +690,13 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     public IcebergTableChange(TableIdentifier tableIdentifier, Transaction transaction) {
       this.tableIdentifier = tableIdentifier;
       this.transaction = transaction;
+    }
+  }
+
+  @VisibleForTesting
+  ViewMetadata loadViewMetadataFromLocation(String metadataLocation) {
+    try (FileIO fileIO = CatalogUtil.loadFileIO(fileIOImpl(), fileIOProperties(), null)) {
+      return ViewMetadataParser.read(fileIO.newInputFile(metadataLocation));
     }
   }
 

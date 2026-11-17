@@ -22,14 +22,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.utils.IcebergTableLocationUtils;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 
 /**
  * Resolves live catalog tables that share a register-table metadata file.
@@ -38,8 +38,6 @@ import org.slf4j.LoggerFactory;
  * authorization interceptor handlers.
  */
 public final class RegisterTableSourceResolver {
-  private static final Logger LOG = LoggerFactory.getLogger(RegisterTableSourceResolver.class);
-
   private RegisterTableSourceResolver() {}
 
   /**
@@ -56,13 +54,14 @@ public final class RegisterTableSourceResolver {
       TableIdentifier target,
       String metadataLocation,
       TableMetadata metadata) {
-    return findOverlappingTables(catalogWrapper, target, metadata.location());
+    return findOverlappingTables(catalogWrapper, target, metadata.location(), metadataLocation);
   }
 
   /**
    * Finds overlapping tables using a bulk pointer lookup when the backend supports it. Pointer
    * inference requires the standard {@code <table>/metadata/<file>} layout. Non-JDBC backends
-   * retain namespace discovery, with unreadable table metadata logged and skipped.
+   * retain namespace discovery. Unreadable metadata propagates the failure instead of bypassing
+   * source authorization.
    *
    * @param catalogWrapper catalog to query
    * @param target destination to exclude
@@ -71,24 +70,41 @@ public final class RegisterTableSourceResolver {
    */
   public static List<TableIdentifier> findOverlappingTables(
       IcebergCatalogWrapper catalogWrapper, TableIdentifier target, String location) {
+    return findOverlappingTables(catalogWrapper, target, location, null);
+  }
+
+  /** Normalizes path strings so {@code file:/} and {@code file:///} compare equal. */
+  public static String normalizePath(String path) {
+    return IcebergTableLocationUtils.normalize(path);
+  }
+
+  private static List<TableIdentifier> findOverlappingTables(
+      IcebergCatalogWrapper catalogWrapper,
+      TableIdentifier target,
+      String location,
+      @Nullable String metadataLocation) {
     List<TableIdentifier> matches = new ArrayList<>();
     if (normalizePath(location).isEmpty()) {
       return matches;
     }
     Optional<Map<TableIdentifier, String>> candidates =
-        catalogWrapper.getTableMetadataLocationCandidates(location);
+        metadataLocation == null
+            ? catalogWrapper.getTableMetadataLocationCandidates(location)
+            : catalogWrapper.getTableMetadataLocationCandidates(location, metadataLocation);
     if (candidates.isPresent()) {
       candidates
           .get()
           .forEach(
               (identifier, pointer) -> {
-                if (!identifier.equals(target) && matchesPointer(pointer, location)) {
+                if (!identifier.equals(target)
+                    && matchesPointer(pointer, location, metadataLocation)) {
                   matches.add(identifier);
                 }
               });
       return matches;
     }
-    collectMatchingTables(catalogWrapper, Namespace.empty(), target, location, matches);
+    collectMatchingTables(
+        catalogWrapper, Namespace.empty(), target, location, metadataLocation, matches);
     return matches;
   }
 
@@ -97,6 +113,7 @@ public final class RegisterTableSourceResolver {
       Namespace parent,
       TableIdentifier target,
       String tableLocation,
+      @Nullable String metadataLocation,
       List<TableIdentifier> matches) {
     List<Namespace> children;
     List<TableIdentifier> tables;
@@ -110,40 +127,42 @@ public final class RegisterTableSourceResolver {
       return;
     }
     for (Namespace child : children) {
-      collectMatchingTables(catalogWrapper, child, target, tableLocation, matches);
+      collectMatchingTables(
+          catalogWrapper, child, target, tableLocation, metadataLocation, matches);
     }
     for (TableIdentifier identifier : tables) {
       if (identifier.equals(target)) {
         continue;
       }
-      if (matchesSource(catalogWrapper, identifier, tableLocation)) {
+      if (matchesSource(catalogWrapper, identifier, tableLocation, metadataLocation)) {
         matches.add(identifier);
       }
     }
   }
 
   private static boolean matchesSource(
-      IcebergCatalogWrapper catalogWrapper, TableIdentifier identifier, String tableLocation) {
+      IcebergCatalogWrapper catalogWrapper,
+      TableIdentifier identifier,
+      String tableLocation,
+      @Nullable String metadataLocation) {
     Optional<String> currentMeta = catalogWrapper.getTableMetadataLocation(identifier);
     if (currentMeta.isPresent()) {
-      return matchesPointer(currentMeta.get(), tableLocation);
+      return matchesPointer(currentMeta.get(), tableLocation, metadataLocation);
     }
     try {
       TableMetadata existing = catalogWrapper.loadTableMetadata(identifier);
       return IcebergTableLocationUtils.overlaps(tableLocation, existing.location());
-    } catch (RuntimeException e) {
-      LOG.warn(
-          "Skipping unreadable table metadata during location authorization: {}", identifier, e);
+    } catch (NoSuchTableException e) {
       return false;
     }
   }
 
-  /** Normalizes path strings so {@code file:/} and {@code file:///} compare equal. */
-  public static String normalizePath(String path) {
-    return IcebergTableLocationUtils.normalize(path);
-  }
-
-  private static boolean matchesPointer(String pointer, String location) {
+  private static boolean matchesPointer(
+      String pointer, String location, @Nullable String metadataLocation) {
+    if (metadataLocation != null
+        && normalizePath(pointer).equals(normalizePath(metadataLocation))) {
+      return true;
+    }
     return IcebergTableLocationUtils.tableLocation(pointer)
         .map(root -> IcebergTableLocationUtils.overlaps(root, location))
         .orElse(false);

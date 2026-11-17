@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.iceberg.common.utils;
 
+import java.net.URI;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.hadoop.fs.Path;
 
 /** Location comparisons and JDBC lookup patterns for Iceberg's standard metadata layout. */
 public final class IcebergTableLocationUtils {
@@ -32,7 +36,8 @@ public final class IcebergTableLocationUtils {
   private IcebergTableLocationUtils() {}
 
   /**
-   * Normalizes trailing separators, local URI forms and equivalent S3 schemes.
+   * Normalizes filesystem dot segments and separators, local URI forms and equivalent S3 schemes.
+   * Dot segments and repeated separators in object-store keys are preserved.
    *
    * @param location storage location, possibly absent
    * @return normalized location, or an empty string for an absent location
@@ -44,14 +49,22 @@ public final class IcebergTableLocationUtils {
     String value = location.trim();
     if (value.startsWith("s3a://") || value.startsWith("s3n://")) {
       value = "s3://" + value.substring(6);
-    } else if (value.startsWith("file:")) {
+    } else if (value.regionMatches(true, 0, "file:", 0, 5)) {
       String path = value.substring(5);
       while (path.startsWith("//")) {
         path = path.substring(1);
       }
-      value = "file:" + (path.startsWith("/") ? path : "/" + path);
-    } else if (value.startsWith("/")) {
-      value = "file:" + value;
+      value = "file:" + Paths.get(path.startsWith("/") ? path : "/" + path).normalize();
+    } else if (!value.isEmpty() && new Path(value).toUri().getScheme() == null) {
+      value = "file:" + Paths.get(value).toAbsolutePath().normalize();
+    } else if (value.regionMatches(true, 0, "hdfs:", 0, 5)
+        || value.regionMatches(true, 0, "viewfs:", 0, 7)) {
+      URI uri = new Path(value).toUri();
+      value =
+          uri.getScheme().toLowerCase(Locale.ROOT)
+              + ":"
+              + (uri.getAuthority() == null ? "" : "//" + uri.getAuthority())
+              + Paths.get(uri.getPath()).normalize();
     }
     while (value.endsWith("/") && !value.endsWith(":/")) {
       value = value.substring(0, value.length() - 1);

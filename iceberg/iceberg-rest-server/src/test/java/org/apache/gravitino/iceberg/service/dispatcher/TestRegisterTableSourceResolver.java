@@ -36,6 +36,7 @@ import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.NoSuchNamespaceException;
+import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.types.Types;
@@ -136,16 +137,47 @@ class TestRegisterTableSourceResolver {
   }
 
   @Test
-  void testUnreadableFallbackIsSkipped() {
+  void testUnreadableFallbackFailsClosed() {
     IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
     TableIdentifier source = TableIdentifier.of("other", "secret");
     stubCatalogWithSource(catalog, source);
     when(catalog.getTableMetadataLocation(source)).thenReturn(Optional.empty());
-    when(catalog.loadTableMetadata(source)).thenThrow(new RuntimeException("unreadable"));
+    RuntimeException failure = new RuntimeException("unreadable");
+    when(catalog.loadTableMetadata(source)).thenThrow(failure);
+    Assertions.assertSame(
+        failure,
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                RegisterTableSourceResolver.findOverlappingTables(
+                    catalog, TableIdentifier.of("mine", "copy"), TABLE_LOC)));
+  }
+
+  @Test
+  void testDisappearedFallbackSourceIsSkipped() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(catalog, source);
+    when(catalog.loadTableMetadata(source)).thenThrow(new NoSuchTableException("gone"));
     Assertions.assertTrue(
         RegisterTableSourceResolver.findOverlappingTables(
                 catalog, TableIdentifier.of("mine", "copy"), TABLE_LOC)
             .isEmpty());
+  }
+
+  @Test
+  void testExactCustomPointerStillRequiresSourceAuthorization() {
+    IcebergCatalogWrapper catalog = mock(IcebergCatalogWrapper.class);
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    String pointer = "s3://b/shared/custom.metadata.json";
+    when(catalog.getTableMetadataLocationCandidates(TABLE_LOC, pointer))
+        .thenReturn(Optional.of(Map.of(source, pointer)));
+    Assertions.assertEquals(
+        List.of(source),
+        RegisterTableSourceResolver.findSourceTables(
+            catalog, TableIdentifier.of("mine", "copy"), pointer, tableMetadata()));
+    verify(catalog, never()).listNamespace(any());
+    verify(catalog, never()).loadTableMetadata(any());
   }
 
   @Test

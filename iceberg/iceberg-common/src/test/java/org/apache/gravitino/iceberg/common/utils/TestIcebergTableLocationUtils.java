@@ -34,7 +34,16 @@ class TestIcebergTableLocationUtils {
     "s3a://b/a,s3n://b/a/data,true",
     "file:///warehouse/a,file:/warehouse/a/data,true",
     "/warehouse/a,file:///warehouse/a,true",
-    "s3://b/a%_!,s3://b/ab,false"
+    "/warehouse/a:b,file:/warehouse/a:b,true",
+    "s3://b/a%_!,s3://b/ab,false",
+    "file:/warehouse/./a,file:/warehouse/a,true",
+    "file:/warehouse/public/../a,file:/warehouse/a,true",
+    "file:/warehouse//a,file:///warehouse/a,true",
+    "hdfs://namenode/warehouse/./a,hdfs://namenode/warehouse/a,true",
+    "hdfs://namenode/warehouse//a,hdfs://namenode/warehouse/a,true",
+    "s3://b/warehouse/./a,s3://b/warehouse/a,false",
+    "s3://b/warehouse//a,s3://b/warehouse/a,false",
+    "gs://b/warehouse/./a,gs://b/warehouse/a,false"
   })
   void testSegmentBoundariesAndAliases(String a, String b, boolean expected) {
     Assertions.assertEquals(expected, IcebergTableLocationUtils.overlaps(a, b));

@@ -20,6 +20,7 @@ package org.apache.gravitino.iceberg.common.ops;
 
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.hadoop.conf.Configuration;
@@ -44,6 +45,7 @@ import org.mockito.Mockito;
 /** Verifies JDBC registration consumes the metadata snapshot authorized for that request. */
 public class TestJdbcRegistrationMetadataReuse {
   private static final AtomicInteger READS = new AtomicInteger();
+  private static final Map<String, AtomicInteger> PATH_READS = new ConcurrentHashMap<>();
 
   @Test
   void testRegistersSameSnapshotWithoutReopeningFile(@TempDir Path dir) throws Exception {
@@ -104,6 +106,20 @@ public class TestJdbcRegistrationMetadataReuse {
       Assertions.assertTrue(overwrite.overwrite());
       Assertions.assertEquals(pointer, wrapper.registerTable(ns, overwrite).metadataLocation());
 
+      TableIdentifier copy = TableIdentifier.of(ns, "copy");
+      wrapper.getCatalog().loadTable(copy).updateProperties().set("marker", "new").commit();
+      Assertions.assertNotEquals(pointer, wrapper.getTableMetadataLocation(copy).orElseThrow());
+      int beforeOverwrite = PATH_READS.get(pointer).get();
+      var restored = wrapper.registerTable(ns, overwrite);
+      Assertions.assertEquals(
+          beforeOverwrite,
+          PATH_READS.get(pointer).get(),
+          "Overwriting must not reopen the authorized metadata snapshot");
+      Assertions.assertEquals(pointer, restored.metadataLocation());
+      Assertions.assertFalse(restored.tableMetadata().properties().containsKey("marker"));
+      Assertions.assertFalse(
+          wrapper.getCatalog().loadTable(copy).properties().containsKey("marker"));
+
       String otherPointer =
           wrapper
               .createTable(
@@ -138,6 +154,7 @@ public class TestJdbcRegistrationMetadataReuse {
     @Override
     public InputFile newInputFile(String path) {
       READS.incrementAndGet();
+      PATH_READS.computeIfAbsent(path, ignored -> new AtomicInteger()).incrementAndGet();
       return super.newInputFile(path);
     }
   }
@@ -168,7 +185,8 @@ public class TestJdbcRegistrationMetadataReuse {
               IllegalStateException.class,
               () -> wrapper.registerTable(Namespace.of("ns"), request)));
       Mockito.verify(catalog, Mockito.never())
-          .registerTable(Mockito.any(), Mockito.any(TableMetadata.class), Mockito.anyBoolean());
+          .registerTableWithMetadata(
+              Mockito.any(), Mockito.any(TableMetadata.class), Mockito.anyBoolean());
     }
   }
 

@@ -30,13 +30,16 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.iceberg.MetadataUpdate;
+import org.apache.iceberg.PartitionSpec;
 import org.apache.iceberg.Schema;
+import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.SupportsNamespaces;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.BadRequestException;
 import org.apache.iceberg.io.ResolvingFileIO;
+import org.apache.iceberg.jdbc.JdbcCatalogWithMetadataLocationSupport;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.CreateViewRequest;
@@ -49,6 +52,7 @@ import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types;
 import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
 import org.apache.iceberg.view.ImmutableViewVersion;
+import org.apache.iceberg.view.ViewMetadata;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
@@ -159,6 +163,65 @@ class TestIcebergStorageLocations {
                       .update(IcebergConstants.LOCATION, location)
                       .build()));
       Assertions.assertFalse(wrapper.namespaceExists(NAMESPACE));
+    }
+  }
+
+  @ParameterizedTest
+  @MethodSource("registeredLocalLocations")
+  void testEveryBackendRejectsEmbeddedLocalTableLocations(
+      String property, boolean preloaded, boolean customJdbc, @TempDir Path dir) throws Exception {
+    String pointer = "s3://bucket/shared/v1.metadata.json";
+    String local = dir.resolve("local").toUri().toString();
+    TableMetadata metadata =
+        TableMetadata.newTableMetadata(
+            SCHEMA,
+            PartitionSpec.unpartitioned(),
+            property.equals("location") ? local : "s3://bucket/table",
+            property.equals("location") ? Map.of() : Map.of(property, local));
+    try (IcebergCatalogWrapper wrapper =
+        Mockito.spy(
+            new IcebergCatalogWrapper(
+                new IcebergConfig(config(dir, "s3://bucket/warehouse", false))))) {
+      Catalog backend =
+          customJdbc ? Mockito.mock(CustomJdbcCatalog.class) : Mockito.mock(Catalog.class);
+      Mockito.doReturn(backend).when(wrapper).getCatalog();
+      Mockito.doReturn(metadata).when(wrapper).loadTableMetadataFromLocation(pointer);
+      var original =
+          ImmutableRegisterTableRequest.builder().name("table").metadataLocation(pointer).build();
+      var request = preloaded ? new RegisterTableRequestWithMetadata(original, metadata) : original;
+      assertRejected(local, () -> wrapper.registerTable(NAMESPACE, request));
+      Mockito.verify(backend, Mockito.never())
+          .registerTable(Mockito.any(), Mockito.anyString(), Mockito.anyBoolean());
+      Assertions.assertFalse(Files.exists(dir.resolve("local")));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"location", "write.metadata.path", "write.data.path"})
+  void testRegisterViewRejectsEmbeddedLocalLocations(String property, @TempDir Path dir)
+      throws Exception {
+    String pointer = "s3://bucket/shared/v1.metadata.json";
+    String local = dir.resolve("local_view").toUri().toString();
+    ViewMetadata metadata = Mockito.mock(ViewMetadata.class);
+    Mockito.when(metadata.location())
+        .thenReturn(property.equals("location") ? local : "s3://bucket/view");
+    Mockito.when(metadata.properties())
+        .thenReturn(property.equals("location") ? Map.of() : Map.of(property, local));
+    try (IcebergCatalogWrapper wrapper =
+        Mockito.spy(
+            new IcebergCatalogWrapper(
+                new IcebergConfig(config(dir, "s3://bucket/warehouse", false))))) {
+      Mockito.doReturn(metadata).when(wrapper).loadViewMetadataFromLocation(pointer);
+      assertRejected(
+          local,
+          () ->
+              wrapper.registerView(
+                  NAMESPACE,
+                  ImmutableRegisterViewRequest.builder()
+                      .name("view")
+                      .metadataLocation(pointer)
+                      .build()));
+      Mockito.verify(wrapper, Mockito.never()).getCatalog();
     }
   }
 
@@ -305,6 +368,17 @@ class TestIcebergStorageLocations {
     return properties;
   }
 
+  private static Stream<Arguments> registeredLocalLocations() {
+    return Stream.of("location", "write.metadata.path", "write.data.path")
+        .flatMap(
+            property ->
+                Stream.of(false, true)
+                    .flatMap(
+                        preloaded ->
+                            Stream.of(false, true)
+                                .map(customJdbc -> Arguments.of(property, preloaded, customJdbc))));
+  }
+
   private static CreateTableRequest createRequest(
       @Nullable String location, boolean staged, Map<String, String> properties) {
     CreateTableRequest.Builder builder =
@@ -324,6 +398,12 @@ class TestIcebergStorageLocations {
   private static void assertRejected(String location, Executable action) {
     BadRequestException failure = Assertions.assertThrows(BadRequestException.class, action);
     Assertions.assertTrue(failure.getMessage().contains(location));
+  }
+
+  private static class CustomJdbcCatalog extends JdbcCatalogWithMetadataLocationSupport {
+    private CustomJdbcCatalog() {
+      super(false);
+    }
   }
 
   private static CreateViewRequest viewRequest(

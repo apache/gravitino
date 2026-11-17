@@ -265,6 +265,35 @@ class TestRegisterTableAuthzHandler {
   }
 
   @Test
+  void testUnreadableSourceWithoutPointerNeverReachesOperation() throws Throwable {
+    TableIdentifier source = TableIdentifier.of("other", "secret");
+    stubCatalogWithSource(source);
+    when(catalogWrapper.getTableMetadataLocation(source)).thenReturn(Optional.empty());
+    when(catalogWrapper.loadTableMetadata(source))
+        .thenThrow(new RuntimeException("storage unavailable"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = registerInvocation(false, "copy", META_LOC);
+    Response response = assertInstanceOf(Response.class, interceptor.invoke(invocation));
+    assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
+    verify(invocation, never()).proceed();
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "file:/warehouse/other/./secret",
+        "file:/warehouse//other/secret",
+        "file:/warehouse/public/../other/secret"
+      })
+  void testFilesystemAliasesCannotBypassCreateAuthorization(String location) throws Throwable {
+    stubCatalogWithSource(TableIdentifier.of("other", "secret"));
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    MethodInvocation invocation = createInvocation(false, location);
+    assertForbidden(interceptor.invoke(invocation));
+    verify(invocation, never()).proceed();
+  }
+
+  @Test
   void testMissingRequestBodyIsBadRequest() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
 

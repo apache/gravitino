@@ -78,6 +78,63 @@ class TestJdbcMetadataLocationLookup {
     }
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"V0", "V1"})
+  void testLookupIncludesFilesystemAliasesAndExactCustomPointer(String version, @TempDir Path dir)
+      throws Exception {
+    String uri = "jdbc:sqlite:" + dir.resolve("catalog.db");
+    try (JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(true)) {
+      catalog.initialize(
+          "main",
+          Map.of(
+              CatalogProperties.URI,
+              uri,
+              CatalogProperties.WAREHOUSE_LOCATION,
+              dir.toString(),
+              "jdbc.schema-version",
+              version));
+      try (Connection connection = DriverManager.getConnection(uri)) {
+        insert(
+            connection,
+            version,
+            "main",
+            "file_alias",
+            "file:/warehouse/public/../secret/metadata/v1.json",
+            "TABLE");
+        insert(
+            connection,
+            version,
+            "main",
+            "hdfs_alias",
+            "hdfs://node/warehouse//secret/metadata/v1.json",
+            "TABLE");
+        insert(
+            connection, version, "main", "custom", "s3n://b/shared/current.metadata.json", "TABLE");
+      }
+      Assertions.assertTrue(
+          catalog
+              .metadataLocationCandidates("file:/warehouse/secret")
+              .orElseThrow()
+              .containsKey(TableIdentifier.of("ns", "file_alias")));
+      Assertions.assertTrue(
+          catalog
+              .metadataLocationCandidates("hdfs://node/warehouse/secret")
+              .orElseThrow()
+              .containsKey(TableIdentifier.of("ns", "hdfs_alias")));
+      Assertions.assertFalse(
+          catalog
+              .metadataLocationCandidates("s3://b/private")
+              .orElseThrow()
+              .containsKey(TableIdentifier.of("ns", "custom")));
+      Assertions.assertTrue(
+          catalog
+              .metadataLocationCandidates("s3://b/private", "s3a://b/shared/current.metadata.json")
+              .orElseThrow()
+              .containsKey(TableIdentifier.of("ns", "custom")));
+    }
+  }
+
   private static void insert(
       Connection connection,
       String version,

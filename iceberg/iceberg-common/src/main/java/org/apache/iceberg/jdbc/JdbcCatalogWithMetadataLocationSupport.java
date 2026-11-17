@@ -25,9 +25,12 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
@@ -78,7 +81,24 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
   /** {@inheritDoc} */
   @Override
   public Optional<Map<TableIdentifier, String>> metadataLocationCandidates(String location) {
+    return metadataLocationCandidates(location, null);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public Optional<Map<TableIdentifier, String>> metadataLocationCandidates(
+      String location, @Nullable String metadataLocation) {
     List<String> patterns = IcebergTableLocationUtils.metadataLocationPatterns(location);
+    Set<String> exactPointers = new LinkedHashSet<>();
+    if (metadataLocation != null) {
+      exactPointers.add(metadataLocation);
+      String normalized = IcebergTableLocationUtils.normalize(metadataLocation);
+      exactPointers.add(normalized);
+      if (normalized.startsWith("s3://")) {
+        exactPointers.add("s3a://" + normalized.substring(5));
+        exactPointers.add("s3n://" + normalized.substring(5));
+      }
+    }
     String predicate =
         String.join(
             " OR ",
@@ -91,6 +111,17 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
                 : " AND (iceberg_type = 'TABLE' OR iceberg_type IS NULL)")
             + " AND ("
             + predicate
+            // Filesystem pointers can contain equivalent dot segments and repeated separators.
+            // Return those strings for lexical comparison without opening their metadata files.
+            + " OR LOWER(metadata_location) LIKE 'file:%'"
+            + " OR LOWER(metadata_location) LIKE 'hdfs:%'"
+            + " OR LOWER(metadata_location) LIKE 'viewfs:%'"
+            + " OR metadata_location NOT LIKE '%://%'"
+            + (exactPointers.isEmpty()
+                ? ""
+                : " OR metadata_location IN ("
+                    + String.join(",", Collections.nCopies(exactPointers.size(), "?"))
+                    + ")")
             + ")";
     try {
       return Optional.of(
@@ -101,6 +132,10 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
                   statement.setString(1, jdbcCatalogName);
                   for (int i = 0; i < patterns.size(); i++) {
                     statement.setString(i + 2, patterns.get(i));
+                  }
+                  int parameter = patterns.size() + 2;
+                  for (String pointer : exactPointers) {
+                    statement.setString(parameter++, pointer);
                   }
                   try (ResultSet result = statement.executeQuery()) {
                     while (result.next()) {
@@ -154,11 +189,10 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
    * @param identifier destination table
    * @param metadata metadata snapshot read and authorized for this request
    * @param overwrite whether an existing registration can be replaced
-   * @return registered table
    */
-  public Table registerTable(
+  public void registerTableWithMetadata(
       TableIdentifier identifier, TableMetadata metadata, boolean overwrite) {
-    return MetastoreRegisterTableUtils.registerTable(
+    MetastoreRegisterTableUtils.registerTableWithMetadata(
         this, identifier, metadata, overwrite, this::overwriteMetadataLocation);
   }
 
