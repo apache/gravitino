@@ -52,6 +52,7 @@ import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStoreFactory;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
+import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -71,11 +72,12 @@ import org.slf4j.LoggerFactory;
  * <p>Request bodies and behavior-changing headers are not compared. Reusing a key on the same URL
  * with different body/header values replays the first response; clients must use a new key for a
  * different logical operation. The catalog mutation and response storage are not transactional:
- * eviction, a crash, serialization failure, or a post-commit exception can permit re-execution.
+ * eviction, expiry, a crash, or a post-commit exception can permit re-execution. If retaining a
+ * terminal response fails, its reservation is kept until expiry to prevent an immediate retry from
+ * re-executing the mutation.
  *
- * <p>This phase does not schedule {@link IdempotencyStore#purgeExpired}. The in-memory store uses
- * Caffeine for reclamation. Custom stores must enforce deadlines and arrange their own cleanup;
- * scheduling durable cleanup belongs to the JDBC-store integration.
+ * <p>Stores enforce deadlines and arrange their own cleanup. The in-memory store uses Caffeine for
+ * reclamation; the JDBC store owns its purge scheduler.
  */
 public class IcebergIdempotencyManager {
 
@@ -166,24 +168,38 @@ public class IcebergIdempotencyManager {
     // A fresh claim per attempt, so that if this reservation is dropped underneath us and another
     // request takes the key, our finalize or release lands on nothing instead of on its record.
     long claim = ThreadLocalRandom.current().nextLong();
-    if (idempotencyStore.reserve(key, binding, claim, expiresAtMs) == ReserveResult.DUPLICATE) {
-      return replay(idempotencyStore, key, binding);
+    try {
+      if (idempotencyStore.reserve(key, binding, claim, expiresAtMs) == ReserveResult.DUPLICATE) {
+        return replay(idempotencyStore, key, binding);
+      }
+    } catch (RuntimeException e) {
+      LOG.warn(
+          "Failed to access idempotency state for key {} before executing the mutation", key, e);
+      // A lost commit acknowledgement may leave a reservation. Do not release or execute it.
+      return Response.fromResponse(
+              IcebergExceptionMapper.toRESTResponse(
+                  new ServiceUnavailableException(
+                      "Idempotency store unavailable; this attempt did not execute the mutation. "
+                          + "Retry with the same Idempotency-Key within its reuse window.")))
+          .header(HttpHeaders.RETRY_AFTER, RETRY_AFTER_SECONDS)
+          .build();
     }
 
-    boolean finalized = false;
+    boolean release = true;
     try {
       Response response = action.get();
       int status = response.getStatus();
-      // Store successful and terminal client responses. Release 5xx and auth outcomes so retries
-      // can re-evaluate them; serialization/finalization failure also releases only our claim.
+      // Retain terminal outcomes even if recording the response fails: the mutation may have
+      // committed, so freeing its reservation would allow an immediate duplicate execution.
       if (status < Response.Status.INTERNAL_SERVER_ERROR.getStatusCode()
           && !NON_FINALIZABLE_STATUSES.contains(status)) {
-        finalized = tryFinalize(idempotencyStore, key, claim, response);
+        release = false;
+        tryFinalize(idempotencyStore, key, claim, response);
       }
       return response;
     } finally {
-      if (!finalized) {
-        // Only release this attempt's claim when the response is retryable or was not retained.
+      if (release) {
+        // Release only when the action throws or returns a retryable/auth response.
         // A replacement owner's reservation must remain untouched.
         idempotencyStore.release(key, claim);
       }
@@ -273,7 +289,7 @@ public class IcebergIdempotencyManager {
     return builder.build();
   }
 
-  private boolean tryFinalize(
+  private void tryFinalize(
       IdempotencyStore idempotencyStore, String idempotencyKey, long claim, Response response) {
     String responseSummary;
     try {
@@ -285,26 +301,24 @@ public class IcebergIdempotencyManager {
       } else {
         responseSummary = icebergObjectMapper.writeValueAsString(entity);
       }
-    } catch (JsonProcessingException e) {
+      idempotencyStore.finalizeRecord(idempotencyKey, claim, response.getStatus(), responseSummary);
+      boolean finalized =
+          idempotencyStore
+              .load(idempotencyKey)
+              .filter(record -> record.isFinalized() && record.claim() == claim)
+              .isPresent();
+      if (!finalized) {
+        LOG.warn(
+            "Response for Idempotency-Key: {} was not retained under this claim; "
+                + "leaving any reservation until expiry",
+            idempotencyKey);
+      }
+    } catch (JsonProcessingException | RuntimeException e) {
       LOG.warn(
-          "Failed to serialize the response for Idempotency-Key: {}, it will not be replayed.",
+          "Failed to retain the response for Idempotency-Key: {}; leaving any reservation until expiry",
           idempotencyKey,
           e);
-      return false;
     }
-    idempotencyStore.finalizeRecord(idempotencyKey, claim, response.getStatus(), responseSummary);
-    boolean finalized =
-        idempotencyStore
-            .load(idempotencyKey)
-            .filter(record -> record.isFinalized() && record.claim() == claim)
-            .isPresent();
-    if (!finalized) {
-      LOG.warn(
-          "Response for Idempotency-Key: {} was not retained under this claim", idempotencyKey);
-    }
-    // Keep the actual mutation response: returning a synthetic 5xx could encourage clients to
-    // retry an operation that already committed. Release is fenced to our claim in the caller.
-    return finalized;
   }
 
   private static Response conflict(String message, boolean retryable) {

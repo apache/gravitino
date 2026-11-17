@@ -197,7 +197,7 @@ Limitations:
 
 - Request identity covers the HTTP method, path, and query parameters. It does **not** compare request bodies or behavior-changing headers such as `X-Iceberg-Access-Delegation`. Reusing a key on the same URL with a changed body or header replays the first response; it does not apply the changed request. Always generate a new key for a different logical operation. Request validation runs before replay, so a retry with an invalid body can return `400 Bad Request` even if the key already has a stored success.
 - Replay preserves the status and JSON body but omits response headers such as `ETag`. Load the table again if the client needs its current ETag.
-- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. A retry can then execute again. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
+- The catalog mutation and response persistence are not one transaction. A crash, serialization failure, lost reservation, or post-commit failure can leave a successful mutation without a replayable response. When saving a terminal response fails, the manager keeps any existing reservation until expiry and returns the original mutation response. Retries receive `409` with `Retry-After` while an unfinalized reservation remains. Expiry, eviction, or a released reservation can still permit re-execution. Claim fencing protects replacement records, but cannot undo or fence catalog side effects.
 - The in-memory store reclaims expired entries through Caffeine. The JDBC store schedules bounded cleanup as described below. Custom stores must enforce expiry on reads/reservations and arrange their own cleanup.
 
 :::caution
@@ -252,15 +252,36 @@ a clock-skew grace period; changing the cleanup interval does not prevent early 
 `reserve()`.
 :::
 
+:::warning The reuse window must outlast the mutation
+There is no heartbeat or in-flight lease renewal. Configure `idempotency-key-lifetime` to exceed
+the maximum elapsed time from starting reservation through completing the mutation and persisting
+its response, plus maximum clock skew and a safety margin. Include database lock waits, backend
+retries, serialization time, and JVM pauses in that bound; typical or percentile latency is not
+sufficient. A client or HTTP timeout does not necessarily stop an already-running catalog mutation.
+
+Once the deadline passes, another replica may reclaim the key while the original mutation is still
+running. If a duration or clock-skew bound cannot be enforced, do not rely on this mechanism for
+at-most-once execution. Reconcile catalog state before retrying outside the reuse window, and do not
+use a new key to bypass an existing reservation for the same logical operation.
+:::
+
+If reservation or replay lookup fails, the server returns `503 Service Unavailable` with
+`Retry-After` and does not execute the mutation in that attempt. The reservation may still have
+committed before a connection failure, so it is retained and a retry with the same key may receive
+`409` until the reservation expires. Retry with the same key within the advertised window; after
+the window, inspect catalog state before deciding whether to execute the operation again. A generic
+mutation `5xx` can still have an uncertain catalog outcome and must not be treated as proof that
+nothing changed.
+
 The 100,000-row cleanup cap applies to each pass, and remaining expired rows wait for later passes.
 Monitor expired-row backlog and database storage growth; shorten the cleanup interval if cleanup
 falls behind, while checking database load and lock waits. Cleanup lag does not extend record
 validity because expiry is checked on access.
 
-Durable storage does not make catalog mutations and response persistence one transaction. A crash
-or response-persistence failure after the catalog mutation can still allow re-execution after the
-reservation is released or expires. Claim fencing protects idempotency records, not external catalog
-side effects. A request running beyond its reuse window can overlap a retry.
+Durable storage does not make catalog mutations and response persistence one transaction. Failed
+response persistence leaves any reservation in place until expiry, but cannot recover a missing
+response after a crash. Claim fencing protects idempotency records, not external catalog side
+effects. A request running beyond its reuse window can overlap a retry.
 
 ### Catalog Backend Configuration
 

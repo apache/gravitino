@@ -53,7 +53,10 @@ import org.slf4j.LoggerFactory;
  * and release calls, but cannot undo catalog side effects or make the catalog mutation and response
  * persistence atomic. Expired keys can be reserved again without waiting for background cleanup.
  * Replicas must synchronize system clocks: a fast clock can reclaim a key another replica still
- * considers live. There is no clock-skew grace period.
+ * considers live. There is no clock-skew grace period. There is also no in-flight renewal: the
+ * configured lifetime must exceed the maximum duration from reservation through mutation completion
+ * and response persistence, plus maximum clock skew and a safety margin. Expiry can otherwise allow
+ * overlapping mutations.
  *
  * <p>Share one store per service instance across requests. Each store owns a cleanup scheduler that
  * is stopped by {@link #close()}; the relational entity store owns the shared connection pool.
@@ -127,9 +130,10 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       String idempotencyKey, String operationBinding, long claim, long expiresAtMs) {
     String key = IdempotencyKeys.canonicalize(idempotencyKey);
     Preconditions.checkArgument(operationBinding != null, "operationBinding should not be null");
-    IcebergIdempotencyKeyPO po =
-        IcebergIdempotencyKeyPO.reserved(key, operationBinding, claim, clock.millis(), expiresAtMs);
     for (int attempt = 0; attempt < 2; attempt++) {
+      IcebergIdempotencyKeyPO po =
+          IcebergIdempotencyKeyPO.reserved(
+              key, operationBinding, claim, clock.millis(), expiresAtMs);
       try {
         execute(mapper -> mapper.insert(po));
         return ReserveResult.RESERVED;
@@ -140,11 +144,11 @@ public class JdbcIdempotencyStore implements IdempotencyStore {
       }
       // The failed insert has rolled back before this update, including on PostgreSQL.
       // Separate transactions also avoid upgrading duplicate-insert locks on MySQL.
-      if (attempt == 0 && execute(mapper -> mapper.replaceExpired(po)) > 0) {
+      if (execute(mapper -> mapper.replaceExpired(po)) > 0) {
         return ReserveResult.RESERVED;
       }
       // Purge or release may have removed the row before replacement. Retry INSERT once to
-      // claim a now-free key or observe another owner's reservation without overwriting it.
+      // claim a now-free key, recheck expiry with a fresh clock, or observe another live owner.
     }
     return ReserveResult.DUPLICATE;
   }

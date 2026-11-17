@@ -79,6 +79,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   private static final long FAR_FUTURE_MS = Long.MAX_VALUE;
 
   private final AtomicLong now = new AtomicLong();
+  private Clock clock;
   private JdbcIdempotencyStore store;
   private JdbcIdempotencyStore peer;
 
@@ -109,7 +110,7 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
   @BeforeEach
   public void prepareIdempotencyStore() {
     now.set(1_000_000L);
-    Clock clock = Mockito.mock(Clock.class);
+    clock = Mockito.mock(Clock.class);
     Mockito.when(clock.millis()).thenAnswer(invocation -> now.get());
     store = new JdbcIdempotencyStore(clock);
     peer = new JdbcIdempotencyStore(clock);
@@ -345,6 +346,22 @@ public class TestJdbcIdempotencyStore extends TestJDBCBackend {
     Assertions.assertEquals(2, record.claim());
     Assertions.assertEquals("new binding", record.operationBinding());
     Assertions.assertEquals("new", record.responseSummary());
+  }
+
+  @TestTemplate
+  void testReserveReclaimsKeyThatExpiresBeforeSecondAttempt() {
+    store.reserve(KEY, BINDING, 1, now.get() + 1);
+    Mockito.when(clock.millis()).thenReturn(now.get(), now.get() + 1);
+
+    Assertions.assertEquals(
+        ReserveResult.RESERVED, peer.reserve(KEY, "new binding", 2, FAR_FUTURE_MS));
+    store.finalizeRecord(KEY, 1, 500, "stale");
+    store.release(KEY, 1);
+    peer.finalizeRecord(KEY, 2, 201, "current");
+    IdempotencyRecord record = store.load(KEY).orElseThrow();
+    Assertions.assertEquals(2, record.claim());
+    Assertions.assertEquals("new binding", record.operationBinding());
+    Assertions.assertEquals("current", record.responseSummary());
   }
 
   @TestTemplate

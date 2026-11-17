@@ -38,7 +38,6 @@ import org.apache.gravitino.iceberg.common.idempotency.IdempotencyStore.ReserveR
 import org.apache.gravitino.iceberg.common.idempotency.InMemoryIdempotencyStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestIcebergIdempotencyManager {
@@ -268,7 +267,7 @@ public class TestIcebergIdempotencyManager {
   }
 
   @Test
-  void testNoOpFinalizeReleasesOnlyItsOwnClaim() {
+  void testNoOpFinalizeRetainsReservation() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
     Mockito.when(
             store.reserve(
@@ -278,14 +277,11 @@ public class TestIcebergIdempotencyManager {
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
     Response response = execute(manager, KEY, new AtomicInteger());
     Assertions.assertEquals(200, response.getStatus());
-    ArgumentCaptor<Long> claim = ArgumentCaptor.forClass(Long.class);
-    Mockito.verify(store)
-        .reserve(Mockito.eq(KEY), Mockito.anyString(), claim.capture(), Mockito.anyLong());
-    Mockito.verify(store).release(KEY, claim.getValue());
+    Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
   }
 
   @Test
-  void testFinalizeWithReplacementClaimReleasesOnlyOriginalClaim() {
+  void testFinalizeWithReplacementClaimDoesNotRelease() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
     Mockito.when(
             store.reserve(
@@ -304,10 +300,47 @@ public class TestIcebergIdempotencyManager {
     IcebergIdempotencyManager manager =
         new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
     Assertions.assertEquals(200, execute(manager, KEY, new AtomicInteger()).getStatus());
-    ArgumentCaptor<Long> claim = ArgumentCaptor.forClass(Long.class);
-    Mockito.verify(store)
-        .reserve(Mockito.eq(KEY), Mockito.anyString(), claim.capture(), Mockito.anyLong());
-    Mockito.verify(store).release(KEY, claim.getValue());
+    Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
+  }
+
+  @Test
+  void testSerializationFailureRetainsReservation() {
+    IcebergIdempotencyManager manager = newManager(ImmutableMap.of());
+    AtomicInteger executions = new AtomicInteger();
+    try (Response first =
+            manager.replayOrExecute(
+                KEY,
+                BINDING,
+                () -> {
+                  executions.incrementAndGet();
+                  return Response.ok(new UnserializableResponse()).build();
+                });
+        Response retry = execute(manager, KEY, executions)) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(409, retry.getStatus());
+      Assertions.assertEquals("1", retry.getHeaderString(HttpHeaders.RETRY_AFTER));
+      Assertions.assertEquals(1, executions.get());
+    }
+  }
+
+  @Test
+  void testReadFailureAfterFinalizeKeepsOriginalResponse() {
+    InMemoryIdempotencyStore store = Mockito.spy(new InMemoryIdempotencyStore());
+    store.initialize(ImmutableMap.of());
+    Mockito.doThrow(new IllegalStateException("read unavailable"))
+        .doCallRealMethod()
+        .when(store)
+        .load(KEY);
+    IcebergIdempotencyManager manager =
+        new IcebergIdempotencyManager(enabledConfig(ImmutableMap.of()), Optional.of(store));
+    AtomicInteger executions = new AtomicInteger();
+    try (Response first = execute(manager, KEY, executions);
+        Response retry = execute(manager, KEY, executions)) {
+      Assertions.assertEquals(200, first.getStatus());
+      Assertions.assertEquals(first.getEntity(), retry.getEntity());
+      Assertions.assertEquals(1, executions.get());
+      Mockito.verify(store, Mockito.never()).release(Mockito.anyString(), Mockito.anyLong());
+    }
   }
 
   @Test
@@ -361,5 +394,12 @@ public class TestIcebergIdempotencyManager {
     Map<String, String> merged = new HashMap<>(properties);
     merged.put(IcebergConstants.ICEBERG_IDEMPOTENCY_ENABLED, "true");
     return new IcebergConfig(merged);
+  }
+
+  private static class UnserializableResponse {
+    /** Simulates a response whose body cannot be serialized. */
+    public String getValue() {
+      throw new IllegalStateException("serialization failure");
+    }
   }
 }
