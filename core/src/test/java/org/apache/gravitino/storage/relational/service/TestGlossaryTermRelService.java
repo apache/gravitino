@@ -22,6 +22,7 @@ package org.apache.gravitino.storage.relational.service;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -49,6 +50,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 import org.mockito.AdditionalAnswers;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -59,6 +61,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
       Namespace.of("glossary", Entity.SYSTEM_CATALOG_RESERVED_NAME, "glossary_term");
   private final GlossaryTermRelService service = GlossaryTermRelService.getInstance();
 
+  /** Checks the T3 endpoint, canonical-pair and transaction-lifecycle invariants. */
   @AfterEach
   public void checkInvariants() throws Exception {
     Assertions.assertFalse(
@@ -67,6 +70,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     GlossaryInvariants.assertRelations();
   }
 
+  /** T3.1/T3.2: relation directions, canonical RELATED pairs and idempotent mutations. */
   @TestTemplate
   public void testRelationsAndCanonicalPairs() throws Exception {
     setupTerms(4);
@@ -90,6 +94,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     Assertions.assertTrue(service.listBroader(100, 104).isEmpty());
   }
 
+  /** T3.1: rejects invalid input and missing or cross-metalake endpoints without writes. */
   @TestTemplate
   public void testRejectInvalidEndpoints() throws Exception {
     setupTerms(2);
@@ -126,6 +131,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
         0, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock WHERE metalake_id=999"));
   }
 
+  /** T3.3/T3.4: deduplicates diamonds and guards one real mapper query per frontier. */
   @TestTemplate
   public void testBatchedWalkAndDiamond() throws Exception {
     setupTerms(8);
@@ -183,132 +189,150 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     service.remove(100, 108, 101, RelationType.BROADER);
   }
 
+  /** T3.5: transaction ownership and fresh reads after acquiring the hierarchy mutex. */
   @TestTemplate
   public void testRollbackAndFreshReadsUnderMutex() throws Exception {
-    setupTerms(3);
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            service.withHierarchyLock(
-                100,
-                () -> {
-                  service.add(100, 101, 102, RelationType.BROADER);
-                  throw new IllegalStateException("rollback graph");
-                }));
-    Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
-    Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
-    SessionUtils.beginTransaction();
-    try {
-      Assertions.assertThrows(
-          IllegalStateException.class,
-          () ->
+    repeatRace(
+        () -> {
+          setupTerms(3);
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () ->
+                  service.withHierarchyLock(
+                      100,
+                      () -> {
+                        service.add(100, 101, 102, RelationType.BROADER);
+                        throw new IllegalStateException("rollback graph");
+                      }));
+          Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
+          Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
+          SessionUtils.beginTransaction();
+          try {
+            Assertions.assertThrows(
+                IllegalStateException.class,
+                () ->
+                    service.withHierarchyLock(
+                        100,
+                        () -> {
+                          service.add(100, 101, 102, RelationType.BROADER);
+                          throw new IllegalStateException("nested callback failed");
+                        }));
+          } finally {
+            // SessionUtils has no savepoints. A caller catching a nested failure owns the rollback.
+            SessionUtils.rollbackTransaction();
+          }
+          Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
+          ExecutorService writer = Executors.newSingleThreadExecutor();
+          try {
+            SessionUtils.beginTransaction();
+            try {
+              Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
+              writer
+                  .submit(() -> service.add(100, 101, 102, RelationType.BROADER))
+                  .get(10, TimeUnit.SECONDS);
               service.withHierarchyLock(
                   100,
                   () -> {
-                    service.add(100, 101, 102, RelationType.BROADER);
-                    throw new IllegalStateException("nested callback failed");
-                  }));
-    } finally {
-      // SessionUtils has no savepoints. A caller catching a nested failure owns the rollback.
-      SessionUtils.rollbackTransaction();
-    }
-    Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
-    ExecutorService writer = Executors.newSingleThreadExecutor();
-    try {
-      SessionUtils.beginTransaction();
-      try {
-        Assertions.assertTrue(service.listBroader(100, 101).isEmpty());
-        writer
-            .submit(() -> service.add(100, 101, 102, RelationType.BROADER))
-            .get(10, TimeUnit.SECONDS);
-        service.withHierarchyLock(
-            100,
-            () -> {
-              Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
-              return null;
-            });
-        SessionUtils.commitTransaction();
-      } finally {
-        if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
-      }
-      Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
-      service.withHierarchyLock(100, () -> null);
-      Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
-    } finally {
-      writer.shutdownNow();
-      Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
-    }
+                    Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
+                    return null;
+                  });
+              SessionUtils.commitTransaction();
+            } finally {
+              if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
+            }
+            Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
+            service.withHierarchyLock(100, () -> null);
+            Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
+          } finally {
+            writer.shutdownNow();
+            Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+          }
+        });
   }
 
+  /** T3.5: two independent transactions concurrently initialize the same mutex, 20 rounds. */
   @TestTemplate
   public void testConcurrentFirstUse() throws Exception {
-    setupTerms(3);
-    CyclicBarrier ready = new CyclicBarrier(2);
-    AtomicInteger inside = new AtomicInteger();
-    ExecutorService writers = Executors.newFixedThreadPool(2);
-    try {
-      List<Future<Boolean>> results = new ArrayList<>();
-      for (int i = 0; i < 2; i++) {
-        final long to = 102L + i;
-        results.add(
-            writers.submit(
-                () -> {
-                  ready.await(10, TimeUnit.SECONDS);
-                  return service.withHierarchyLock(
-                      100,
+    repeatRace(
+        () -> {
+          setupTerms(3);
+          CyclicBarrier ready = new CyclicBarrier(2);
+          AtomicInteger inside = new AtomicInteger();
+          ExecutorService writers = Executors.newFixedThreadPool(2);
+          try {
+            List<Future<Boolean>> results = new ArrayList<>();
+            for (int i = 0; i < 2; i++) {
+              final long to = 102L + i;
+              results.add(
+                  writers.submit(
                       () -> {
-                        Assertions.assertEquals(1, inside.incrementAndGet());
-                        try {
-                          return service.add(100, 101, to, RelationType.BROADER);
-                        } finally {
-                          inside.decrementAndGet();
-                        }
-                      });
-                }));
-      }
-      for (Future<Boolean> result : results)
-        Assertions.assertTrue(result.get(20, TimeUnit.SECONDS));
-      Assertions.assertEquals(Set.of(102L, 103L), service.listBroader(100, 101));
-      Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
-    } finally {
-      writers.shutdownNow();
-      Assertions.assertTrue(writers.awaitTermination(10, TimeUnit.SECONDS));
-    }
+                        ready.await(10, TimeUnit.SECONDS);
+                        return service.withHierarchyLock(
+                            100,
+                            () -> {
+                              Assertions.assertEquals(1, inside.incrementAndGet());
+                              try {
+                                return service.add(100, 101, to, RelationType.BROADER);
+                              } finally {
+                                inside.decrementAndGet();
+                              }
+                            });
+                      }));
+            }
+            for (Future<Boolean> result : results)
+              Assertions.assertTrue(result.get(20, TimeUnit.SECONDS));
+            Assertions.assertEquals(Set.of(102L, 103L), service.listBroader(100, 101));
+            Assertions.assertEquals(1, scalar("SELECT COUNT(*) FROM glossary_hierarchy_lock"));
+          } finally {
+            writers.shutdownNow();
+            Assertions.assertTrue(writers.awaitTermination(10, TimeUnit.SECONDS));
+          }
+        });
   }
 
+  /**
+   * T3.5: a returned operation retains its lock through outer commit while reads remain unlocked.
+   */
   @TestTemplate
   public void testLockHeldThroughOuterCommitAndReadersDoNotBlock() throws Exception {
-    setupTerms(3);
-    ExecutorService worker = Executors.newFixedThreadPool(2);
-    CountDownLatch attempted = new CountDownLatch(1);
-    try {
-      SessionUtils.beginTransaction();
-      Future<Boolean> waiting;
-      try {
-        service.add(100, 101, 102, RelationType.BROADER);
-        waiting =
-            worker.submit(
-                () -> {
-                  attempted.countDown();
-                  return service.add(100, 101, 103, RelationType.BROADER);
-                });
-        Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
-        Assertions.assertThrows(
-            TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
-        Assertions.assertTrue(
-            worker.submit(() -> service.listBroader(100, 101)).get(10, TimeUnit.SECONDS).isEmpty());
-        SessionUtils.commitTransaction();
-      } finally {
-        if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
-      }
-      Assertions.assertTrue(waiting.get(10, TimeUnit.SECONDS));
-      Assertions.assertEquals(Set.of(102L, 103L), service.listBroader(100, 101));
-    } finally {
-      worker.shutdownNow();
-      Assertions.assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
-    }
+    repeatRace(
+        () -> {
+          setupTerms(3);
+          ExecutorService worker = Executors.newFixedThreadPool(2);
+          CountDownLatch attempted = new CountDownLatch(1);
+          try {
+            SessionUtils.beginTransaction();
+            Future<Boolean> waiting;
+            try {
+              service.add(100, 101, 102, RelationType.BROADER);
+              waiting =
+                  worker.submit(
+                      () -> {
+                        attempted.countDown();
+                        return service.add(100, 101, 103, RelationType.BROADER);
+                      });
+              Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
+              Assertions.assertThrows(
+                  TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
+              Assertions.assertTrue(
+                  worker
+                      .submit(() -> service.listBroader(100, 101))
+                      .get(10, TimeUnit.SECONDS)
+                      .isEmpty());
+              SessionUtils.commitTransaction();
+            } finally {
+              if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
+            }
+            Assertions.assertTrue(waiting.get(10, TimeUnit.SECONDS));
+            Assertions.assertEquals(Set.of(102L, 103L), service.listBroader(100, 101));
+          } finally {
+            worker.shutdownNow();
+            Assertions.assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
+          }
+        });
   }
 
+  /** T3.1: repeated edge generations, strict expiry cutoff and bounded garbage collection. */
   @TestTemplate
   public void testRetiredGenerationsAndBoundedGc() throws Exception {
     setupTerms(2);
@@ -330,6 +354,7 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
   }
 
+  /** T3.1: definition and metalake deletion retire edges and collect their tombstones. */
   @TestTemplate
   public void testTermAndMetalakeCleanup() throws Exception {
     setupTerms(3);
@@ -353,86 +378,116 @@ public class TestGlossaryTermRelService extends TestJDBCBackend {
     Assertions.assertEquals(0, scalar("SELECT COUNT(*) FROM glossary_term_meta"));
   }
 
+  /** T3.5: the committed mutex itself excludes a writer independently of the parent fence. */
   @TestTemplate
   public void testMutexExcludesIndependentDatabaseWriter() throws Exception {
-    setupTerms(2);
-    service.withHierarchyLock(100, () -> null);
-    ExecutorService worker = Executors.newSingleThreadExecutor();
-    CountDownLatch attempted = new CountDownLatch(1);
-    try {
-      SessionUtils.beginTransaction();
-      Future<Long> waiting;
-      try {
-        service.withHierarchyLock(100, () -> null);
-        waiting =
-            worker.submit(
-                () ->
-                    SessionUtils.doWithCommitAndFetchResult(
-                        GlossaryTermRelMapper.class,
-                        mapper -> {
-                          attempted.countDown();
-                          // Deliberately skip the parent fence to prove the mutex itself, including
-                          // on H2.
-                          mapper.ensureLock(100);
-                          return mapper.lockHierarchy(100);
-                        }));
-        Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
-        Assertions.assertThrows(
-            TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
-        SessionUtils.commitTransaction();
-      } finally {
-        if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
-      }
-      Assertions.assertEquals(100L, waiting.get(10, TimeUnit.SECONDS));
-    } finally {
-      worker.shutdownNow();
-      Assertions.assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
-    }
+    repeatRace(
+        () -> {
+          setupTerms(2);
+          service.withHierarchyLock(100, () -> null);
+          ExecutorService worker = Executors.newSingleThreadExecutor();
+          CountDownLatch attempted = new CountDownLatch(1);
+          try {
+            SessionUtils.beginTransaction();
+            Future<Long> waiting;
+            try {
+              service.withHierarchyLock(100, () -> null);
+              waiting =
+                  worker.submit(
+                      () ->
+                          SessionUtils.doWithCommitAndFetchResult(
+                              GlossaryTermRelMapper.class,
+                              mapper -> {
+                                attempted.countDown();
+                                // Deliberately skip the parent fence to prove the mutex itself,
+                                // including
+                                // on H2.
+                                mapper.ensureLock(100);
+                                return mapper.lockHierarchy(100);
+                              }));
+              Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
+              Assertions.assertThrows(
+                  TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
+              SessionUtils.commitTransaction();
+            } finally {
+              if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
+            }
+            Assertions.assertEquals(100L, waiting.get(10, TimeUnit.SECONDS));
+          } finally {
+            worker.shutdownNow();
+            Assertions.assertTrue(worker.awaitTermination(10, TimeUnit.SECONDS));
+          }
+        });
   }
 
+  /**
+   * T3.1/T3.5: deletion rollback restores edges and committed deletion fences concurrent additions.
+   */
   @TestTemplate
   public void testDeleteFencesNewEdgesAndRollbackRestoresRelations() throws Exception {
-    setupTerms(3);
-    service.add(100, 101, 102, RelationType.BROADER);
-    Assertions.assertThrows(
-        IllegalStateException.class,
-        () ->
-            SessionUtils.doMultipleWithCommit(
-                () -> {
-                  GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term102"));
-                  throw new IllegalStateException("rollback deletion");
-                }));
-    Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
-    ExecutorService writer = Executors.newSingleThreadExecutor();
-    CountDownLatch attempted = new CountDownLatch(1);
-    try {
-      SessionUtils.beginTransaction();
-      Future<?> waiting;
-      try {
-        Assertions.assertTrue(
-            GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term102")));
-        waiting =
-            writer.submit(
-                () -> {
-                  attempted.countDown();
-                  Assertions.assertThrows(
-                      NoSuchEntityException.class,
-                      () -> service.add(100, 103, 102, RelationType.RELATED));
-                });
-        Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
-        Assertions.assertThrows(
-            TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
-        SessionUtils.commitTransaction();
-      } finally {
-        if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
-      }
-      waiting.get(10, TimeUnit.SECONDS);
-      Assertions.assertEquals(
-          0, scalar("SELECT COUNT(*) FROM glossary_term_rel WHERE deleted_at=0"));
-    } finally {
-      writer.shutdownNow();
-      Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
-    }
+    repeatRace(
+        () -> {
+          setupTerms(3);
+          service.add(100, 101, 102, RelationType.BROADER);
+          Assertions.assertThrows(
+              IllegalStateException.class,
+              () ->
+                  SessionUtils.doMultipleWithCommit(
+                      () -> {
+                        GlossaryTermMetaService.getInstance()
+                            .delete(NameIdentifier.of(NS, "Term102"));
+                        throw new IllegalStateException("rollback deletion");
+                      }));
+          Assertions.assertEquals(Set.of(102L), service.listBroader(100, 101));
+          ExecutorService writer = Executors.newSingleThreadExecutor();
+          CountDownLatch attempted = new CountDownLatch(1);
+          try {
+            SessionUtils.beginTransaction();
+            Future<?> waiting;
+            try {
+              Assertions.assertTrue(
+                  GlossaryTermMetaService.getInstance().delete(NameIdentifier.of(NS, "Term102")));
+              waiting =
+                  writer.submit(
+                      () -> {
+                        attempted.countDown();
+                        Assertions.assertThrows(
+                            NoSuchEntityException.class,
+                            () -> service.add(100, 103, 102, RelationType.RELATED));
+                      });
+              Assertions.assertTrue(attempted.await(10, TimeUnit.SECONDS));
+              Assertions.assertThrows(
+                  TimeoutException.class, () -> waiting.get(200, TimeUnit.MILLISECONDS));
+              SessionUtils.commitTransaction();
+            } finally {
+              if (SessionUtils.isInTransaction()) SessionUtils.rollbackTransaction();
+            }
+            waiting.get(10, TimeUnit.SECONDS);
+            Assertions.assertEquals(
+                0, scalar("SELECT COUNT(*) FROM glossary_term_rel WHERE deleted_at=0"));
+          } finally {
+            writer.shutdownNow();
+            Assertions.assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS));
+          }
+        });
+  }
+
+  private void repeatRace(Executable race) {
+    Assertions.assertTimeoutPreemptively(
+        Duration.ofMinutes(2),
+        () -> {
+          for (int round = 0; round < 20; round++) {
+            race.execute();
+            checkInvariants();
+            // Reset only this test's completed fixture, so each round starts without a mutex row.
+            // All worker futures have finished and owned transactions are closed before this reset.
+            execute("DELETE FROM glossary_term_rel WHERE metalake_id=100");
+            execute("DELETE FROM glossary_hierarchy_lock WHERE metalake_id=100");
+            execute("DELETE FROM glossary_term_synonym WHERE metalake_id=100");
+            execute("DELETE FROM glossary_term_meta WHERE metalake_id=100");
+            execute("DELETE FROM metalake_meta WHERE metalake_id=100");
+          }
+        });
   }
 
   private void setupTerms(int count) throws Exception {
