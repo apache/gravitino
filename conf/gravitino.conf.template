@@ -159,7 +159,8 @@ gravitino.lance-rest.namespace-backend = gravitino
 # gravitino.maintenance.gravitinoUri = http://localhost:8090
 
 # The user TMS uses to submit jobs when gravitino.authorization.enable is true.
-# The user must exist in each metalake that runs maintenance jobs.
+# Create the user in each metalake that runs maintenance jobs, and grant RUN_JOB plus
+# USE_JOB_TEMPLATE (and any privileges Spark callbacks need).
 # gravitino.maintenance.jobSubmitter = tms
 
 # IRC → post-commit maintenance listener (§5.2.3). Requires colocated iceberg-rest aux service and TableMaintenanceRESTFeature.

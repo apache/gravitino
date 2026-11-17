@@ -93,11 +93,13 @@ Scheduler pool sizes have these defaults:
 | `gravitino.maintenance.scheduler.cronThreads`   | `8`     |
 | `gravitino.maintenance.scheduler.commitThreads` | `4`     |
 
-When `gravitino.authorization.enable=true`, set a TMS submit identity. The user must exist in each metalake that runs maintenance jobs (checked at submit time):
+When `gravitino.authorization.enable=true`, set a TMS submit identity:
 
-| Configuration item                     | Default | Description |
-|----------------------------------------|---------|-------------|
-| `gravitino.maintenance.jobSubmitter`   | (none)  | Required USER when authorization is enabled. TMS submits jobs as this principal. |
+| Configuration item                   | Default | Description                                      |
+|--------------------------------------|---------|--------------------------------------------------|
+| `gravitino.maintenance.jobSubmitter` | (none)  | USER principal TMS uses to submit maintenance jobs |
+
+Create that user under every metalake that runs maintenance jobs (TMS checks at submit time). Grant the user metalake `RUN_JOB` and `USE_JOB_TEMPLATE` on the Iceberg maintenance job template so `runJob` can succeed; grant any further table or catalog privileges your maintenance Spark jobs need when they call back into Gravitino.
 
 ## Time Trigger
 
