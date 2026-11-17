@@ -128,63 +128,68 @@ public class PartitionUtils {
       PartitionEntry entry = partition.get(i);
       Transform transform = partitioning[i];
 
-      String columnName = getColumnName(transform);
-      // Nested paths like event.ts are absent from schema; fall back to top-level event.
-      Column column = columnMap.get(columnName.toLowerCase(Locale.ROOT));
-      if (column == null && columnName.indexOf('.') >= 0) {
-        column =
-            columnMap.get(
-                columnName.substring(0, columnName.indexOf('.')).toLowerCase(Locale.ROOT));
-      }
-      Preconditions.checkNotNull(column, "Column '%s' not found in table schema", columnName);
+      // Keep transform field-name components (do not join/split on '.') so names like user-id
+      // stay one component through schema lookup and SQL rendering.
+      String[] fieldName = getFieldName(transform);
+      Preconditions.checkArgument(
+          fieldName != null && fieldName.length > 0, "transform field name cannot be empty");
+      Column column = columnMap.get(fieldName[0].toLowerCase(Locale.ROOT));
+      Preconditions.checkNotNull(
+          column, "Column '%s' not found in table schema", joinFieldName(fieldName));
 
-      String expression = buildExpression(transform, columnName, catalogName.trim());
+      String quotedPath = quoteFieldPath(fieldName);
+      String expression = buildExpression(transform, quotedPath, catalogName.trim());
       // Walk into struct fields so nested identity uses TIMESTAMP/INT/... not STRUCT→string.
       String literal =
-          formatLiteral(transform, resolveLeafDataType(column, columnName), entry.partitionValue());
+          formatLiteral(transform, resolveLeafDataType(column, fieldName), entry.partitionValue());
       predicates.add(String.format("%s = %s", expression, literal));
     }
 
     return String.join(" AND ", predicates);
   }
 
-  private static String getColumnName(Transform transform) {
+  private static String[] getFieldName(Transform transform) {
     if (transform instanceof Transform.SingleFieldTransform) {
-      return joinFieldName(((Transform.SingleFieldTransform) transform).fieldName());
+      return ((Transform.SingleFieldTransform) transform).fieldName();
     } else if (transform instanceof Transforms.TruncateTransform) {
-      return joinFieldName(((Transforms.TruncateTransform) transform).fieldName());
+      return ((Transforms.TruncateTransform) transform).fieldName();
     } else if (transform instanceof Transforms.BucketTransform) {
       String[][] fieldNames = ((Transforms.BucketTransform) transform).fieldNames();
       Preconditions.checkArgument(
           fieldNames.length > 0, "Bucket transform must have at least one field");
-      return joinFieldName(fieldNames[0]);
+      return fieldNames[0];
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
-  /** Resolves the leaf type for {@code event.ts}-style paths under a top-level struct column. */
-  private static Type resolveLeafDataType(Column column, String columnName) {
-    // Exact match (including odd top-level names that contain '.') — no nested walk.
-    if (column.name().equalsIgnoreCase(columnName) || columnName.indexOf('.') < 0) {
+  /**
+   * Resolves the leaf type by walking every transform field-name component after the top-level
+   * column (supports struct-in-struct, e.g. {@code event} → {@code meta} → {@code user-id}).
+   */
+  private static Type resolveLeafDataType(Column column, String[] fieldName) {
+    if (fieldName.length == 1) {
       return column.dataType();
     }
     Type type = column.dataType();
-    String[] parts = columnName.split("\\.");
-    for (int i = 1; i < parts.length; i++) {
+    String path = joinFieldName(fieldName);
+    for (int i = 1; i < fieldName.length; i++) {
       if (!(type instanceof Types.StructType)) {
         throw new IllegalArgumentException(
-            "Cannot resolve nested field '" + columnName + "': not a struct path");
+            "Cannot resolve nested field '"
+                + path
+                + "': '"
+                + joinFieldName(Arrays.copyOf(fieldName, i))
+                + "' is not a struct");
       }
       Types.StructType.Field matched = null;
       for (Types.StructType.Field field : ((Types.StructType) type).fields()) {
-        if (field.name().equalsIgnoreCase(parts[i])) {
+        if (field.name().equalsIgnoreCase(fieldName[i])) {
           matched = field;
           break;
         }
       }
       if (matched == null) {
-        throw new IllegalArgumentException(
-            "Nested field '" + columnName + "' not found in table schema");
+        throw new IllegalArgumentException("Nested field '" + path + "' not found in table schema");
       }
       type = matched.type();
     }
@@ -199,42 +204,54 @@ public class PartitionUtils {
    * {@code truncate} put the width argument first, matching Iceberg's Spark UDF signatures.
    * Non-identity functions are qualified as {@code catalog.system.<fn>} so a catalog {@code
    * default-namespace} cannot rewrite them to {@code catalog.<ns>.<fn>}.
+   *
+   * @param quotedFieldPath backtick-quoted field path ({@code `event`.`meta`.`user-id`})
    */
   private static String buildExpression(
-      Transform transform, String columnName, String catalogName) {
+      Transform transform, String quotedFieldPath, String catalogName) {
     if (transform instanceof Transforms.IdentityTransform) {
-      return columnName;
+      return quotedFieldPath;
     }
-    String systemFn = quoteCatalogIdentifier(catalogName) + ".system.";
+    String systemFn = quoteIdentifier(catalogName) + ".system.";
     if (transform instanceof Transforms.YearTransform) {
-      return systemFn + "years(" + columnName + ")";
+      return systemFn + "years(" + quotedFieldPath + ")";
     } else if (transform instanceof Transforms.MonthTransform) {
-      return systemFn + "months(" + columnName + ")";
+      return systemFn + "months(" + quotedFieldPath + ")";
     } else if (transform instanceof Transforms.DayTransform) {
-      return systemFn + "days(" + columnName + ")";
+      return systemFn + "days(" + quotedFieldPath + ")";
     } else if (transform instanceof Transforms.HourTransform) {
-      return systemFn + "hours(" + columnName + ")";
+      return systemFn + "hours(" + quotedFieldPath + ")";
     } else if (transform instanceof Transforms.BucketTransform) {
       return systemFn
           + "bucket("
           + ((Transforms.BucketTransform) transform).numBuckets()
           + ", "
-          + columnName
+          + quotedFieldPath
           + ")";
     } else if (transform instanceof Transforms.TruncateTransform) {
       return systemFn
           + "truncate("
           + ((Transforms.TruncateTransform) transform).width()
           + ", "
-          + columnName
+          + quotedFieldPath
           + ")";
     }
     throw new IllegalArgumentException("Unsupported transform: " + transform.getClass().getName());
   }
 
-  /** Backtick-quotes a Spark catalog identifier (internal backticks are doubled). */
-  private static String quoteCatalogIdentifier(String catalogName) {
-    return "`" + catalogName.replace("`", "``") + "`";
+  /**
+   * Backtick-quotes each field-name component, including multi-level struct paths ({@code
+   * `event`.`meta`.`user-id`}).
+   */
+  private static String quoteFieldPath(String[] fieldNameParts) {
+    return Arrays.stream(fieldNameParts)
+        .map(PartitionUtils::quoteIdentifier)
+        .collect(Collectors.joining("."));
+  }
+
+  /** Backtick-quotes a Spark identifier (internal backticks are doubled). */
+  private static String quoteIdentifier(String name) {
+    return "`" + name.replace("`", "``") + "`";
   }
 
   private static String formatLiteral(Transform transform, Type type, String rawValue) {

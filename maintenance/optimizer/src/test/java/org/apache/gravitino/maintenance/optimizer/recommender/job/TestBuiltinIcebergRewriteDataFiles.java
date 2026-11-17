@@ -262,6 +262,11 @@ public class TestBuiltinIcebergRewriteDataFiles {
         assertRewriteCallForStructTruncate(spark, ansi);
         assertRewriteCallForStructIdentityTimestamp(spark, ansi);
         assertRewriteCallForStructIdentityInt(spark, ansi);
+        assertRewriteCallForStructIdentityHyphenatedInt(spark, ansi);
+        assertRewriteCallForStructDayHyphenated(spark, ansi);
+        assertRewriteCallForStructBucketHyphenated(spark, ansi);
+        assertRewriteCallForStructInStructIdentityHyphenated(spark, ansi);
+        assertRewriteCallForStructInStructDayHyphenated(spark, ansi);
       }
       spark.conf().set("spark.sql.ansi.enabled", "false");
       spark.conf().set("spark.sql.ansi.doubleQuotedIdentifiers", "false");
@@ -284,7 +289,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(region = 'usa')", where);
+    Assertions.assertEquals("(`region` = 'usa')", where);
     callRewrite(spark, table, where);
   }
 
@@ -316,7 +321,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(region = 'O\\'Brien')", where);
+    Assertions.assertEquals("(`region` = 'O\\'Brien')", where);
     callRewrite(spark, table, where);
   }
 
@@ -340,7 +345,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("region", Types.StringType.get())},
             new Transform[] {Transforms.identity("region")},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(region = 'a\"b\\\\c')", where);
+    Assertions.assertEquals("(`region` = 'a\"b\\\\c')", where);
     callRewrite(spark, table, where);
   }
 
@@ -358,7 +363,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("dt", Types.DateType.get())},
             new Transform[] {Transforms.identity("dt")},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
+    Assertions.assertEquals("(`dt` = DATE '2024-01-01')", where);
     callRewrite(spark, table, where);
   }
 
@@ -376,7 +381,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
             new Transform[] {Transforms.identity("ts")},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(ts = TIMESTAMP '2024-01-01 00:00:00')", where);
+    Assertions.assertEquals("(`ts` = TIMESTAMP '2024-01-01 00:00:00')", where);
     callRewrite(spark, table, where);
   }
 
@@ -398,7 +403,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             partitioning,
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system.days(ts) = DATE \'2026-03-18\')", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(`ts`) = DATE \'2026-03-18\')", where);
     callRewrite(spark, table, where);
   }
 
@@ -435,7 +440,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {transform},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(ts) = " + value + ")", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(`ts`) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -461,7 +466,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {Transforms.bucket(16, new String[] {"user_id"})},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(16, user_id) = " + value + ")", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(16, `user_id`) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -480,7 +485,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {Transforms.truncate(3, "country")},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(3, country) = 'usa')", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(3, `country`) = 'usa')", where);
     callRewrite(spark, table, where);
   }
 
@@ -490,7 +495,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
         "struct_day_" + ansi,
         "days(event.ts)",
         Transforms.day(new String[] {"event", "ts"}),
-        "(`" + SPARK_CATALOG_NAME + "`.system.days(event.ts) = DATE '2026-03-18')",
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(`event`.`ts`) = DATE '2026-03-18')",
         "2026-03-18");
   }
 
@@ -552,7 +557,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {transform},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(event.ts) = " + value + ")",
+        "(`" + SPARK_CATALOG_NAME + "`.system." + functionName + "(`event`.`ts`) = " + value + ")",
         where);
     callRewrite(spark, table, where);
   }
@@ -582,7 +587,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {Transforms.bucket(8, new String[][] {new String[] {"event", "uid"}})},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(8, event.uid) = " + value + ")", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(8, `event`.`uid`) = " + value + ")", where);
     callRewrite(spark, table, where);
   }
 
@@ -608,7 +613,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Transform[] {Transforms.truncate(2, new String[] {"event", "loc"})},
             SPARK_CATALOG_NAME);
     Assertions.assertEquals(
-        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(2, event.loc) = 'ab')", where);
+        "(`" + SPARK_CATALOG_NAME + "`.system.truncate(2, `event`.`loc`) = 'ab')", where);
     callRewrite(spark, table, where);
   }
 
@@ -623,7 +628,7 @@ public class TestBuiltinIcebergRewriteDataFiles {
             new Column[] {eventStructColumn()},
             new Transform[] {Transforms.identity(new String[] {"event", "ts"})},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(event.ts = TIMESTAMP '2026-03-18 12:00:00')", where);
+    Assertions.assertEquals("(`event`.`ts` = TIMESTAMP '2026-03-18 12:00:00')", where);
     callRewrite(spark, table, where);
   }
 
@@ -648,7 +653,180 @@ public class TestBuiltinIcebergRewriteDataFiles {
             },
             new Transform[] {Transforms.identity(new String[] {"event", "code"})},
             SPARK_CATALOG_NAME);
-    Assertions.assertEquals("(event.code = 7)", where);
+    Assertions.assertEquals("(`event`.`code` = 7)", where);
+    callRewrite(spark, table, where);
+  }
+
+  /**
+   * Nested hyphenated field {@code user-id} must be backtick-quoted in the predicate; otherwise
+   * Spark parses {@code event.user-id} as subtraction.
+   */
+  private static void assertRewriteCallForStructIdentityHyphenatedInt(
+      SparkSession spark, String ansi) {
+    String table = fullTable("struct_id_hyphen_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<`user-id`: INT>) USING iceberg "
+            + "PARTITIONED BY (event.`user-id`)");
+    spark.sql("INSERT INTO " + table + " SELECT id, named_struct('user-id', 7) FROM range(0, 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id", "7")))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+            },
+            new Transform[] {Transforms.identity(new String[] {"event", "user-id"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals("(`event`.`user-id` = 7)", where);
+    callRewrite(spark, table, where);
+  }
+
+  /**
+   * System function names stay unquoted; only the hyphenated nested field path is backtick-quoted.
+   */
+  private static void assertRewriteCallForStructDayHyphenated(SparkSession spark, String ansi) {
+    String table = fullTable("struct_day_hyphen_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<`event-ts`: TIMESTAMP>) USING iceberg "
+            + "PARTITIONED BY (days(event.`event-ts`))");
+    spark.sql(
+        "INSERT INTO "
+            + table
+            + " SELECT id, named_struct('event-ts', TIMESTAMP '2026-03-18 12:00:00') FROM range(0,"
+            + " 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(
+                PartitionPath.of(List.of(new PartitionEntryImpl("event.event-ts", "2026-03-18")))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField(
+                          "event-ts", Types.TimestampType.withoutTimeZone())))
+            },
+            new Transform[] {Transforms.day(new String[] {"event", "event-ts"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(`event`.`event-ts`) = DATE '2026-03-18')",
+        where);
+    callRewrite(spark, table, where);
+  }
+
+  /** Struct-in-struct identity: {@code `event`.`meta`.`user-id`}. */
+  private static void assertRewriteCallForStructInStructIdentityHyphenated(
+      SparkSession spark, String ansi) {
+    String table = fullTable("struct2_id_hyphen_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<meta: STRUCT<`user-id`: INT>>) USING iceberg "
+            + "PARTITIONED BY (event.meta.`user-id`)");
+    spark.sql(
+        "INSERT INTO "
+            + table
+            + " SELECT id, named_struct('meta', named_struct('user-id', 7)) FROM range(0, 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.meta.user-id", "7")))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField(
+                          "meta",
+                          Types.StructType.of(
+                              Types.StructType.Field.notNullField(
+                                  "user-id", Types.IntegerType.get())))))
+            },
+            new Transform[] {Transforms.identity(new String[] {"event", "meta", "user-id"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", where);
+    callRewrite(spark, table, where);
+  }
+
+  /** Struct-in-struct day: path quoted, {@code system.days} bare. */
+  private static void assertRewriteCallForStructInStructDayHyphenated(
+      SparkSession spark, String ansi) {
+    String table = fullTable("struct2_day_hyphen_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<meta: STRUCT<`event-ts`: TIMESTAMP>>) USING iceberg "
+            + "PARTITIONED BY (days(event.meta.`event-ts`))");
+    spark.sql(
+        "INSERT INTO "
+            + table
+            + " SELECT id, named_struct('meta', named_struct('event-ts', TIMESTAMP '2026-03-18"
+            + " 12:00:00')) FROM range(0, 20)");
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(
+                PartitionPath.of(
+                    List.of(new PartitionEntryImpl("event.meta.event-ts", "2026-03-18")))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField(
+                          "meta",
+                          Types.StructType.of(
+                              Types.StructType.Field.notNullField(
+                                  "event-ts", Types.TimestampType.withoutTimeZone())))))
+            },
+            new Transform[] {Transforms.day(new String[] {"event", "meta", "event-ts"})},
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.days(`event`.`meta`.`event-ts`) = DATE '2026-03-18')",
+        where);
+    callRewrite(spark, table, where);
+  }
+
+  /** Same quoting contract for {@code bucket}: path quoted, {@code system.bucket} bare. */
+  private static void assertRewriteCallForStructBucketHyphenated(SparkSession spark, String ansi) {
+    String table = fullTable("struct_bucket_hyphen_" + ansi);
+    spark.sql("CREATE NAMESPACE IF NOT EXISTS " + SPARK_CATALOG_NAME + ".db");
+    spark.sql("DROP TABLE IF EXISTS " + table);
+    spark.sql(
+        "CREATE TABLE "
+            + table
+            + " (id INT, event STRUCT<`user-id`: INT>) USING iceberg "
+            + "PARTITIONED BY (bucket(8, event.`user-id`))");
+    spark.sql("INSERT INTO " + table + " SELECT id, named_struct('user-id', 42) FROM range(0, 20)");
+    Row partitionStruct =
+        spark.sql("SELECT partition FROM " + table + ".partitions LIMIT 1").first().getStruct(0);
+    String value = String.valueOf(partitionStruct.get(0));
+    String where =
+        PartitionUtils.getWhereClauseForPartitions(
+            List.of(
+                PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id_bucket", value)))),
+            new Column[] {
+              column(
+                  "event",
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+            },
+            new Transform[] {
+              Transforms.bucket(8, new String[][] {new String[] {"event", "user-id"}})
+            },
+            SPARK_CATALOG_NAME);
+    Assertions.assertEquals(
+        "(`" + SPARK_CATALOG_NAME + "`.system.bucket(8, `event`.`user-id`) = " + value + ")",
+        where);
     callRewrite(spark, table, where);
   }
 

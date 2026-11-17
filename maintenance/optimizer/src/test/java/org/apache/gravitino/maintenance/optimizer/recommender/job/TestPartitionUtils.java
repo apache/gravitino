@@ -46,6 +46,29 @@ public class TestPartitionUtils {
             Types.StructType.Field.notNullField("ts", Types.TimestampType.withoutTimeZone())));
   }
 
+  /** {@code event STRUCT<meta: STRUCT<user-id: INT>>}. */
+  private static Column eventMetaUserIdStructColumn() {
+    return column(
+        "event",
+        Types.StructType.of(
+            Types.StructType.Field.notNullField(
+                "meta",
+                Types.StructType.of(
+                    Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))));
+  }
+
+  /** {@code event STRUCT<meta: STRUCT<event-ts: TIMESTAMP>>}. */
+  private static Column eventMetaEventTsStructColumn() {
+    return column(
+        "event",
+        Types.StructType.of(
+            Types.StructType.Field.notNullField(
+                "meta",
+                Types.StructType.of(
+                    Types.StructType.Field.notNullField(
+                        "event-ts", Types.TimestampType.withoutTimeZone())))));
+  }
+
   @Test
   void testIdentityStringPartition() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("colA", "O'Hara"));
@@ -55,7 +78,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("colA = 'O\\'Hara'", where);
+    Assertions.assertEquals("`colA` = 'O\\'Hara'", where);
   }
 
   @Test
@@ -67,7 +90,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("part = 7", where);
+    Assertions.assertEquals("`part` = 7", where);
   }
 
   @Test
@@ -79,7 +102,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("flag = true", where);
+    Assertions.assertEquals("`flag` = true", where);
   }
 
   @Test
@@ -92,7 +115,7 @@ public class TestPartitionUtils {
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
     // One-level single-quoted literal escapes; CALL outer escaping is done by the job builder.
-    Assertions.assertEquals("colA = 'a\"b\\\\c'", where);
+    Assertions.assertEquals("`colA` = 'a\"b\\\\c'", where);
   }
 
   @Test
@@ -106,7 +129,7 @@ public class TestPartitionUtils {
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
     // Double-quoted typed literal survives CALL where => '...' embedding.
-    Assertions.assertEquals("ts = TIMESTAMP '2024-01-01 00:00:00'", where);
+    Assertions.assertEquals("`ts` = TIMESTAMP '2024-01-01 00:00:00'", where);
   }
 
   @Test
@@ -118,7 +141,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("t = TIME '12:34:56'", where);
+    Assertions.assertEquals("`t` = TIME '12:34:56'", where);
   }
 
   @Test
@@ -131,7 +154,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("ts = TIMESTAMP '2024-01-01 00:00:00\"x\\\\y'", where);
+    Assertions.assertEquals("`ts` = TIMESTAMP '2024-01-01 00:00:00\"x\\\\y'", where);
   }
 
   @Test
@@ -143,7 +166,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.bucket(16, user_id) = 14", where);
+    Assertions.assertEquals("`ice`.system.bucket(16, `user_id`) = 14", where);
   }
 
   @Test
@@ -155,7 +178,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.truncate(3, country) = 'usa'", where);
+    Assertions.assertEquals("`ice`.system.truncate(3, `country`) = 'usa'", where);
   }
 
   @Test
@@ -172,7 +195,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("colA = 'abc' AND `ice`.system.bucket(2, colB) = 1", where);
+    Assertions.assertEquals("`colA` = 'abc' AND `ice`.system.bucket(2, `colB`) = 1", where);
   }
 
   @Test
@@ -193,7 +216,7 @@ public class TestPartitionUtils {
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
     Assertions.assertEquals(
-        "`ice`.system.truncate(5, colC) = 'prefix' AND `ice`.system.years(colD) = 54", where);
+        "`ice`.system.truncate(5, `colC`) = 'prefix' AND `ice`.system.years(`colD`) = 54", where);
   }
 
   @Test
@@ -206,7 +229,7 @@ public class TestPartitionUtils {
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
     // ISO only (DateTimeUtil.isoDateToDays); Iceberg Spark `ice`.system.days() returns DateType
-    Assertions.assertEquals("`ice`.system.days(event_time) = DATE '2024-01-01'", where);
+    Assertions.assertEquals("`ice`.system.days(`event_time`) = DATE '2024-01-01'", where);
   }
 
   @Test
@@ -220,7 +243,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.days(event.ts) = DATE '2026-03-18'", where);
+    Assertions.assertEquals("`ice`.system.days(`event`.`ts`) = DATE '2026-03-18'", where);
   }
 
   @Test
@@ -234,7 +257,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("event.ts = TIMESTAMP '2026-03-18 12:00:00'", where);
+    Assertions.assertEquals("`event`.`ts` = TIMESTAMP '2026-03-18 12:00:00'", where);
   }
 
   @Test
@@ -252,7 +275,112 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("event.id = 7", where);
+    Assertions.assertEquals("`event`.`id` = 7", where);
+  }
+
+  @Test
+  void testIdentityNestedHyphenatedFieldIsBacktickQuoted() {
+    // event.user-id without quotes parses as subtraction; quote each component.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.user-id", "7"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+        };
+    Transform[] transforms =
+        new Transform[] {Transforms.identity(new String[] {"event", "user-id"})};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("`event`.`user-id` = 7", where);
+  }
+
+  @Test
+  void testIdentityTopLevelHyphenatedFieldIsBacktickQuoted() {
+    // Bare user-id is subtraction in Spark SQL; identity must emit `user-id`.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("user-id", "7"));
+    Column[] columns = new Column[] {column("user-id", Types.IntegerType.get())};
+    Transform[] transforms = new Transform[] {Transforms.identity("user-id")};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("`user-id` = 7", where);
+  }
+
+  @Test
+  void testDayOnNestedHyphenatedFieldQuotesPathNotSystemFunction() {
+    // Quote field components only: catalog + path get backticks; system/days stay bare
+    // (not `system`.`days`).
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.event-ts_day", "2026-03-18"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField(
+                      "event-ts", Types.TimestampType.withoutTimeZone())))
+        };
+    Transform[] transforms = new Transform[] {Transforms.day(new String[] {"event", "event-ts"})};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("`ice`.system.days(`event`.`event-ts`) = DATE '2026-03-18'", where);
+  }
+
+  @Test
+  void testBucketOnNestedHyphenatedFieldQuotesPathNotSystemFunction() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.user-id_bucket", "3"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+        };
+    Transform[] transforms =
+        new Transform[] {Transforms.bucket(8, new String[][] {new String[] {"event", "user-id"}})};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("`ice`.system.bucket(8, `event`.`user-id`) = 3", where);
+  }
+
+  @Test
+  void testIdentityStructInStructHyphenatedFieldIsBacktickQuoted() {
+    // event.meta.user-id: quote each component so Spark does not parse subtraction.
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.meta.user-id", "7"));
+    Column[] columns = new Column[] {eventMetaUserIdStructColumn()};
+    Transform[] transforms =
+        new Transform[] {Transforms.identity(new String[] {"event", "meta", "user-id"})};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals("`event`.`meta`.`user-id` = 7", where);
+  }
+
+  @Test
+  void testDayOnStructInStructHyphenatedFieldQuotesPathNotSystemFunction() {
+    List<PartitionEntry> partitions =
+        Arrays.asList(new PartitionEntryImpl("event.meta.event-ts_day", "2026-03-18"));
+    Column[] columns = new Column[] {eventMetaEventTsStructColumn()};
+    Transform[] transforms =
+        new Transform[] {Transforms.day(new String[] {"event", "meta", "event-ts"})};
+
+    String where =
+        PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
+
+    Assertions.assertEquals(
+        "`ice`.system.days(`event`.`meta`.`event-ts`) = DATE '2026-03-18'", where);
   }
 
   @Test
@@ -305,6 +433,30 @@ public class TestPartitionUtils {
   }
 
   @Test
+  void testNestedPathThroughNonStructLeafThrowsClearError() {
+    // event.id is INT; a deeper component cannot be resolved as a struct walk.
+    List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.id.x", "1"));
+    Column[] columns =
+        new Column[] {
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField("id", Types.IntegerType.get())))
+        };
+    Transform[] transforms =
+        new Transform[] {Transforms.identity(new String[] {"event", "id", "x"})};
+
+    IllegalArgumentException ex =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                PartitionUtils.getWhereClauseForPartition(
+                    partitions, columns, transforms, CATALOG));
+    Assertions.assertTrue(ex.getMessage().contains("event.id.x"), ex.getMessage());
+    Assertions.assertTrue(ex.getMessage().contains("is not a struct"), ex.getMessage());
+  }
+
+  @Test
   void testYearPartitionOnNestedStructField() {
     List<PartitionEntry> partitions = Arrays.asList(new PartitionEntryImpl("event.ts_year", "56"));
     Column[] columns = new Column[] {eventStructColumn()};
@@ -313,7 +465,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.years(event.ts) = 56", where);
+    Assertions.assertEquals("`ice`.system.years(`event`.`ts`) = 56", where);
   }
 
   @Test
@@ -326,7 +478,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.months(event.ts) = 674", where);
+    Assertions.assertEquals("`ice`.system.months(`event`.`ts`) = 674", where);
   }
 
   @Test
@@ -339,7 +491,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.hours(event.ts) = 492724", where);
+    Assertions.assertEquals("`ice`.system.hours(`event`.`ts`) = 492724", where);
   }
 
   @Test
@@ -357,7 +509,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.bucket(8, event.id) = 3", where);
+    Assertions.assertEquals("`ice`.system.bucket(8, `event`.`id`) = 3", where);
   }
 
   @Test
@@ -377,7 +529,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.truncate(2, event.loc) = 'ab'", where);
+    Assertions.assertEquals("`ice`.system.truncate(2, `event`.`loc`) = 'ab'", where);
   }
 
   @Test
@@ -390,7 +542,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.days(event_time) = DATE '2026-01-01'", where);
+    Assertions.assertEquals("`ice`.system.days(`event_time`) = DATE '2026-01-01'", where);
   }
 
   @Test
@@ -450,7 +602,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.months(event_time) = 660", where);
+    Assertions.assertEquals("`ice`.system.months(`event_time`) = 660", where);
   }
 
   @Test
@@ -462,7 +614,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.years(event_time) = 56", where);
+    Assertions.assertEquals("`ice`.system.years(`event_time`) = 56", where);
   }
 
   @Test
@@ -521,7 +673,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("`ice`.system.hours(event_time) = 492724", where);
+    Assertions.assertEquals("`ice`.system.hours(`event_time`) = 492724", where);
   }
 
   @Test
@@ -540,7 +692,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning, CATALOG);
 
-    Assertions.assertEquals("(a = 'x1' AND b = 'y1') OR (a = 'x2' AND b = 'y2')", where);
+    Assertions.assertEquals("(`a` = 'x1' AND `b` = 'y1') OR (`a` = 'x2' AND `b` = 'y2')", where);
   }
 
   @Test
@@ -560,7 +712,8 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning, CATALOG);
 
-    Assertions.assertEquals("(id = 123 AND score = 45.6) OR (id = 456 AND score = 78.9)", where);
+    Assertions.assertEquals(
+        "(`id` = 123 AND `score` = 45.6) OR (`id` = 456 AND `score` = 78.9)", where);
   }
 
   @Test
@@ -574,7 +727,7 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartition(partitions, columns, transforms, CATALOG);
 
-    Assertions.assertEquals("score = 1.0", where);
+    Assertions.assertEquals("`score` = 1.0", where);
   }
 
   @Test
@@ -589,14 +742,18 @@ public class TestPartitionUtils {
     String where =
         PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning, CATALOG);
 
-    Assertions.assertEquals("(dt = DATE '2024-01-01')", where);
+    Assertions.assertEquals("(`dt` = DATE '2024-01-01')", where);
   }
 
   @Test
   void testWhereClauseWithMixedTransformsAndMultiplePartitions() {
     Column[] columns =
         new Column[] {
-          column("event.ts", Types.TimestampType.withoutTimeZone()),
+          column(
+              "event",
+              Types.StructType.of(
+                  Types.StructType.Field.notNullField(
+                      "ts", Types.TimestampType.withoutTimeZone()))),
           column("country", Types.StringType.get()),
           column("user_id", Types.LongType.get()),
           column("flag", Types.BooleanType.get())
@@ -628,8 +785,8 @@ public class TestPartitionUtils {
         PartitionUtils.getWhereClauseForPartitions(partitions, columns, partitioning, CATALOG);
 
     Assertions.assertEquals(
-        "(`ice`.system.hours(event.ts) = 8 AND `ice`.system.truncate(3, country) = 'usa' AND `ice`.system.bucket(16, user_id) = 5 AND flag = false) "
-            + "OR (`ice`.system.hours(event.ts) = 12 AND `ice`.system.truncate(3, country) = 'can' AND `ice`.system.bucket(16, user_id) = 9 AND flag = true)",
+        "(`ice`.system.hours(`event`.`ts`) = 8 AND `ice`.system.truncate(3, `country`) = 'usa' AND `ice`.system.bucket(16, `user_id`) = 5 AND `flag` = false) "
+            + "OR (`ice`.system.hours(`event`.`ts`) = 12 AND `ice`.system.truncate(3, `country`) = 'can' AND `ice`.system.bucket(16, `user_id`) = 9 AND `flag` = true)",
         where);
   }
 

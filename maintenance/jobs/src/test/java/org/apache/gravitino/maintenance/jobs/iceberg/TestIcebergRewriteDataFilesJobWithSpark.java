@@ -346,12 +346,12 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
 
     try {
       // Match PartitionUtils inner literal form (' → \'), then CALL outer escape.
-      String whereClause = "description = 'O\\'Brien'";
+      String whereClause = "`description` = 'O\\'Brien'";
       String sql =
           IcebergRewriteDataFilesJob.buildProcedureCall(
               catalogName, "db_special.data_table", null, null, whereClause, null);
 
-      assertTrue(sql.contains("description = \\'O\\\\\\'Brien\\'"), sql);
+      assertTrue(sql.contains("`description` = \\'O\\\\\\'Brien\\'"), sql);
 
       // Execute - this should work or fail gracefully without injection
       try {
@@ -528,7 +528,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
               new Column[] {column("region", Types.StringType.get())},
               new Transform[] {Transforms.identity("region")},
               catalogName);
-      assertEquals("(region = 'O\\'Brien')", where);
+      assertEquals("(`region` = 'O\\'Brien')", where);
 
       String sql =
           IcebergRewriteDataFilesJob.buildProcedureCall(
@@ -539,7 +539,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
               where,
               "{\"rewrite-all\":\"true\",\"min-input-files\":\"1\"}");
       // Outer CALL uses \'; inner apostrophe is \\' after escapeSparkCallStringArg.
-      assertTrue(sql.contains("where => '(region = \\'O\\\\\\'Brien\\')'"), sql);
+      assertTrue(sql.contains("where => '(`region` = \\'O\\\\\\'Brien\\')'"), sql);
       spark.sql(sql).collect();
       spark.sql("REFRESH TABLE " + table);
 
@@ -558,7 +558,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   private static Set<String> dataFilePathsForRegion(String table, String region) {
     return spark
         .table(table + ".files")
-        .where("content = 0")
+        .where("`content` = 0")
         .select("file_path", "partition.region")
         .collectAsList()
         .stream()
@@ -576,8 +576,8 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
   public void testPartitionUtilsWhereAnsiLiteralModesThroughJobEscapeAndSpark() {
     String partitionValue = "a\"b\\c";
     // PartitionUtils: one-level \\ / \' ; job builder re-escapes for CALL where => '...'.
-    String expectedWhere = "(region = 'a\"b\\\\c')";
-    String expectedCallWhere = "(region = \\'a\"b\\\\\\\\c\\')";
+    String expectedWhere = "(`region` = 'a\"b\\\\c')";
+    String expectedCallWhere = "(`region` = \\'a\"b\\\\\\\\c\\')";
     boolean[][] modes =
         new boolean[][] {
           {false, false},
@@ -646,7 +646,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
                     new Transform[] {Transforms.day("ts")},
                     catalogName);
             assertEquals(
-                "(`" + catalogName + "`.system.days(ts) = DATE '2024-01-01')",
+                "(`" + catalogName + "`.system.days(`ts`) = DATE '2024-01-01')",
                 dateWhere,
                 ansiModeLabel(ansiEnabled, doubleQuotedIds));
             String dateSql =
@@ -654,7 +654,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
                     catalogName, "db." + tableSuffix, "binpack", null, dateWhere, null);
             assertTrue(
                 dateSql.contains(
-                    "where => '(`" + catalogName + "`.system.days(ts) = DATE \\'2024-01-01\\')'"),
+                    "where => '(`" + catalogName + "`.system.days(`ts`) = DATE \\'2024-01-01\\')'"),
                 ansiModeLabel(ansiEnabled, doubleQuotedIds) + ": " + dateSql);
             assertDoesNotThrow(
                 () -> spark.sql(dateSql).collect(),
@@ -662,6 +662,265 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
 
             spark.sql("DROP TABLE IF EXISTS " + table);
           });
+    }
+  }
+
+  /**
+   * Top-level hyphenated identity field {@code user-id} must be rendered as {@code `user-id`}; bare
+   * {@code user-id} is parsed as subtraction by Spark.
+   */
+  @Test
+  public void testPartitionUtilsWhereTopLevelHyphenatedFieldThroughSparkCall() {
+    String table = catalogName + ".db.pu_hyphen_top";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, `user-id` INT) USING iceberg PARTITIONED BY (`user-id`)");
+      spark.sql("INSERT INTO " + table + " SELECT id, 7 FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("user-id", "7")))),
+              new Column[] {column("user-id", Types.IntegerType.get())},
+              new Transform[] {Transforms.identity("user-id")},
+              catalogName);
+      assertEquals("(`user-id` = 7)", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_hyphen_top", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * Nested hyphenated identity field {@code user-id} must be rendered as {@code `event`.`user-id`};
+   * bare {@code event.user-id} is parsed as subtraction by Spark.
+   */
+  @Test
+  public void testPartitionUtilsWhereNestedHyphenatedFieldThroughSparkCall() {
+    String table = catalogName + ".db.pu_hyphen";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, event STRUCT<`user-id`: INT>) USING iceberg "
+              + "PARTITIONED BY (event.`user-id`)");
+      spark.sql(
+          "INSERT INTO " + table + " SELECT id, named_struct('user-id', 7) FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id", "7")))),
+              new Column[] {
+                column(
+                    "event",
+                    Types.StructType.of(
+                        Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+              },
+              new Transform[] {Transforms.identity(new String[] {"event", "user-id"})},
+              catalogName);
+      assertEquals("(`event`.`user-id` = 7)", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_hyphen", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * Struct-in-struct identity path {@code event.meta.user-id} must quote every component: {@code
+   * `event`.`meta`.`user-id`}.
+   */
+  @Test
+  public void testPartitionUtilsWhereStructInStructHyphenatedFieldThroughSparkCall() {
+    String table = catalogName + ".db.pu_struct2_hyphen";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, event STRUCT<meta: STRUCT<`user-id`: INT>>) USING iceberg "
+              + "PARTITIONED BY (event.meta.`user-id`)");
+      spark.sql(
+          "INSERT INTO "
+              + table
+              + " SELECT id, named_struct('meta', named_struct('user-id', 7)) FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("event.meta.user-id", "7")))),
+              new Column[] {
+                column(
+                    "event",
+                    Types.StructType.of(
+                        Types.StructType.Field.notNullField(
+                            "meta",
+                            Types.StructType.of(
+                                Types.StructType.Field.notNullField(
+                                    "user-id", Types.IntegerType.get())))))
+              },
+              new Transform[] {Transforms.identity(new String[] {"event", "meta", "user-id"})},
+              catalogName);
+      assertEquals("(`event`.`meta`.`user-id` = 7)", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_struct2_hyphen", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * Struct-in-struct + system function: quote the full path, leave {@code system.days} unquoted.
+   */
+  @Test
+  public void testPartitionUtilsWhereDayOnStructInStructHyphenatedFieldThroughSparkCall() {
+    String table = catalogName + ".db.pu_struct2_hyphen_day";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, event STRUCT<meta: STRUCT<`event-ts`: TIMESTAMP>>) USING iceberg "
+              + "PARTITIONED BY (days(event.meta.`event-ts`))");
+      spark.sql(
+          "INSERT INTO "
+              + table
+              + " SELECT id, named_struct('meta', named_struct('event-ts', TIMESTAMP"
+              + " '2026-03-18 12:00:00')) FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(
+                      List.of(new PartitionEntryImpl("event.meta.event-ts", "2026-03-18")))),
+              new Column[] {
+                column(
+                    "event",
+                    Types.StructType.of(
+                        Types.StructType.Field.notNullField(
+                            "meta",
+                            Types.StructType.of(
+                                Types.StructType.Field.notNullField(
+                                    "event-ts", Types.TimestampType.withoutTimeZone())))))
+              },
+              new Transform[] {Transforms.day(new String[] {"event", "meta", "event-ts"})},
+              catalogName);
+      assertEquals(
+          "(`" + catalogName + "`.system.days(`event`.`meta`.`event-ts`) = DATE '2026-03-18')",
+          where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_struct2_hyphen_day", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * Hyphenated nested field inside a system function: quote the path, leave {@code system.days}
+   * unquoted.
+   */
+  @Test
+  public void testPartitionUtilsWhereDayOnNestedHyphenatedFieldThroughSparkCall() {
+    String table = catalogName + ".db.pu_hyphen_day";
+    try {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, event STRUCT<`event-ts`: TIMESTAMP>) USING iceberg "
+              + "PARTITIONED BY (days(event.`event-ts`))");
+      spark.sql(
+          "INSERT INTO "
+              + table
+              + " SELECT id, named_struct('event-ts', TIMESTAMP '2026-03-18 12:00:00') FROM"
+              + " range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(
+                      List.of(new PartitionEntryImpl("event.event-ts", "2026-03-18")))),
+              new Column[] {
+                column(
+                    "event",
+                    Types.StructType.of(
+                        Types.StructType.Field.notNullField(
+                            "event-ts", Types.TimestampType.withoutTimeZone())))
+              },
+              new Transform[] {Transforms.day(new String[] {"event", "event-ts"})},
+              catalogName);
+      assertEquals(
+          "(`" + catalogName + "`.system.days(`event`.`event-ts`) = DATE '2026-03-18')", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "db.pu_hyphen_day", "binpack", null, where, null);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
+    }
+  }
+
+  /**
+   * Iceberg/Spark multi-level namespace (Gravitino hierarchical schema {@code a:b} maps here to
+   * {@code a.b}). Quoted nested field predicates must still work under {@code table => 'a.b.t'}.
+   */
+  @Test
+  public void testPartitionUtilsWhereInNestedNamespaceThroughSparkCall() {
+    String parentNs = catalogName + ".a";
+    String nestedNs = catalogName + ".a.b";
+    String table = nestedNs + ".pu_nested_ns";
+    try {
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + parentNs);
+      spark.sql("CREATE NAMESPACE IF NOT EXISTS " + nestedNs);
+      spark.sql("DROP TABLE IF EXISTS " + table);
+      spark.sql(
+          "CREATE TABLE "
+              + table
+              + " (id INT, event STRUCT<`user-id`: INT>) USING iceberg "
+              + "PARTITIONED BY (event.`user-id`)");
+      spark.sql(
+          "INSERT INTO " + table + " SELECT id, named_struct('user-id', 7) FROM range(0, 20)");
+
+      String where =
+          PartitionUtils.getWhereClauseForPartitions(
+              Collections.singletonList(
+                  PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id", "7")))),
+              new Column[] {
+                column(
+                    "event",
+                    Types.StructType.of(
+                        Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+              },
+              new Transform[] {Transforms.identity(new String[] {"event", "user-id"})},
+              catalogName);
+      assertEquals("(`event`.`user-id` = 7)", where);
+
+      String sql =
+          IcebergRewriteDataFilesJob.buildProcedureCall(
+              catalogName, "a.b.pu_nested_ns", "binpack", null, where, null);
+      assertTrue(sql.contains("table => 'a.b.pu_nested_ns'"), sql);
+      assertDoesNotThrow(() -> spark.sql(sql).collect());
+    } finally {
+      spark.sql("DROP TABLE IF EXISTS " + table);
     }
   }
 
@@ -711,7 +970,7 @@ public class TestIcebergRewriteDataFilesJobWithSpark {
               new Column[] {column("ts", Types.TimestampType.withoutTimeZone())},
               new Transform[] {Transforms.year("ts")},
               dnsCatalog);
-      assertEquals("(`" + dnsCatalog + "`.system.years(ts) = 54)", where);
+      assertEquals("(`" + dnsCatalog + "`.system.years(`ts`) = 54)", where);
 
       // Prefer CatalogManager over SQL current_namespace(): with default-namespace set, Spark may
       // resolve the SQL function under catalog.db and fail UNRESOLVED_ROUTINE.

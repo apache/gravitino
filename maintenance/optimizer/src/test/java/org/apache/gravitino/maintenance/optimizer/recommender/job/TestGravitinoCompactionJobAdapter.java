@@ -90,7 +90,7 @@ public class TestGravitinoCompactionJobAdapter {
                     partitions));
 
     Assertions.assertEquals(
-        "(`catalog`.system.days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
+        "(`catalog`.system.days(`ts`) = DATE '2026-01-01')", conf.get("where_clause"));
   }
 
   @Test
@@ -125,7 +125,78 @@ public class TestGravitinoCompactionJobAdapter {
 
     Assertions.assertEquals("ice", conf.get("catalog_name"));
     Assertions.assertEquals(
-        "(`ice`.system.days(ts) = DATE '2026-01-01')", conf.get("where_clause"));
+        "(`ice`.system.days(`ts`) = DATE '2026-01-01')", conf.get("where_clause"));
+  }
+
+  @Test
+  public void testHierarchicalSchemaTableIdentifierAndQuotedFieldWhere() {
+    // Gravitino hierarchical schema is one schema segment joined by ':' (default separator),
+    // e.g. a:b:c — not catalog.a.b.c levels. table_identifier keeps that logical schema name.
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("event")
+              .withDataType(
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField("user-id", Types.IntegerType.get())))
+              .build()
+        };
+    Transform[] partitioning =
+        new Transform[] {Transforms.identity(new String[] {"event", "user-id"})};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.user-id", "7"))));
+
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "a:b:c", "events"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    columns,
+                    partitioning,
+                    partitions));
+
+    Assertions.assertEquals("a:b:c.events", conf.get("table_identifier"));
+    Assertions.assertEquals("(`event`.`user-id` = 7)", conf.get("where_clause"));
+  }
+
+  @Test
+  public void testStructInStructHyphenatedFieldWhere() {
+    Column[] columns =
+        new Column[] {
+          ColumnDTO.builder()
+              .withName("event")
+              .withDataType(
+                  Types.StructType.of(
+                      Types.StructType.Field.notNullField(
+                          "meta",
+                          Types.StructType.of(
+                              Types.StructType.Field.notNullField(
+                                  "user-id", Types.IntegerType.get())))))
+              .build()
+        };
+    Transform[] partitioning =
+        new Transform[] {Transforms.identity(new String[] {"event", "meta", "user-id"})};
+    List<PartitionPath> partitions =
+        List.of(PartitionPath.of(List.of(new PartitionEntryImpl("event.meta.user-id", "7"))));
+
+    Map<String, String> conf =
+        new GravitinoCompactionJobAdapter()
+            .jobConfig(
+                new CompactionJobContext(
+                    NameIdentifier.of("catalog", "db", "events"),
+                    Map.of("target_file_size_bytes", "1073741824"),
+                    "compaction-job-template",
+                    "binpack",
+                    "",
+                    columns,
+                    partitioning,
+                    partitions));
+
+    Assertions.assertEquals("(`event`.`meta`.`user-id` = 7)", conf.get("where_clause"));
   }
 
   private CompactionJobContext mockCompactionJobContext(String rewriteStrategy, String sortOrder) {
