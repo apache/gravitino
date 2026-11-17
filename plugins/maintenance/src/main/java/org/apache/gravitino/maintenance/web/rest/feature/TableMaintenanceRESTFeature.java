@@ -113,6 +113,8 @@ public class TableMaintenanceRESTFeature implements Feature {
             env.internalTableDispatcher());
 
     DataSource dataSource = AutocommitDataSources.entityStore();
+    TableMaintenanceActionMetaService actionMetaService =
+        TableMaintenanceActionMetaService.getInstance();
     MaintenanceSchedulerPools pools = new MaintenanceSchedulerPools();
     pools.start(
         dataSource,
@@ -120,8 +122,8 @@ public class TableMaintenanceRESTFeature implements Feature {
         config,
         MaintenanceJobManager.getInstance(
             env.jobOperationDispatcher(), env.internalOwnerDispatcher()),
-        MaintenanceActionManager.getInstance(),
-        TableMaintenanceActionMetaService.getInstance(),
+        MaintenanceActionManager.getInstance(actionMetaService, maintenanceConfig.claimTimeoutMs()),
+        actionMetaService,
         tableEnumerator,
         policyMetaService);
     if (!SCHEDULER_POOLS.compareAndSet(null, pools)) {

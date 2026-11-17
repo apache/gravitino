@@ -20,7 +20,6 @@ package org.apache.gravitino.maintenance;
 
 import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.maintenance.storage.po.TableMaintenanceActionPO;
 import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 
@@ -35,9 +34,6 @@ import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMe
  */
 public final class MaintenanceActionManager {
 
-  private static final TableMaintenanceActionMetaService ACTION_SERVICE =
-      TableMaintenanceActionMetaService.getInstance();
-
   private static volatile MaintenanceActionManager instance;
 
   private final TableMaintenanceActionMetaService actionMetaService;
@@ -46,15 +42,18 @@ public final class MaintenanceActionManager {
   /**
    * Returns the shared action manager for the server process.
    *
+   * <p>Composition roots resolve the action store and claim TTL (from config) and pass them in.
+   *
+   * @param actionMetaService maintenance action store
+   * @param claimTimeoutMs unbound claim TTL
    * @return singleton manager
    */
-  public static MaintenanceActionManager getInstance() {
+  public static MaintenanceActionManager getInstance(
+      TableMaintenanceActionMetaService actionMetaService, long claimTimeoutMs) {
     if (instance == null) {
       synchronized (MaintenanceActionManager.class) {
         if (instance == null) {
-          long claimTimeoutMs =
-              TableMaintenanceConfig.from(GravitinoEnv.getInstance().config()).claimTimeoutMs();
-          instance = new MaintenanceActionManager(ACTION_SERVICE, claimTimeoutMs);
+          instance = new MaintenanceActionManager(actionMetaService, claimTimeoutMs);
         }
       }
     }
@@ -62,8 +61,6 @@ public final class MaintenanceActionManager {
   }
 
   /**
-   * Test / override constructor. Production code should use {@link #getInstance()}.
-   *
    * @param actionMetaService maintenance action store
    * @param claimTimeoutMs unbound claim TTL
    */
@@ -75,7 +72,7 @@ public final class MaintenanceActionManager {
   }
 
   /**
-   * Test / override constructor with the default claim timeout.
+   * Test helper with the default claim timeout.
    *
    * @param actionMetaService maintenance action store
    */

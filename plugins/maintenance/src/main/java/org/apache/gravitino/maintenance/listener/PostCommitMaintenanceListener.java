@@ -24,9 +24,11 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.maintenance.MaintenanceActionManager;
+import org.apache.gravitino.maintenance.TableMaintenanceConfig;
 import org.apache.gravitino.maintenance.scheduler.AutocommitDataSources;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobClient;
 import org.apache.gravitino.maintenance.scheduler.job.commit.CommitJobPlanner;
+import org.apache.gravitino.maintenance.storage.service.TableMaintenanceActionMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.slf4j.Logger;
@@ -65,10 +67,13 @@ public class PostCommitMaintenanceListener implements EventListenerPlugin {
     if (gravitinoConfig == null) {
       throw new IllegalStateException("GravitinoEnv config is not available");
     }
+    TableMaintenanceConfig maintenanceConfig = TableMaintenanceConfig.from(gravitinoConfig);
     CommitJobPlanner planner =
         new CommitJobPlanner(
             gravitinoConfig,
-            MaintenanceActionManager.getInstance(),
+            MaintenanceActionManager.getInstance(
+                TableMaintenanceActionMetaService.getInstance(),
+                maintenanceConfig.claimTimeoutMs()),
             TableMetaService.getInstance(),
             PolicyMetaService.getInstance(),
             env.entityStore());
