@@ -86,4 +86,61 @@ public class TestFromIcebergPartitionSpec extends TestBaseConvert {
       }
     }
   }
+
+  @Test
+  public void testNestedHyphenatedIdentityKeepsFieldComponents() {
+    // Iceberg idToName is "event.user-id"; Gravitino must keep ["event", "user-id"], not one
+    // dotted component.
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(
+                1,
+                "event",
+                Types.StructType.of(
+                    Types.NestedField.required(2, "user-id", Types.IntegerType.get()))));
+    PartitionSpec partitionSpec =
+        PartitionSpec.builderFor(schema).identity("event.user-id").build();
+
+    Transform[] transforms = FromIcebergPartitionSpec.fromPartitionSpec(partitionSpec, schema);
+
+    Assertions.assertEquals(1, transforms.length);
+    Assertions.assertInstanceOf(Transforms.IdentityTransform.class, transforms[0]);
+    Assertions.assertArrayEquals(
+        new String[] {"event", "user-id"},
+        ((Transforms.IdentityTransform) transforms[0]).fieldName());
+    Assertions.assertEquals("event.user-id", schema.idToName().get(2));
+  }
+
+  @Test
+  public void testNestedHyphenatedDayKeepsFieldComponents() {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(
+                1,
+                "event",
+                Types.StructType.of(
+                    Types.NestedField.required(2, "event-ts", Types.TimestampType.withoutZone()))));
+    PartitionSpec partitionSpec = PartitionSpec.builderFor(schema).day("event.event-ts").build();
+
+    Transform[] transforms = FromIcebergPartitionSpec.fromPartitionSpec(partitionSpec, schema);
+
+    Assertions.assertEquals(1, transforms.length);
+    Assertions.assertInstanceOf(Transforms.DayTransform.class, transforms[0]);
+    Assertions.assertArrayEquals(
+        new String[] {"event", "event-ts"}, ((Transforms.DayTransform) transforms[0]).fieldName());
+  }
+
+  @Test
+  public void testSplitIcebergNameToFieldPath() {
+    Assertions.assertArrayEquals(
+        new String[] {"col_1"}, ConvertUtil.splitIcebergNameToFieldPath("col_1"));
+    Assertions.assertArrayEquals(
+        new String[] {"event", "user-id"},
+        ConvertUtil.splitIcebergNameToFieldPath("event.user-id"));
+    Assertions.assertArrayEquals(
+        new String[] {"event", "meta", "user-id"},
+        ConvertUtil.splitIcebergNameToFieldPath("event.meta.user-id"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> ConvertUtil.splitIcebergNameToFieldPath(""));
+  }
 }
