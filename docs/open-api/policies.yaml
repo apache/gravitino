@@ -520,7 +520,8 @@ components:
       type: object
       description: >
         Thresholds for one resolved Iceberg partition spec. Supports catalog, schema, and table
-        policies, plus TMS execution peers such as `timeTrigger` and `jobOptions`.
+        policies, plus TMS execution peers such as `timeTrigger` and `jobOptions`. On
+        updateContent, newContent fully replaces the previous content; omitting a peer clears it.
       additionalProperties: false
       properties:
         <<: *policy-execution-peer-properties
