@@ -13,7 +13,7 @@
  * limitations under the License.
  */
 'use strict';
-const { TRUSTED_REQUIRED } = require('./publish-ci-status.cjs');
+const { TRUSTED_REQUIRED, NEEDS_ATTENTION } = require('./publish-ci-status.cjs');
 const { readFileSync } = require('node:fs');
 const path = require('node:path');
 const UPSTREAM = { owner: 'apache', repo: 'gravitino' };
@@ -60,9 +60,14 @@ const MISSING_WORKFLOW = 'Your fork has no Fork CI workflow, so pushes to this b
   'Merge or rebase the branch onto the latest base branch, which adds .github/workflows/fork-ci.yml, ' +
   'make sure Actions are enabled in your fork, and push again.';
 const requiredAction = note => ({ status: 'completed', conclusion: 'action_required',
-  title: 'Fork CI needs attention', note });
+  title: NEEDS_ATTENTION, note });
+
+const newerAttempt = (run, jobs) => jobs.some(job => job.run_attempt > run.run_attempt);
+const incompleteAttempt = () => requiredAction('The jobs API reports a newer attempt than the run listing. ' +
+  'Waiting for consistent results; the publisher will automatically check again.');
 
 function evaluateExecution(pr, run, jobs, baseSha) {
+  if (newerAttempt(run, jobs)) return incompleteAttempt();
   const required = jobs.find(job => job.name === requiredName(pr, baseSha));
   if (run.status !== 'completed') {
     // A workflow can remain queued while some of its matrix jobs already have runners.
@@ -91,13 +96,18 @@ function evaluateExecution(pr, run, jobs, baseSha) {
   const auxiliaryOnly = ['failure', 'timed_out', 'cancelled'].includes(run.conclusion) &&
     jobs.some(job => isAuxiliary(job) && ['failure', 'timed_out', 'cancelled'].includes(job.conclusion)) &&
     currentJobs.every(job => ['success', 'skipped'].includes(job.conclusion));
+  // Run and job metadata are separate API snapshots. Even a successful aggregate must
+  // not hide a failed prerequisite or suite observed in the jobs response.
+  if (failed.length) return { status: 'completed', conclusion: 'failure',
+    title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
   if (run.conclusion !== 'success' && !auxiliaryOnly) {
-    // Fork CI cancels its own run on the first failed job, so report that job, not the cancellation.
-    if (failed.length) return { status: 'completed', conclusion: 'failure',
-      title: `Failed: ${failed[0]}${failed.length > 1 ? ` (+${failed.length - 1} more)` : ''}`.slice(0, 200) };
     return { status: 'completed',
       conclusion: ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
         ? run.conclusion : 'action_required', title: `Fork CI ${run.conclusion}` };
+  }
+  if (currentJobs.some(job => !['success', 'skipped'].includes(job.conclusion))) {
+    return requiredAction('The run reports success but a required job is cancelled or unfinished. ' +
+      'The publisher will check the results again automatically.');
   }
   if (!required || required.conclusion !== 'success') {
     return requiredAction('The run did not finish Required CI for this exact head, base branch and base SHA. ' +
@@ -172,7 +182,8 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
       { owner, repo, run_id: run.id, filter: 'all', per_page: 100 });
     const latest = new Map();
     for (const job of jobs) {
-      if ((job.run_attempt || 1) > run.run_attempt) continue;
+      // Keep evidence of a rerun that started after the run listing was read. Silently
+      // discarding it could turn an earlier attempt's success into the current result.
       const previous = latest.get(job.name);
       if (!previous || (job.run_attempt || 1) > (previous.run_attempt || 1) ||
           ((job.run_attempt || 1) === (previous.run_attempt || 1) && job.id > previous.id)) {
@@ -252,6 +263,9 @@ function createService(github, { readWorkflow = sha => github.rest.repos.getCont
     const { owner, repo, run } = selected;
     // A manual upstream run uses the workflow definitions at run.head_sha, not the PR definitions.
     const jobs = selected.trusted ? trustedJobs : await jobsFor(owner, repo, run);
+    if (newerAttempt(run, jobs)) {
+      return { ...selected, fork: ordinary?.run, result: incompleteAttempt() };
+    }
     const base = selected.trusted ? run.head_sha : !sameDefinitions ? pr.base.sha : await testedBase(pr, jobs);
     let result = evaluateExecution(pr, run, jobs, base);
     const needsSuiteChecks = !result;

@@ -14,7 +14,7 @@
  */
 'use strict';
 const { createService } = require('./fork-ci-status.cjs');
-const { latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
+const { NEEDS_ATTENTION, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState } = require('./publish-ci-status.cjs');
 const { retireCancelled } = require('./retire-fork-ci.cjs');
 
 const RECENT_MS = 6 * 60 * 60 * 1000;
@@ -171,7 +171,11 @@ async function update({ github, context, core, sleep = ms => new Promise(resolve
       probed++;
       await visit(pr, async () => {
         const latest = await forkStatus(pr);
-        if (latest && statusCompleted(latest) && pr.head.repo) {
+        // Incomplete/mismatched jobs may become consistent without another run or attempt.
+        // Retry these attention results within the normal sweep budget, while authoritative
+        // failures/cancellations and successes retain the cheap settled-run probe.
+        const retry = latest?.state === 'error' && latest.description?.startsWith(NEEDS_ATTENTION);
+        if (latest && !retry && statusCompleted(latest) && pr.head.repo) {
           const shown = parseRunUrl(latest.target_url);
           // A fork without fork-ci.yml (404) has no run to watch; its status already says so.
           const fork = (await service.findRun(pr, false).catch(error => {

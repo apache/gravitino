@@ -53,6 +53,7 @@ async function publishStatus({ github, repo, sha, context, state, description, t
 }
 
 // Waiting for a committer is not a failure of the contributor's change.
+const NEEDS_ATTENTION = 'Fork CI needs attention';
 const TRUSTED_REQUIRED = 'Fork CI passed; trusted verification required';
 
 function statusState(result) {
@@ -67,4 +68,4 @@ function statusCompleted(status) {
   return status.state !== 'pending' || status.description === TRUSTED_REQUIRED;
 }
 
-module.exports = { TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };
+module.exports = { NEEDS_ATTENTION, TRUSTED_REQUIRED, latestStatus, parseRunUrl, publishStatus, runUrl, statusCompleted, statusState };

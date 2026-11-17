@@ -43,7 +43,7 @@ test('every real caller must have successful jobs, with only path-based skips al
   const children = [...jobs(p), { name: 'build / coverage', conclusion: 'skipped' }];
   assert.equal(evaluate(p, run(), children).conclusion, 'success');
   children.at(-1).conclusion = 'failure';
-  assert.equal(evaluate(p, run(), children).conclusion, 'action_required');
+  assert.equal(evaluate(p, run(), children).conclusion, 'failure');
 });
 test('the head, base branch and base SHA must all match the tested context', () => {
   const p = pr(), oldJobs = jobs(p);
@@ -493,7 +493,7 @@ test('partial reruns retain successful callers but use each job newest result', 
   };
   assert.equal((await createService(github).mirror(p)).result.conclusion, 'success');
   rerunConclusion = 'failure';
-  assert.equal((await createService(github).mirror(p)).result.conclusion, 'action_required');
+  assert.equal((await createService(github).mirror(p)).result.conclusion, 'failure');
 });
 
 function partialRerunJobs(p) {
@@ -538,8 +538,6 @@ test('partial reruns use only the latest available suite result', async () => {
   for (const conclusion of ['failure', 'timed_out', 'cancelled', 'skipped', null]) {
     const forkJobs = partialRerunJobs(pr());
     forkJobs.find(job => job.id === 300).conclusion = conclusion;
-    // A successful execution from a later attempt must not be used yet.
-    forkJobs.push({ name: 'spark / SparkIT', id: 400, run_attempt: 4, conclusion: 'success' });
     const github = serviceMock({ forkJobs });
     github.rest.actions.listWorkflowRuns = async ({ event }) => ({ data: { workflow_runs:
       event !== 'workflow_dispatch' ? [{ ...run(), run_attempt: 3, conclusion: 'cancelled' }] : [] } });
@@ -747,7 +745,7 @@ test('scheduled sweeps probe recently updated PRs first and refresh only running
   const old = Array.from({ length: 20 }, (_, i) => ({ ...pr(), number: 100 + i,
     head: { ...pr().head, sha: (100 + i).toString(16).padStart(40, 'd') } }));
   const settled = { ...pr(), number: 8, updated_at: recent, head: { ...pr().head, sha: 'e'.repeat(40) } };
-  // Any completed result, not only success, is final until its fork run id or attempt changes.
+  // Authoritative cancellations stay settled until the fork run id or attempt changes.
   stored.set(settled.head.sha, [forkStatus('error', 'Fork CI cancelled')]);
   const failed = { ...pr(), updated_at: recent };
   const all = [...old, settled, failed];
@@ -1614,4 +1612,87 @@ test('a transient trusted workflow lookup failure recovers on the next polling p
   assert.equal(trustedReads, 2);
   assert.equal(statuses.length, 1); assert.equal(statuses[0].state, 'success');
   assert.deepEqual(failures, []);
+}));
+
+test('successful aggregates still verify every non-auxiliary job', async () => {
+  for (const trusted of [false, true]) {
+    for (const name of ['Resolve fork CI eligibility', 'backend / extra prerequisite']) {
+      for (const conclusion of ['failure', 'timed_out', 'cancelled', 'action_required', null]) {
+        const current = [...jobs(pr()), { name, conclusion, run_attempt: 1 }];
+        const github = serviceMock({ trusted, forkJobs: current, trustedJobs: current });
+        const { result } = await createService(github).mirror(pr());
+        assert.notEqual(result.conclusion, 'success', JSON.stringify({ trusted, name, conclusion }));
+        if (['failure', 'timed_out'].includes(conclusion)) {
+          assert.equal(result.conclusion, 'failure'); assert.equal(result.title, `Failed: ${name}`);
+        }
+      }
+    }
+  }
+});
+
+test('newer jobs invalidate a stale run listing instead of reusing old success', async () => {
+  for (const trusted of [false, true]) {
+    for (const changed of [false, true]) {
+      for (const conclusion of ['success', 'failure', 'cancelled', null]) {
+        const current = [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+          { name: 'backend / changes', id: 200, run_attempt: 2, conclusion }];
+        const github = serviceMock({ trusted, changed, forkJobs: current, trustedJobs: current });
+        const { result } = await createService(github).mirror(pr());
+        assert.equal(result.conclusion, 'action_required');
+        assert.match(result.note, /newer attempt/);
+        assert.equal(statusState(result), 'error');
+      }
+    }
+  }
+});
+
+test('scheduled publication clears stale success and recovers once the run listing catches up', async () => withPublisher(async ({ ctx, core }) => {
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const rerun = run();
+  const { github, statuses } = publisherMock({ current: recent, rerun,
+    latest: forkStatus('success', 'All required suites passed') });
+  github.rest.pulls.get = async () => ({ data: recent });
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => args.run_id === 1
+    ? [...jobs(pr()).map((job, i) => ({ ...job, id: i + 1, run_attempt: 1 })),
+      { name: 'backend / changes', id: 200, run_attempt: 2, conclusion: 'success' }]
+    : endpoint === github.rest.pulls.list ? [recent] : paginate(endpoint, args);
+  // A signal refresh observes the jobs from attempt 2 before its run listing catches up.
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.at(-1).state, 'error');
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  const count = statuses.length;
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.length, count); // Persistent disagreement does not flood status history.
+  rerun.run_attempt = 2;
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.at(-1).state, 'success');
+  assert.equal(statuses.at(-1).target_url, url(1, 2));
+}));
+
+test('scheduled sweeps recheck incomplete summaries without a new run or attempt', async () => withPublisher(async ({ ctx, core }) => {
+  const recent = { ...pr(), updated_at: new Date().toISOString() };
+  const { github, statuses } = publisherMock({ current: recent, rerun: { ...run(), run_attempt: 2 } });
+  ctx.eventName = 'schedule'; delete ctx.payload.inputs;
+  github.rest.pulls.get = async () => ({ data: recent });
+  let incomplete = true, jobReads = 0;
+  const paginate = github.paginate;
+  github.paginate = async (endpoint, args) => {
+    if (endpoint === github.rest.pulls.list) return [recent];
+    if (args.run_id !== 1) return paginate(endpoint, args);
+    jobReads++;
+    return incomplete ? [...jobs(pr()).map(job => ({ ...job, run_attempt: 1 })),
+      { name: 'Required CI / unresolved', run_attempt: 2, conclusion: 'cancelled' }]
+      : jobs(pr()).map(job => ({ ...job, run_attempt: 2 }));
+  };
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(statuses.at(-1).state, 'error');
+  const reads = jobReads;
+  incomplete = false;
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.ok(jobReads > reads);
+  assert.equal(statuses.at(-1).state, 'success');
+  const settledReads = jobReads;
+  await update({ github, context: ctx, core, sleep: async () => {} });
+  assert.equal(jobReads, settledReads); // Recovered successes regain the cheap settled probe.
 }));
