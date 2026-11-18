@@ -181,6 +181,19 @@ public class TestCatalogManager {
     public void close() {}
   }
 
+  /** Reference provider that can build URNs but always fails on read (missing secret). */
+  public static class TestUnreadableReferenceSecretsProvider extends TestReferenceSecretsProvider {
+    @Override
+    public String type() {
+      return "test-unreadable-reference";
+    }
+
+    @Override
+    public String readSecret(SecretUrn urn) {
+      throw new IllegalArgumentException("Secret not found for URN: " + urn);
+    }
+  }
+
   private static CatalogManager catalogManager;
 
   private static EntityStore entityStore;
@@ -2850,6 +2863,36 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCreateRejectsEmptySecretBindingPlaintext() {
+    Assertions.assertThrows(IllegalArgumentException.class, () -> new SecretBinding("memory", ""));
+  }
+
+  @Test
+  void testCreateRejectsUnreadableSecretReference() throws Exception {
+    try (SecretManager secrets = unreadableReferenceSecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_missing_ref");
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  manager.createCatalog(
+                      ident,
+                      Catalog.Type.RELATIONAL,
+                      provider,
+                      "comment",
+                      catalogProps(),
+                      Map.of(),
+                      Map.of(
+                          PROPERTY_KEY4,
+                          new SecretReference("unreadable", Map.of("path", "does-not-exist")))));
+      Assertions.assertTrue(ex.getMessage().contains("Secret not found"), ex.getMessage());
+      Assertions.assertFalse(manager.catalogExists(ident));
+    }
+  }
+
+  @Test
   void testCatalogManageableWhenSecretMissing() throws Exception {
     try (SecretManager secrets = memorySecretManager();
         CatalogManager manager =
@@ -3002,6 +3045,24 @@ public class TestCatalogManager {
             + "reference."
             + SecretProviderRegistry.CLASS_NAME,
         TestReferenceSecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
+  }
+
+  private static SecretManager unreadableReferenceSecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory,unreadable");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "unreadable."
+            + SecretProviderRegistry.CLASS_NAME,
+        TestUnreadableReferenceSecretsProvider.class.getName());
     c.loadFromProperties(p);
     return new SecretManager(c);
   }

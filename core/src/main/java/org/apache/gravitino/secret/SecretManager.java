@@ -123,10 +123,19 @@ public class SecretManager implements Closeable {
    * Checks secret keys and puts reference / write-through URN strings into {@code
    * targetProperties}.
    *
+<<<<<<< HEAD
    * <p>Callers typically validate {@code targetProperties}, then call {@link #writeSecrets} with
    * the returned secret materials, and {@link #rollbackSecrets} on failure. {@code properties} is
    * used only for key uniqueness checks (e.g. the original request map); {@code targetProperties}
    * is the mutable map that will be stored (may already contain merged catalog conf).
+=======
+   * <p>Callers typically invoke {@link #validateProposedSecrets} on {@code targetProperties} and
+   * the returned plaintexts, then {@link #stageSecrets}, and call {@link #commitSecrets} after the
+   * entity is created or {@link #rollbackSecrets(SecretVersionChanges)} on failure. {@code
+   * properties} is used only for key uniqueness checks (e.g. the original request map); {@code
+   * targetProperties} is the mutable map that will be stored (may already contain merged catalog
+   * conf).
+>>>>>>> 8bca65935 ([#15056] fix(secret): Reject empty binding plaintext and fail fast on missing refs (#15057))
    *
    * @param properties properties used for key uniqueness checks (may be null)
    * @param targetProperties mutable properties that receive URN values (may be null only when both
@@ -423,15 +432,59 @@ public class SecretManager implements Closeable {
   }
 
   /**
+<<<<<<< HEAD
    * Stages an alter batch: writes its plaintexts as new versions and finds the versions it
    * releases.
+=======
+   * Validates the proposed secret property view for a create or alter batch.
+   *
+   * <p>Checks each write-through plaintext (non-blank, not the masked placeholder), then overlays
+   * {@code plaintexts} onto a copy of {@code finalProperties} and resolves that view with {@link
+   * #toPlaintextProperties(Map)}. New bindings are therefore checked as plaintext (same idea as
+   * {@link SecretAlterChanges#prepareCatalogChangesForTest}) while references and any other secret
+   * URNs are read through their providers. Callers should invoke this before {@link #stageSecrets}
+   * so a blank binding or missing reference fails without writing secret versions.
+   *
+   * @param finalProperties entity properties after the create or alter (URNs for secrets; may be
+   *     null when there are no secrets)
+   * @param plaintexts property key → plaintext that {@link #stageSecrets} will write
+   * @throws IllegalArgumentException if a plaintext is blank or masked, or a secret cannot be read
+   */
+  public void validateProposedSecrets(
+      @Nullable Map<String, String> finalProperties, Map<String, String> plaintexts) {
+    Preconditions.checkArgument(plaintexts != null, "plaintexts must not be null");
+    if ((finalProperties == null || finalProperties.isEmpty()) && plaintexts.isEmpty()) {
+      return;
+    }
+    Preconditions.checkArgument(
+        finalProperties != null, "finalProperties must not be null when secrets are present");
+    for (String plaintext : plaintexts.values()) {
+      SecretPropertyUtils.validateAlterSecretBindingPlaintext(plaintext);
+    }
+    Map<String, String> view = new HashMap<>(finalProperties);
+    view.putAll(plaintexts);
+    toPlaintextProperties(view);
+  }
+
+  /**
+   * Stages an entity create or alter batch: writes its plaintexts as new versions and finds the
+   * versions it releases.
+>>>>>>> 8bca65935 ([#15056] fix(secret): Reject empty binding plaintext and fail fast on missing refs (#15057))
    *
    * <p>Works from the properties before and after the whole batch, so a batch that changes one key
    * several times is treated by its net effect. A URN that has a current version keeps it readable
    * until {@link #commitSecrets}. If a write fails, the versions already written are deleted.
    *
+<<<<<<< HEAD
    * @param startProperties entity properties before the alter (may be null)
    * @param finalProperties entity properties after the alter
+=======
+   * <p>Callers must invoke {@link #validateProposedSecrets} first. This method only writes and
+   * records versions.
+   *
+   * @param startProperties entity properties before the alter, or {@code null} for a create
+   * @param finalProperties entity properties after the create or alter
+>>>>>>> 8bca65935 ([#15056] fix(secret): Reject empty binding plaintext and fail fast on missing refs (#15057))
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param plaintexts property key → plaintext to write; each key holds a write-through URN of this
@@ -737,6 +790,10 @@ public class SecretManager implements Closeable {
     return resolvePlaintextProperties(properties, false);
   }
 
+  /**
+   * Replaces secret URN values with plaintext, or with {@link HiddenPropertyMaskUtils#MASKED_VALUE}
+   * when {@code failOnMissing} is false and a secret cannot be read.
+   */
   private Map<String, String> resolvePlaintextProperties(
       @Nullable Map<String, String> properties, boolean failOnMissing) {
     if (properties == null || properties.isEmpty()) {

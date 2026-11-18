@@ -201,9 +201,19 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
     // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
+<<<<<<< HEAD
     // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back on any create
     // failure (same pattern as CatalogManager / SchemaOperationDispatcher).
     secretManager.writeSecrets(secretMaterials);
+=======
+    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back only if the
+    // catalog create fails; once it returns, the fileset references these secrets.
+    secretManager.validateProposedSecrets(entityProperties, secretPlaintexts);
+    SecretVersionChanges stagedSecrets =
+        secretManager.stageSecrets(null, entityProperties, "fileset", uid, secretPlaintexts);
+    AtomicBoolean createdInCatalog = new AtomicBoolean();
+    Fileset createdFileset;
+>>>>>>> 8bca65935 ([#15056] fix(secret): Reject empty binding plaintext and fail fast on missing refs (#15057))
     try {
       Fileset createdFileset =
           TreeLockUtils.doWithTreeLock(

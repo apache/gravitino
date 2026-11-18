@@ -889,7 +889,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             checkOpen();
             checkMetalake(metalakeIdent, store);
             // Initialization resolves secret URNs, but must not publish the entity yet.
+<<<<<<< HEAD
             secretManager.writeSecrets(secretMaterials);
+=======
+            secretManager.validateProposedSecrets(mergedConfig, secretPlaintexts);
+            SecretVersionChanges stagedSecrets =
+                secretManager.stageSecrets(null, mergedConfig, "catalog", uid, secretPlaintexts);
+>>>>>>> 8bca65935 ([#15056] fix(secret): Reject empty binding plaintext and fail fast on missing refs (#15057))
             AtomicBoolean entityStored = new AtomicBoolean(false);
             try {
               // Reject known duplicates before contacting the backend; store.put still arbitrates
