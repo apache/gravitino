@@ -19,6 +19,7 @@
 package org.apache.gravitino.bundles;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,12 +32,52 @@ import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.jar.JarFile;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.slf4j.LoggerFactory;
 
 class TestTencentBundleShadedAvro {
   private static final File BUNDLE = new File(System.getProperty("shadowJarPath"));
+
+  @TempDir private Path dir;
+  private ClassLoader previousLoader;
+  private URLClassLoader loader;
+  private Class<?> confClass;
+  private Class<?> pathClass;
+  private Class<?> fsClass;
+  private Object conf;
+  private Object fs;
+
+  @BeforeEach
+  void setUp() throws Exception {
+    URL[] urls = {
+      BUNDLE.toURI().toURL(),
+      LoggerFactory.class.getProtectionDomain().getCodeSource().getLocation()
+    };
+    // The ordinary test classpath also contains unshaded Hadoop, so load only the bundle.
+    loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader());
+    previousLoader = Thread.currentThread().getContextClassLoader();
+    Thread.currentThread().setContextClassLoader(loader);
+    confClass = loader.loadClass("org.apache.hadoop.conf.Configuration");
+    pathClass = loader.loadClass("org.apache.hadoop.fs.Path");
+    fsClass = loader.loadClass("org.apache.hadoop.fs.FileSystem");
+    conf = confClass.getConstructor().newInstance();
+    fs = fsClass.getMethod("getLocal", confClass).invoke(null, conf);
+  }
+
+  @AfterEach
+  void tearDown() throws Exception {
+    try {
+      if (fs != null) {
+        fsClass.getMethod("close").invoke(fs);
+      }
+      loader.close();
+    } finally {
+      Thread.currentThread().setContextClassLoader(previousLoader);
+    }
+  }
 
   @Test
   void testBundleExcludesShadedAvro() throws Exception {
@@ -49,49 +90,75 @@ class TestTencentBundleShadedAvro {
                           || entry.getName().startsWith("META-INF/maven/org.apache.avro/")),
           BUNDLE.getName());
     }
+    // The Avro serializations are removed from the defaults together with the shaded Avro.
+    assertEquals(
+        "org.apache.hadoop.io.serializer.WritableSerialization",
+        confClass.getMethod("get", String.class).invoke(conf, "io.serializations"));
   }
 
   @Test
-  void testHadoopFileSystemWorksWithoutShadedAvro(@TempDir Path dir) throws Exception {
-    URL[] urls = {
-      BUNDLE.toURI().toURL(),
-      LoggerFactory.class.getProtectionDomain().getCodeSource().getLocation()
-    };
+  void testFileSystemWorksWithoutShadedAvro() throws Exception {
+    // Path and Text are annotated with the removed Avro annotations.
+    pathClass.getAnnotations();
+    loader.loadClass("org.apache.hadoop.io.Text").getAnnotations();
+    // Creating the bundled file system does not contact a remote service.
+    Object cloudFs =
+        loader.loadClass("org.apache.hadoop.fs.CosNFileSystem").getConstructor().newInstance();
+    assertTrue(fsClass.isInstance(cloudFs));
+
     byte[] data = "gravitino".getBytes(StandardCharsets.UTF_8);
-    Thread thread = Thread.currentThread();
-    ClassLoader previous = thread.getContextClassLoader();
-    // The ordinary test classpath also contains unshaded Hadoop, so load only the bundle.
-    try (URLClassLoader loader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader())) {
-      thread.setContextClassLoader(loader);
-      Class<?> confClass = loader.loadClass("org.apache.hadoop.conf.Configuration");
-      Class<?> pathClass = loader.loadClass("org.apache.hadoop.fs.Path");
-      Class<?> fsClass = loader.loadClass("org.apache.hadoop.fs.FileSystem");
-      // Path and Text are annotated with the removed Avro annotations.
-      pathClass.getAnnotations();
-      loader.loadClass("org.apache.hadoop.io.Text").getAnnotations();
-
-      // Creating the bundled file system does not contact a remote service.
-      Object cloudFs =
-          loader.loadClass("org.apache.hadoop.fs.CosNFileSystem").getConstructor().newInstance();
-      assertTrue(fsClass.isInstance(cloudFs));
-
-      Object conf = confClass.getConstructor().newInstance();
-      Object fs = fsClass.getMethod("getLocal", confClass).invoke(null, conf);
-      Object file =
-          pathClass
-              .getConstructor(String.class)
-              .newInstance(dir.resolve("data").toUri().toString());
-      Method create = fsClass.getMethod("create", pathClass);
-      try (OutputStream out = (OutputStream) create.invoke(fs, file)) {
-        out.write(data);
-      }
-      Method open = fsClass.getMethod("open", pathClass);
-      try (InputStream in = (InputStream) open.invoke(fs, file)) {
-        assertArrayEquals(data, in.readAllBytes());
-      }
-      fsClass.getMethod("close").invoke(fs);
-    } finally {
-      thread.setContextClassLoader(previous);
+    Object file = newPath("data");
+    Method create = fsClass.getMethod("create", pathClass);
+    try (OutputStream out = (OutputStream) create.invoke(fs, file)) {
+      out.write(data);
     }
+    Method open = fsClass.getMethod("open", pathClass);
+    try (InputStream in = (InputStream) open.invoke(fs, file)) {
+      assertArrayEquals(data, in.readAllBytes());
+    }
+  }
+
+  @Test
+  void testWritableSequenceFileWorksWithoutShadedAvro() throws Exception {
+    Class<?> textClass = loader.loadClass("org.apache.hadoop.io.Text");
+    Class<?> writableClass = loader.loadClass("org.apache.hadoop.io.Writable");
+    Class<?> writerClass = loader.loadClass("org.apache.hadoop.io.SequenceFile$Writer");
+    Class<?> readerClass = loader.loadClass("org.apache.hadoop.io.SequenceFile$Reader");
+    Object file = newPath("data.seq");
+
+    Object writer =
+        loader
+            .loadClass("org.apache.hadoop.io.SequenceFile")
+            .getMethod("createWriter", fsClass, confClass, pathClass, Class.class, Class.class)
+            .invoke(null, fs, conf, file, textClass, textClass);
+    try {
+      writerClass
+          .getMethod("append", writableClass, writableClass)
+          .invoke(writer, newText(textClass, "key"), newText(textClass, "value"));
+    } finally {
+      writerClass.getMethod("close").invoke(writer);
+    }
+
+    Object reader =
+        readerClass.getConstructor(fsClass, pathClass, confClass).newInstance(fs, file, conf);
+    try {
+      Object key = newText(textClass, "");
+      Object value = newText(textClass, "");
+      Method next = readerClass.getMethod("next", writableClass, writableClass);
+      assertTrue((Boolean) next.invoke(reader, key, value));
+      assertEquals("key", key.toString());
+      assertEquals("value", value.toString());
+      assertFalse((Boolean) next.invoke(reader, key, value));
+    } finally {
+      readerClass.getMethod("close").invoke(reader);
+    }
+  }
+
+  private Object newPath(String name) throws Exception {
+    return pathClass.getConstructor(String.class).newInstance(dir.resolve(name).toUri().toString());
+  }
+
+  private static Object newText(Class<?> textClass, String value) throws Exception {
+    return textClass.getConstructor(String.class).newInstance(value);
   }
 }
