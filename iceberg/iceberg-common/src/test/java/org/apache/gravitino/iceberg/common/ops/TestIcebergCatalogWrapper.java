@@ -138,12 +138,17 @@ public class TestIcebergCatalogWrapper {
     Mockito.doReturn("org.apache.iceberg.aws.s3.S3FileIO").when(wrapper).fileIOImpl();
     Catalog catalog = Mockito.mock(Catalog.class);
     Mockito.doReturn(catalog).when(wrapper).getCatalog();
-    Mockito.when(catalog.registerTable(Mockito.any(), Mockito.eq(location), Mockito.anyBoolean()))
+    String pointer = location + "/metadata/v1.metadata.json";
+    TableMetadata metadata = Mockito.mock(TableMetadata.class);
+    Mockito.when(metadata.location()).thenReturn(location);
+    Mockito.when(metadata.properties()).thenReturn(Collections.emptyMap());
+    Mockito.doReturn(metadata).when(wrapper).loadTableMetadataFromLocation(pointer);
+    Mockito.when(catalog.registerTable(Mockito.any(), Mockito.eq(pointer), Mockito.anyBoolean()))
         .thenThrow(new IllegalStateException("register backend reached"));
     Mockito.when(catalog.loadTable(Mockito.any()))
         .thenThrow(new IllegalStateException("update backend reached"));
     RegisterTableRequest register =
-        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(location).build();
+        ImmutableRegisterTableRequest.builder().name("t").metadataLocation(pointer).build();
     UpdateTableRequest update =
         new UpdateTableRequest(
             Collections.emptyList(),
