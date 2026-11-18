@@ -44,7 +44,7 @@ public class TestAuthorizationExpressionConverter {
         Map.ofEntries(
             Map.entry("SELECT_TABLE", "TABLE"),
             Map.entry("MODIFY_TABLE", "TABLE"),
-            Map.entry("PROBE_TABLE_LIKE", "TABLE"),
+            Map.entry("PROBE_TABLE_LIKE", "(TABLE != null ? TABLE : VIEW)"),
             Map.entry("SELECT_VIEW", "VIEW"),
             Map.entry("READ_FILESET", "FILESET"),
             Map.entry("WRITE_FILESET", "FILESET"),
