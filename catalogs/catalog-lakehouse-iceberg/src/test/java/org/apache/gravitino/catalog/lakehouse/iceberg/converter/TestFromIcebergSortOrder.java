@@ -84,15 +84,18 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
                 Collectors.toMap(
                     sortOrder -> {
                       if (sortOrder.expression() instanceof NamedReference.FieldReference) {
-                        return ((NamedReference.FieldReference) sortOrder.expression())
-                            .fieldName()[0];
+                        return String.join(
+                            ".",
+                            ((NamedReference.FieldReference) sortOrder.expression()).fieldName());
                       } else if (sortOrder.expression() instanceof FunctionExpression) {
                         Expression[] arguments =
                             ((FunctionExpression) sortOrder.expression()).arguments();
                         if (arguments.length == 1) {
-                          return ((NamedReference.FieldReference) arguments[0]).fieldName()[0];
+                          return String.join(
+                              ".", ((NamedReference.FieldReference) arguments[0]).fieldName());
                         } else {
-                          return ((NamedReference.FieldReference) arguments[1]).fieldName()[0];
+                          return String.join(
+                              ".", ((NamedReference.FieldReference) arguments[1]).fieldName());
                         }
                       }
                       throw new RuntimeException("Unsupported sort expression type");
@@ -120,5 +123,28 @@ public class TestFromIcebergSortOrder extends TestBaseConvert {
           getGravitinoSortOrderExpressionString(sortOrder.expression());
       Assertions.assertEquals(icebergSortOrderString, gravitinoSortOrderString);
     }
+  }
+
+  @Test
+  public void testNestedHyphenatedFieldSortKeepsFieldComponents() {
+    Schema schema =
+        new Schema(
+            Types.NestedField.required(
+                1,
+                "event",
+                Types.StructType.of(
+                    Types.NestedField.required(2, "user-id", Types.IntegerType.get()))));
+    org.apache.iceberg.SortOrder icebergSortOrder =
+        org.apache.iceberg.SortOrder.builderFor(schema)
+            .sortBy("event.user-id", org.apache.iceberg.SortDirection.ASC, NullOrder.NULLS_LAST)
+            .build();
+
+    SortOrder[] sortOrders = FromIcebergSortOrder.fromSortOrder(icebergSortOrder);
+
+    Assertions.assertEquals(1, sortOrders.length);
+    Assertions.assertInstanceOf(NamedReference.FieldReference.class, sortOrders[0].expression());
+    Assertions.assertArrayEquals(
+        new String[] {"event", "user-id"},
+        ((NamedReference.FieldReference) sortOrders[0].expression()).fieldName());
   }
 }

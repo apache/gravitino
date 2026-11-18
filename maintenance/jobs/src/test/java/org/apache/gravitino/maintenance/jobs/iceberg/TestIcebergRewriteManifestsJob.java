@@ -186,6 +186,7 @@ public class TestIcebergRewriteManifestsJob {
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.type"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.uri"));
     assertTrue(configs.containsKey("spark.sql.catalog.{{catalog_name}}.warehouse"));
+    assertEquals("{{catalog_name}}", configs.get("spark.sql.defaultCatalog"));
   }
 
   @Test

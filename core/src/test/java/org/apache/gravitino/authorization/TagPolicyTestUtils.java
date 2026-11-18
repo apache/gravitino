@@ -20,23 +20,18 @@
 package org.apache.gravitino.authorization;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.utils.NamespaceUtil;
 
-/** Shared tag-policy entities and a controllable reader for authorization tests. */
+/** Shared tag-policy entities for authorization tests. */
 final class TagPolicyTestUtils {
   static final String METALAKE = "metalake";
 
@@ -84,48 +79,5 @@ final class TagPolicyTestUtils {
                 Collections.emptyMap()))
         .withAuditInfo(audit())
         .build();
-  }
-
-  /** Counts reads and allows tests to inject assignment or policy-read failures. */
-  static final class InMemoryReader implements TagPolicyReader {
-    final Map<MetadataObject, List<TagEntity>> assignments = new HashMap<>();
-    final Map<String, List<ResolvedTagPolicy>> bindings = new HashMap<>();
-    final AtomicInteger tagReads = new AtomicInteger();
-    final AtomicInteger policyReads = new AtomicInteger();
-    RuntimeException tagFailure;
-    RuntimeException policyFailure;
-
-    void bind(TagEntity tag, PolicyEntity policy, PolicyAssociationSelector selector) {
-      bindings
-          .computeIfAbsent(tag.name(), ignored -> new ArrayList<>())
-          .add(new ResolvedTagPolicy(tag, policy, selector));
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public List<TagEntity> loadTags(String metalake, MetadataObject object) {
-      tagReads.incrementAndGet();
-      if (tagFailure != null) {
-        throw tagFailure;
-      }
-      return assignments.getOrDefault(object, Collections.emptyList());
-    }
-
-    /** {@inheritDoc} */
-    @Override
-    public List<ResolvedTagPolicy> loadPolicyBindings(String metalake, List<TagEntity> tags) {
-      policyReads.incrementAndGet();
-      if (policyFailure != null) {
-        throw policyFailure;
-      }
-      List<ResolvedTagPolicy> result = new ArrayList<>();
-      for (TagEntity tag : tags) {
-        for (ResolvedTagPolicy binding :
-            bindings.getOrDefault(tag.name(), Collections.emptyList())) {
-          result.add(new ResolvedTagPolicy(tag, binding.policy(), binding.selector()));
-        }
-      }
-      return result;
-    }
   }
 }

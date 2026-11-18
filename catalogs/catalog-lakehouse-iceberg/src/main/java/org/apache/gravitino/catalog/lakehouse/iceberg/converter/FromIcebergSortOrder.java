@@ -84,13 +84,13 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
 
   private SortOrder fieldSortOrder(int id, SortDirection direction, NullOrder nullOrder) {
     return SortOrders.of(
-        NamedReference.field(idToName.get(id)), toGravitino(direction), toGravitino(nullOrder));
+        NamedReference.field(fieldName(id)), toGravitino(direction), toGravitino(nullOrder));
   }
 
   private SortOrder functionSortOrder(
       String name, int id, SortDirection direction, NullOrder nullOrder) {
     return SortOrders.of(
-        FunctionExpression.of(name, NamedReference.field(idToName.get(id))),
+        FunctionExpression.of(name, NamedReference.field(fieldName(id))),
         toGravitino(direction),
         toGravitino(nullOrder));
   }
@@ -99,9 +99,13 @@ public class FromIcebergSortOrder implements SortOrderVisitor<SortOrder> {
       String name, int width, int id, SortDirection direction, NullOrder nullOrder) {
     return SortOrders.of(
         FunctionExpression.of(
-            name, Literals.integerLiteral(width), NamedReference.field(idToName.get(id))),
+            name, Literals.integerLiteral(width), NamedReference.field(fieldName(id))),
         toGravitino(direction),
         toGravitino(nullOrder));
+  }
+
+  private String[] fieldName(int id) {
+    return ConvertUtil.splitIcebergNameToFieldPath(idToName.get(id));
   }
 
   private org.apache.gravitino.rel.expressions.sorts.SortDirection toGravitino(

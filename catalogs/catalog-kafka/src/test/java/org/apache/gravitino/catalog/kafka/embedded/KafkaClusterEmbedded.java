@@ -19,8 +19,6 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.util.Properties;
 import java.util.UUID;
-import kafka.server.KafkaConfig;
-import kafka.server.KafkaConfig$;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
@@ -46,7 +44,7 @@ public abstract class KafkaClusterEmbedded {
     Properties brokerConfig = initBrokerConfig();
     LOG.info(
         "Starting a Kafka instance on port {} ...",
-        brokerConfig.getProperty(KafkaConfig.ListenersProp()));
+        brokerConfig.getProperty(BrokerConfigKeys.LISTENERS));
     broker = new KafkaEmbedded(brokerConfig);
     LOG.info(
         "Kafka instance is running at {}, connected to ZooKeeper at {}",
@@ -83,20 +81,20 @@ public abstract class KafkaClusterEmbedded {
 
   private static Properties initBrokerConfig() {
     Properties configs = new Properties();
-    configs.put(KafkaConfig$.MODULE$.ZkConnectProp(), zookeeper.connectString());
-    configs.put(KafkaConfig$.MODULE$.ZkSessionTimeoutMsProp(), 30 * 1000);
-    configs.put(KafkaConfig$.MODULE$.ZkConnectionTimeoutMsProp(), 60 * 1000);
-    configs.put(KafkaConfig$.MODULE$.DeleteTopicEnableProp(), true);
-    configs.put(KafkaConfig$.MODULE$.LogCleanerDedupeBufferSizeProp(), 2 * 1024 * 1024L);
-    configs.put(KafkaConfig$.MODULE$.GroupMinSessionTimeoutMsProp(), 0);
-    configs.put(KafkaConfig$.MODULE$.OffsetsTopicReplicationFactorProp(), (short) 1);
-    configs.put(KafkaConfig$.MODULE$.OffsetsTopicPartitionsProp(), 1);
-    configs.put(KafkaConfig$.MODULE$.AutoCreateTopicsEnableProp(), true);
+    configs.put(BrokerConfigKeys.ZOOKEEPER_CONNECT, zookeeper.connectString());
+    configs.put(BrokerConfigKeys.ZOOKEEPER_SESSION_TIMEOUT_MS, 30 * 1000);
+    configs.put(BrokerConfigKeys.ZOOKEEPER_CONNECTION_TIMEOUT_MS, 60 * 1000);
+    configs.put(BrokerConfigKeys.DELETE_TOPIC_ENABLE, true);
+    configs.put(BrokerConfigKeys.LOG_CLEANER_DEDUPE_BUFFER_SIZE, 2 * 1024 * 1024L);
+    configs.put(BrokerConfigKeys.GROUP_MIN_SESSION_TIMEOUT_MS, 0);
+    configs.put(BrokerConfigKeys.OFFSETS_TOPIC_REPLICATION_FACTOR, (short) 1);
+    configs.put(BrokerConfigKeys.OFFSETS_TOPIC_NUM_PARTITIONS, 1);
+    configs.put(BrokerConfigKeys.AUTO_CREATE_TOPICS_ENABLE, true);
     // Find a random port
     try (ServerSocket socket = new ServerSocket(0)) {
       socket.setReuseAddress(true);
       configs.put(
-          KafkaConfig.ListenersProp(),
+          BrokerConfigKeys.LISTENERS,
           String.format("PLAINTEXT://127.0.0.1:%s", socket.getLocalPort()));
     } catch (IOException e) {
       throw new RuntimeException("Can't find a port to start embedded Kafka broker", e);

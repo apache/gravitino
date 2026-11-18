@@ -93,6 +93,7 @@ dependencies {
   testImplementation(libs.testcontainers.mysql)
   testImplementation(libs.testcontainers.postgresql)
   testImplementation(project(":integration-test-common", "testArtifacts"))
+  testImplementation(project(":catalogs:catalog-lakehouse-iceberg"))
   testImplementation(project(":server"))
   testRuntimeOnly(libs.mysql.driver)
   testRuntimeOnly(libs.postgresql.driver)
@@ -124,6 +125,12 @@ tasks {
 
 configurations.testRuntimeClasspath {
   exclude(group = "org.apache.logging.log4j", module = "log4j-slf4j2-impl")
+}
+
+// The lakehouse-iceberg catalog packages runtime jars beside its module jar in build/libs
+// (same pattern as jobs → optimizer:copyDepends). Order compileTestJava after that.
+tasks.compileTestJava {
+  dependsOn(":catalogs:catalog-lakehouse-iceberg:jar", ":catalogs:catalog-lakehouse-iceberg:runtimeJars")
 }
 
 tasks.test {

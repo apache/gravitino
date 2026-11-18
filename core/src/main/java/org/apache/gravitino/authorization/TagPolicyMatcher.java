@@ -25,8 +25,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.policy.AccessControlContent;
+import org.apache.gravitino.policy.ObjectPolicyResolver;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicySelectorMatcher;
 import org.apache.gravitino.tag.TagAssignment;
 
 /** Matches requested privileges and active roles against resolved tag-policy bindings. */
@@ -59,7 +59,7 @@ public final class TagPolicyMatcher {
       AccessControlContent content = (AccessControlContent) binding.policy().content();
       if (content.privileges().contains(privilege)
           && !Collections.disjoint(content.applicableRoles(), activeRoleNames)
-          && PolicySelectorMatcher.matches(
+          && ObjectPolicyResolver.matches(
               binding.selector(), binding.tag().assignment().orElseGet(TagAssignment::noValue))) {
         return Optional.of(binding);
       }
