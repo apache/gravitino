@@ -93,6 +93,14 @@ Scheduler pool sizes have these defaults:
 | `gravitino.maintenance.scheduler.cronThreads`   | `8`     |
 | `gravitino.maintenance.scheduler.commitThreads` | `4`     |
 
+When `gravitino.authorization.enable=true`, set a TMS submit identity:
+
+| Configuration item                              | Default | Description                                        |
+|-------------------------------------------------|---------|----------------------------------------------------|
+| `gravitino.maintenance.jobSubmitter`            | (none)  | USER principal TMS uses to submit maintenance jobs |
+
+Create that user under every metalake that runs maintenance jobs. Grant the user metalake `RUN_JOB` and `USE_JOB_TEMPLATE` on the Iceberg maintenance job template so `runJob` can succeed; grant any further table or catalog privileges your maintenance Spark jobs need when they call back into Gravitino.
+
 ## Time Trigger
 
 `timeTrigger` stores the cron string on the policy. `0 */5 * * * ?` runs at second 0 of every fifth minute. A five-field Unix cron is not accepted.

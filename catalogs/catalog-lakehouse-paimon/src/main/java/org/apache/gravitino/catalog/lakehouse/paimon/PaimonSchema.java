@@ -20,6 +20,7 @@ package org.apache.gravitino.catalog.lakehouse.paimon;
 
 import static org.apache.gravitino.meta.AuditInfo.EMPTY;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import lombok.ToString;
@@ -36,12 +37,20 @@ public class PaimonSchema extends BaseSchema {
   private PaimonSchema() {}
 
   /**
-   * Converts {@link PaimonSchema} instance to inner schema.
+   * Converts {@link PaimonSchema} instance to inner schema. The schema comment is stored under the
+   * {@link PaimonSchemaPropertiesMetadata#COMMENT} property, where Paimon keeps database comments.
    *
    * @return The converted inner schema.
    */
   public Map<String, String> toPaimonProperties() {
-    return properties;
+    Map<String, String> paimonProperties = new HashMap<>();
+    if (properties != null) {
+      paimonProperties.putAll(properties);
+    }
+    if (comment != null) {
+      paimonProperties.put(PaimonSchemaPropertiesMetadata.COMMENT, comment);
+    }
+    return paimonProperties;
   }
 
   /**

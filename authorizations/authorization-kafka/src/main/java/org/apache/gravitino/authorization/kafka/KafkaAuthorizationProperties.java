@@ -24,6 +24,7 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.authorization.common.AuthorizationProperties;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -106,6 +107,11 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
   /** Default Kafka AdminClient request timeout in milliseconds. */
   public static final int DEFAULT_REQUEST_TIMEOUT_MS = 30000;
 
+  // Kafka resolves "${provider:path:key}" placeholders in client configs through
+  // "config.providers",
+  // which can read the Gravitino server's own environment variables and files.
+  private static final String CONFIG_PROVIDERS_KEY = "config.providers";
+
   private final Map<String, String> rawConfig;
 
   /**
@@ -176,6 +182,8 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
 
     // Validate catalog ID if provided
     getCatalogId();
+
+    checkNoConfigProviders();
   }
 
   /**
@@ -362,6 +370,7 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
    * @return Properties configured for Kafka {@code AdminClient}.
    */
   public Properties toAdminClientProperties() {
+    checkNoConfigProviders();
     Properties adminProps = new Properties();
     rawConfig.forEach(
         (key, value) -> {
@@ -406,5 +415,26 @@ public class KafkaAuthorizationProperties extends AuthorizationProperties {
               : "gravitino-kafka-authz-plugin");
     }
     return adminProps;
+  }
+
+  private void checkNoConfigProviders() {
+    String disallowedKeys =
+        rawConfig.keySet().stream()
+            .filter(KafkaAuthorizationProperties::isConfigProviderKey)
+            .sorted()
+            .collect(Collectors.joining(", "));
+    Preconditions.checkArgument(
+        disallowedKeys.isEmpty(),
+        "Kafka config providers are not supported, please remove the properties: %s",
+        disallowedKeys);
+  }
+
+  private static boolean isConfigProviderKey(String key) {
+    String bypassProvidersKey = BaseCatalog.CATALOG_BYPASS_PREFIX + CONFIG_PROVIDERS_KEY;
+    String adminProvidersKey = ADMIN_CLIENT_PREFIX + CONFIG_PROVIDERS_KEY;
+    return key.equals(bypassProvidersKey)
+        || key.startsWith(bypassProvidersKey + ".")
+        || key.equals(adminProvidersKey)
+        || key.startsWith(adminProvidersKey + ".");
   }
 }

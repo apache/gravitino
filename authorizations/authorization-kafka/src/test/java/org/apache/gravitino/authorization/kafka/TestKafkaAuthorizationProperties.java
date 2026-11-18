@@ -202,6 +202,35 @@ public class TestKafkaAuthorizationProperties {
         IllegalArgumentException.class, () -> validProps.formatGroupPrincipal("*"));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> validProps.formatGroupPrincipal(" * "));
+
+    for (String disallowedKey :
+        new String[] {
+          "gravitino.bypass.config.providers",
+          "gravitino.bypass.config.providers.env.class",
+          "authorization.kafka.admin.config.providers",
+          "authorization.kafka.admin.config.providers.file.class"
+        }) {
+      KafkaAuthorizationProperties propsWithConfigProvider =
+          new KafkaAuthorizationProperties(
+              ImmutableMap.of("bootstrap.servers", "localhost:9092", disallowedKey, "env"));
+      IllegalArgumentException ex =
+          Assertions.assertThrows(
+              IllegalArgumentException.class, propsWithConfigProvider::validate);
+      Assertions.assertTrue(ex.getMessage().contains(disallowedKey), ex.getMessage());
+      Assertions.assertThrows(
+          IllegalArgumentException.class, propsWithConfigProvider::toAdminClientProperties);
+    }
+
+    KafkaAuthorizationProperties similarKeyProps =
+        new KafkaAuthorizationProperties(
+            ImmutableMap.of(
+                "bootstrap.servers",
+                "localhost:9092",
+                "gravitino.bypass.config.providersx",
+                "ignored",
+                "authorization.kafka.admin.config.providersx",
+                "ignored"));
+    Assertions.assertDoesNotThrow(similarKeyProps::validate);
   }
 
   @Test

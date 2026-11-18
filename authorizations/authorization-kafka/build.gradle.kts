@@ -35,6 +35,7 @@ dependencies {
   implementation(libs.guava)
   implementation(libs.kafka.clients) {
     // AdminClient ACL control-plane calls do not compress record batches.
+    exclude(group = "at.yawk.lz4", module = "lz4-java")
     exclude(group = "com.github.luben", module = "zstd-jni")
     exclude(group = "org.lz4", module = "lz4-java")
     exclude(group = "org.xerial.snappy", module = "snappy-java")
