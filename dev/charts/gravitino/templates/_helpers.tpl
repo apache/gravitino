@@ -111,6 +111,7 @@ Return the proper Postgresql image name for the init-postgresql initContainer
 
 {{/*
 True when per-pod init-mysql should apply schema SQL (in-chart Bitnami only).
+Skipped when schema.migrate.enabled runs the shared Job instead.
 */}}
 {{- define "gravitino.mysqlSchemaInitEnabled" -}}
 {{- if and .Values.mysql.enabled (ne (include "gravitino.schemaMigrateEnabled" . | trim) "true") -}}
@@ -120,11 +121,60 @@ true
 
 {{/*
 True when per-pod init-postgresql should apply schema SQL (in-chart Bitnami only).
+Skipped when schema.migrate.enabled runs the shared Job instead.
 */}}
 {{- define "gravitino.postgresqlSchemaInitEnabled" -}}
 {{- if and .Values.postgresql.enabled (ne (include "gravitino.schemaMigrateEnabled" . | trim) "true") -}}
 true
 {{- end -}}
+{{- end -}}
+
+{{/*
+True when Deployment should wait for gravitino_schema_migration (schema-migrate Job).
+*/}}
+{{- define "gravitino.schemaWaitEnabled" -}}
+{{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" -}}
+true
+{{- end -}}
+{{- end -}}
+
+{{/*
+How long wait-for-schema init containers poll before failing.
+*/}}
+{{- define "gravitino.schemaWaitTimeoutSeconds" -}}
+{{- $schema := .Values.schema | default dict -}}
+{{- $wait := $schema.wait | default dict -}}
+{{- $n := int ($wait.timeoutSeconds | default 600) -}}
+{{- if lt $n 1 -}}
+{{- fail "schema.wait.timeoutSeconds must be a positive integer" -}}
+{{- end -}}
+{{- $n -}}
+{{- end -}}
+
+{{/*
+Shared prefix for wait-for-schema init containers.
+*/}}
+{{- define "gravitino.schemaWaitPreamble" -}}
+timeout="${SCHEMA_WAIT_TIMEOUT:-600}"
+case "$timeout" in
+  ''|*[!0-9]*) echo "ERROR: SCHEMA_WAIT_TIMEOUT must be a positive integer" >&2; exit 1 ;;
+esac
+if [ "$timeout" -lt 1 ]; then
+  echo "ERROR: SCHEMA_WAIT_TIMEOUT must be a positive integer" >&2
+  exit 1
+fi
+deadline=$((SECONDS + timeout))
+required_column_name_capacity=128
+if [ "$(printf '%s\n%s' 1.3.2 "$VERSION" | sort -V | head -n1)" = 1.3.2 ]; then
+  required_column_name_capacity=300
+fi
+{{- end -}}
+
+{{/*
+Schema readiness includes the 1.3.2+ column expansion.
+*/}}
+{{- define "gravitino.schemaReadyQuery" -}}
+SELECT schema_version FROM gravitino_schema_migration WHERE id = 1 AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = {{ if eq . "mysql" }}DATABASE(){{ else }}current_schema(){{ end }} AND table_name = 'table_column_version_info' AND column_name = 'column_name' AND character_maximum_length >= ${required_column_name_capacity});
 {{- end -}}
 
 {{/*
@@ -255,7 +305,7 @@ true
 {{- end -}}
 
 {{/*
-True when the Helm hook schema-migrate Job should run.
+True when the schema-migrate Job should run (regular resource, not a Helm hook).
 */}}
 {{- define "gravitino.schemaMigrateEnabled" -}}
 {{- if .Values.schema.migrate.enabled -}}

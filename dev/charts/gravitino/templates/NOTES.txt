@@ -71,10 +71,11 @@ before any non-trial deployment.
 
 {{- if eq (include "gravitino.schemaMigrateEnabled" . | trim) "true" }}
 
-NOTE: Entity schema migration runs in a pre-install/pre-upgrade Helm hook Job
-(schema.migrate.enabled). Use helm install/upgrade --wait so the Job completes
-before application Pods start. Per-pod init-mysql/init-postgresql schema apply
-is disabled while the hook is enabled.
+NOTE: Entity schema migration runs in a regular schema-migrate Job
+(schema.migrate.enabled). Application Pods wait for gravitino_schema_migration
+before starting. Per-pod init-mysql/init-postgresql schema apply is replaced by
+wait-only inits while migrate is enabled. For an existing database without a
+recorded version, set schema.baselineVersion to the version that created it.
 {{- if and (not .Values.mysql.enabled) (not .Values.postgresql.enabled) }}
 Set schema.migrate.existingSecret for external database credentials.
 {{- end }}

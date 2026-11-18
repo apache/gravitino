@@ -142,12 +142,19 @@ Replace database-1.***.***.rds.amazonaws.com with your actual MySQL host. \
 Change admin and admin123 to your actual MySQL username and password. \
 Ensure the target MySQL database (gravitino) exists before deployment._
 
-### Schema migration Helm hook (MySQL / PostgreSQL)
+### Schema migration Job (MySQL / PostgreSQL)
 
 For install and upgrade, you can run entity-store schema SQL once per revision in a
-`pre-install` / `pre-upgrade` hook Job instead of per-pod init containers (avoids
-rolling-update races). Enable it with `schema.migrate.enabled=true` and use
-`helm upgrade --install ... --wait` so Helm waits for the Job before rolling Pods.
+regular Kubernetes Job instead of per-pod init containers (avoids rolling-update
+races). Enable it with `schema.migrate.enabled=true`. The Job and its ConfigMap are
+created together in the same release; Gravitino Pods wait on
+`gravitino_schema_migration` before starting (so bundled databases can come up first).
+
+The migrate script records the current schema version and applies the full
+`upgrade-*-to-*-*.sql` chain from that version to the image version. For an
+existing database that has no recorded version, set `schema.baselineVersion` to
+the Gravitino version that created it (or to the image version to only record and
+skip DDL).
 
 For external MySQL or PostgreSQL, set `schema.migrate.existingSecret` to a Secret
 that holds the `entity.jdbcUser` password. Optional `schema.dbHost`, `schema.dbPort`,

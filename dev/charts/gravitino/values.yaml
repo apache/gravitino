@@ -115,24 +115,31 @@ postgresql:
     ##
     existingSecret: ""
 
-## Schema migration (Helm hook Job)
-## Runs once per install/upgrade before Pods roll (#11099, #9013).
-## When enabled, per-pod init-mysql / init-postgresql schema apply is skipped.
+## Schema migration (regular Job + Deployment wait)
+## Runs once per revision as a normal Job (#11099, #9013). Application Pods wait
+## for gravitino_schema_migration before starting. When enabled, per-pod
+## init-mysql / init-postgresql schema apply is replaced by wait-only inits.
 ##
 schema:
   migrate:
-    ## @param schema.migrate.enabled Run pre-install/pre-upgrade hook Job for entity DB schema.
+    ## @param schema.migrate.enabled Run a schema-migrate Job for entity DB schema.
     enabled: false
-    ## @param schema.migrate.backoffLimit Job retries before Helm marks the hook failed.
+    ## @param schema.migrate.backoffLimit Job retries before the Job fails.
     backoffLimit: 3
     ## @param schema.migrate.activeDeadlineSeconds Hard limit for the migrate Job.
     activeDeadlineSeconds: 600
-    ## @param schema.migrate.hookWeight helm.sh/hook-weight (lower runs earlier with other hooks).
-    hookWeight: "1"
     ## @param schema.migrate.existingSecret Password Secret for external MySQL/PostgreSQL (required when no in-chart DB).
     existingSecret: ""
     ## @param schema.migrate.existingSecretPasswordKey Key in existingSecret for entity.jdbcUser password.
     existingSecretPasswordKey: password
+  ## How long Gravitino Pods wait for gravitino_schema_migration before the init fails.
+  wait:
+    timeoutSeconds: 600
+  ## Used when an existing database has no gravitino_schema_migration row and the
+  ## version cannot be inferred from tables. Set to the Gravitino version that
+  ## created the database (for example 1.2.0). Set to the image version to only
+  ## record the version and skip DDL.
+  baselineVersion: ""
   ## Optional overrides when entity.jdbcUrl is not enough (IPv6, multi-host, and so on).
   dbHost: ""
   dbPort: ""

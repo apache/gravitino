@@ -17,22 +17,40 @@
 # under the License.
 #
 
-suite: test schema migrate hook job
+suite: test schema migrate job and wait-init
 templates:
   - schema-migrate-job.yaml
   - configmap.yaml
   - deployment.yaml
 tests:
-  - it: ships schema-migrate.sh in the ConfigMap
+  - it: ships schema-migrate.sh with a full upgrade chain
     template: configmap.yaml
     release:
       name: gravitino
     asserts:
       - matchRegex:
           path: data["schema-migrate.sh"]
-          pattern: "apply_migrations"
+          pattern: "apply_upgrade_chain"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "find_next_upgrade"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "Refusing to skip intermediate migrations"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "schema_upgrade_script_from"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "ensure_column_name_capacity"
+      - matchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "schema.baselineVersion"
+      - notMatchRegex:
+          path: data["schema-migrate.sh"]
+          pattern: "tail -n 1"
 
-  - it: renders pre-install pre-upgrade hook Job for in-chart PostgreSQL
+  - it: renders a regular Job without Helm hooks for in-chart PostgreSQL
     template: schema-migrate-job.yaml
     release:
       name: gravitino
@@ -45,12 +63,8 @@ tests:
     asserts:
       - isKind:
           of: Job
-      - equal:
+      - notExists:
           path: metadata.annotations["helm.sh/hook"]
-          value: pre-install,pre-upgrade
-      - equal:
-          path: metadata.annotations["helm.sh/hook-weight"]
-          value: "1"
       - equal:
           path: spec.parallelism
           value: 1
@@ -62,8 +76,31 @@ tests:
           content:
             name: DB_ENGINE
             value: postgresql
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: ""
 
-  - it: skips init-postgresql on Deployment when schema migrate is enabled
+  - it: passes schema.baselineVersion to the migrate Job
+    template: schema-migrate-job.yaml
+    release:
+      name: gravitino
+    set:
+      schema:
+        migrate:
+          enabled: true
+        baselineVersion: "1.2.0"
+      postgresql:
+        enabled: true
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: BASELINE_VERSION
+            value: "1.2.0"
+
+  - it: postgresql wait-init does not apply upgrade SQL when migrate is enabled
     template: deployment.yaml
     release:
       name: gravitino
@@ -74,13 +111,25 @@ tests:
       postgresql:
         enabled: true
     asserts:
-      - notContains:
-          path: spec.template.spec.initContainers
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: init-postgresql
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "gravitino_schema_migration"
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "upgrade-.*-to-.*-postgresql"
+      - contains:
+          path: spec.template.spec.initContainers[1].env
           content:
-            name: init-postgresql
-          any: true
+            name: SCHEMA_WAIT_TIMEOUT
+            value: "600"
 
-  - it: skips init-mysql on Deployment when schema migrate is enabled
+  - it: mysql wait-init does not apply upgrade SQL when migrate is enabled
     template: deployment.yaml
     release:
       name: gravitino
@@ -91,14 +140,17 @@ tests:
       mysql:
         enabled: true
     asserts:
-      - notContains:
-          path: spec.template.spec.initContainers
-          content:
-            name: init-mysql
-          any: true
+      - equal:
+          path: spec.template.spec.initContainers[1].name
+          value: init-mysql
+      - matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
+      - notMatchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "upgrade-.*-to-.*-mysql"
 
-  - it: renders external PostgreSQL migrate Job with operator Secret
-    template: schema-migrate-job.yaml
+  - it: external PostgreSQL migrate Job uses operator Secret and Deployment wait
     release:
       name: gravitino
     set:
@@ -113,12 +165,14 @@ tests:
         jdbcDriver: org.postgresql.Driver
         jdbcUser: gravitino_app
     asserts:
-      - contains:
+      - template: schema-migrate-job.yaml
+        contains:
           path: spec.template.spec.containers[0].env
           content:
             name: DB_HOST
             value: pg.example.ci.local
-      - contains:
+      - template: schema-migrate-job.yaml
+        contains:
           path: spec.template.spec.containers[0].env
           content:
             name: POSTGRES_PASSWORD
@@ -126,6 +180,14 @@ tests:
               secretKeyRef:
                 name: gravitino-pg-secret
                 key: password
+      - template: deployment.yaml
+        equal:
+          path: spec.template.spec.initContainers[1].name
+          value: wait-for-schema
+      - template: deployment.yaml
+        matchRegex:
+          path: spec.template.spec.initContainers[1].command[2]
+          pattern: "Waiting for schema version"
 
   - it: fails when schema migrate enabled without relational target
     template: schema-migrate-job.yaml
