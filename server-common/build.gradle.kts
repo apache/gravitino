@@ -41,7 +41,11 @@ dependencies {
   implementation(libs.bundles.jwt) {
     exclude(group = "com.google.errorprone", module = "error_prone_annotations")
   }
-  implementation(libs.bundles.kerby)
+  // Keep the interactive admin shell library (org.jline) out of the server; only keytab/principal
+  // types are used, and the shell is only referenced by the kerb-admin command line tool.
+  implementation(libs.bundles.kerby) {
+    exclude("org.jline")
+  }
   implementation(libs.bundles.log4j)
   implementation(libs.bundles.metrics)
   implementation(libs.caffeine)
