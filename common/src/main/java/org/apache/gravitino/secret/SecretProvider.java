@@ -85,8 +85,8 @@ public interface SecretProvider {
    * keep the value the entity still references.
    *
    * <p>Providers that support write-through must implement this method and the other version
-   * methods; altering a write-through secret uses them. Providers that only build external
-   * references can keep the defaults, which throw.
+   * methods; creating or altering a write-through secret uses them. Providers that only build
+   * external references can keep the defaults, which throw.
    *
    * <p>Version ids are non-blank and are not reused for the same URN until {@link #deleteSecret}
    * removes it, because Gravitino deletes replaced versions by id. Gravitino passes to the other
