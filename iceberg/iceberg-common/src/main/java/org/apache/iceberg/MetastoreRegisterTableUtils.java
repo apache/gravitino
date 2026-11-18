@@ -20,6 +20,7 @@ package org.apache.iceberg;
 
 import com.google.common.base.Preconditions;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.ValidationException;
 
 /**
  * Shared helpers for {@link org.apache.iceberg.catalog.Catalog#registerTable(TableIdentifier,
@@ -84,7 +85,20 @@ public class MetastoreRegisterTableUtils {
     Preconditions.checkArgument(
         base != null, "Cannot overwrite table %s: current metadata is missing", identifier);
 
-    TableMetadataParser.read(metastoreOps.io().newInputFile(metadataFileLocation));
+    TableMetadata newMetadata =
+        TableMetadataParser.read(metastoreOps.io().newInputFile(metadataFileLocation));
+
+    // Refuse an overwrite whose metadata belongs to a different table before committing the swap.
+    // Otherwise the location is repointed first and the subsequent refresh() fails the UUID check,
+    // leaving the table pointing at the other table's metadata while the client sees an error.
+    ValidationException.check(
+        base.uuid() == null || newMetadata.uuid() == null || base.uuid().equals(newMetadata.uuid()),
+        "Cannot overwrite table %s: metadata file %s belongs to a different table "
+            + "(current UUID %s != metadata UUID %s)",
+        identifier,
+        metadataFileLocation,
+        base.uuid(),
+        newMetadata.uuid());
 
     String oldMetadataLocation = base.metadataFileLocation();
     metadataLocationOverwrite.overwrite(identifier, oldMetadataLocation, metadataFileLocation);
