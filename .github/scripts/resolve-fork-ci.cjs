@@ -32,13 +32,15 @@ async function resolve({ github, context, core }) {
     const { data: pr } = await github.rest.pulls.get({ ...context.repo, pull_number: Number(number) });
     if (pr.state !== 'open' || !pr.head.repo) throw new Error('The pull request must be open with an existing head repository.');
     baseRef = pr.base.ref;
-    if (baseRef !== context.payload.repository.default_branch || context.ref !== `refs/heads/${baseRef}`) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+    // Use only reviewed upstream default/release branch workflows, never a PR or feature ref.
+    const supportedTarget = baseRef === context.payload.repository.default_branch || /^branch-\d+\.\d+$/.test(baseRef);
+    if (!supportedTarget || context.ref !== `refs/heads/${baseRef}`) {
+      throw new Error(`Dispatch trusted Fork CI from the current upstream PR target branch (${baseRef}); only the default branch and branch-X.Y releases are supported.`);
     }
     // Pull requests retain an older base.sha after the base branch advances.
     const { data: base } = await github.rest.repos.getBranch({ ...context.repo, branch: baseRef });
     if (context.sha !== base.commit.sha) {
-      throw new Error('Dispatch the trusted workflow from the current default branch; release branches use their own CI.');
+      throw new Error(`Dispatch trusted Fork CI from the current upstream PR target branch (${baseRef}); only the default branch and branch-X.Y releases are supported.`);
     }
     headSha = pr.head.sha;
     headRepository = pr.head.repo.full_name;
