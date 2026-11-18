@@ -29,7 +29,13 @@ dependencies {
   // and the published POM resolve the version in the catalog.
   implementation(libs.jettison)
   implementation(libs.aliyun.credentials.sdk)
-  implementation(libs.aliyun.sdk.oss)
+  implementation(libs.aliyun.sdk.oss) {
+    // aliyun-sdk-oss 3.13.0 pulls aliyun-java-sdk-core 4.5.10, which depends on ini4j 0.5.4.
+    // ini4j only backs the core SDK's local profile credentials provider, and OSSFileIO
+    // authenticates with a static key or a session token, so keep it out of the bundle
+    // (HIGH CVE-2022-41404, tracked in #14777).
+    exclude(group = "org.ini4j", module = "ini4j")
+  }
   // Aliyun oss SDK depends on this package, and JDK >= 9 requires manual add
   // https://www.alibabacloud.com/help/en/oss/developer-reference/java-installation?spm=a2c63.p38356.0.i1
   implementation(libs.sun.activation)
