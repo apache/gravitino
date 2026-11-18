@@ -27,10 +27,9 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
-import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.snapshot.SnapshotExpirationJobContext;
 import org.apache.gravitino.policy.IcebergSnapshotExpirationContent;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Converts snapshot-expiration options to the built-in Spark template configuration. */
 public class GravitinoSnapshotExpirationJobAdapter implements GravitinoJobAdapter {
@@ -93,8 +92,7 @@ public class GravitinoSnapshotExpirationJobAdapter implements GravitinoJobAdapte
     Map<String, String> config = new LinkedHashMap<>();
     config.put(
         TABLE_IDENTIFIER_KEY,
-        IdentifierUtils.toSparkTableIdentifier(
-            expire.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator()));
+        SparkTableIdentifierUtils.toSparkTableIdentifier(expire.nameIdentifier()));
     // Match template placeholders {{older_than:-}} / {{retain_last:-}}: omit when using the same
     // defaults as Iceberg's procedure so table history.expire.* properties remain authoritative.
     if (days == IcebergSnapshotExpirationContent.DEFAULT_OLDER_THAN_DAYS) {

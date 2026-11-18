@@ -23,8 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.ManifestRewriteJobContext;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Maps a manifest rewrite decision to the built-in Spark job's arguments. */
 public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAdapter {
@@ -41,8 +41,7 @@ public final class GravitinoManifestRewriteJobAdapter implements GravitinoJobAda
         IdentifierUtils.getCatalogNameFromTableIdentifier(rewrite.nameIdentifier()));
     config.put(
         "table_identifier",
-        IdentifierUtils.toSparkTableIdentifier(
-            rewrite.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator()));
+        SparkTableIdentifierUtils.toSparkTableIdentifier(rewrite.nameIdentifier()));
     return Map.copyOf(config);
   }
 }

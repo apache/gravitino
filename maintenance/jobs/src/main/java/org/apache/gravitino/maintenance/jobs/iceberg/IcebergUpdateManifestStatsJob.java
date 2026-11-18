@@ -49,7 +49,6 @@ import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValue;
 import org.apache.gravitino.stats.StatisticValues;
@@ -116,7 +115,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
     if (catalog == null || catalog.trim().isEmpty() || table == null) {
       throw new IllegalArgumentException("--catalog and --table are required");
     }
-    IdentifierUtils.sparkTableIdentifierLevels(table);
+    IcebergJobUtils.requireSparkTableIdentifier(table);
     Map<String, String> options =
         IcebergSparkConfigUtils.parseFlatJsonMap(
             arguments.get("updater-options"), "updater-options");
@@ -210,8 +209,7 @@ public class IcebergUpdateManifestStatsJob implements BuiltInJob {
       @Nullable Path coordinationDirectory)
       throws IOException {
     NameIdentifier identifier =
-        IdentifierUtils.fromSparkTableIdentifier(
-            catalogName, tableIdentifier, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+        IcebergJobUtils.toGravitinoTableIdentifier(catalogName, tableIdentifier);
     if (coordinationDirectory == null) {
       updater.updateTableStatistics(
           identifier, collectManifestStatistics(spark, catalogName, tableIdentifier));

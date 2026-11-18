@@ -46,7 +46,6 @@ import org.apache.gravitino.maintenance.optimizer.common.StatisticEntryImpl;
 import org.apache.gravitino.maintenance.optimizer.common.conf.OptimizerConfig;
 import org.apache.gravitino.maintenance.optimizer.common.util.GravitinoAuthSettings;
 import org.apache.gravitino.maintenance.optimizer.common.util.IcebergSparkConfigUtils;
-import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.ProviderUtils;
 import org.apache.gravitino.stats.StatisticValues;
 import org.apache.spark.sql.Row;
@@ -509,12 +508,11 @@ public class IcebergUpdateStatsAndMetricsJob implements BuiltInJob {
 
   private static NameIdentifier toGravitinoTableIdentifier(
       String catalogName, String tableIdentifier) {
-    return IdentifierUtils.fromSparkTableIdentifier(
-        catalogName, tableIdentifier, IdentifierUtils.DEFAULT_SCHEMA_SEPARATOR);
+    return IcebergJobUtils.toGravitinoTableIdentifier(catalogName, tableIdentifier);
   }
 
   private static String buildFilesTableIdentifier(String catalogName, String tableIdentifier) {
-    return IcebergJobUtils.qualifyCatalogTableSql(catalogName, tableIdentifier) + ".`files`";
+    return IcebergJobUtils.qualifyCatalogMetadataTableSql(catalogName, tableIdentifier, "files");
   }
 
   private static long toLongValue(Row row, String fieldName) {

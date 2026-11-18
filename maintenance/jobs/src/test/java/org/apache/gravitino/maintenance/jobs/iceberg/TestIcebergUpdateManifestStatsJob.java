@@ -80,7 +80,10 @@ public class TestIcebergUpdateManifestStatsJob {
     assertEquals(
         "`cat``alog`.`db`.`tbl``name`",
         IcebergUpdateManifestStatsJob.buildTableIdentifier("cat`alog", "db.tbl`name"));
-    for (String invalid : Arrays.asList("table", "db.", ".table", "db.table.extra", " ")) {
+    assertEquals(
+        "`catalog`.`a`.`b`.`c`.`events`",
+        IcebergUpdateManifestStatsJob.buildTableIdentifier("catalog", "a.b.c.events"));
+    for (String invalid : Arrays.asList("table", "db.", ".table", " ")) {
       assertThrows(
           IllegalArgumentException.class,
           () -> IcebergUpdateManifestStatsJob.buildTableIdentifier("catalog", invalid));

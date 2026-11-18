@@ -26,11 +26,10 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
-import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.common.util.OrphanFileLocationUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.orphan.OrphanFileRemovalJobContext;
 import org.apache.gravitino.policy.IcebergOrphanFileRemovalContent;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 /** Converts orphan cleanup options to the existing Spark template's configuration. */
 public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter {
@@ -85,8 +84,7 @@ public class GravitinoOrphanFileRemovalJobAdapter implements GravitinoJobAdapter
     }
     return Map.of(
         TABLE_IDENTIFIER_KEY,
-        IdentifierUtils.toSparkTableIdentifier(
-            orphan.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator()),
+        SparkTableIdentifierUtils.toSparkTableIdentifier(orphan.nameIdentifier()),
         OLDER_THAN_KEY,
         cutoff(days),
         LOCATION_KEY,

@@ -29,9 +29,9 @@ import java.util.TreeMap;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.maintenance.optimizer.api.recommender.JobExecutionContext;
 import org.apache.gravitino.maintenance.optimizer.common.util.IdentifierUtils;
+import org.apache.gravitino.maintenance.optimizer.common.util.SparkTableIdentifierUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionJobContext;
 import org.apache.gravitino.policy.IcebergDataCompactionContent;
-import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
 public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
 
@@ -72,8 +72,7 @@ public class GravitinoCompactionJobAdapter implements GravitinoJobAdapter {
   }
 
   private String getTableName(CompactionJobContext jobContext) {
-    return IdentifierUtils.toSparkTableIdentifier(
-        jobContext.nameIdentifier(), HierarchicalSchemaUtil.schemaSeparator());
+    return SparkTableIdentifierUtils.toSparkTableIdentifier(jobContext.nameIdentifier());
   }
 
   private String getWhereClause(
