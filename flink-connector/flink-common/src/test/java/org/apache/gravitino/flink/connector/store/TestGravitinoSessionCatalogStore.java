@@ -37,6 +37,7 @@ import org.apache.flink.table.catalog.CatalogDescriptor;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,9 @@ public class TestGravitinoSessionCatalogStore {
   /** A catalog name excluded from Gravitino in the session. */
   private static final String EXCLUDED_CATALOG = "paimon_catalog";
 
+  /** The name of a Gravitino catalog that a session catalog shadows. */
+  private static final String SHADOWED_CATALOG = "shadowed_catalog";
+
   private GravitinoCatalogStore gravitinoCatalogStore;
   private GenericInMemoryCatalogStore memoryCatalogStore;
   private GravitinoSessionCatalogStore sessionCatalogStore;
@@ -75,6 +79,11 @@ public class TestGravitinoSessionCatalogStore {
     memoryCatalogStore = mock(GenericInMemoryCatalogStore.class);
     sessionCatalogStore =
         new GravitinoSessionCatalogStore(gravitinoCatalogStore, memoryCatalogStore);
+  }
+
+  @AfterEach
+  void tearDown() {
+    GravitinoSessionCatalogStore.clearShadowedGravitinoCatalog();
   }
 
   @Test
@@ -360,8 +369,204 @@ public class TestGravitinoSessionCatalogStore {
   }
 
   // -------------------------------------------------------------------------
+  // session catalog shadowing
+  // -------------------------------------------------------------------------
+
+  @Test
+  void testShadowing_contains_unaccessedGravitinoCatalog_returnsFalse() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    verify(gravitinoCatalogStore).contains(SHADOWED_CATALOG);
+    Assertions.assertFalse(store.contains("missing_catalog"));
+  }
+
+  @Test
+  void testShadowing_storeSessionCatalog_shadowsGravitinoCatalog() {
+    GenericInMemoryCatalogStore memoryStore = new GenericInMemoryCatalogStore();
+    GravitinoSessionCatalogStore store = shadowingStore(memoryStore);
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+    CatalogDescriptor sessionDescriptor = descriptorWithType(SESSION_CATALOG_TYPE);
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    store.storeCatalog(SHADOWED_CATALOG, sessionDescriptor);
+
+    Assertions.assertTrue(memoryStore.contains(SHADOWED_CATALOG));
+    Assertions.assertTrue(store.contains(SHADOWED_CATALOG));
+    Assertions.assertEquals(Optional.of(sessionDescriptor), store.getCatalog(SHADOWED_CATALOG));
+    when(gravitinoCatalogStore.listCatalogs()).thenReturn(ImmutableSet.of(SHADOWED_CATALOG));
+    Assertions.assertEquals(ImmutableSet.of(SHADOWED_CATALOG), store.listCatalogs());
+
+    store.removeCatalog(SHADOWED_CATALOG, false);
+    Assertions.assertFalse(memoryStore.contains(SHADOWED_CATALOG));
+    verify(gravitinoCatalogStore, never()).getCatalog(anyString());
+    verify(gravitinoCatalogStore, never()).storeCatalog(anyString(), any());
+    verify(gravitinoCatalogStore, never()).removeCatalog(anyString(), anyBoolean());
+  }
+
+  @Test
+  void testShadowing_removeSessionCatalog_revealsGravitinoCatalog() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    CatalogDescriptor gravitinoDescriptor = descriptorWithType(GRAVITINO_CATALOG_TYPE);
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+    when(gravitinoCatalogStore.getCatalog(SHADOWED_CATALOG))
+        .thenReturn(Optional.of(gravitinoDescriptor));
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    store.storeCatalog(SHADOWED_CATALOG, descriptorWithType(SESSION_CATALOG_TYPE));
+    store.removeCatalog(SHADOWED_CATALOG, false);
+
+    Assertions.assertEquals(Optional.of(gravitinoDescriptor), store.getCatalog(SHADOWED_CATALOG));
+    verify(gravitinoCatalogStore, never()).removeCatalog(anyString(), anyBoolean());
+  }
+
+  @Test
+  void testShadowing_accessedGravitinoCatalog_keepsExistingBehavior() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+    when(gravitinoCatalogStore.getCatalog(SHADOWED_CATALOG))
+        .thenReturn(Optional.of(descriptorWithType(GRAVITINO_CATALOG_TYPE)));
+
+    Assertions.assertTrue(store.getCatalog(SHADOWED_CATALOG).isPresent());
+    Assertions.assertTrue(store.contains(SHADOWED_CATALOG));
+
+    store.removeCatalog(SHADOWED_CATALOG, false);
+    verify(gravitinoCatalogStore).removeCatalog(SHADOWED_CATALOG, false);
+    // After the Gravitino catalog is dropped, the name is no longer tracked as accessed.
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+  }
+
+  @Test
+  void testShadowing_missingGravitinoCatalog_isNotTrackedAsAccessed() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    when(gravitinoCatalogStore.getCatalog(SHADOWED_CATALOG)).thenReturn(Optional.empty());
+    Assertions.assertFalse(store.getCatalog(SHADOWED_CATALOG).isPresent());
+
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+  }
+
+  @Test
+  void testShadowing_gravitinoCatalogCreatedInSession_keepsExistingBehavior() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    CatalogDescriptor gravitinoDescriptor = descriptorWithType(GRAVITINO_CATALOG_TYPE);
+
+    Assertions.assertFalse(store.contains("new_gravitino_catalog"));
+    store.storeCatalog("new_gravitino_catalog", gravitinoDescriptor);
+    verify(gravitinoCatalogStore).storeCatalog("new_gravitino_catalog", gravitinoDescriptor);
+
+    when(gravitinoCatalogStore.contains("new_gravitino_catalog")).thenReturn(true);
+    Assertions.assertTrue(store.contains("new_gravitino_catalog"));
+    store.removeCatalog("new_gravitino_catalog", false);
+    verify(gravitinoCatalogStore).removeCatalog("new_gravitino_catalog", false);
+  }
+
+  @Test
+  void testShadowing_storeGravitinoManagedCatalogUnderShadowedName_isRejected() {
+    GenericInMemoryCatalogStore memoryStore = new GenericInMemoryCatalogStore();
+    GravitinoSessionCatalogStore store = shadowingStore(memoryStore);
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    CatalogException exception =
+        Assertions.assertThrows(
+            CatalogException.class,
+            () -> store.storeCatalog(SHADOWED_CATALOG, descriptorWithType(GRAVITINO_CATALOG_TYPE)));
+
+    Assertions.assertTrue(exception.getMessage().contains("already exists"));
+    Assertions.assertTrue(exception.getMessage().contains(SHADOWED_CATALOG));
+    Assertions.assertFalse(memoryStore.contains(SHADOWED_CATALOG));
+    verify(gravitinoCatalogStore, never()).storeCatalog(anyString(), any());
+  }
+
+  @Test
+  void testShadowing_factoryCheck_rejectsOnlyTheShadowedNameOnce() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        "other_catalog", GRAVITINO_CATALOG_TYPE);
+    // The check consumes the recorded name, whether it matches or not.
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE);
+
+    Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+    CatalogException exception =
+        Assertions.assertThrows(
+            CatalogException.class,
+            () ->
+                GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+                    SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE));
+    Assertions.assertTrue(exception.getMessage().contains(GRAVITINO_CATALOG_TYPE));
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE);
+  }
+
+  @Test
+  void testShadowing_recordedNameIsClearedByEveryStoreOperation() {
+    GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+    when(gravitinoCatalogStore.getCatalog(anyString())).thenReturn(Optional.empty());
+    when(gravitinoCatalogStore.listCatalogs()).thenReturn(ImmutableSet.of());
+
+    for (Runnable operation :
+        new Runnable[] {
+          () -> store.contains("missing_catalog"),
+          () -> store.getCatalog("missing_catalog"),
+          () -> store.listCatalogs(),
+          () -> store.removeCatalog("missing_catalog", true),
+          () -> store.storeCatalog("session_catalog", descriptorWithType(SESSION_CATALOG_TYPE))
+        }) {
+      Assertions.assertFalse(store.contains(SHADOWED_CATALOG));
+      operation.run();
+      GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+          SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE);
+    }
+  }
+
+  @Test
+  void testShadowing_disabled_neverRecordsShadowedName() {
+    GravitinoSessionCatalogStore store =
+        new GravitinoSessionCatalogStore(
+            gravitinoCatalogStore, openedMemoryStore(), ImmutableSet.of(), false);
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+
+    Assertions.assertTrue(store.contains(SHADOWED_CATALOG));
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE);
+  }
+
+  @Test
+  void testShadowing_excludedName_isNeverResolvedAgainstGravitino() {
+    GravitinoSessionCatalogStore store =
+        new GravitinoSessionCatalogStore(
+            gravitinoCatalogStore, openedMemoryStore(), ImmutableSet.of(EXCLUDED_CATALOG), true);
+
+    Assertions.assertFalse(store.contains(EXCLUDED_CATALOG));
+    Assertions.assertFalse(store.getCatalog(EXCLUDED_CATALOG).isPresent());
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        EXCLUDED_CATALOG, GRAVITINO_CATALOG_TYPE);
+    verify(gravitinoCatalogStore, never()).contains(EXCLUDED_CATALOG);
+    verify(gravitinoCatalogStore, never()).getCatalog(EXCLUDED_CATALOG);
+  }
+
+  // -------------------------------------------------------------------------
   // helpers
   // -------------------------------------------------------------------------
+
+  private static GenericInMemoryCatalogStore openedMemoryStore() {
+    GenericInMemoryCatalogStore memoryStore = new GenericInMemoryCatalogStore();
+    memoryStore.open();
+    return memoryStore;
+  }
+
+  private GravitinoSessionCatalogStore shadowingStore(GenericInMemoryCatalogStore memoryStore) {
+    memoryStore.open();
+    return new GravitinoSessionCatalogStore(
+        gravitinoCatalogStore, memoryStore, ImmutableSet.of(), true);
+  }
 
   private GravitinoSessionCatalogStore storeExcluding(String... catalogNames) {
     return new GravitinoSessionCatalogStore(

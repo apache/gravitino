@@ -46,6 +46,7 @@ import org.apache.gravitino.flink.connector.iceberg.GravitinoIcebergCatalogFacto
 import org.apache.gravitino.flink.connector.jdbc.GravitinoJdbcCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.paimon.GravitinoPaimonCatalogFactoryOptions;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import org.apache.gravitino.flink.connector.store.GravitinoSessionCatalogStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -179,7 +180,9 @@ public class FactoryUtils {
    *
    * <p>Gravitino catalog factories must call this method before creating a catalog. It rejects
    * catalog names excluded from Gravitino by {@link
-   * GravitinoCatalogStoreFactoryOptions#GRAVITINO_EXCLUDED_CATALOGS} in the current session.
+   * GravitinoCatalogStoreFactoryOptions#GRAVITINO_EXCLUDED_CATALOGS} in the current session, and
+   * names of Gravitino catalogs that a session catalog would shadow by {@link
+   * GravitinoCatalogStoreFactoryOptions#GRAVITINO_ENABLE_SESSION_CATALOG_SHADOWING}.
    *
    * <p>Note: This utility checks for left-over options in the final step.
    *
@@ -189,6 +192,8 @@ public class FactoryUtils {
    */
   public static FactoryUtil.CatalogFactoryHelper createCatalogFactoryHelper(
       CatalogFactory factory, CatalogFactory.Context context) {
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        context.getName(), factory.factoryIdentifier());
     checkCatalogNameNotExcluded(factory, context);
     return new FactoryUtils.GravitinoCatalogFactoryHelper(factory, context);
   }

@@ -18,16 +18,23 @@
  */
 package org.apache.gravitino.flink.connector.utils;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ServiceConfigurationError;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.table.catalog.GenericInMemoryCatalogStore;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.flink.table.factories.Factory;
 import org.apache.flink.table.factories.FactoryUtil;
+import org.apache.gravitino.flink.connector.store.GravitinoCatalogStore;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
+import org.apache.gravitino.flink.connector.store.GravitinoSessionCatalogStore;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -66,6 +73,35 @@ public class TestFactoryUtils {
         FactoryUtils.createCatalogFactoryHelper(
             new FakeExternalCatalogFactory(),
             catalogContext("PAIMON_CATALOG", sessionConfiguration)));
+    Assertions.assertNotNull(
+        FactoryUtils.createCatalogFactoryHelper(
+            new FakeExternalCatalogFactory(),
+            catalogContext("paimon_catalog", new Configuration())));
+  }
+
+  @Test
+  void testCreateCatalogFactoryHelper_shadowedGravitinoCatalogName_isRejected() {
+    GravitinoCatalogStore gravitinoCatalogStore = mock(GravitinoCatalogStore.class);
+    when(gravitinoCatalogStore.contains("paimon_catalog")).thenReturn(true);
+    GenericInMemoryCatalogStore memoryCatalogStore = new GenericInMemoryCatalogStore();
+    memoryCatalogStore.open();
+    GravitinoSessionCatalogStore store =
+        new GravitinoSessionCatalogStore(
+            gravitinoCatalogStore, memoryCatalogStore, ImmutableSet.of(), true);
+
+    // Flink checks the catalog store and then instantiates the catalog on the same thread.
+    Assertions.assertFalse(store.contains("paimon_catalog"));
+    CatalogException exception =
+        Assertions.assertThrows(
+            CatalogException.class,
+            () ->
+                FactoryUtils.createCatalogFactoryHelper(
+                    new FakeExternalCatalogFactory(),
+                    catalogContext("paimon_catalog", new Configuration())));
+    Assertions.assertTrue(exception.getMessage().contains("paimon_catalog"));
+    Assertions.assertTrue(exception.getMessage().contains(FakeExternalCatalogFactory.IDENTIFIER));
+
+    // The check applies to the creation that follows the store check only.
     Assertions.assertNotNull(
         FactoryUtils.createCatalogFactoryHelper(
             new FakeExternalCatalogFactory(),
