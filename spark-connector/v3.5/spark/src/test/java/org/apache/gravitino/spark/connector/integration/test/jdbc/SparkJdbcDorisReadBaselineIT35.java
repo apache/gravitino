@@ -23,6 +23,7 @@ import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.
 import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.GRAVITINO_JDBC_PASSWORD;
 import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.GRAVITINO_JDBC_URL;
 import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.GRAVITINO_JDBC_USER;
+import static org.apache.spark.sql.functions.avg;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -32,6 +33,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -57,6 +60,7 @@ import org.apache.spark.sql.execution.datasources.v2.DataSourceV2ScanRelation;
 import org.apache.spark.sql.execution.datasources.v2.V1ScanWrapper;
 import org.apache.spark.sql.execution.datasources.v2.jdbc.JDBCScan;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.DecimalType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -77,6 +81,7 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
   private static final String PATTERN_MATCH_TABLE_NAME = "readxbaseline";
   private static final String OTHER_DATABASE_NAME = "doris_spark_baseline_other_it";
   private static final String UNSUPPORTED_TABLE_NAME = "unsupported_json";
+  private static final String QUERY_TABLE_NAME = "query_read_contract";
   private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
   private static final DorisImageName DORIS_IMAGE = DorisImageName.VERSION_3_0;
 
@@ -171,23 +176,161 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     Assertions.assertEquals(1, rows.size());
     Assertions.assertEquals(1, rows.get(0).getInt(0));
     Assertions.assertEquals("one", rows.get(0).getString(1));
-    JDBCScan jdbcScan = null;
-    Iterator<LogicalPlan> leaves =
-        result.queryExecution().optimizedPlan().collectLeaves().iterator();
-    while (leaves.hasNext()) {
-      LogicalPlan leaf = leaves.next();
-      if (leaf instanceof DataSourceV2ScanRelation) {
-        Scan scan = ((DataSourceV2ScanRelation) leaf).scan();
-        if (scan instanceof V1ScanWrapper) {
-          scan = ((V1ScanWrapper) scan).v1Scan();
-        }
-        Assertions.assertTrue(scan instanceof JDBCScan, scan.getClass().getName());
-        jdbcScan = (JDBCScan) scan;
-      }
-    }
-    Assertions.assertNotNull(jdbcScan);
+    JDBCScan jdbcScan = jdbcScan(result);
     Assertions.assertEquals(0, jdbcScan.pushedPredicates().length);
     Assertions.assertTrue(result.queryExecution().optimizedPlan().toString().contains("Filter"));
+  }
+
+  @Test
+  void testPartitionedReadOptionsAreScopedToEachRead() throws Exception {
+    try {
+      createQueryTable();
+      List<Row> expected = new ArrayList<>();
+      try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+          Statement statement = connection.createStatement();
+          ResultSet results =
+              statement.executeQuery(
+                  "SELECT id, partition_key, label FROM "
+                      + dorisTable(QUERY_TABLE_NAME)
+                      + " ORDER BY id")) {
+        while (results.next()) {
+          int partitionKey = results.getInt(2);
+          boolean nullPartition = results.wasNull();
+          expected.add(
+              RowFactory.create(
+                  results.getInt(1), nullPartition ? null : partitionKey, results.getString(3)));
+        }
+      }
+      Assertions.assertEquals(
+          List.of(
+              RowFactory.create(1, null, "a"), RowFactory.create(2, -10, "a"),
+              RowFactory.create(3, 0, "A"), RowFactory.create(4, 50, "c"),
+              RowFactory.create(5, 100, "c"), RowFactory.create(6, 120, "d")),
+          expected);
+
+      Dataset<Row> partitioned = readQueryTable(true);
+      Assertions.assertEquals(3, jdbcScan(partitioned).relation().parts().length);
+      Assertions.assertEquals(
+          expected,
+          partitioned.select("id", "partition_key", "label").orderBy("id").collectAsList());
+      Assertions.assertEquals(
+          List.of(
+              RowFactory.create("A"),
+              RowFactory.create("a"),
+              RowFactory.create("a"),
+              RowFactory.create("c"),
+              RowFactory.create("c"),
+              RowFactory.create("d")),
+          partitioned.select("label").orderBy("label").collectAsList());
+
+      Dataset<Row> nextRead = readQueryTable(false);
+      Assertions.assertEquals(1, jdbcScan(nextRead).relation().parts().length);
+      Assertions.assertEquals(
+          expected, nextRead.select("id", "partition_key", "label").orderBy("id").collectAsList());
+    } finally {
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(QUERY_TABLE_NAME));
+    }
+  }
+
+  @Test
+  void testGovernedQueriesWithPartitionedRead() throws Exception {
+    String view = "doris_query_contract";
+    String singlePartitionView = "doris_query_contract_single_partition";
+    try {
+      createQueryTable();
+      Dataset<Row> partitioned = readQueryTable(true);
+      Assertions.assertEquals(3, jdbcScan(partitioned).relation().parts().length);
+      partitioned.createOrReplaceTempView(view);
+
+      Dataset<Row> total = getSparkSession().sql("SELECT COUNT(*), SUM(id) FROM " + view);
+      Assertions.assertEquals(List.of(RowFactory.create(6L, 21L)), total.collectAsList());
+      if (jdbcScan(total).pushedAggregateColumn().length > 0) {
+        Assertions.assertTrue(
+            total.queryExecution().optimizedPlan().toString().contains("Aggregate"));
+      }
+      List<Row> groups =
+          getSparkSession()
+              .sql(
+                  "SELECT group_id, COUNT(*) FROM " + view + " GROUP BY group_id ORDER BY group_id")
+              .collectAsList();
+      Assertions.assertEquals(List.of(RowFactory.create(1, 3L), RowFactory.create(2, 3L)), groups);
+      Dataset<Row> sparkAverage =
+          getSparkSession()
+              .read()
+              .option("pushDownAggregate", "false")
+              .table(sparkTable(QUERY_TABLE_NAME))
+              .agg(avg("amount"));
+      Dataset<Row> defaultAverage =
+          getSparkSession().read().table(sparkTable(QUERY_TABLE_NAME)).agg(avg("amount"));
+      Assertions.assertTrue(sparkAverage.schema().fields()[0].dataType() instanceof DecimalType);
+      Assertions.assertTrue(defaultAverage.schema().fields()[0].dataType() instanceof DecimalType);
+      BigDecimal sparkValue = sparkAverage.head().getDecimal(0);
+      Assertions.assertEquals(0, sparkValue.compareTo(new BigDecimal("3.666667")));
+      BigDecimal expectedAverage = sparkValue;
+      if (Arrays.stream(jdbcScan(defaultAverage).pushedAggregateColumn())
+          .anyMatch(column -> column.toUpperCase(Locale.ROOT).contains("AVG("))) {
+        try (Connection connection = DriverManager.getConnection(jdbcUrl, jdbcUser, jdbcPassword);
+            Statement statement = connection.createStatement();
+            ResultSet results =
+                statement.executeQuery("SELECT AVG(amount) FROM " + dorisTable(QUERY_TABLE_NAME))) {
+          Assertions.assertTrue(results.next());
+          expectedAverage = results.getBigDecimal(1);
+        }
+      }
+      Assertions.assertEquals(0, defaultAverage.head().getDecimal(0).compareTo(expectedAverage));
+      Assertions.assertEquals(
+          2, getSparkSession().sql("SELECT id FROM " + view + " LIMIT 2").collectAsList().size());
+      Assertions.assertEquals(
+          List.of(RowFactory.create(5), RowFactory.create(6)),
+          getSparkSession()
+              .sql("SELECT id FROM " + view + " WHERE partition_key > 50 ORDER BY id")
+              .collectAsList());
+      Assertions.assertEquals(
+          List.of(RowFactory.create(6), RowFactory.create(5)),
+          getSparkSession()
+              .sql("SELECT id FROM " + view + " ORDER BY id DESC LIMIT 2")
+              .collectAsList());
+      Assertions.assertEquals(
+          List.of(RowFactory.create(3), RowFactory.create(4)),
+          getSparkSession()
+              .sql("SELECT id FROM " + view + " ORDER BY id LIMIT 2 OFFSET 2")
+              .collectAsList());
+      Dataset<Row> singlePartition = readQueryTable(false);
+      Assertions.assertEquals(1, jdbcScan(singlePartition).relation().parts().length);
+      singlePartition.createOrReplaceTempView(singlePartitionView);
+      Assertions.assertEquals(
+          List.of(RowFactory.create(3), RowFactory.create(4)),
+          getSparkSession()
+              .sql("SELECT id FROM " + singlePartitionView + " ORDER BY id LIMIT 2 OFFSET 2")
+              .collectAsList());
+      Dataset<Row> residualBeforeLimit =
+          getSparkSession()
+              .sql("SELECT id FROM " + singlePartitionView + " WHERE id > 3 ORDER BY id LIMIT 1");
+      Assertions.assertEquals(0, jdbcScan(residualBeforeLimit).pushedPredicates().length);
+      Assertions.assertTrue(
+          residualBeforeLimit.queryExecution().optimizedPlan().toString().contains("Filter"));
+      Assertions.assertEquals(List.of(RowFactory.create(4)), residualBeforeLimit.collectAsList());
+      Assertions.assertTrue(
+          getSparkSession()
+              .sql("SELECT id FROM " + view + " ORDER BY id LIMIT 2 OFFSET 20")
+              .collectAsList()
+              .isEmpty());
+      Dataset<Row> filtered =
+          getSparkSession()
+              .sql("SELECT id FROM " + view + " WHERE label = 'a' ORDER BY id LIMIT 1");
+      Assertions.assertEquals(List.of(RowFactory.create(1)), filtered.collectAsList());
+      Assertions.assertTrue(
+          filtered.queryExecution().optimizedPlan().toString().contains("Filter"));
+      Dataset<Row> filteredCount =
+          getSparkSession().sql("SELECT COUNT(*) FROM " + view + " WHERE label = 'a'");
+      Assertions.assertEquals(List.of(RowFactory.create(2L)), filteredCount.collectAsList());
+      Assertions.assertTrue(
+          filteredCount.queryExecution().optimizedPlan().toString().contains("Filter"));
+    } finally {
+      getSparkSession().catalog().dropTempView(view);
+      getSparkSession().catalog().dropTempView(singlePartitionView);
+      executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(QUERY_TABLE_NAME));
+    }
   }
 
   @ParameterizedTest(name = "{0}")
@@ -373,6 +516,51 @@ public class SparkJdbcDorisReadBaselineIT35 extends SparkEnvIT {
     } finally {
       executeJdbcSql("DROP TABLE IF EXISTS " + dorisTable(UNSUPPORTED_TABLE_NAME));
     }
+  }
+
+  private void createQueryTable() throws SQLException {
+    executeJdbcSql(
+        "DROP TABLE IF EXISTS " + dorisTable(QUERY_TABLE_NAME),
+        "CREATE TABLE "
+            + dorisTable(QUERY_TABLE_NAME)
+            + " (id INT NOT NULL, partition_key INT NULL, group_id INT NOT NULL, "
+            + "label VARCHAR(64), amount DECIMAL(10,2)) "
+            + "DISTRIBUTED BY HASH(id) BUCKETS 1",
+        "INSERT INTO "
+            + dorisTable(QUERY_TABLE_NAME)
+            + " VALUES (1, NULL, 1, 'a', 1), (2, -10, 1, 'a', 2), (3, 0, 1, 'A', 3), "
+            + "(4, 50, 2, 'c', 4), (5, 100, 2, 'c', 5), (6, 120, 2, 'd', 7)");
+  }
+
+  private Dataset<Row> readQueryTable(boolean partitioned) {
+    if (partitioned) {
+      return getSparkSession()
+          .read()
+          .option("partitionColumn", "partition_key")
+          .option("lowerBound", "0")
+          .option("upperBound", "100")
+          .option("numPartitions", "3")
+          .option("pushDownPredicate", "true")
+          .table(sparkTable(QUERY_TABLE_NAME));
+    }
+    return getSparkSession().read().table(sparkTable(QUERY_TABLE_NAME));
+  }
+
+  private static JDBCScan jdbcScan(Dataset<Row> result) {
+    Iterator<LogicalPlan> leaves =
+        result.queryExecution().optimizedPlan().collectLeaves().iterator();
+    while (leaves.hasNext()) {
+      LogicalPlan leaf = leaves.next();
+      if (leaf instanceof DataSourceV2ScanRelation) {
+        Scan scan = ((DataSourceV2ScanRelation) leaf).scan();
+        if (scan instanceof V1ScanWrapper) {
+          scan = ((V1ScanWrapper) scan).v1Scan();
+        }
+        Assertions.assertTrue(scan instanceof JDBCScan, scan.getClass().getName());
+        return (JDBCScan) scan;
+      }
+    }
+    return Assertions.fail("Expected a JDBC scan");
   }
 
   private void executeJdbcSql(String... statements) throws SQLException {

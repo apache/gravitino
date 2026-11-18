@@ -280,6 +280,7 @@ tasks.test {
     dependsOn(":iceberg:iceberg-rest-server:jar")
     dependsOn(":lance:lance-rest-server:jar")
     dependsOn(":catalogs:catalog-lakehouse-paimon:jar")
+    dependsOn(":catalogs:catalog-jdbc-doris:jar")
     dependsOn(":catalogs:catalog-jdbc-mysql:jar")
     dependsOn(":catalogs:catalog-jdbc-postgresql:jar")
   }
