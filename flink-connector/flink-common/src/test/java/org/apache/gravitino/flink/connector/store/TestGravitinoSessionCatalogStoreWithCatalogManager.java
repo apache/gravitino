@@ -393,6 +393,51 @@ public class TestGravitinoSessionCatalogStoreWithCatalogManager {
     verifyGravitinoCatalogNeverLoadedOrModified(SHADOWED_CATALOG);
   }
 
+  /**
+   * A session catalog that shadows a Gravitino catalog cannot be altered into a Gravitino-managed
+   * catalog type, which would resolve the shadowed Gravitino catalog. The rejection must happen
+   * before Flink replaces the session catalog.
+   */
+  @Test
+  void testShadowing_alterToGravitinoManagedType_isRejectedBeforeReplacement() {
+    Assumptions.assumeTrue(
+        isCatalogFactoryRegistered(GRAVITINO_PAIMON),
+        "The gravitino-paimon catalog factory is not registered in this module");
+    Assumptions.assumeTrue(
+        Arrays.stream(CatalogManager.class.getMethods())
+            .anyMatch(method -> method.getName().equals("alterCatalog")),
+        "ALTER CATALOG requires Flink 1.20 or later");
+    TableEnvironment tableEnv = shadowingTableEnv();
+    execute(tableEnv, CREATE_SHADOWING_CATALOG);
+
+    Throwable exception =
+        Assertions.assertThrows(
+            Exception.class,
+            () ->
+                execute(
+                    tableEnv,
+                    "ALTER CATALOG "
+                        + SHADOWED_CATALOG
+                        + " SET ('type'='"
+                        + GRAVITINO_PAIMON
+                        + "', 'catalog-backend'='filesystem', 'warehouse'='/tmp/unused')"));
+
+    Assertions.assertTrue(
+        allMessages(exception).contains("already exists in Gravitino"), allMessages(exception));
+    // The session catalog is not replaced. Flink applies ALTER CATALOG options to the stored
+    // descriptor in place, so DESCRIBE CATALOG shows them even after the rejection.
+    Assertions.assertInstanceOf(
+        GenericInMemoryCatalog.class, tableEnv.getCatalog(SHADOWED_CATALOG).get());
+    Assertions.assertThrows(
+        Exception.class,
+        () ->
+            execute(
+                tableEnv,
+                "ALTER CATALOG " + SHADOWED_CATALOG + " SET ('default-database'='session_db')"));
+    execute(tableEnv, "DROP CATALOG " + SHADOWED_CATALOG);
+    verifyGravitinoCatalogNeverLoadedOrModified(SHADOWED_CATALOG);
+  }
+
   /** Shadowing a catalog does not change how other Gravitino catalogs behave in the session. */
   @Test
   void testShadowing_otherGravitinoCatalogsKeepExistingBehavior() {

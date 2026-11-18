@@ -34,6 +34,7 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.table.catalog.Catalog;
 import org.apache.flink.table.catalog.CatalogDescriptor;
+import org.apache.flink.table.catalog.CatalogManager;
 import org.apache.flink.table.catalog.CommonCatalogOptions;
 import org.apache.flink.table.catalog.GenericInMemoryCatalog;
 import org.apache.flink.table.catalog.hive.factories.HiveCatalogFactoryOptions;
@@ -43,6 +44,7 @@ import org.apache.gravitino.flink.connector.integration.test.FlinkEnvIT;
 import org.apache.gravitino.flink.connector.store.GravitinoCatalogStoreFactoryOptions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -563,6 +565,53 @@ public abstract class FlinkSupportsSessionCatalogIT extends FlinkEnvIT {
       shadowingEnv.useCatalog(catalogName);
       shadowingEnv.listDatabases();
       shadowingEnv.useCatalog(DEFAULT_CATALOG);
+    } finally {
+      tableEnv.useCatalog(DEFAULT_CATALOG);
+      tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);
+      Assertions.assertFalse(metalake.catalogExists(catalogName));
+    }
+  }
+
+  /**
+   * With shadowing, a session catalog that shadows a Gravitino catalog cannot be altered into a
+   * Gravitino-managed catalog type. The session catalog and the Gravitino catalog must be left
+   * unchanged. {@code ALTER CATALOG} is available since Flink 1.20.
+   */
+  @Test
+  public void testShadowingRejectsAlteringSessionCatalogToGravitinoManagedType() {
+    Assumptions.assumeTrue(
+        Arrays.stream(CatalogManager.class.getMethods())
+            .anyMatch(method -> method.getName().equals("alterCatalog")),
+        "ALTER CATALOG requires Flink 1.20 or later");
+    tableEnv.useCatalog(DEFAULT_CATALOG);
+    String catalogName = "session_it_shadowing_alter_hive";
+    createGravitinoHiveCatalog(catalogName);
+    try {
+      Map<String, String> propertiesBefore = metalake.loadCatalog(catalogName).properties();
+      TableEnvironment shadowingEnv = createTableEnvWithShadowing();
+      shadowingEnv.executeSql(
+          String.format("CREATE CATALOG %s WITH ('type'='generic_in_memory')", catalogName));
+
+      Exception exception =
+          Assertions.assertThrows(
+              Exception.class,
+              () ->
+                  shadowingEnv.executeSql(
+                      String.format(
+                          "ALTER CATALOG %s SET ("
+                              + "'type'='%s',"
+                              + "'hive-conf-dir'='%s',"
+                              + "'hive.metastore.uris'='%s'"
+                              + ")",
+                          catalogName,
+                          GravitinoHiveCatalogFactoryOptions.IDENTIFIER,
+                          hiveConfDir,
+                          hiveMetastoreUri)));
+      Assertions.assertTrue(
+          containsMessage(exception, "already exists in Gravitino"), collectMessages(exception));
+      Assertions.assertInstanceOf(
+          GenericInMemoryCatalog.class, shadowingEnv.getCatalog(catalogName).get());
+      Assertions.assertEquals(propertiesBefore, metalake.loadCatalog(catalogName).properties());
     } finally {
       tableEnv.useCatalog(DEFAULT_CATALOG);
       tableEnv.executeSql("DROP CATALOG IF EXISTS " + catalogName);

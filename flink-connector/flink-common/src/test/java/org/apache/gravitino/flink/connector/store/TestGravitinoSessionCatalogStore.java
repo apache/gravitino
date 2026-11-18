@@ -505,6 +505,40 @@ public class TestGravitinoSessionCatalogStore {
   }
 
   @Test
+  void testShadowing_contains_sessionCatalogShadowingGravitinoCatalog_isRecorded() {
+    GenericInMemoryCatalogStore memoryStore = new GenericInMemoryCatalogStore();
+    GravitinoSessionCatalogStore store = shadowingStore(memoryStore);
+    memoryStore.storeCatalog(SHADOWED_CATALOG, descriptorWithType(SESSION_CATALOG_TYPE));
+    memoryStore.storeCatalog("session_only_catalog", descriptorWithType(SESSION_CATALOG_TYPE));
+    when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);
+
+    // ALTER CATALOG checks the store before Flink instantiates the replacement catalog.
+    Assertions.assertTrue(store.contains(SHADOWED_CATALOG));
+    Assertions.assertThrows(
+        CatalogException.class,
+        () ->
+            GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+                SHADOWED_CATALOG, GRAVITINO_CATALOG_TYPE));
+
+    // A session catalog without a Gravitino catalog of the same name is not recorded.
+    Assertions.assertTrue(store.contains("session_only_catalog"));
+    GravitinoSessionCatalogStore.checkGravitinoManagedCatalogNotShadowing(
+        "session_only_catalog", GRAVITINO_CATALOG_TYPE);
+  }
+
+  @Test
+  void testShadowing_contains_excludedSessionCatalog_neverChecksGravitino() {
+    GenericInMemoryCatalogStore memoryStore = openedMemoryStore();
+    GravitinoSessionCatalogStore store =
+        new GravitinoSessionCatalogStore(
+            gravitinoCatalogStore, memoryStore, ImmutableSet.of(EXCLUDED_CATALOG), true);
+    memoryStore.storeCatalog(EXCLUDED_CATALOG, descriptorWithType(SESSION_CATALOG_TYPE));
+
+    Assertions.assertTrue(store.contains(EXCLUDED_CATALOG));
+    verify(gravitinoCatalogStore, never()).contains(anyString());
+  }
+
+  @Test
   void testShadowing_recordedNameIsClearedByEveryStoreOperation() {
     GravitinoSessionCatalogStore store = shadowingStore(new GenericInMemoryCatalogStore());
     when(gravitinoCatalogStore.contains(SHADOWED_CATALOG)).thenReturn(true);

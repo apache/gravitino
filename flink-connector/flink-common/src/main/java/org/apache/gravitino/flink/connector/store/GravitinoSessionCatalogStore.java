@@ -80,11 +80,13 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoSessionCatalogStore.class);
 
   /**
-   * The name of the Gravitino catalog that {@link #contains(String)} has just reported as absent
-   * because of shadowing. Flink calls {@link #contains(String)} and then, on the same thread,
-   * creates the catalog without calling this store in between. The creation step reads the name to
-   * reject Gravitino-managed catalog types and to log the shadowing. Every other method of this
-   * store clears it, so it never outlives the catalog creation that follows the check.
+   * The name of a Gravitino catalog that {@link #contains(String)} has just found shadowed: either
+   * reported as absent so that a session catalog can take its name, or already shadowed by a
+   * session catalog. Flink calls {@link #contains(String)} and then, on the same thread,
+   * instantiates the catalog for CREATE CATALOG or ALTER CATALOG without calling this store in
+   * between. The instantiation step reads the name to reject Gravitino-managed catalog types, and
+   * {@link #storeCatalog(String, CatalogDescriptor)} reads it to log the shadowing. Every other
+   * method of this store clears it, so it never outlives the operation that follows the check.
    */
   private static final ThreadLocal<String> SHADOWED_GRAVITINO_CATALOG = new ThreadLocal<>();
 
@@ -145,11 +147,12 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   }
 
   /**
-   * Rejects instantiating a Gravitino-managed catalog that would shadow a Gravitino catalog with
-   * the same name. Gravitino catalog factories call this method before they create a catalog,
-   * because Flink may instantiate and register a catalog before it stores the catalog in the
-   * catalog store. Loading an existing Gravitino catalog is not affected, because Flink always
-   * resolves it through {@link #getCatalog(String)} first.
+   * Rejects instantiating a Gravitino-managed catalog under the name of a shadowed Gravitino
+   * catalog, either by CREATE CATALOG or by ALTER CATALOG on the session catalog that shadows it.
+   * Gravitino catalog factories call this method before they create a catalog, because Flink may
+   * instantiate and register a catalog before it stores the catalog in the catalog store. Loading
+   * an existing Gravitino catalog is not affected, because Flink always resolves it through {@link
+   * #getCatalog(String)} first.
    *
    * <p>This method is intended for Gravitino catalog factories only.
    *
@@ -298,6 +301,14 @@ public class GravitinoSessionCatalogStore extends AbstractCatalogStore {
   public boolean contains(String catalogName) throws CatalogException {
     SHADOWED_GRAVITINO_CATALOG.remove();
     if (memoryCatalogStore.contains(catalogName)) {
+      // Flink also checks the store before it replaces a catalog in ALTER CATALOG. Record a
+      // session catalog that shadows a Gravitino catalog, so that it cannot be altered into a
+      // Gravitino-managed catalog that would resolve the shadowed Gravitino catalog.
+      if (sessionCatalogShadowing
+          && !isExcluded(catalogName)
+          && gravitinoCatalogStore.contains(catalogName)) {
+        SHADOWED_GRAVITINO_CATALOG.set(catalogName);
+      }
       return true;
     }
     if (isExcluded(catalogName)) {
