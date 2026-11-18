@@ -150,3 +150,5 @@ class DomainDTO:  # pylint: disable=too-many-instance-attributes
         Precondition.check_argument(
             self._audit is not None, "Domain response must have audit information"
         )
+        if self._backing_tag is not None:
+            self._backing_tag.validate()

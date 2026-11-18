@@ -198,6 +198,10 @@ public class TestDomainOperations extends TestBase {
         200);
     Assertions.assertFalse(original.updateBackingTag(null).backingTag().isPresent());
     Assertions.assertEquals("dept", original.backingTag().get());
+    Domain blankBackingTag =
+        new GenericDomain(
+            dto(NAME, Domain.Status.DRAFT, null, " "), client.restClient(), "metalake");
+    Assertions.assertThrows(IllegalArgumentException.class, blankBackingTag::backingTag);
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> original.properties().put("x", "y"));
   }

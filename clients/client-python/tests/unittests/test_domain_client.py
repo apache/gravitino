@@ -156,6 +156,13 @@ class TestDomainClient(unittest.TestCase):
         self.assertEqual([], domain.relations())
         self.assertIsNone(self._domain(backingTag=None).backing_tag())
 
+    def test_blank_backing_tag_in_response_is_rejected(self):
+        for name in (" ", ""):
+            with self.subTest(name=name):
+                dto = DomainDTO.from_dict(self._dto(backingTag={"name": name}))
+                with self.assertRaises(IllegalArgumentException):
+                    dto.validate()
+
     def test_create_top_level_and_subdomain(self):
         for parent in (None, self.NAME):
             for create, tag in (

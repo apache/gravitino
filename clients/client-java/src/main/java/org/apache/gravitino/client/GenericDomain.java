@@ -96,7 +96,12 @@ class GenericDomain implements Domain {
   /** {@inheritDoc} */
   @Override
   public Optional<String> backingTag() {
-    return Optional.ofNullable(domain.getBackingTag()).map(DomainBackingTagDTO::getName);
+    return Optional.ofNullable(domain.getBackingTag())
+        .map(
+            tag -> {
+              tag.validate();
+              return tag.getName();
+            });
   }
 
   /** {@inheritDoc} */
